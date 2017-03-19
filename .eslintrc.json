@@ -1,0 +1,19 @@
+{
+  "env": {
+    "es6": true,
+    "node": true
+  },
+  "extends": [
+    "eslint:recommended"
+  ],
+  "rules": {
+    "array-bracket-spacing": [ "warn", "always" ],
+    "semi": [ "warn", "always" ],
+    "space-before-blocks": "warn",
+    "block-spacing": "warn",
+    "object-curly-spacing": [ "warn", "always" ],
+    "keyword-spacing": "warn",
+    "curly": "warn",
+    "brace-style": "warn"
+  }
+}

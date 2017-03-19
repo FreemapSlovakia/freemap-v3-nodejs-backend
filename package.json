@@ -3,13 +3,21 @@
   "version": "1.0.0",
   "description": "",
   "main": "index.js",
-  "dependencies": {
-    "express": "^4.15.2",
-    "node-mysql": "^0.4.2"
+  "engines": {
+    "node": "6.x"
   },
-  "devDependencies": {},
+  "dependencies": {
+    "bunyan": "1.8.8",
+    "config": "1.25.1",
+    "express": "4.15.2",
+    "node-mysql": "0.4.2"
+  },
+  "devDependencies": {
+    "eslint": "3.18.0"
+  },
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "node index.js",
+    "watch": "nodemon --watch lib --watch config --watch index.js --watch node_modules index.js"
   },
   "author": "",
   "license": "ISC"

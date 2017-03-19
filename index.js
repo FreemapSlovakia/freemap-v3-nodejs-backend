@@ -1,10 +1,5 @@
-const express = require('express');
-const app = express();
+global.rootRequire = function (name) {
+  return require(__dirname + '/lib/' + name);
+};
 
-app.get('/', function (req, res) {
-  res.send('Hello World!');
-});
-
-app.listen(3000, function () {
-  console.log('Example app listening on port 3000!');
-});
+require('./lib/main.js');
