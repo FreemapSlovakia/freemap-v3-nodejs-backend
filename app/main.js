@@ -22,8 +22,8 @@ app.post('/tracklogs', jsonParser, function (req, res) {
     const filePath = USER_DATA_DIR + '/tracklogs/' + fileUID + '.gpx';
     fs.writeFile(filePath, gpx, (err) => {
       if(err) {
-        // TODO
-        console.log(err)
+        logger.error('failed to save gpx file to '+filePath)
+        logger.error(err)
         res.status(500).send({error: err})
       } else {
         res.status(201).send({uid: fileUID});
