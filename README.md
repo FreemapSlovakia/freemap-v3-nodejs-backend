@@ -1,13 +1,13 @@
 # Freemap 3 API
 
-Freemap 3 API.
+Part of backend for Freemap v3 written in node.js
 
 ## Running in development mode
 
 ```
 sudo npm i -g bunyan
 npm i
-node run watch | bunyan
+npm run-script watch | bunyan
 ```
 
 ## Running in production mode
