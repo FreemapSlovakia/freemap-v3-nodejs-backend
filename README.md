@@ -17,3 +17,11 @@ sudo npm i -g bunyan
 npm i
 NODE_ENV=production node start | bunyan
 ```
+
+## Running tests
+
+```
+sudo npm install -g mocha
+npm i
+mocha test/
+```
