@@ -15,12 +15,30 @@ app.get('/', function (req, res) {
   res.send('Hello World!');
 });
 
+app.get('/tracklogs/:uid', function (req, res) {
+  const fileUID = req.params.uid
+  if(!fileUID.match(/^[a-zA-Z0-9]*$/)){
+    res.status(400).send({error: 'bad uid'})
+  } else {
+    const filePath = USER_DATA_DIR + '/tracklogs/' + fileUID + '.b64.gpx';
+    fs.readFile(filePath, 'utf8', function read(err,  b64gpx) {
+      if (err) {
+        logger.error('failed to read gpx file')
+        logger.error(err)
+        res.status(404).send({error: 'file with such uid not found'})
+      } else {
+        res.status(200).send({uid: fileUID, data: b64gpx, mediaType: 'application/gpx+xml'})
+      }
+    });
+  }
+})
+
 app.post('/tracklogs', jsonParser, function (req, res) {
-  const gpx = req.body.data;
-  if(gpx && gpx.length) {
+  const b64gpx = req.body.data;
+  if(b64gpx && b64gpx.length) {
     const fileUID = uuidBase62.v4();
-    const filePath = USER_DATA_DIR + '/tracklogs/' + fileUID + '.gpx';
-    fs.writeFile(filePath, gpx, (err) => {
+    const filePath = USER_DATA_DIR + '/tracklogs/' + fileUID + '.b64.gpx';
+    fs.writeFile(filePath, b64gpx, (err) => {
       if(err) {
         logger.error('failed to save gpx file to '+filePath)
         logger.error(err)
