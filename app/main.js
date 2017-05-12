@@ -8,8 +8,13 @@ const fs = require('fs');
 const port = config.get('http.port');
 const logger = bunyan.createLogger({ name: 'freemap-api' });
 const app = express();
+const USER_DATA_DIR = './user_data';
 
-const USER_DATA_DIR = './user_data'
+app.use(function(req, res, next) {
+  res.header("Access-Control-Allow-Origin", "*");
+  res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept");
+  next();
+});
 
 app.get('/', function (req, res) {
   res.send('Hello World!');
