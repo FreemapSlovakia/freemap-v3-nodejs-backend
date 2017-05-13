@@ -1,8 +1,8 @@
 const express = require('express');
 const bunyan = require('bunyan');
 const config = require('config');
-const bodyParser = require('body-parser')
-const jsonParser = bodyParser.json({limit: '5mb'})
+const bodyParser = require('body-parser');
+const jsonParser = bodyParser.json({limit: '5mb'});
 const uuidBase62 = require('uuid-base62');
 const fs = require('fs');
 const port = config.get('http.port');
@@ -21,37 +21,35 @@ app.get('/', function (req, res) {
 });
 
 app.get('/tracklogs/:uid', function (req, res) {
-  const fileUID = req.params.uid
-  if(!fileUID.match(/^[a-zA-Z0-9]*$/)){
-    res.status(400).send({error: 'bad uid'})
+  const fileUID = req.params.uid;
+  if (!fileUID.match(/^[a-zA-Z0-9]*$/)) {
+    res.status(400).json({ error: 'bad uid' });
   } else {
     const filePath = USER_DATA_DIR + '/tracklogs/' + fileUID + '.b64.gpx';
     fs.readFile(filePath, 'utf8', function read(err,  b64gpx) {
       if (err) {
-        logger.error('failed to read gpx file')
-        logger.error(err)
-        res.status(404).send({error: 'file with such uid not found'})
+        logger.error({ err }, `Failed to save gpx file to "${filePath}".`);
+        res.status(404).json({ error: 'file with such uid not found' });
       } else {
-        res.status(200).send({uid: fileUID, data: b64gpx, mediaType: 'application/gpx+xml'})
+        res.status(200).json({ uid: fileUID, data: b64gpx, mediaType: 'application/gpx+xml' });
       }
     });
   }
-})
+});
 
 app.post('/tracklogs', jsonParser, function (req, res) {
   const b64gpx = req.body.data;
-  if(b64gpx && b64gpx.length) {
+  if (b64gpx && b64gpx.length) {
     const fileUID = uuidBase62.v4();
     const filePath = USER_DATA_DIR + '/tracklogs/' + fileUID + '.b64.gpx';
     fs.writeFile(filePath, b64gpx, (err) => {
-      if(err) {
-        logger.error('failed to save gpx file to '+filePath)
-        logger.error(err)
-        res.status(500).send({error: err})
+      if (err) {
+        logger.error({ err }, `Failed to save gpx file to "${filePath}".`);
+        res.status(500).json({ error: err });
       } else {
-        res.status(201).send({uid: fileUID});
+        res.status(201).json({ uid: fileUID });
       }
-    })
+    });
   } else {
     res.status(400).send({error: 'no data found in request'});
   }
