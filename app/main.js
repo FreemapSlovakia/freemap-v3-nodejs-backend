@@ -51,7 +51,7 @@ app.post('/tracklogs', jsonParser, function (req, res) {
       }
     });
   } else {
-    res.status(400).send({error: 'no data found in request'});
+    res.status(400).send({ error: 'no data found in request' });
   }
 
 });
