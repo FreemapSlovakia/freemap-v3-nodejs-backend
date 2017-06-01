@@ -2,12 +2,16 @@
 
 Part of backend for Freemap v3 written in node.js
 
+## Requirements
+
+* Node 8
+
 ## Running in development mode
 
 ```
 sudo npm i -g bunyan
 npm i
-npm run-script watch | bunyan
+npm run watch | bunyan
 ```
 
 ## Running in production mode

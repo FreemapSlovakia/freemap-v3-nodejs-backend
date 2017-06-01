@@ -4,26 +4,41 @@
   "description": "",
   "main": "index.js",
   "engines": {
-    "node": "6.x"
+    "node": "8.x"
   },
   "dependencies": {
-    "body-parser": "1.17.1",
-    "bunyan": "1.8.8",
-    "config": "1.25.1",
-    "express": "4.15.2",
+    "ajv": "5.1.5",
+    "body-parser": "1.17.2",
+    "bunyan": "1.8.10",
+    "config": "1.26.1",
+    "express": "4.15.3",
     "node-mysql": "0.4.2",
+    "on-finished": "2.3.0",
     "uuid-base62": "0.1.0"
   },
   "devDependencies": {
+    "babel-eslint": "7.2.3",
     "chai": "3.5.0",
     "chakram": "1.5.0",
-    "eslint": "3.18.0",
+    "eslint": "3.19.0",
+    "eslint-config-airbnb-base": "11.2.0",
+    "eslint-plugin-import": "2.3.0",
     "nodemon": "1.11.0"
   },
   "scripts": {
     "start": "node index.js",
-    "watch": "nodemon --watch lib --watch config --watch index.js --watch node_modules index.js"
+    "watch": "nodemon --watch app --watch config --watch index.js index.js"
   },
-  "author": "",
-  "license": "ISC"
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/FreemapSlovakia/ffreemap-v3-nodejs-backend.git"
+  },
+  "author": {
+    "name": "Freemap Slovakia",
+    "email": "freemap@freemap.sk"
+  },
+  "license": "Apache-2.0",
+  "bugs": {
+    "url": "https://github.com/FreemapSlovakia/ffreemap-v3-nodejs-backend/issues"
+  }
 }

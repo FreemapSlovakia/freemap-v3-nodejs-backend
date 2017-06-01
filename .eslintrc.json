@@ -1,19 +1,39 @@
 {
+  "parser": "babel-eslint",
   "env": {
-    "es6": true,
-    "node": true
+    "commonjs": true,
+    "es6": true
   },
   "extends": [
-    "eslint:recommended"
+    "airbnb-base"
   ],
+  "parserOptions": {
+    "ecmaVersion": 6,
+    "sourceType": "module",
+    "impliedStrict": true,
+    "ecmaFeatures": {
+      "jsx": true
+    }
+  },
   "rules": {
-    "array-bracket-spacing": [ "warn", "always" ],
-    "semi": [ "warn", "always" ],
-    "space-before-blocks": "warn",
-    "block-spacing": "warn",
-    "object-curly-spacing": [ "warn", "always" ],
-    "keyword-spacing": "warn",
-    "curly": "warn",
-    "brace-style": "warn"
+    "import/extensions": 0,
+    "import/no-extraneous-dependencies": 0,
+    "import/no-unresolved": 0,
+    "no-mixed-operators": 0,
+    "global-require": 0,
+    "import/no-dynamic-require": 0,
+    "no-use-before-define": 0,
+    "max-len": 0,
+    "default-case": 1,
+    "new-cap": 1,
+    "no-param-reassign": 1,
+    "no-underscore-dangle": 1,
+    "no-shadow": 1,
+    "no-unused-vars": 1,
+    "new-cap": 0
+  },
+  "globals": {
+    "rootRequire": 1,
+    "rootDir": 1
   }
 }

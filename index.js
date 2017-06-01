@@ -1,5 +1,4 @@
-global.rootRequire = function (name) {
-  return require(__dirname + '/lib/' + name);
-};
+global.rootDir = __dirname;
+global.rootRequire = name => require(`${__dirname}/app/${name}`);
 
 require('./app/main.js');
