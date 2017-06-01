@@ -1,12 +1,23 @@
 const express = require('express');
 const config = require('config');
 const bodyParser = require('body-parser');
+const ebl = require('express-bunyan-logger');
 
 const logger = rootRequire('logger');
 const attachTracklogsHandlers = rootRequire('handlers/tracklogs');
 
+const httpLogger = ebl({
+  logger: logger.child({ module: 'http-server' }),
+  parseUA: false,
+  genReqId() { },
+  excludes: ['user-agent', 'body', 'short-body', 'req-headers', 'res-headers',
+    'req', 'res', 'incoming', 'response-hrtime', 'referer', 'url'],
+});
+
 const port = config.get('http.port');
 const app = express();
+
+app.use(httpLogger);
 
 app.use(bodyParser.json({ limit: '5mb' }));
 
