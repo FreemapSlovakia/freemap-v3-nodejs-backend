@@ -19,7 +19,7 @@ npm run watch | bunyan
 ```
 sudo npm i -g bunyan
 npm i
-NODE_ENV=production node start | bunyan
+NODE_ENV=production npm start | bunyan
 ```
 
 ## Running tests
