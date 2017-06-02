@@ -5,8 +5,8 @@ const checkRequestMiddleware = rootRequire('checkRequestMiddleware');
 
 const { TRACKLOGS_DIR } = rootRequire('routers/tracklogs/constants');
 
-module.exports = function attachGetTracklogHandler(app) {
-  app.all('/:uid',
+module.exports = function attachGetTracklogHandler(router) {
+  router.all('/:uid',
     checkRequestMiddleware({ method: 'GET' }),
     (req, res) => {
       const fileUID = req.params.uid;
@@ -17,9 +17,9 @@ module.exports = function attachGetTracklogHandler(app) {
         fs.readFile(filePath, 'utf8', (err, b64gpx) => {
           if (err) {
             logger.error({ err }, `Error reading file "${filePath}".`);
-            res.status(404);
+            res.status(404).end();
           } else {
-            res.status(200).json({
+            res.json({
               uid: fileUID,
               data: b64gpx,
               mediaType: 'application/gpx+xml',

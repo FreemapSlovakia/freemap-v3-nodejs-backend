@@ -7,8 +7,8 @@ const logger = rootRequire('logger');
 const { TRACKLOGS_DIR } = rootRequire('routers/tracklogs/constants');
 const createTracklogSchema = rootRequire('routers/tracklogs/createTracklogSchema.json');
 
-module.exports = function attachCreateTracklogHandler(app) {
-  app.all(
+module.exports = function attachCreateTracklogHandler(router) {
+  router.all(
     '/',
     checkRequestMiddleware({ method: 'POST', acceptsJson: true, schema: createTracklogSchema }),
     (req, res) => {
@@ -18,7 +18,7 @@ module.exports = function attachCreateTracklogHandler(app) {
       fs.writeFile(filePath, b64gpx, (err) => {
         if (err) {
           logger.error({ err }, `Failed to save gpx file to "${filePath}".`);
-          res.status(500).json({ error: err });
+          res.status(500);
         } else {
           res.status(201).json({ uid: fileUID });
         }
