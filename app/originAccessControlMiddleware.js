@@ -1,8 +1,8 @@
 module.exports = function originAccessControlMiddleware(req, res, next) {
   const origin = req.get('Origin');
 
-  res.header('Access-Control-Allow-Origin', origin);
-  res.header('Vary', 'Origin');
+  res.set('Access-Control-Allow-Origin', origin);
+  res.set('Vary', 'Origin');
 
   if (req.method === 'OPTIONS') {
     res.set('Access-Control-Allow-Headers', 'Authorization, Content-Type, Accept, Accept-Language');

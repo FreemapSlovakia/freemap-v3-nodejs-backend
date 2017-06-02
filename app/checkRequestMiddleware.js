@@ -5,7 +5,7 @@ const ajv = new Ajv();
 module.exports = function checkRequestMiddleware({ method, acceptsJson, schema }) {
   return (req, res, next) => {
     if (method && req.method !== method) {
-      res.status(405).header('Allow', method).end();
+      res.status(405).set('Allow', method).end();
     } else if (acceptsJson && !req.accepts('application/json')) {
       res.status(406).end();
     } else if (schema) {

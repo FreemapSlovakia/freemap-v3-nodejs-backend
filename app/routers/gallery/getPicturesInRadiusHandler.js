@@ -14,8 +14,6 @@ module.exports = function attachGetPicturesInRadiusHandler(router) {
       const lon = parseFloat(lonStr);
       const distance = parseFloat(distanceStr);
 
-	console.log(lat, lon, distance);
-
       if ([lat, lon, distance].some(v => isNaN(v))) {
         res.status(400).json('invalid_query_parameters');
         return;
