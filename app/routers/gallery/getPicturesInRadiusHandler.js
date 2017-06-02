@@ -8,13 +8,15 @@ module.exports = function attachGetPicturesInRadiusHandler(router) {
     checkRequestMiddleware({ method: 'GET' }),
     dbMiddleware,
     (req, res) => {
-      const { latStr, lonStr, distanceStr } = req.query;
+      const { lat: latStr, lon: lonStr, distance: distanceStr } = req.query;
 
       const lat = parseFloat(latStr);
       const lon = parseFloat(lonStr);
       const distance = parseFloat(distanceStr);
 
-      if ([lat, lon, distanceStr].some(v => isNaN(v))) {
+	console.log(lat, lon, distance);
+
+      if ([lat, lon, distance].some(v => isNaN(v))) {
         res.status(400).json('invalid_query_parameters');
         return;
       }
@@ -37,7 +39,7 @@ module.exports = function attachGetPicturesInRadiusHandler(router) {
         (err, rows) => {
           if (err) {
             logger.error({ err }, 'Error selecting pictures.');
-            res.status(500);
+            res.status(500).end();
           } else {
             res.json(rows.map(({ ImagePath, Title, Description, Lat, Lon }) =>
               ({ path: ImagePath, title: Title, description: Description, lat: Lat, lon: Lon })));

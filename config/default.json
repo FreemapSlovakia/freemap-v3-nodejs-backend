@@ -5,7 +5,8 @@
   "mysql": {
     "host": "localhost",
     "port": 3306,
-    "username": "martin",
-    "password": "****"
+    "database": "freemap",
+    "user": "martin",
+    "password": "***"
   }
 }
