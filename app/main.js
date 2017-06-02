@@ -4,7 +4,7 @@ const bodyParser = require('body-parser');
 const ebl = require('express-bunyan-logger');
 
 const logger = rootRequire('logger');
-const attachTracklogsHandlers = rootRequire('handlers/tracklogs');
+const tracklogsRouter = rootRequire('routers/tracklogs');
 
 const httpLogger = ebl({
   logger: logger.child({ module: 'http-server' }),
@@ -36,7 +36,7 @@ app.use((req, res, next) => {
   }
 });
 
-attachTracklogsHandlers(app);
+app.use('/tracklogs', tracklogsRouter);
 
 app.listen(port, () => {
   logger.info(`Freemap v3 API listening on port ${port}.`);
