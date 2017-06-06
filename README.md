@@ -29,3 +29,9 @@ sudo npm install -g mocha
 npm i
 mocha test/
 ```
+
+running single test:
+
+```
+mocha test -g "POST /tracklogs should return uid"
+```
