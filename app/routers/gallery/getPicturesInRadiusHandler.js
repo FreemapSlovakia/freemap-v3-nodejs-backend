@@ -28,7 +28,7 @@ module.exports = function attachGetPicturesInRadiusHandler(router) {
 
       req.db.query(
         `SELECT ${fields},
-          (6371 * acos(cos(radians(?)) * cos(radians(fm_Attachment.Lat)) * cos(radians(fm_Attachment.Lon) - radians(?) ) + sin(radians(?)) * sin(radians(fm_Attachment.Lat)))) AS distance,
+          (6371 * acos(cos(radians(?)) * cos(radians(fm_Attachment.Lat)) * cos(radians(fm_Attachment.Lon) - radians(?) ) + sin(radians(?)) * sin(radians(fm_Attachment.Lat)))) AS distance
           FROM fm_Attachment JOIN fm_User ON UserID = user_id
           WHERE fm_Attachment.Lat BETWEEN ? AND ? AND fm_Attachment.Lon BETWEEN ? AND ?
           HAVING distance <= ?
