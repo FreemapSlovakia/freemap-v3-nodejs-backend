@@ -26,11 +26,11 @@ module.exports = function attachGetPicturesInRadiusHandler(router) {
       const lon2 = lon + distance / Math.abs(Math.cos(lat * Math.PI / 180) * 43);
 
       req.db.query(
-        `SELECT RecordID, Created, ImagePath, Title, Description, Lat, Lon,
-          (6371 * acos(cos(radians(?)) * cos(radians(Lat)) * cos(radians(Lon) - radians(?) ) + sin(radians(?)) * sin(radians(Lat)))) AS distance,
+        `SELECT RecordID, fm_Attachment.Created AS created, ImagePath, Title, Description, fm_Attachment.Lat as lat, fm_Attachment.Lon AS lon,
+          (6371 * acos(cos(radians(?)) * cos(radians(fm_Attachment.Lat)) * cos(radians(fm_Attachment.Lon) - radians(?) ) + sin(radians(?)) * sin(radians(fm_Attachment.Lat)))) AS distance,
           nickname
           FROM fm_Attachment JOIN fm_User ON UserID = user_id
-          WHERE Lat BETWEEN ? AND ? AND Lon BETWEEN ? AND ?
+          WHERE fm_Attachment.Lat BETWEEN ? AND ? AND fm_Attachment.Lon BETWEEN ? AND ?
           HAVING distance <= ?
           ORDER BY distance
           LIMIT 10`,
@@ -40,14 +40,14 @@ module.exports = function attachGetPicturesInRadiusHandler(router) {
             logger.error({ err }, 'Error selecting pictures.');
             res.status(500).end();
           } else {
-            res.json(rows.map(({ RecordID, Created, ImagePath, Title, Description, Lat, Lon, nickname }) => ({
+            res.json(rows.map(({ RecordID, created, ImagePath, Title, Description, lat, lon, nickname }) => ({
               id: RecordID,
-              createdAt: Created.toISOString(),
+              createdAt: created.toISOString(),
               path: ImagePath,
               title: Title,
               description: Description,
-              lat: Lat,
-              lon: Lon,
+              lat,
+              lon,
               author: nickname,
             })));
           }
