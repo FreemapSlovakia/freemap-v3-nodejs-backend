@@ -33,7 +33,7 @@ module.exports = function attachGetPicturesInRadiusHandler(router) {
           WHERE fm_Attachment.Lat BETWEEN ? AND ? AND fm_Attachment.Lon BETWEEN ? AND ?
           HAVING distance <= ?
           ORDER BY distance
-          LIMIT 10`,
+          LIMIT 50`,
         [lat, lon, lat, lat1, lat2, lon1, lon2, distance],
         (err, rows) => {
           if (err) {
