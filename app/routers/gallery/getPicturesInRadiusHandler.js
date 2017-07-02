@@ -1,6 +1,7 @@
 const { dbMiddleware } = rootRequire('database');
 const checkRequestMiddleware = rootRequire('checkRequestMiddleware');
 const logger = rootRequire('logger');
+const { fromDb, fields } = rootRequire('routers/gallery/galleryCommons');
 
 module.exports = function attachGetPicturesInRadiusHandler(router) {
   router.all(
@@ -26,9 +27,8 @@ module.exports = function attachGetPicturesInRadiusHandler(router) {
       const lon2 = lon + distance / Math.abs(Math.cos(lat * Math.PI / 180) * 43);
 
       req.db.query(
-        `SELECT RecordID, fm_Attachment.Created AS created, ImagePath, Title, Description, fm_Attachment.Lat as lat, fm_Attachment.Lon AS lon,
+        `SELECT ${fields},
           (6371 * acos(cos(radians(?)) * cos(radians(fm_Attachment.Lat)) * cos(radians(fm_Attachment.Lon) - radians(?) ) + sin(radians(?)) * sin(radians(fm_Attachment.Lat)))) AS distance,
-          nickname
           FROM fm_Attachment JOIN fm_User ON UserID = user_id
           WHERE fm_Attachment.Lat BETWEEN ? AND ? AND fm_Attachment.Lon BETWEEN ? AND ?
           HAVING distance <= ?
@@ -40,16 +40,7 @@ module.exports = function attachGetPicturesInRadiusHandler(router) {
             logger.error({ err }, 'Error selecting pictures.');
             res.status(500).end();
           } else {
-            res.json(rows.map(({ RecordID, created, ImagePath, Title, Description, lat, lon, nickname }) => ({
-              id: RecordID,
-              createdAt: created.toISOString(),
-              path: ImagePath,
-              title: Title,
-              description: Description,
-              lat,
-              lon,
-              author: nickname,
-            })));
+            res.json(rows.map(row => fromDb(row)));
           }
         },
       );
