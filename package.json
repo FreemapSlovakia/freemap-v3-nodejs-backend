@@ -7,7 +7,7 @@
     "node": "8.x"
   },
   "dependencies": {
-    "ajv": "5.1.5",
+    "ajv": "5.2.2",
     "body-parser": "1.17.2",
     "bunyan": "1.8.10",
     "config": "1.26.1",
@@ -16,6 +16,8 @@
     "node-mysql": "0.4.2",
     "on-finished": "2.3.0",
     "process-nextick-args": "1.0.7",
+    "querystring": "0.2.0",
+    "request": "2.81.0",
     "uuid-base62": "0.1.0"
   },
   "devDependencies": {
