@@ -8,5 +8,10 @@
     "database": "freemap",
     "user": "martin",
     "password": "***"
+  },
+  "oauth": {
+    "consumerKey": "XsCiIfvjfhS6iBNR30H29ymmgRYAb3j98kjOyCUu",
+    "consumerSecret": "eASOhF36wPcsRXPMS7baat26KCX2TsL2UHK7qAWV",
+    "callback": "http://localhost:8080/authCallback.html"
   }
 }

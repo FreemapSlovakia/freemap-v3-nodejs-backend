@@ -8,6 +8,7 @@ const httpLoggerMiddleware = rootRequire('httpLoggerMiddleware');
 
 const tracklogsRouter = rootRequire('routers/tracklogs');
 const galleryRouter = rootRequire('routers/gallery');
+const authRouter = rootRequire('routers/auth');
 
 const app = express();
 
@@ -19,6 +20,7 @@ app.use(bodyParser.json({ limit: '5mb' }));
 
 app.use('/tracklogs', tracklogsRouter);
 app.use('/gallery', galleryRouter);
+app.use('/auth', authRouter);
 
 app.use((req, res) => {
   res.status(404).json({ error: 'no_such_handler' });
