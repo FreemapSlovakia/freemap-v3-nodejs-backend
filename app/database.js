@@ -28,10 +28,11 @@ function initDatabase(mainCb) {
   const scripts = [
     `CREATE TABLE IF NOT EXISTS user (
       userId INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-      email VARCHAR(255) CHARSET utf8 COLLATE utf8_general_ci NULL UNIQUE,
+      name VARCHAR(255) CHARSET utf8 COLLATE utf8_general_ci NOT NULL,
       createdAt TIMESTAMP NOT NULL,
       lastLoginAt TIMESTAMP NULL,
       authToken VARCHAR(255) CHARSET utf8 COLLATE utf8_bin NULL UNIQUE,
+      osmId INT UNSIGNED NULL UNIQUE,
       osmAuthToken VARCHAR(255) CHARSET utf8 COLLATE utf8_bin NULL UNIQUE
     ) ENGINE=InnoDB`,
   ];
@@ -48,4 +49,17 @@ function initDatabase(mainCb) {
   });
 }
 
-module.exports = { pool, dbMiddleware, initDatabase };
+function runWithDatabaseConnection(fn, cb) {
+  pool.getConnection((err, db) => {
+    if (err) {
+      cb(err);
+    } else {
+      fn(db, (...args) => {
+        db.release();
+        cb(...args);
+      });
+    }
+  });
+}
+
+module.exports = { pool, dbMiddleware, initDatabase, runWithDatabaseConnection };

@@ -6,6 +6,7 @@ const { parseString } = require('xml2js');
 const consumerKey = config.get('oauth.consumerKey');
 const consumerSecret = config.get('oauth.consumerSecret');
 
+const runWithDatabaseConnection = require('~/database');
 const checkRequestMiddleware = require('~/checkRequestMiddleware');
 const logger = require('~/logger');
 
@@ -60,9 +61,29 @@ function next(res, permData) {
             logger.error({ err: err1 }, 'Error parsing response XML.');
             res.status(500).end();
           } else {
-            res.json(result);
+            saveUser(res, result);
           }
         });
+      }
+    },
+  );
+}
+
+function saveUser(res, result) {
+  runWithDatabaseConnection(
+    (cb) => {
+      // result.osm.user[0].$.display_name;
+      // result.osm.user[0].$.id;
+      // result.osm.home[0].$.lat;
+      // result.osm.home[0].$.lon;
+      cb();
+    },
+    (err) => {
+      if (err) {
+        logger.error({ err }, 'Error (DB).');
+        res.status(500).end();
+      } else {
+        res.json(result);
       }
     },
   );
