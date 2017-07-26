@@ -31,7 +31,7 @@ module.exports = function attachLoginHandler(router) {
             const reqData = qs.parse(body);
             global.oauth_token_secret = reqData.oauth_token_secret; // TODO store to DB under session
             res.json({
-              redirect: `http://www.openstreetmap.org/oauth/authorize?${qs.stringify({ oauth_token: reqData.oauth_token })}`
+              redirect: `http://www.openstreetmap.org/oauth/authorize?${qs.stringify({ oauth_token: reqData.oauth_token })}`,
             });
           }
         },
