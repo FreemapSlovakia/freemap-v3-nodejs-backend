@@ -1,6 +1,7 @@
 const request = require('request');
 const qs = require('querystring');
 const config = require('config');
+const { parseString } = require('xml2js');
 
 const consumerKey = config.get('oauth.consumerKey');
 const consumerSecret = config.get('oauth.consumerSecret');
@@ -54,7 +55,14 @@ function next(res, permData) {
         logger.error({ err }, 'Error fetching request token.');
         res.status(500).end();
       } else {
-        res.json(body); // TODO pase XML, store to DB, ...
+        parseString(body, (err1, result) => {
+          if (err1) {
+            logger.error({ err: err1 }, 'Error parsing response XML.');
+            res.status(500).end();
+          } else {
+            res.json(result);
+          }
+        });
       }
     },
   );

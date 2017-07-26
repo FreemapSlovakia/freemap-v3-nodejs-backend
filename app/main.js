@@ -5,6 +5,7 @@ const bodyParser = require('body-parser');
 const logger = rootRequire('logger');
 const originAccessControlMiddleware = rootRequire('originAccessControlMiddleware');
 const httpLoggerMiddleware = rootRequire('httpLoggerMiddleware');
+const { initDatabase } = rootRequire('database');
 
 const tracklogsRouter = rootRequire('routers/tracklogs');
 const galleryRouter = rootRequire('routers/gallery');
@@ -26,7 +27,13 @@ app.use((req, res) => {
   res.status(404).json({ error: 'no_such_handler' });
 });
 
-const port = config.get('http.port');
-app.listen(port, () => {
-  logger.info(`Freemap v3 API listening on port ${port}.`);
+initDatabase((err) => {
+  if (err) {
+    logger.fatal({ err }, 'Error initializing database.');
+  } else {
+    const port = config.get('http.port');
+    app.listen(port, () => {
+      logger.info(`Freemap v3 API listening on port ${port}.`);
+    });
+  }
 });

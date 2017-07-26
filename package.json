@@ -8,6 +8,7 @@
   },
   "dependencies": {
     "ajv": "5.2.2",
+    "async": "2.5.0",
     "body-parser": "1.17.2",
     "bunyan": "1.8.10",
     "config": "1.26.1",
@@ -18,7 +19,9 @@
     "process-nextick-args": "1.0.7",
     "querystring": "0.2.0",
     "request": "2.81.0",
-    "uuid-base62": "0.1.0"
+    "uuid-base62": "0.1.0",
+    "verror": "1.10.0",
+    "xml2js": "0.4.17"
   },
   "devDependencies": {
     "babel-eslint": "7.2.3",

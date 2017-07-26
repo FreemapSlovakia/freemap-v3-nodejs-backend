@@ -6,8 +6,8 @@
     "host": "localhost",
     "port": 3306,
     "database": "freemap",
-    "user": "martin",
-    "password": "***"
+    "user": "freemap",
+    "password": "freemap"
   },
   "oauth": {
     "consumerKey": "XsCiIfvjfhS6iBNR30H29ymmgRYAb3j98kjOyCUu",
