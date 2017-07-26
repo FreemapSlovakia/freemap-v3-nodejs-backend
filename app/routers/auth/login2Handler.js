@@ -6,8 +6,8 @@ const { parseString } = require('xml2js');
 const consumerKey = config.get('oauth.consumerKey');
 const consumerSecret = config.get('oauth.consumerSecret');
 
-const checkRequestMiddleware = rootRequire('checkRequestMiddleware');
-const logger = rootRequire('logger');
+const checkRequestMiddleware = require('~/checkRequestMiddleware');
+const logger = require('~/logger');
 
 module.exports = function attachLogin2Handler(router) {
   router.all(

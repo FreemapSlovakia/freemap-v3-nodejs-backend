@@ -2,14 +2,14 @@ const express = require('express');
 const config = require('config');
 const bodyParser = require('body-parser');
 
-const logger = rootRequire('logger');
-const originAccessControlMiddleware = rootRequire('originAccessControlMiddleware');
-const httpLoggerMiddleware = rootRequire('httpLoggerMiddleware');
-const { initDatabase } = rootRequire('database');
+const logger = require('~/logger');
+const originAccessControlMiddleware = require('~/originAccessControlMiddleware');
+const httpLoggerMiddleware = require('~/httpLoggerMiddleware');
+const { initDatabase } = require('~/database');
 
-const tracklogsRouter = rootRequire('routers/tracklogs');
-const galleryRouter = rootRequire('routers/gallery');
-const authRouter = rootRequire('routers/auth');
+const tracklogsRouter = require('~/routers/tracklogs');
+const galleryRouter = require('~/routers/gallery');
+const authRouter = require('~/routers/auth');
 
 const app = express();
 

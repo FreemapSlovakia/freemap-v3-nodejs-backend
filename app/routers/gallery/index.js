@@ -1,7 +1,7 @@
 const express = require('express');
 
-const attachGetPicturesInRadiusHandler = rootRequire('routers/gallery/getPicturesInRadiusHandler');
-const attachGetPictureHandler = rootRequire('routers/gallery/getPictureHandler');
+const attachGetPicturesInRadiusHandler = require('~/routers/gallery/getPicturesInRadiusHandler');
+const attachGetPictureHandler = require('~/routers/gallery/getPictureHandler');
 
 const router = express.Router();
 

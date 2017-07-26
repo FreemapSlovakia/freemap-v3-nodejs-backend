@@ -1,7 +1,7 @@
-const { dbMiddleware } = rootRequire('database');
-const checkRequestMiddleware = rootRequire('checkRequestMiddleware');
-const logger = rootRequire('logger');
-const { fromDb, fields } = rootRequire('routers/gallery/galleryCommons');
+const { dbMiddleware } = require('~/database');
+const checkRequestMiddleware = require('~/checkRequestMiddleware');
+const logger = require('~/logger');
+const { fromDb, fields } = require('~/routers/gallery/galleryCommons');
 
 module.exports = function attachGetPicturesInRadiusHandler(router) {
   router.all(

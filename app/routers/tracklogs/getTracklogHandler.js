@@ -1,9 +1,9 @@
 const fs = require('fs');
 
-const logger = rootRequire('logger');
-const checkRequestMiddleware = rootRequire('checkRequestMiddleware');
+const logger = require('~/logger');
+const checkRequestMiddleware = require('~/checkRequestMiddleware');
 
-const { TRACKLOGS_DIR } = rootRequire('routers/tracklogs/constants');
+const { TRACKLOGS_DIR } = require('~/routers/tracklogs/constants');
 
 module.exports = function attachGetTracklogHandler(router) {
   router.all('/:uid',

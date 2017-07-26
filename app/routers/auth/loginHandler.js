@@ -6,8 +6,8 @@ const consumerKey = config.get('oauth.consumerKey');
 const consumerSecret = config.get('oauth.consumerSecret');
 const callback = config.get('oauth.callback');
 
-const checkRequestMiddleware = rootRequire('checkRequestMiddleware');
-const logger = rootRequire('logger');
+const checkRequestMiddleware = require('~/checkRequestMiddleware');
+const logger = require('~/logger');
 
 module.exports = function attachLoginHandler(router) {
   router.all(

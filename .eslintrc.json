@@ -16,24 +16,11 @@
     }
   },
   "rules": {
-    "import/extensions": 0,
-    "import/no-extraneous-dependencies": 0,
-    "import/no-unresolved": 0,
     "no-mixed-operators": 0,
-    "global-require": 0,
-    "import/no-dynamic-require": 0,
     "no-use-before-define": 0,
-    "max-len": 0,
-    "default-case": 1,
-    "new-cap": 1,
-    "no-param-reassign": 1,
-    "no-underscore-dangle": 1,
-    "no-shadow": 1,
-    "no-unused-vars": 1,
-    "new-cap": 0
+    "max-len": 0
   },
-  "globals": {
-    "rootRequire": 1,
-    "rootDir": 1
+  "settings": {
+    "import/resolver": "babel-root-import"
   }
 }

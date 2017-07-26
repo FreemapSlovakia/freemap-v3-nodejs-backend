@@ -1,7 +1,7 @@
 const express = require('express');
 
-const attachCreateTracklogHandler = rootRequire('routers/tracklogs/createTracklogHandler');
-const attachGetTracklogHandler = rootRequire('routers/tracklogs/getTracklogHandler');
+const attachCreateTracklogHandler = require('~/routers/tracklogs/createTracklogHandler');
+const attachGetTracklogHandler = require('~/routers/tracklogs/getTracklogHandler');
 
 const router = express.Router();
 

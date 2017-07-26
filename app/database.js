@@ -3,7 +3,7 @@ const mysql = require('mysql');
 const onFinished = require('on-finished');
 const each = require('async/each');
 
-const logger = rootRequire('logger');
+const logger = require('~/logger');
 
 const pool = mysql.createPool(config.get('mysql'));
 const VError = require('verror');

@@ -1,11 +1,11 @@
 const uuidBase62 = require('uuid-base62');
 const fs = require('fs');
 
-const checkRequestMiddleware = rootRequire('checkRequestMiddleware');
-const logger = rootRequire('logger');
+const checkRequestMiddleware = require('~/checkRequestMiddleware');
+const logger = require('~/logger');
 
-const { TRACKLOGS_DIR } = rootRequire('routers/tracklogs/constants');
-const createTracklogSchema = rootRequire('routers/tracklogs/createTracklogSchema.json');
+const { TRACKLOGS_DIR } = require('~/routers/tracklogs/constants');
+const createTracklogSchema = require('~/routers/tracklogs/createTracklogSchema.json');
 
 module.exports = function attachCreateTracklogHandler(router) {
   router.all(
