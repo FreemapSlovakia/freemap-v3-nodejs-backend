@@ -1,32 +1,32 @@
 const fs = require('fs');
-
-const logger = require('~/logger');
-const checkRequestMiddleware = require('~/checkRequestMiddleware');
-
+const { promisify } = require('util');
 const { TRACKLOGS_DIR } = require('~/routers/tracklogs/constants');
 
+const readFileAsync = promisify(fs.readFile);
+const existsAsync = promisify(fs.exists);
+
 module.exports = function attachGetTracklogHandler(router) {
-  router.all('/:uid',
-    checkRequestMiddleware({ method: 'GET' }),
-    (req, res) => {
-      const fileUID = req.params.uid;
+  router.get('/:uid',
+    async (ctx) => {
+      const fileUID = ctx.params.uid;
       if (!fileUID.match(/^[a-zA-Z0-9]*$/)) {
-        res.status(400).json({ error: 'invalid_uid' });
-      } else {
-        const filePath = `${TRACKLOGS_DIR}/${fileUID}.b64.gpx`;
-        fs.readFile(filePath, 'utf8', (err, b64gpx) => {
-          if (err) {
-            logger.error({ err }, `Error reading file "${filePath}".`);
-            res.status(404).end();
-          } else {
-            res.json({
-              uid: fileUID,
-              data: b64gpx,
-              mediaType: 'application/gpx+xml',
-            });
-          }
-        });
+        ctx.status = 400;
+        return;
       }
+
+      const filePath = `${TRACKLOGS_DIR}/${fileUID}.b64.gpx`;
+      if (!await existsAsync(filePath)) {
+        ctx.status = 404;
+        return;
+      }
+
+      const b64gpx = await readFileAsync(filePath, 'utf8');
+
+      ctx.body = {
+        uid: fileUID,
+        data: b64gpx,
+        mediaType: 'application/gpx+xml',
+      };
     },
   );
 };

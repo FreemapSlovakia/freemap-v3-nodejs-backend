@@ -1,22 +1,19 @@
 const { dbMiddleware } = require('~/database');
-const checkRequestMiddleware = require('~/checkRequestMiddleware');
-const logger = require('~/logger');
 const { fromDb, fields } = require('~/routers/gallery/galleryCommons');
 
 module.exports = function attachGetPicturesInRadiusHandler(router) {
-  router.all(
+  router.get(
     '/pictures',
-    checkRequestMiddleware({ method: 'GET' }),
     dbMiddleware,
-    (req, res) => {
-      const { lat: latStr, lon: lonStr, distance: distanceStr } = req.query;
+    async (ctx) => {
+      const { lat: latStr, lon: lonStr, distance: distanceStr } = ctx.query;
 
       const lat = parseFloat(latStr);
       const lon = parseFloat(lonStr);
       const distance = parseFloat(distanceStr);
 
       if ([lat, lon, distance].some(v => isNaN(v))) {
-        res.status(400).json('invalid_query_parameters');
+        ctx.status = 400;
         return;
       }
 
@@ -26,7 +23,7 @@ module.exports = function attachGetPicturesInRadiusHandler(router) {
       const lon1 = lon - distance / Math.abs(Math.cos(lat * Math.PI / 180) * 43);
       const lon2 = lon + distance / Math.abs(Math.cos(lat * Math.PI / 180) * 43);
 
-      req.db.query(
+      const rows = await ctx.state.db.query(
         `SELECT ${fields},
           (6371 * acos(cos(radians(?)) * cos(radians(fm_Attachment.Lat)) * cos(radians(fm_Attachment.Lon) - radians(?) ) + sin(radians(?)) * sin(radians(fm_Attachment.Lat)))) AS distance
           FROM fm_Attachment JOIN fm_User ON UserID = user_id
@@ -35,15 +32,9 @@ module.exports = function attachGetPicturesInRadiusHandler(router) {
           ORDER BY distance
           LIMIT 50`,
         [lat, lon, lat, lat1, lat2, lon1, lon2, distance],
-        (err, rows) => {
-          if (err) {
-            logger.error({ err }, 'Error selecting pictures.');
-            res.status(500).end();
-          } else {
-            res.json(rows.map(row => fromDb(row)));
-          }
-        },
       );
+
+      ctx.body = rows.map(row => fromDb(row));
     },
   );
 };

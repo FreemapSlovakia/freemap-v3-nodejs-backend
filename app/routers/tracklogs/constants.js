@@ -1,3 +1,3 @@
 module.exports = {
-  TRACKLOGS_DIR: `${__dirname}/user_data/tracklogs`,
+  TRACKLOGS_DIR: `${__dirname}/../../../user_data/tracklogs`,
 };

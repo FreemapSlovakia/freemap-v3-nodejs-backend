@@ -1,4 +1,4 @@
-const request = require('request');
+const rp = require('request-promise-native');
 const qs = require('querystring');
 const config = require('config');
 
@@ -6,36 +6,24 @@ const consumerKey = config.get('oauth.consumerKey');
 const consumerSecret = config.get('oauth.consumerSecret');
 const callback = config.get('oauth.callback');
 
-const checkRequestMiddleware = require('~/checkRequestMiddleware');
-const logger = require('~/logger');
-
 module.exports = function attachLoginHandler(router) {
-  router.all(
+  router.post(
     '/login',
-    checkRequestMiddleware({ method: 'POST' }),
-    (req, res) => {
-      request.post(
-        {
-          url: 'http://www.openstreetmap.org/oauth/request_token',
-          oauth: {
-            callback,
-            consumer_key: consumerKey,
-            consumer_secret: consumerSecret,
-          },
+    async (ctx) => {
+      const body = await rp.post({
+        url: 'http://www.openstreetmap.org/oauth/request_token',
+        oauth: {
+          callback,
+          consumer_key: consumerKey,
+          consumer_secret: consumerSecret,
         },
-        (err, _, body) => {
-          if (err) {
-            logger.error({ err }, 'Error fetching request token.');
-            res.status(500).end();
-          } else {
-            const reqData = qs.parse(body);
-            global.oauth_token_secret = reqData.oauth_token_secret; // TODO store to DB under session
-            res.json({
-              redirect: `http://www.openstreetmap.org/oauth/authorize?${qs.stringify({ oauth_token: reqData.oauth_token })}`,
-            });
-          }
-        },
-      );
+      });
+
+      const reqData = qs.parse(body);
+      global.oauth_token_secret = reqData.oauth_token_secret; // TODO store to DB under session
+      ctx.body = {
+        redirect: `http://www.openstreetmap.org/oauth/authorize?${qs.stringify({ oauth_token: reqData.oauth_token })}`,
+      };
     },
   );
 };

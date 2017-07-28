@@ -1,9 +1,9 @@
-const express = require('express');
+const Router = require('koa-router');
 
 const attachGetPicturesInRadiusHandler = require('~/routers/gallery/getPicturesInRadiusHandler');
 const attachGetPictureHandler = require('~/routers/gallery/getPictureHandler');
 
-const router = express.Router();
+const router = new Router();
 
 attachGetPicturesInRadiusHandler(router);
 attachGetPictureHandler(router);

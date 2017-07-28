@@ -1,9 +1,9 @@
-const express = require('express');
+const Router = require('koa-router');
 
 const attachCreateTracklogHandler = require('~/routers/tracklogs/createTracklogHandler');
 const attachGetTracklogHandler = require('~/routers/tracklogs/getTracklogHandler');
 
-const router = express.Router();
+const router = new Router();
 
 attachCreateTracklogHandler(router);
 attachGetTracklogHandler(router);
