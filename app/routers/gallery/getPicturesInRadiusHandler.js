@@ -11,9 +11,9 @@ module.exports = function attachGetPicturesInRadiusHandler(router) {
       distance: parseFloat,
     }),
     queryValidator({
-      lat: v => v >= -90 && v <= 90,
-      lon: v => v >= -180 && v <= 180,
-      distance: v => v > 0,
+      lat: v => v >= -90 && v <= 90 || 'lat must be between -90 and 90',
+      lon: v => v >= -180 && v <= 180 || 'lon must be between -180 and 180',
+      distance: v => v > 0 || 'distance must be positive',
     }),
     dbMiddleware,
     async (ctx) => {
