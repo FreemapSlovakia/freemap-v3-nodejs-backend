@@ -9,7 +9,7 @@ module.exports = function attachGetTracklogHandler(router) {
   router.get('/:uid',
     async (ctx) => {
       const fileUID = ctx.params.uid;
-      if (!fileUID.match(/^[a-zA-Z0-9]*$/)) {
+      if (!/^[a-zA-Z0-9]*$/.test(fileUID)) {
         ctx.status = 404;
         return;
       }
