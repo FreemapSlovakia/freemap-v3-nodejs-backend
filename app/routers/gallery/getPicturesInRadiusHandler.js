@@ -1,21 +1,23 @@
 const { dbMiddleware } = require('~/database');
 const { fromDb, fields } = require('~/routers/gallery/galleryCommons');
+const { queryValidator, queryAdapter } = require('~/requestValidators');
 
 module.exports = function attachGetPicturesInRadiusHandler(router) {
   router.get(
     '/pictures',
+    queryAdapter({
+      lat: parseFloat,
+      lon: parseFloat,
+      distance: parseFloat,
+    }),
+    queryValidator({
+      lat: v => v >= -90 && v <= 90,
+      lon: v => v >= -180 && v <= 180,
+      distance: v => v > 0,
+    }),
     dbMiddleware,
     async (ctx) => {
-      const { lat: latStr, lon: lonStr, distance: distanceStr } = ctx.query;
-
-      const lat = parseFloat(latStr);
-      const lon = parseFloat(lonStr);
-      const distance = parseFloat(distanceStr);
-
-      if ([lat, lon, distance].some(v => isNaN(v))) {
-        ctx.status = 400;
-        return;
-      }
+      const { lat, lon, distance } = ctx.query;
 
       // cca 1 degree
       const lat1 = lat - (distance / 43);
