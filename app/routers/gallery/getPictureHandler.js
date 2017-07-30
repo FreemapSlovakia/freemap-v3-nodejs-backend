@@ -1,13 +1,16 @@
 const { dbMiddleware } = require('~/database');
 const { fromDb, fields } = require('~/routers/gallery/galleryCommons');
+const { acceptValidator } = require('~/requestValidators');
+
 
 module.exports = function attachGetPicturesInRadiusHandler(router) {
   router.get(
     '/picture/:id',
+    acceptValidator('application/json'),
     dbMiddleware,
     async (ctx) => {
       const rows = await ctx.state.db.query(
-        `SELECT ${fields} FROM fm_Attachment JOIN fm_User ON UserID = user_id WHERE RecordID = ?`,
+        `SELECT ${fields} FROM picture LEFT JOIN user ON userId = user.id WHERE picture.id = ?`,
         [ctx.params.id],
       );
 

@@ -15,7 +15,7 @@ function queryValidator(spec) {
     const errors = [];
     Object.keys(spec).forEach((key) => {
       const msg = spec[key](ctx.query[key]);
-      if (msg) {
+      if (msg && typeof msg === 'string') {
         errors.push(key in ctx.query ? `invalid parameter ${key}: ${msg}` : `missing parameter ${key}`);
       }
     });

@@ -1,18 +1,20 @@
-function fromDb({ RecordID, created, ImagePath, Title, Description, lat, lon, nickname }) {
+function fromDb({ pictureId, createdAt, pathname, title, description, lat, lon, userId, name }) {
   return {
-    id: RecordID,
-    createdAt: created.toISOString(),
-    path: ImagePath,
-    title: Title,
-    description: Description,
+    id: pictureId,
+    createdAt: createdAt.toISOString(),
+    pathname,
+    title,
+    description,
     lat,
     lon,
-    author: nickname,
+    user: userId && {
+      id: userId,
+      name,
+    },
   };
 }
 
 module.exports = {
   fromDb,
-  fields: 'RecordID, fm_Attachment.Created AS created, ImagePath, '
-    + 'Title, Description, fm_Attachment.Lat as lat, fm_Attachment.Lon AS lon, nickname',
+  fields: 'picture.id AS pictureId, picture.createdAt, pathname, title, description, picture.lat, picture.lon, user.id as userId, user.name',
 };

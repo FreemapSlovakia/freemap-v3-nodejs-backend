@@ -1,10 +1,11 @@
 const { dbMiddleware } = require('~/database');
 const { fromDb, fields } = require('~/routers/gallery/galleryCommons');
-const { queryValidator, queryAdapter } = require('~/requestValidators');
+const { acceptValidator, queryValidator, queryAdapter } = require('~/requestValidators');
 
 module.exports = function attachGetPicturesInRadiusHandler(router) {
   router.get(
     '/pictures',
+    acceptValidator('application/json'),
     queryAdapter({
       lat: parseFloat,
       lon: parseFloat,
@@ -27,9 +28,9 @@ module.exports = function attachGetPicturesInRadiusHandler(router) {
 
       const rows = await ctx.state.db.query(
         `SELECT ${fields},
-          (6371 * acos(cos(radians(?)) * cos(radians(fm_Attachment.Lat)) * cos(radians(fm_Attachment.Lon) - radians(?) ) + sin(radians(?)) * sin(radians(fm_Attachment.Lat)))) AS distance
-          FROM fm_Attachment JOIN fm_User ON UserID = user_id
-          WHERE fm_Attachment.Lat BETWEEN ? AND ? AND fm_Attachment.Lon BETWEEN ? AND ?
+          (6371 * acos(cos(radians(?)) * cos(radians(picture.lat)) * cos(radians(picture.lon) - radians(?) ) + sin(radians(?)) * sin(radians(picture.lat)))) AS distance
+          FROM picture JOIN user ON userId = user.id
+          WHERE picture.lat BETWEEN ? AND ? AND picture.lon BETWEEN ? AND ?
           HAVING distance <= ?
           ORDER BY distance
           LIMIT 50`,
