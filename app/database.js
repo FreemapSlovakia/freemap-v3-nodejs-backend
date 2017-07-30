@@ -20,7 +20,7 @@ async function initDatabase() {
       name VARCHAR(255) CHARSET utf8 COLLATE utf8_general_ci NOT NULL,
       createdAt TIMESTAMP NOT NULL,
       lat FLOAT(8, 6) NULL,
-      lon FLOAT(9, 6) NULL,
+      lon FLOAT(9, 6) NULL
     ) ENGINE=InnoDB`,
 
     `CREATE TABLE IF NOT EXISTS auth (
@@ -40,7 +40,7 @@ async function initDatabase() {
       description VARCHAR(4096) CHARSET utf8 COLLATE utf8_general_ci NULL,
       createdAt TIMESTAMP NOT NULL,
       lat FLOAT(8, 6) NULL,
-      lon FLOAT(9, 6) NULL,
+      lon FLOAT(9, 6) NULL
     ) ENGINE=InnoDB`,
   ];
 

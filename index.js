@@ -1,5 +1,7 @@
 const Module = require('module');
 
+global.rootDir = __dirname;
+
 const originalRequire = Module.prototype.require;
 
 Module.prototype.require = function require(id) {

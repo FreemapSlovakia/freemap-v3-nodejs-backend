@@ -9,6 +9,7 @@ const callback = config.get('oauth.callback');
 module.exports = function attachLoginHandler(router) {
   router.post(
     '/login',
+    // TODO validation
     async (ctx) => {
       const body = await rp.post({
         url: 'http://www.openstreetmap.org/oauth/request_token',
@@ -27,35 +28,3 @@ module.exports = function attachLoginHandler(router) {
     },
   );
 };
-
-// request.post(
-//   {
-//     url: 'http://www.openstreetmap.org/oauth/access_token',
-//     oauth: {
-//       consumer_key: consumerKey,
-//       consumer_secret: consumerSecret,
-//       token: 'wQLq4546d8Bl6agAxEI5YKGaRNloP6HEfEIy9iiT',
-//       token_secret: 'SGcgegjLLnHbQiRqyNfGUFTOcNnkLzIK2zLUAcDH',
-//       verifier: 'uq3mEBCxwRxwYb9WjmT6',
-//     },
-//   },
-//   (e, r, body) => {
-//     const permData = qs.parse(body);
-//     console.log(permData);
-//   }
-// );
-
-// request.get(
-//   {
-//     url: 'http://api.openstreetmap.org/api/0.6/user/details',
-//     oauth: {
-//       consumer_key: consumerKey,
-//       consumer_secret: consumerSecret,
-//       token: 'LPS1OTaMpmTucbsX6IxPPevQN1GZd3WSDHpgm121',
-//       token_secret: 'H7DwhDJCJVZLkHiuQtTwfEPvzKeGNOdR6GpHdgSy',
-//     },
-//   },
-//   (e, r, body) => {
-//    console.log('bbbbbbbbbbbbbb', body);
-//   },
-// );

@@ -1,3 +1,4 @@
+const uuidBase62 = require('uuid-base62');
 const rp = require('request-promise-native');
 const qs = require('querystring');
 const config = require('config');
@@ -13,6 +14,7 @@ const consumerSecret = config.get('oauth.consumerSecret');
 module.exports = function attachLogin2Handler(router) {
   router.post(
     '/login2',
+    // TODO validation
     dbMiddleware,
     async (ctx) => {
       const body = await rp.post({
@@ -44,17 +46,22 @@ module.exports = function attachLogin2Handler(router) {
 
       const now = new Date();
 
-      // result.osm.user[0].$.display_name;
-      // result.osm.user[0].$.id;
-      // result.osm.home[0].$.lat;
-      // result.osm.home[0].$.lon;
+      const { display_name: name, id: osmId, lat, lon } = result.osm.home[0].$;
 
-      await ctx.state.db.query(
-        'INSERT INTO user (name, createdAt, lastLoginAt, authToken, osmId, osmAuthToken, osmAuthTokenSecret) VALUES (?, ?, ?, ?, ?, ?, ?)',
-        [result.osm.user[0].$.display_name, now, now, '123', result.osm.user[0].$.id, permData.oauth_token, permData.oauth_token_secret],
+      // TODO only if logged for the fist time
+      const { insertId } = await ctx.state.db.query(
+        'INSERT INTO user (name, createdAt, lat, lon) VALUES (?, ?, ?, ?, ?, ?, ?, )',
+        [name, now, lat, lon],
       );
 
-      // TODO return authToken
+      const authToken = uuidBase62.v4(); // TODO rather some crypro securerandom
+
+      await ctx.state.db.query(
+        'INSERT INTO auth (userId, createdAt, authToken, osmId, osmAuthToken, osmAuthTokenSecret) VALUES (?, ?, ?, ?, ?, ?)',
+        [insertId, now, authToken, osmId, permData.oauth_token, permData.oauth_token_secret],
+      );
+
+      ctx.body = { authToken, name, lat, lon };
     },
   );
 };
