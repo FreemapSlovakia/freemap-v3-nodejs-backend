@@ -46,19 +46,27 @@ module.exports = function attachLogin2Handler(router) {
 
       const now = new Date();
 
-      const { display_name: name, id: osmId, lat, lon } = result.osm.home[0].$;
+      const { $: { display_name: name, id: osmId }, home: [{ $: { lat, lon } }] } = result.osm.user[0];
 
-      // TODO only if logged for the fist time
-      const { insertId } = await ctx.state.db.query(
-        'INSERT INTO user (name, createdAt, lat, lon) VALUES (?, ?, ?, ?, ?, ?, ?, )',
-        [name, now, lat, lon],
-      );
+      const { db } = ctx.state;
+
+      const users = await db.query('SELECT id FROM user WHERE osmId = ?', [osmId]);
+
+      let userId;
+      if (users.length) {
+        userId = users[0].id;
+      } else {
+        userId = await db.query(
+          'INSERT INTO user (osmId, name, createdAt, lat, lon) VALUES (?, ?, ?, ?, ?)',
+          [osmId, name, now, lat, lon],
+        ).insertId;
+      }
 
       const authToken = uuidBase62.v4(); // TODO rather some crypro securerandom
 
-      await ctx.state.db.query(
-        'INSERT INTO auth (userId, createdAt, authToken, osmId, osmAuthToken, osmAuthTokenSecret) VALUES (?, ?, ?, ?, ?, ?)',
-        [insertId, now, authToken, osmId, permData.oauth_token, permData.oauth_token_secret],
+      await db.query(
+        'INSERT INTO auth (userId, createdAt, authToken, osmAuthToken, osmAuthTokenSecret) VALUES (?, ?, ?, ?, ?)',
+        [userId, now, authToken, permData.oauth_token, permData.oauth_token_secret],
       );
 
       ctx.body = { authToken, name, lat, lon };

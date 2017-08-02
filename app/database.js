@@ -17,7 +17,8 @@ async function initDatabase() {
   const scripts = [
     `CREATE TABLE IF NOT EXISTS user (
       id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-      name VARCHAR(255) CHARSET utf8 COLLATE utf8_general_ci NOT NULL,
+      osmId INT UNSIGNED NOT NULL UNIQUE,
+      name VARCHAR(255) CHARSET utf8 COLLATE utf8_general_ci UNIQUE NOT NULL,
       createdAt TIMESTAMP NOT NULL,
       lat FLOAT(8, 6) NULL,
       lon FLOAT(9, 6) NULL
@@ -27,7 +28,6 @@ async function initDatabase() {
       authToken VARCHAR(255) CHARSET utf8 COLLATE utf8_bin PRIMARY KEY,
       userId INT UNSIGNED,
       createdAt TIMESTAMP NOT NULL,
-      osmId INT UNSIGNED NULL UNIQUE,
       osmAuthToken VARCHAR(255) CHARSET utf8 COLLATE utf8_bin NULL UNIQUE,
       osmAuthTokenSecret VARCHAR(255) CHARSET utf8 COLLATE utf8_bin NULL
     ) ENGINE=InnoDB`,
