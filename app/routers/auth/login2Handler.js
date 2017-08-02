@@ -5,6 +5,7 @@ const config = require('config');
 const { parseString } = require('xml2js');
 const { promisify } = require('util');
 const { dbMiddleware } = require('~/database');
+const requestTokenRegistry = require('./requestTokenRegistry');
 
 const parseStringAsync = promisify(parseString);
 
@@ -23,7 +24,7 @@ module.exports = function attachLogin2Handler(router) {
           consumer_key: consumerKey,
           consumer_secret: consumerSecret,
           token: ctx.request.body.token,
-          token_secret: global.oauth_token_secret, // TODO read from session
+          token_secret: requestTokenRegistry.get(ctx.request.body.token),
           verifier: ctx.request.body.verifier,
         },
       });
@@ -49,7 +50,7 @@ module.exports = function attachLogin2Handler(router) {
       const users = await db.query('SELECT id FROM user WHERE osmId = ?', [osmId]);
 
       const now = new Date();
-      
+
       let userId;
       if (users.length) {
         userId = users[0].id;

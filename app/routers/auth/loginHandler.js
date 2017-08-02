@@ -1,6 +1,7 @@
 const rp = require('request-promise-native');
 const qs = require('querystring');
 const config = require('config');
+const requestTokenRegistry = require('./requestTokenRegistry');
 
 const consumerKey = config.get('oauth.consumerKey');
 const consumerSecret = config.get('oauth.consumerSecret');
@@ -21,7 +22,7 @@ module.exports = function attachLoginHandler(router) {
       });
 
       const reqData = qs.parse(body);
-      global.oauth_token_secret = reqData.oauth_token_secret; // TODO store to DB under session
+      requestTokenRegistry.set(reqData.oauth_token, reqData.oauth_token_secret);
       ctx.body = {
         redirect: `http://www.openstreetmap.org/oauth/authorize?${qs.stringify({ oauth_token: reqData.oauth_token })}`,
       };

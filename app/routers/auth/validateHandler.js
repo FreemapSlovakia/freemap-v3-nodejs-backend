@@ -26,22 +26,33 @@ module.exports = function attachLogoutHandler(router) {
       const authToken = m[1];
       const auths = await ctx.state.db.query('SELECT osmAuthToken, osmAuthTokenSecret FROM auth WHERE authToken = ?', [authToken]);
 
+      let userDetails;
       if (auths.length) {
-        const userDetails = await rp.get({
-          url: 'http://api.openstreetmap.org/api/0.6/user/details',
-          oauth: {
-            consumer_key: consumerKey,
-            consumer_secret: consumerSecret,
-            token: auths[0].osmAuthToken,
-            token_secret: auths[0].osmAuthTokenSecret,
-          },
-        });
+        try {
+          userDetails = await rp.get({
+            url: 'http://api.openstreetmap.org/api/0.6/user/details',
+            oauth: {
+              consumer_key: consumerKey,
+              consumer_secret: consumerSecret,
+              token: auths[0].osmAuthToken,
+              token_secret: auths[0].osmAuthTokenSecret,
+            },
+          });
+        } catch (e) {
+          if (e.name === 'StatusCodeError' && e.statusCode === 401) {
+            // TODO delete authToken from DB
+
+            ctx.status = 401;
+            ctx.set('WWW-Authenticate', 'Bearer realm="freemap"; error="invalid OSM authorization"');
+            return;
+          }
+        }
 
         const result = await parseStringAsync(userDetails);
 
         const { $: { display_name: name /* , id: osmId */ }, home: [{ $: { lat, lon } }] } = result.osm.user[0];
 
-        // TODO update name, lat, lon (and ensure osmId is the same)
+        // TODO update name (and ensure osmId is the same)
 
         ctx.body = { authToken, name, lat, lon };
       } else {
