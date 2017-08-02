@@ -30,7 +30,7 @@ module.exports = function attachLogin2Handler(router) {
 
       const permData = qs.parse(body);
 
-      const body2 = await rp.get({
+      const userDetails = await rp.get({
         url: 'http://api.openstreetmap.org/api/0.6/user/details',
         oauth: {
           consumer_key: consumerKey,
@@ -40,11 +40,7 @@ module.exports = function attachLogin2Handler(router) {
         },
       });
 
-      const result = await parseStringAsync(body2);
-
-      ctx.body = result;
-
-      const now = new Date();
+      const result = await parseStringAsync(userDetails);
 
       const { $: { display_name: name, id: osmId }, home: [{ $: { lat, lon } }] } = result.osm.user[0];
 
@@ -52,13 +48,16 @@ module.exports = function attachLogin2Handler(router) {
 
       const users = await db.query('SELECT id FROM user WHERE osmId = ?', [osmId]);
 
+      const now = new Date();
+      
       let userId;
       if (users.length) {
         userId = users[0].id;
+        // TODO update name (and ensure osmId is the same)
       } else {
         userId = await db.query(
-          'INSERT INTO user (osmId, name, createdAt, lat, lon) VALUES (?, ?, ?, ?, ?)',
-          [osmId, name, now, lat, lon],
+          'INSERT INTO user (osmId, name, createdAt) VALUES (?, ?, ?)',
+          [osmId, name, now],
         ).insertId;
       }
 
