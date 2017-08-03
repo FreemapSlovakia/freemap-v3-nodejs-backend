@@ -76,7 +76,7 @@ async function byBbox(ctx) {
   }
 
   ctx.body = await ctx.state.db.query(
-    `SELECT lat, lon FROM picture WHERE lat BETWEEN ? AND ? AND lon BETWEEN ? AND ?
+    `SELECT id, lat, lon FROM picture WHERE lat BETWEEN ? AND ? AND lon BETWEEN ? AND ?
       ${ctx.query.excludeBbox ? 'AND NOT (lat BETWEEN ? AND ? AND lon BETWEEN ? AND ?)' : ''}`,
     [minLat, maxLat, minLon, maxLon],
   );

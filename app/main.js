@@ -4,6 +4,7 @@ const Koa = require('koa');
 const Router = require('koa-router');
 const cors = require('kcors');
 const koaBunyanLogger = require('koa-bunyan-logger');
+const koaSend = require('koa-send');
 
 const logger = require('~/logger');
 const { initDatabase } = require('~/database');
@@ -31,6 +32,14 @@ const router = new Router();
 router.use('/tracklogs', tracklogsRouter.routes(), tracklogsRouter.allowedMethods());
 router.use('/gallery', galleryRouter.routes(), galleryRouter.allowedMethods());
 router.use('/auth', authRouter.routes(), authRouter.allowedMethods());
+
+app.use(async (ctx, next) => {
+  if (ctx.path.startsWith('/static/gallery/')) {
+    await koaSend(ctx, ctx.path.substring(16), { root: `${global.rootDir}/user_data/pictures/` });
+  } else {
+    await next();
+  }
+});
 
 app.use(router.routes());
 
