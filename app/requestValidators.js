@@ -38,7 +38,7 @@ function bodySchemaValidator(schema, ignoreType) {
   return async (ctx, next) => {
     if (!ignoreType && !ctx.is('application/json')) {
       ctx.status = 415;
-    } else if (!validate.validate(schema, ctx.request.body)) {
+    } else if (!validate(ctx.request.body)) {
       ctx.status = 400;
       ctx.body = {
         error: 'request_body_doesnt_match_schema',

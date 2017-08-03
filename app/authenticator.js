@@ -8,14 +8,18 @@ const parseStringAsync = promisify(parseString);
 const consumerKey = config.get('oauth.consumerKey');
 const consumerSecret = config.get('oauth.consumerSecret');
 
-module.exports = function authChecker(require, osm) {
-  return async function checkAuth(ctx, next) {
+module.exports = function authenticator(require, osm) {
+  return async function authorize(ctx, next) {
     const ah = ctx.get('Authorization');
 
     const m = /^bearer (.+)$/i.exec(ah || '');
     if (!m) {
-      ctx.status = 401;
-      ctx.set('WWW-Authenticate', 'Bearer realm="freemap"; error="missing token"');
+      if (require) {
+        ctx.status = 401;
+        ctx.set('WWW-Authenticate', 'Bearer realm="freemap"; error="missing token"');
+      } else {
+        await next();
+      }
       return;
     }
 
@@ -39,24 +43,29 @@ module.exports = function authChecker(require, osm) {
           if (e.name === 'StatusCodeError' && e.statusCode === 401) {
             // TODO delete authToken from DB
 
-            ctx.status = 401;
-            ctx.set('WWW-Authenticate', 'Bearer realm="freemap"; error="invalid OSM authorization"');
+            if (require) {
+              ctx.status = 401;
+              ctx.set('WWW-Authenticate', 'Bearer realm="freemap"; error="invalid OSM authorization"');
+            } else {
+              await next();
+            }
             return;
           }
         }
 
         const result = await parseStringAsync(userDetails);
-
         const { $: { display_name: name /* , id: osmId */ }, home: [{ $: { lat, lon } }] } = result.osm.user[0];
-        ctx.state.user = { authToken, name, lat, lon };
+        ctx.state.user = { id: auths[0].userId, name, lat, lon };
         await next();
       } else {
-        ctx.state.user = { userId: auths[0].userId };
+        ctx.state.user = { id: auths[0].userId };
         await next();
       }
-    } else {
+    } else if (require) {
       ctx.status = 401;
       ctx.set('WWW-Authenticate', 'Bearer realm="freemap"; error="invalid token"');
+    } else {
+      next();
     }
   };
 };

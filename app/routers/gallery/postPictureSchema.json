@@ -7,32 +7,46 @@
       "required": ["meta"],
       "properties": {
         "meta": {
-          "type": "string"
+          "type": "object",
+          "required": ["position"],
+          "properties": {
+            "position": {
+              "type": "object",
+              "required": ["lat", "lon"],
+              "properties": {
+                "lat": {
+                  "type": "number"
+                },
+                "lon": {
+                  "type": "number"
+                }
+              }
+            },
+            "name": {
+              "type": "string"
+            },
+            "description": {
+              "type": "string"
+            }
+          }
         }
       }
     },
     "files": {
       "type": "object",
-      "required": ["uploads"],
-      "properties": {
-        "uploads": {
-          "type": "array",
-          "minItems": 1,
-          "maxItems": 1,
-          "items": {
-            "type": "object",
-            "required": ["path", "name", "type"],
-            "properties": {
-              "path": {
-                "type": "string"
-              },
-              "name": {
-                "type": "string"
-              },
-              "type": {
-                "enum": ["image/jpeg", "image/png"]
-              }
-            }
+      "required": ["image"],
+      "image": {
+        "type": "object",
+        "required": ["path", "name", "type"],
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "type": {
+            "enum": ["image/jpeg", "image/png"]
           }
         }
       }
