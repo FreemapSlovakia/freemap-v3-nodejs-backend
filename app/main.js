@@ -40,10 +40,10 @@ initDatabase()
       const port = config.get('http.port');
       app.listen(port, () => {
         logger.info(`Freemap v3 API listening on port ${port}.`);
-      });    
-    }
+      });
+    },
   ).catch(
     (err) => {
       logger.fatal({ err }, 'Error initializing database.');
-    }
+    },
   );
