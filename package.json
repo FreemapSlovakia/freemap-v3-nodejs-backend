@@ -8,7 +8,6 @@
   },
   "dependencies": {
     "ajv": "5.2.2",
-    "body-parser": "1.17.2",
     "bunyan": "1.8.10",
     "config": "1.26.1",
     "fs-extra": "4.0.1",

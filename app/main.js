@@ -22,7 +22,10 @@ app.use(cors({
   origin: ctx => (/\.freemap\.sk(:\d+)?$/.test(ctx.header.origin) ? ctx.header.origin : null),
 }));
 
-app.use(koaBody({ jsonLimit: '5mb' }));
+app.use(koaBody({
+  jsonLimit: '5mb',
+  multipart: true,
+}));
 
 const router = new Router();
 router.use('/tracklogs', tracklogsRouter.routes(), tracklogsRouter.allowedMethods());

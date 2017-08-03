@@ -32,11 +32,11 @@ function queryValidator(spec) {
   };
 }
 
-function bodySchemaValidator(schema) {
+function bodySchemaValidator(schema, ignoreType) {
   const validate = ajv.compile(schema);
 
   return async (ctx, next) => {
-    if (!ctx.is('application/json')) {
+    if (!ignoreType && !ctx.is('application/json')) {
       ctx.status = 415;
     } else if (!validate.validate(schema, ctx.request.body)) {
       ctx.status = 400;
