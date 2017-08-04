@@ -56,10 +56,10 @@ module.exports = function attachLogin2Handler(router) {
         userId = users[0].id;
         // TODO update name (and ensure osmId is the same)
       } else {
-        userId = await db.query(
+        userId = (await db.query(
           'INSERT INTO user (osmId, name, createdAt) VALUES (?, ?, ?)',
           [osmId, name, now],
-        ).insertId;
+        )).insertId;
       }
 
       const authToken = uuidBase62.v4(); // TODO rather some crypro securerandom
