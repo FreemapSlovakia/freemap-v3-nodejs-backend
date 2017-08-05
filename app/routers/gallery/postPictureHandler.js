@@ -1,9 +1,12 @@
-const fs = require('fs-extra');
 const { dbMiddleware } = require('~/database');
 const { acceptValidator, contentTypeValidator, bodySchemaValidator } = require('~/requestValidators');
 const postPictureSchema = require('./postPictureSchema');
 const uuidBase62 = require('uuid-base62');
 const authenticator = require('~/authenticator');
+const { promisify } = require('util');
+const { execFile } = require('child_process');
+
+const execFileAsync = promisify(execFile);
 
 module.exports = function attachGetPicturesInRadiusHandler(router) {
   router.post(
@@ -39,7 +42,7 @@ module.exports = function attachGetPicturesInRadiusHandler(router) {
 
       const name = uuidBase62.v4();
 
-      await fs.copy(image.path, `${global.rootDir}/user_data/pictures/${name}.jpeg`); // TODO file.type
+      await execFileAsync('exiftran', ['-a', image.path, '-o', `${global.rootDir}/user_data/pictures/${name}.jpeg`]); // TODO file.type
 
       const { insertId } = await ctx.state.db.query(
         'INSERT INTO picture (pathname, userId, title, description, createdAt, lat, lon) VALUES (?, ?, ?, ?, ?, ?, ?)',
