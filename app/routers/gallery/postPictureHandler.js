@@ -38,15 +38,15 @@ module.exports = function attachGetPicturesInRadiusHandler(router) {
     acceptValidator('application/json'),
     async (ctx) => {
       const image = ctx.request.body.files.image;
-      const { title, description, position: { lat, lon } } = ctx.request.body.fields.meta;
+      const { title, description, timestamp, position: { lat, lon } } = ctx.request.body.fields.meta;
 
       const name = uuidBase62.v4();
 
-      await execFileAsync('exiftran', ['-a', image.path, '-o', `${global.rootDir}/user_data/pictures/${name}.jpeg`]); // TODO file.type
+      await execFileAsync('exiftran', ['-a', image.path, '-o', `${global.rootDir}/user_data/pictures/${name}.jpeg`]);
 
       const { insertId } = await ctx.state.db.query(
-        'INSERT INTO picture (pathname, userId, title, description, createdAt, lat, lon) VALUES (?, ?, ?, ?, ?, ?, ?)',
-        [`${name}.jpeg`, ctx.state.user.id, title, description, new Date(), lat, lon],
+        'INSERT INTO picture (pathname, userId, title, description, createdAt, takenAt, lat, lon) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+        [`${name}.jpeg`, ctx.state.user.id, title, description, new Date(), timestamp ? new Date(timestamp) : null, lat, lon],
       );
 
       ctx.body = { id: insertId };

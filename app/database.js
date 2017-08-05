@@ -37,6 +37,7 @@ async function initDatabase() {
       userId INT UNSIGNED NOT NULL,
       title VARCHAR(255) CHARSET utf8 COLLATE utf8_general_ci NULL,
       description VARCHAR(4096) CHARSET utf8 COLLATE utf8_general_ci NULL,
+      takenAt TIMESTAMP NULL,
       createdAt TIMESTAMP NOT NULL,
       lat FLOAT(8, 6) NULL,
       lon FLOAT(9, 6) NULL,

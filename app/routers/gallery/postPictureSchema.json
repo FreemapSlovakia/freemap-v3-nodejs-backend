@@ -27,6 +27,10 @@
             },
             "description": {
               "type": "string"
+            },
+            "timestamp": {
+              "type": "string",
+              "format": "date-time"
             }
           }
         }
@@ -46,7 +50,7 @@
             "type": "string"
           },
           "type": {
-            "enum": ["image/jpeg", "image/png"]
+            "const": ["image/jpeg"]
           }
         }
       }
