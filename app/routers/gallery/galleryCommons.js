@@ -1,4 +1,4 @@
-function fromDb({ pictureId, createdAt, pathname, title, description, takenAt, lat, lon, userId, name }) {
+function fromDb({ pictureId, createdAt, pathname, title, description, takenAt, lat, lon, userId, name, tags }) {
   return {
     id: pictureId,
     createdAt: createdAt.toISOString(),
@@ -12,10 +12,12 @@ function fromDb({ pictureId, createdAt, pathname, title, description, takenAt, l
       id: userId,
       name,
     },
+    tags: tags ? tags.split('\n') : [],
   };
 }
 
 module.exports = {
   fromDb,
-  fields: 'picture.id AS pictureId, picture.createdAt, pathname, title, description, takenAt, picture.lat, picture.lon, user.id as userId, user.name',
+  fields: 'picture.id AS pictureId, picture.createdAt, pathname, title, description, takenAt, picture.lat, picture.lon, user.id as userId, user.name'
+    + ', (SELECT GROUP_CONCAT(name SEPARATOR \'\n\') FROM pictureTag WHERE pictureId = picture.id) AS tags',
 };

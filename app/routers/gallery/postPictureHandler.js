@@ -38,7 +38,7 @@ module.exports = function attachGetPicturesInRadiusHandler(router) {
     acceptValidator('application/json'),
     async (ctx) => {
       const image = ctx.request.body.files.image;
-      const { title, description, takenAt, position: { lat, lon } } = ctx.request.body.fields.meta;
+      const { title, description, takenAt, position: { lat, lon }, tags = [] } = ctx.request.body.fields.meta;
 
       const name = uuidBase62.v4();
 
@@ -48,6 +48,11 @@ module.exports = function attachGetPicturesInRadiusHandler(router) {
         'INSERT INTO picture (pathname, userId, title, description, createdAt, takenAt, lat, lon) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
         [`${name}.jpeg`, ctx.state.user.id, title, description, new Date(), takenAt ? new Date(takenAt) : null, lat, lon],
       );
+
+      await Promise.all(tags.map(tag => ctx.state.db.query(
+        'INSERT INTO pictureTag (name, pictureId) VALUES (?, ?)',
+        [tag, insertId],
+      )));
 
       ctx.body = { id: insertId };
     },

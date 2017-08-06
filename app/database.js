@@ -45,6 +45,13 @@ async function initDatabase() {
       INDEX USING BTREE (lat),
       INDEX USING BTREE (lon)
     ) ENGINE=InnoDB`,
+
+    `CREATE TABLE IF NOT EXISTS pictureTag (
+      pictureId INT UNSIGNED NOT NULL,
+      name VARCHAR(255) CHARSET utf8 COLLATE utf8_general_ci,
+      PRIMARY KEY (pictureId, name),
+      FOREIGN KEY (pictureId) REFERENCES picture (id) ON DELETE CASCADE
+    ) ENGINE=InnoDB`,
   ];
 
   const db = await pool.getConnection();
