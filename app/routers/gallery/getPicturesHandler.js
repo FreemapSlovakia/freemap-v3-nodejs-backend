@@ -1,7 +1,6 @@
 const { dbMiddleware } = require('~/database');
 const { fromDb, fields } = require('~/routers/gallery/galleryCommons');
 const { acceptValidator, queryValidator, queryAdapter } = require('~/requestValidators');
-const authenticator = require('~/authenticator');
 
 const radiusQueryValidator = queryValidator({
   lat: v => v >= -90 && v <= 90 || 'lat must be between -90 and 90',
@@ -28,15 +27,11 @@ module.exports = function attachGetPicturesInRadiusHandler(router) {
     queryValidator({
       by: v => ['radius', 'bbox'].includes(v) || '"by" must be either "radius" or "bbox"',
       userId: userId => !userId || userId > 0 || 'invalid userId',
-      own: (own, ctx) => !('own' in ctx.query) || !ctx.query.userId || 'only one of "own" or "userId" may be specified',
     }),
     async (ctx, next) => {
       await (ctx.query.by === 'radius' ? radiusQueryValidator : bboxQueryValidator)(ctx, next);
     },
     dbMiddleware,
-    async (ctx, next) => {
-      await authenticator('own' in ctx.query)(ctx, next);
-    },
     async (ctx) => {
       if (ctx.query.by === 'radius') {
         await byRadius(ctx);
@@ -48,9 +43,7 @@ module.exports = function attachGetPicturesInRadiusHandler(router) {
 };
 
 async function byRadius(ctx) {
-  const { lat, lon, distance, tag } = ctx.query;
-
-  const userId = getUserId(ctx);
+  const { lat, lon, distance, userId, tag } = ctx.query;
 
   // cca 1 degree
   const lat1 = lat - (distance / 43);
@@ -76,8 +69,7 @@ async function byRadius(ctx) {
 }
 
 async function byBbox(ctx) {
-  const { bbox: [minLon, minLat, maxLon, maxLat], tag } = ctx.query;
-  const userId = getUserId(ctx);
+  const { bbox: [minLon, minLat, maxLon, maxLat], userId, tag } = ctx.query;
 
   const { db } = ctx.state;
 
@@ -87,8 +79,4 @@ async function byBbox(ctx) {
       ${tag ? `JOIN pictureTag ON pictureId = id AND pictureId.name = ${db.escape(tag)}` : ''}
       WHERE lat BETWEEN ${minLat} AND ${maxLat} AND lon BETWEEN ${minLon} AND ${maxLon} ${userId ? ` AND userId = ${userId}` : ''}`,
   );
-}
-
-function getUserId(ctx) {
-  return 'own' in ctx.query ? ctx.state.user.id : ctx.query.userId;
 }
