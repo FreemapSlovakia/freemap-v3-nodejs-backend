@@ -4,8 +4,8 @@ setInterval(cleanup, 60 * 60 * 1000);
 
 function cleanup() {
   const now = Date.now();
-  registry.forEach(({ timestamp }, key) => {
-    if (now - timestamp > 24 * 60 * 60 * 1000) {
+  registry.forEach(({ takenAt }, key) => {
+    if (now - takenAt > 24 * 60 * 60 * 1000) {
       registry.delete(key);
     }
   });
@@ -19,6 +19,6 @@ module.exports = {
   },
 
   set(key, value) {
-    registry.set(key, { value, timestamp: Date.now() });
+    registry.set(key, { value, takenAt: Date.now() });
   },
 };

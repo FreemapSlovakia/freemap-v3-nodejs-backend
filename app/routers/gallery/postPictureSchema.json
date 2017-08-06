@@ -28,7 +28,7 @@
             "description": {
               "type": "string"
             },
-            "timestamp": {
+            "takenAt": {
               "type": "string",
               "format": "date-time"
             }
