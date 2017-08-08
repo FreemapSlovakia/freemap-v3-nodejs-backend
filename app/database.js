@@ -1,6 +1,8 @@
 const config = require('config');
 const mysql = require('promise-mysql');
 
+const logger = require('~/logger');
+
 const pool = mysql.createPool(config.get('mysql'));
 
 async function dbMiddleware(ctx, next) {
@@ -54,11 +56,24 @@ async function initDatabase() {
     ) ENGINE=InnoDB`,
   ];
 
+  const updates = [
+    'ALTER TABLE user ADD COLUMN admin BOOL',
+  ];
+
   const db = await pool.getConnection();
   try {
-    for (const stript of scripts) {
-      await db.query(stript);
+    for (const script of scripts) {
+      await db.query(script);
     }
+
+    for (const script of updates) {
+      try {
+        await db.query(script);
+      } catch (err) {
+        logger.info(`Unsuccessful SQL ${script}: ${err.message}`);
+      }
+    }
+
   } finally {
     pool.releaseConnection(db);
   }
