@@ -43,7 +43,9 @@ module.exports = function attachLogin2Handler(router) {
 
       const result = await parseStringAsync(userDetails);
 
-      const { $: { display_name: name, id: osmId }, home: [{ $: { lat, lon } }] } = result.osm.user[0];
+      const { $: { display_name: name, id: osmId }, home } = result.osm.user[0];
+
+      const { lat, lon } = home && home.length && home[0].$ || {};
 
       const { db } = ctx.state;
 
