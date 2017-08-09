@@ -23,17 +23,17 @@
               }
             },
             "name": {
-              "type": "string"
+              "type": ["string", "null"]
             },
             "description": {
-              "type": "string"
+              "type": ["string", "null"]
             },
             "takenAt": {
-              "type": "string",
+              "type": ["string", "null"],
               "format": "date-time"
             },
             "tags": {
-              "type": "array",
+              "type": ["array", "null"],
               "items": {
                 "type": "string"
               }
