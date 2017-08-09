@@ -54,7 +54,10 @@ module.exports = function authenticator(require, osm) {
         }
 
         const result = await parseStringAsync(userDetails);
-        const { $: { display_name: name /* , id: osmId */ }, home: [{ $: { lat, lon } }] } = result.osm.user[0];
+
+        const { $: { display_name: name /* , id: osmId */ }, home } = result.osm.user[0];
+        const { lat, lon } = home && home.length && home[0].$ || {};
+
         ctx.state.user = { id: auths[0].userId, name, lat, lon, authToken };
         await next();
       } else {
