@@ -1,5 +1,9 @@
 const { dbMiddleware } = require('~/database');
 const authenticator = require('~/authenticator');
+const { promisify } = require('util');
+const { unlink } = require('fs');
+
+const unlinkAsync = promisify(unlink);
 
 module.exports = function attachGetPicturesInRadiusHandler(router) {
   router.delete(
@@ -7,13 +11,23 @@ module.exports = function attachGetPicturesInRadiusHandler(router) {
     dbMiddleware,
     authenticator(true),
     async (ctx) => {
-      const { affectedRows } = await ctx.state.db.query(
-        `DELETE FROM picture WHERE id = ?${ctx.state.user.admin ? '' : ` AND userId = ${ctx.state.user.id}`}`,
-        [ctx.params.id],
-      );
+      // TODO transaction
 
-      // TODO return 403 instead of 404 in case of use mismatch
-      ctx.status = affectedRows ? 204 : 404;
+      const rows = await ctx.state.db.query('SELECT pathname, userId FROM picture WHERE id = ? FOR UPDATE', [ctx.params.id]);
+      if (rows.length === 0) {
+        ctx.status = 404;
+        return;
+      }
+
+      if (!ctx.state.user.admin && rows[0].userId !== ctx.state.user.id) {
+        ctx.status = 403;
+      }
+
+      await ctx.state.db.query('DELETE FROM picture WHERE id = ?', [ctx.params.id]);
+
+      await unlinkAsync(`${global.rootDir}/user_data/pictures/${rows[0].pathname}`);
+
+      ctx.status = 204;
     },
   );
 };
