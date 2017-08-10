@@ -24,10 +24,12 @@ module.exports = function authenticator(require, osm) {
     }
 
     const authToken = m[1];
-    const auths = await ctx.state.db.query('SELECT userId, osmAuthToken, osmAuthTokenSecret FROM auth WHERE authToken = ?', [authToken]);
+    const auths = await ctx.state.db.query(`SELECT userId, osmAuthToken, osmAuthTokenSecret, name, isAdmin
+      FROM auth INNER JOIN user ON (userId = id) WHERE authToken = ?`, [authToken]);
 
     let userDetails;
     if (auths.length) {
+      const [auth] = auths;
       if (osm) {
         try {
           userDetails = await rp.get({
@@ -35,8 +37,8 @@ module.exports = function authenticator(require, osm) {
             oauth: {
               consumer_key: consumerKey,
               consumer_secret: consumerSecret,
-              token: auths[0].osmAuthToken,
-              token_secret: auths[0].osmAuthTokenSecret,
+              token: auth.osmAuthToken,
+              token_secret: auth.osmAuthTokenSecret,
             },
           });
         } catch (e) {
@@ -58,10 +60,12 @@ module.exports = function authenticator(require, osm) {
         const { $: { display_name: name /* , id: osmId */ }, home } = result.osm.user[0];
         const { lat, lon } = home && home.length && home[0].$ || {};
 
-        ctx.state.user = { id: auths[0].userId, name, lat, lon, authToken };
+        // TODO update name in DB
+
+        ctx.state.user = { id: auth.userId, isAdmin: !!auth.isAdmin, name, authToken, lat, lon };
         await next();
       } else {
-        ctx.state.user = { id: auths[0].userId, authToken };
+        ctx.state.user = { id: auth.userId, isAdmin: !!auth.isAdmin, name: auth.name, authToken };
         await next();
       }
     } else if (require) {
