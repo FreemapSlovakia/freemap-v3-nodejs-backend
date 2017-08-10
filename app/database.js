@@ -90,7 +90,6 @@ async function initDatabase() {
         logger.info(`Unsuccessful SQL ${script}: ${err.message}`);
       }
     }
-
   } finally {
     pool.releaseConnection(db);
   }
