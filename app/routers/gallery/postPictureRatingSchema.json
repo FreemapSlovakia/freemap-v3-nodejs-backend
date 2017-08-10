@@ -1,0 +1,11 @@
+{
+  "type": "object",
+  "required": ["stars"],
+  "properties": {
+    "stars": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 5
+    }
+  }
+}

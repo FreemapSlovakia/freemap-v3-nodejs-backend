@@ -3,9 +3,9 @@ const { bodySchemaValidator } = require('~/requestValidators');
 const putPictureSchema = require('./putPictureSchema');
 const authenticator = require('~/authenticator');
 
-module.exports = function attachGetPicturesInRadiusHandler(router) {
+module.exports = function attachPutPictureHandler(router) {
   router.put(
-    '/picture',
+    '/picture/:id',
     dbMiddleware,
     authenticator(true),
     bodySchemaValidator(putPictureSchema),

@@ -6,6 +6,8 @@ const attachPostPictureHandler = require('~/routers/gallery/postPictureHandler')
 const attachGetAllTagsHandler = require('~/routers/gallery/getAllTagsHandler');
 const attachDeletePictureHandler = require('~/routers/gallery/deletePictureHandler');
 const attachPutPictureHandler = require('~/routers/gallery/putPictureHandler');
+const attachPostPictureCommentHandler = require('~/routers/gallery/postPictureCommentHandler');
+const attachPostPictureRatingHandler = require('~/routers/gallery/postPictureRatingHandler');
 
 const router = new Router();
 
@@ -15,5 +17,7 @@ attachPostPictureHandler(router);
 attachGetAllTagsHandler(router);
 attachDeletePictureHandler(router);
 attachPutPictureHandler(router);
+attachPostPictureCommentHandler(router);
+attachPostPictureRatingHandler(router);
 
 module.exports = router;

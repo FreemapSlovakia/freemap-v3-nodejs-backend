@@ -5,7 +5,7 @@ const { unlink } = require('fs');
 
 const unlinkAsync = promisify(unlink);
 
-module.exports = function attachGetPicturesInRadiusHandler(router) {
+module.exports = function attachDeletePictureHandler(router) {
   router.delete(
     '/picture/:id',
     dbMiddleware,

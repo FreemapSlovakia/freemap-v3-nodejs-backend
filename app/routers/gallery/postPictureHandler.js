@@ -8,7 +8,7 @@ const { execFile } = require('child_process');
 
 const execFileAsync = promisify(execFile);
 
-module.exports = function attachGetPicturesInRadiusHandler(router) {
+module.exports = function attachPostPictureHandler(router) {
   router.post(
     '/picture',
     dbMiddleware,

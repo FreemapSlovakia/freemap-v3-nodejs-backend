@@ -2,7 +2,7 @@ const { dbMiddleware } = require('~/database');
 const { fromDb, fields } = require('~/routers/gallery/galleryCommons');
 const { acceptValidator } = require('~/requestValidators');
 
-module.exports = function attachGetPicturesInRadiusHandler(router) {
+module.exports = function attachGetPictureHandler(router) {
   router.get(
     '/picture/:id',
     acceptValidator('application/json'),

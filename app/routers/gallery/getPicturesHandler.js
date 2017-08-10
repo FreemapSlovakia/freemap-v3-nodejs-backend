@@ -12,7 +12,7 @@ const bboxQueryValidator = queryValidator({
   bbox: v => v && v.length === 4 && v.every(x => !isNaN(x)) || 'invalid bbox',
 });
 
-module.exports = function attachGetPicturesInRadiusHandler(router) {
+module.exports = function attachGetPicturesHandler(router) {
   router.get(
     '/pictures',
     acceptValidator('application/json'),
