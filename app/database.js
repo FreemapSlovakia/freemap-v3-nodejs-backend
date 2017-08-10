@@ -82,6 +82,7 @@ async function initDatabase() {
 
   const db = await pool.getConnection();
   try {
+    /* eslint-disable no-await-in-loop, no-restricted-syntax */
     for (const script of scripts) {
       await db.query(script);
     }
