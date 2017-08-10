@@ -21,6 +21,7 @@ module.exports = function attachGetPicturesInRadiusHandler(router) {
 
       if (!ctx.state.user.admin && rows[0].userId !== ctx.state.user.id) {
         ctx.status = 403;
+        return;
       }
 
       await ctx.state.db.query('DELETE FROM picture WHERE id = ?', [ctx.params.id]);
