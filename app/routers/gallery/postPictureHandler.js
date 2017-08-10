@@ -49,10 +49,12 @@ module.exports = function attachGetPicturesInRadiusHandler(router) {
         [`${name}.jpeg`, ctx.state.user.id, title, description, new Date(), takenAt ? new Date(takenAt) : null, lat, lon],
       );
 
-      await Promise.all(tags.map(tag => ctx.state.db.query(
-        'INSERT INTO pictureTag (name, pictureId) VALUES (?, ?)',
-        [tag, insertId],
-      )));
+      if (tags.length) {
+        await ctx.state.db.query(
+          `INSERT INTO pictureTag (name, pictureId) VALUES ${tags.map(() => '(?, ?)').join(', ')} ON DUPLICATE KEY UPDATE name = name`,
+          [].concat(...tags.map(tag => ([tag, insertId]))),
+        );
+      }
 
       ctx.body = { id: insertId };
     },
