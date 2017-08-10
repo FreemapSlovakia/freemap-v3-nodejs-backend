@@ -54,6 +54,23 @@ async function initDatabase() {
       PRIMARY KEY (pictureId, name),
       FOREIGN KEY (pictureId) REFERENCES picture (id) ON DELETE CASCADE
     ) ENGINE=InnoDB`,
+
+    `CREATE TABLE IF NOT EXISTS pictureComment (
+      id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+      pictureId INT UNSIGNED NOT NULL,
+      createdAt TIMESTAMP NOT NULL,
+      comment VARCHAR(4096) CHARSET utf8 COLLATE utf8_general_ci,
+      FOREIGN KEY (pictureId) REFERENCES picture (id) ON DELETE CASCADE
+    ) ENGINE=InnoDB`,
+
+    `CREATE TABLE IF NOT EXISTS pictureRating (
+      userId INT UNSIGNED NOT NULL,
+      pictureId INT UNSIGNED NOT NULL,
+      stars TINYINT UNSIGNED NOT NULL,
+      PRIMARY KEY (pictureId, userId),
+      FOREIGN KEY (pictureId) REFERENCES picture (id) ON DELETE CASCADE,
+      FOREIGN KEY (userId) REFERENCES user (id) ON DELETE CASCADE
+    ) ENGINE=InnoDB`,
   ];
 
   const updates = [
