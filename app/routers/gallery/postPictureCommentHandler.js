@@ -5,7 +5,7 @@ const authenticator = require('~/authenticator');
 
 module.exports = function attachPostPictureCommentHandler(router) {
   router.post(
-    '/picture/:id/comment',
+    '/pictures/:id/comments',
     dbMiddleware,
     authenticator(true),
     bodySchemaValidator(postPictureCommentSchema, true),

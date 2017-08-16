@@ -4,7 +4,7 @@ const { acceptValidator } = require('~/requestValidators');
 
 module.exports = function attachGetPictureHandler(router) {
   router.get(
-    '/picture/:id',
+    '/pictures/:id',
     acceptValidator('application/json'),
     dbMiddleware,
     async (ctx) => {

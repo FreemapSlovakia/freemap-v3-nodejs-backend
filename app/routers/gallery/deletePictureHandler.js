@@ -7,7 +7,7 @@ const unlinkAsync = promisify(unlink);
 
 module.exports = function attachDeletePictureHandler(router) {
   router.delete(
-    '/picture/:id',
+    '/pictures/:id',
     dbMiddleware,
     authenticator(true),
     async (ctx) => {

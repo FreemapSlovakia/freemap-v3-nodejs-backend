@@ -5,7 +5,7 @@ const authenticator = require('~/authenticator');
 
 module.exports = function attachPutPictureHandler(router) {
   router.put(
-    '/picture/:id',
+    '/pictures/:id',
     dbMiddleware,
     authenticator(true),
     bodySchemaValidator(putPictureSchema),

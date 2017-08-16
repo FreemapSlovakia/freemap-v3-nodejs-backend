@@ -5,7 +5,7 @@ const authenticator = require('~/authenticator');
 
 module.exports = function attachPostPictureRatingHandler(router) {
   router.post(
-    '/picture/:id/rating',
+    '/pictures/:id/rating',
     dbMiddleware,
     authenticator(true),
     bodySchemaValidator(postPictureRatingSchema, true),
