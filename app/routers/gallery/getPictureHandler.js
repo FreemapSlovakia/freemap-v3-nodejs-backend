@@ -9,7 +9,7 @@ module.exports = function attachGetPictureHandler(router) {
     async (ctx) => {
       const rows = await ctx.state.db.query(
         `SELECT picture.id AS pictureId, picture.createdAt, pathname, title, description, takenAt, picture.lat, picture.lon, user.id as userId, user.name,
-          (SELECT GROUP_CONCAT(name SEPARATOR \'\n\') FROM pictureTag WHERE pictureId = picture.id) AS tags
+          (SELECT GROUP_CONCAT(name SEPARATOR '\n') FROM pictureTag WHERE pictureId = picture.id) AS tags
         FROM picture LEFT JOIN user ON userId = user.id WHERE picture.id = ?`,
         [ctx.params.id],
       );
