@@ -1,5 +1,4 @@
 const { dbMiddleware } = require('~/database');
-const { fromDb, fields } = require('~/routers/gallery/galleryCommons');
 const { acceptValidator, queryValidator, queryAdapter } = require('~/requestValidators');
 
 const radiusQueryValidator = queryValidator({
@@ -54,7 +53,7 @@ async function byRadius(ctx) {
   const { db } = ctx.state;
 
   const rows = await db.query(
-    `SELECT ${fields},
+    `SELECT picture.id AS id,
       (6371 * acos(cos(radians(${lat})) * cos(radians(picture.lat)) * cos(radians(picture.lon) - radians(${lon}) ) + sin(radians(${lat})) * sin(radians(picture.lat)))) AS distance
       FROM picture
       JOIN user ON userId = user.id
@@ -65,7 +64,7 @@ async function byRadius(ctx) {
       LIMIT 50`,
   );
 
-  ctx.body = rows.map(row => fromDb(row));
+  ctx.body = rows.map(({ id }) => ({ id }));
 }
 
 async function byBbox(ctx) {
