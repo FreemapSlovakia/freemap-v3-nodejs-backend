@@ -1,8 +1,7 @@
-function fromDb({ pictureId, createdAt, pathname, title, description, takenAt, lat, lon, userId, name, tags }) {
+function fromDb({ pictureId, createdAt, title, description, takenAt, lat, lon, userId, name, tags }) {
   return {
     id: pictureId,
     createdAt: createdAt.toISOString(),
-    pathname,
     title,
     description,
     takenAt: takenAt ? takenAt.toISOString() : null,
