@@ -14,7 +14,7 @@ module.exports = function attachPostPictureCommentHandler(router) {
       const { comment } = ctx.request.body;
 
       const { insertId } = await ctx.state.db.query(
-        'INSERT INTO pictureComment (pictueId, userId, comment, createdAt) VALUES (?, ?, ?)',
+        'INSERT INTO pictureComment (pictureId, userId, comment, createdAt) VALUES (?, ?, ?, ?)',
         [ctx.params.id, ctx.state.user.id, comment, new Date()],
       );
 
