@@ -1,6 +1,9 @@
 const { dbMiddleware } = require('~/database');
 const { acceptValidator } = require('~/requestValidators');
 
+const bayesM = 6;
+const bayesC = 4;
+
 module.exports = function attachGetPictureHandler(router) {
   router.get(
     '/pictures/:id',
@@ -10,7 +13,8 @@ module.exports = function attachGetPictureHandler(router) {
       const rows = await ctx.state.db.query(
         `SELECT picture.id AS pictureId, picture.createdAt, pathname, title, description, takenAt, picture.lat, picture.lon,
           user.id as userId, user.name,
-          (SELECT GROUP_CONCAT(name SEPARATOR '\n') FROM pictureTag WHERE pictureId = picture.id) AS tags
+          (SELECT GROUP_CONCAT(name SEPARATOR '\n') FROM pictureTag WHERE pictureId = picture.id) AS tags,
+          (SELECT (COALESCE(SUM((stars - 1) * 2.5), 0) + ${bayesM} * ${bayesC}) / (COUNT(stars) + ${bayesC}) FROM pictureRating WHERE pictureId = picture.id) AS rating
         FROM picture LEFT JOIN user ON userId = user.id WHERE picture.id = ?`,
         [ctx.params.id],
       );
@@ -35,7 +39,7 @@ module.exports = function attachGetPictureHandler(router) {
         },
       }));
 
-      const { pictureId, createdAt, title, description, takenAt, lat, lon, userId, name, tags } = rows[0];
+      const { pictureId, createdAt, title, description, takenAt, lat, lon, userId, name, tags, rating } = rows[0];
       ctx.body = {
         id: pictureId,
         createdAt: createdAt.toISOString(),
@@ -50,6 +54,7 @@ module.exports = function attachGetPictureHandler(router) {
         },
         tags: tags ? tags.split('\n') : [],
         comments,
+        rating,
       };
     },
   );
