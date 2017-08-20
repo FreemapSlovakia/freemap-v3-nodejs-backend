@@ -2,8 +2,8 @@ const { dbMiddleware } = require('~/database');
 const { acceptValidator } = require('~/requestValidators');
 const authenticator = require('~/authenticator');
 
-const bayesC = 3; // three ratings...
-const bayesM = 4; // ...of ranking 6
+const bayesC = 2; // three ratings...
+const bayesM = 5; // ...of ranking 5
 
 module.exports = function attachGetPictureHandler(router) {
   router.get(
