@@ -24,6 +24,7 @@ module.exports = function attachGetPictureHandler(router) {
 
       if (rows.length === 0) {
         ctx.status = 404;
+        return;
       }
 
       const commentRows = await ctx.state.db.query(
