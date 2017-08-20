@@ -17,9 +17,9 @@ module.exports = function attachGetPictureHandler(router) {
         [ctx.params.id],
       );
 
-      const pathname = `${global.rootDir}/user_data/pictures/${rows[0].pathname}`;
-
       if (rows.length) {
+        const pn = rows[0].pathname;
+        const pathname = pn.startsWith(':') ? `/freemap/datastore.fm/upload/gallery/${pn.substring(1)}` : `${global.rootDir}/user_data/pictures/${pn}`;
         const stats = await statSync(pathname);
         ctx.status = 200;
         ctx.response.lastModified = stats.mtime;
