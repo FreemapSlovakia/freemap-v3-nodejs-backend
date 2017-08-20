@@ -3,7 +3,7 @@ const { acceptValidator } = require('~/requestValidators');
 const authenticator = require('~/authenticator');
 
 const bayesC = 3; // three ratings...
-const bayesM = 6; // ...of ranking 6
+const bayesM = 4; // ...of ranking 6
 
 module.exports = function attachGetPictureHandler(router) {
   router.get(
