@@ -13,7 +13,7 @@ module.exports = function attachPostPictureRatingHandler(router) {
       const { stars } = ctx.request.body;
 
       await ctx.state.db.query(
-        'INSERT INTO pictureRating (pictueId, userId, stars, ratedAt) VALUES (?, ?, ?, ?) ON DUPLICATE KEY UPDATE stars = ?, ratedAt = ?',
+        'INSERT INTO pictureRating (pictureId, userId, stars, ratedAt) VALUES (?, ?, ?, ?) ON DUPLICATE KEY UPDATE stars = ?, ratedAt = ?',
         [ctx.params.id, ctx.state.user.id, stars, new Date(), stars, new Date()],
       );
 
