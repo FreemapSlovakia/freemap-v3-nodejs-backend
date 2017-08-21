@@ -22,13 +22,13 @@ async function initDatabase() {
       osmId INT UNSIGNED NOT NULL UNIQUE,
       name VARCHAR(255) CHARSET utf8 COLLATE utf8_general_ci UNIQUE NOT NULL,
       isAdmin BOOL NOT NULL DEFAULT 0,
-      createdAt TIMESTAMP NOT NULL
+      createdAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
     ) ENGINE=InnoDB`,
 
     `CREATE TABLE IF NOT EXISTS auth (
       authToken VARCHAR(255) CHARSET utf8 COLLATE utf8_bin PRIMARY KEY,
       userId INT UNSIGNED NOT NULL,
-      createdAt TIMESTAMP NOT NULL,
+      createdAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
       osmAuthToken VARCHAR(255) CHARSET utf8 COLLATE utf8_bin NULL UNIQUE,
       osmAuthTokenSecret VARCHAR(255) CHARSET utf8 COLLATE utf8_bin NULL,
       FOREIGN KEY (userId) REFERENCES user (id) ON DELETE CASCADE
@@ -41,7 +41,7 @@ async function initDatabase() {
       title VARCHAR(255) CHARSET utf8 COLLATE utf8_general_ci NULL,
       description VARCHAR(4096) CHARSET utf8 COLLATE utf8_general_ci NULL,
       takenAt TIMESTAMP NULL,
-      createdAt TIMESTAMP NOT NULL,
+      createdAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
       lat FLOAT(8, 6) NULL,
       lon FLOAT(9, 6) NULL,
       FOREIGN KEY (userId) REFERENCES user (id) ON DELETE CASCADE,
@@ -60,7 +60,7 @@ async function initDatabase() {
       id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
       pictureId INT UNSIGNED NOT NULL,
       userId INT UNSIGNED NOT NULL,
-      createdAt TIMESTAMP NOT NULL,
+      createdAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
       comment VARCHAR(4096) CHARSET utf8 COLLATE utf8_general_ci,
       FOREIGN KEY (pictureId) REFERENCES picture (id) ON DELETE CASCADE,
       FOREIGN KEY (userId) REFERENCES user (id) ON DELETE CASCADE
