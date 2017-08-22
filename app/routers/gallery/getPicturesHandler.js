@@ -75,7 +75,7 @@ async function byBbox(ctx) {
   ctx.body = await db.query(
     `SELECT lat, lon
       FROM picture
-      ${tag ? `JOIN pictureTag ON pictureId = id AND pictureId.name = ${db.escape(tag)}` : ''}
+      ${tag ? `JOIN pictureTag ON pictureId = id AND name = ${db.escape(tag)}` : ''}
       WHERE lat BETWEEN ${minLat} AND ${maxLat} AND lon BETWEEN ${minLon} AND ${maxLon} ${userId ? ` AND userId = ${userId}` : ''}`,
   );
 }
