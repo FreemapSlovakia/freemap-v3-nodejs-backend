@@ -9,6 +9,7 @@ const attachDeletePictureHandler = require('~/routers/gallery/deletePictureHandl
 const attachPutPictureHandler = require('~/routers/gallery/putPictureHandler');
 const attachPostPictureCommentHandler = require('~/routers/gallery/postPictureCommentHandler');
 const attachPostPictureRatingHandler = require('~/routers/gallery/postPictureRatingHandler');
+const attachGetAllPictureUsers = require('~/routers/gallery/getAllUsersHandler');
 
 const router = new Router();
 
@@ -21,5 +22,6 @@ attachDeletePictureHandler(router);
 attachPutPictureHandler(router);
 attachPostPictureCommentHandler(router);
 attachPostPictureRatingHandler(router);
+attachGetAllPictureUsers(router);
 
 module.exports = router;
