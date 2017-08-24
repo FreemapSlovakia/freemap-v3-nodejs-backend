@@ -19,7 +19,7 @@ module.exports = function attachDeletePictureHandler(router) {
         return;
       }
 
-      if (!ctx.state.user.admin && rows[0].userId !== ctx.state.user.id) {
+      if (!ctx.state.user.isAdmin && rows[0].userId !== ctx.state.user.id) {
         ctx.status = 403;
         return;
       }
