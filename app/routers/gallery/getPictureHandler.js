@@ -1,9 +1,7 @@
 const { dbMiddleware } = require('~/database');
 const { acceptValidator } = require('~/requestValidators');
 const authenticator = require('~/authenticator');
-
-const bayesC = 2; // three ratings...
-const bayesM = 5; // ...of ranking 5
+const { ratingSubquery } = require('./ratingConstants');
 
 module.exports = function attachGetPictureHandler(router) {
   router.get(
@@ -16,7 +14,7 @@ module.exports = function attachGetPictureHandler(router) {
         `SELECT picture.id AS pictureId, picture.createdAt, pathname, title, description, takenAt, picture.lat, picture.lon,
           user.id as userId, user.name,
           (SELECT GROUP_CONCAT(name SEPARATOR '\n') FROM pictureTag WHERE pictureId = picture.id) AS tags,
-          (SELECT (COALESCE(SUM((stars - 1) * 2.5), 0) + ${bayesM} * ${bayesC}) / (COUNT(stars) + ${bayesC}) FROM pictureRating WHERE pictureId = picture.id) AS rating
+          ${ratingSubquery}
           ${ctx.state.user ? `, (SELECT stars FROM pictureRating WHERE pictureId = picture.id AND userId = ${ctx.state.user.id}) AS myStars` : ''}
         FROM picture LEFT JOIN user ON userId = user.id WHERE picture.id = ?`,
         [ctx.params.id],

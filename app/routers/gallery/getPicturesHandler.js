@@ -1,5 +1,6 @@
 const { dbMiddleware } = require('~/database');
 const { acceptValidator, queryValidator, queryAdapter } = require('~/requestValidators');
+const { ratingSubquery, ratingExp } = require('./ratingConstants');
 
 const radiusQueryValidator = queryValidator({
   lat: v => v >= -90 && v <= 90 || 'lat must be between -90 and 90',
@@ -42,7 +43,7 @@ module.exports = function attachGetPicturesHandler(router) {
 };
 
 async function byRadius(ctx) {
-  const { lat, lon, distance, userId, tag } = ctx.query;
+  const { lat, lon, distance, userId, tag, ratingFrom, ratingTo, takenAtFrom, takenAtTo } = ctx.query;
 
   // cca 1 degree
   const lat1 = lat - (distance / 43);
@@ -53,13 +54,18 @@ async function byRadius(ctx) {
   const { db } = ctx.state;
 
   const rows = await db.query(
-    `SELECT picture.id AS id,
-      (6371 * acos(cos(radians(${lat})) * cos(radians(picture.lat)) * cos(radians(picture.lon) - radians(${lon}) ) + sin(radians(${lat})) * sin(radians(picture.lat)))) AS distance
+    `SELECT id,
+      (6371 * acos(cos(radians(${lat})) * cos(radians(lat)) * cos(radians(lon) - radians(${lon}) ) + sin(radians(${lat})) * sin(radians(lat)))) AS distance
+      ${ratingFrom || ratingTo ? `, ${ratingSubquery}` : ''}
       FROM picture
-      JOIN user ON userId = user.id
       ${tag ? `JOIN pictureTag ON pictureId = picture.id AND pictureTag.name = ${db.escape(tag)}` : ''}
-      WHERE picture.lat BETWEEN ${lat1} AND ${lat2} AND picture.lon BETWEEN ${lon1} AND ${lon2} ${userId ? `AND picture.userId = ${userId}` : ''}
+      WHERE lat BETWEEN ${lat1} AND ${lat2} AND lon BETWEEN ${lon1} AND ${lon2}
+      ${takenAtFrom ? `AND takenAt >= ${db.escape(takenAtFrom)}` : ''}
+      ${takenAtTo ? `AND takenAt <= ${db.escape(takenAtTo)}` : ''}
+      ${userId ? `AND userId = ${userId}` : ''}
       HAVING distance <= ${distance}
+      ${ratingFrom ? `AND rating >= ${parseFloat(ratingFrom, 10)}` : ''}
+      ${ratingTo ? `AND rating <= ${parseFloat(ratingTo, 10)}` : ''}
       ORDER BY distance
       LIMIT 50`,
   );
@@ -68,14 +74,22 @@ async function byRadius(ctx) {
 }
 
 async function byBbox(ctx) {
-  const { bbox: [minLon, minLat, maxLon, maxLat], userId, tag } = ctx.query;
+  const { bbox: [minLon, minLat, maxLon, maxLat], userId, tag, ratingFrom, ratingTo, takenAtFrom, takenAtTo } = ctx.query;
 
   const { db } = ctx.state;
 
-  ctx.body = await db.query(
-    `SELECT lat, lon
-      FROM picture
-      ${tag ? `JOIN pictureTag ON pictureId = id AND name = ${db.escape(tag)}` : ''}
-      WHERE lat BETWEEN ${minLat} AND ${maxLat} AND lon BETWEEN ${minLon} AND ${maxLon} ${userId ? ` AND userId = ${userId}` : ''}`,
-  );
+  const sql = `SELECT lat, lon ${ratingFrom || ratingTo ? `, ${ratingSubquery}` : ''}
+    FROM picture
+    ${tag ? `JOIN pictureTag ON pictureTag.pictureId = picture.id AND name = ${db.escape(tag)}` : ''}
+    WHERE lat BETWEEN ${minLat} AND ${maxLat} AND lon BETWEEN ${minLon} AND ${maxLon}
+    ${takenAtFrom ? `AND takenAt >= ${db.escape(takenAtFrom)}` : ''}
+    ${takenAtTo ? `AND takenAt <= ${db.escape(takenAtTo)}` : ''}
+    ${userId ? `AND userId = ${userId}` : ''}
+    ${ratingFrom ? `HAVING rating >= ${parseFloat(ratingFrom)} ` : ''}
+    ${ratingTo ? `${ratingTo ? 'AND' : 'HAVING'} rating <= ${parseFloat(ratingTo)} ` : ''}
+  `;
+
+  const rows = await db.query(sql);
+
+  ctx.body = rows.map(({ lat, lon }) => ({ lat, lon }));
 }
