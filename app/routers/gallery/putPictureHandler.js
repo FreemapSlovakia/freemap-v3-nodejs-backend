@@ -22,7 +22,7 @@ module.exports = function attachPutPictureHandler(router) {
         ctx.status = 403;
         return;
       }
-      
+
       const queries = [
         ctx.state.db.query(
           'UPDATE picture SET title = ?, description = ?, takenAt = ?, lat = ?, lon = ? WHERE id = ?',
