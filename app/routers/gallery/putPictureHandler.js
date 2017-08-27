@@ -22,21 +22,21 @@ module.exports = function attachPutPictureHandler(router) {
         ctx.status = 403;
         return;
       }
-
+      
       const queries = [
         ctx.state.db.query(
-          'UPDATE picture SET title = ?, description = ?, takenAt = ?, lat = ?, lon = ? WHERE pictureId = ?',
+          'UPDATE picture SET title = ?, description = ?, takenAt = ?, lat = ?, lon = ? WHERE id = ?',
           [title, description, takenAt ? new Date(takenAt) : null, lat, lon, ctx.params.id],
         ),
         // delete missing tags
         ctx.state.db.query(
-          `DELETE FROM pictureTag WHERE pictureId = ?${tags.length ? ` AND name NOT IN (${tags.map(() => '?').join(', ')}` : ''})`,
+          `DELETE FROM pictureTag WHERE pictureId = ?${tags.length ? ` AND name NOT IN (${tags.map(() => '?').join(', ')})` : ''}`,
           [ctx.params.id, ...tags],
         ),
       ];
 
       if (tags.length) {
-        queries.put(
+        queries.push(
           ctx.state.db.query(
             `INSERT INTO pictureTag (name, pictureId) VALUES ${tags.map(() => '(?, ?)').join(', ')} ON DUPLICATE KEY UPDATE name = name`,
             [].concat(...tags.map(tag => ([tag, ctx.params.id]))),
@@ -45,6 +45,7 @@ module.exports = function attachPutPictureHandler(router) {
       }
 
       await Promise.all(queries);
+      ctx.status = 204;
     },
   );
 };
