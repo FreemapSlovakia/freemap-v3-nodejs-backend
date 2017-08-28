@@ -1,3 +1,4 @@
+const sharp = require('sharp');
 const fs = require('fs');
 const { promisify } = require('util');
 const calculate = require('etag');
@@ -23,7 +24,7 @@ module.exports = function attachGetPictureHandler(router) {
         const stats = await statSync(pathname);
         ctx.status = 200;
         ctx.response.lastModified = stats.mtime;
-        ctx.response.length = stats.size;
+        ctx.append('Vary', 'Width');
         ctx.response.etag = calculate(stats, {
           weak: true,
         });
@@ -31,7 +32,10 @@ module.exports = function attachGetPictureHandler(router) {
         if (ctx.fresh) {
           ctx.status = 304;
         } else {
-          ctx.body = fs.createReadStream(pathname);
+          const w = parseInt(ctx.headers.width || ctx.query.width || 'NaN', 10);
+          const resize = w ? sharp().resize(w).jpeg() : null;
+          const fileStream = fs.createReadStream(pathname);
+          ctx.body = resize ? fileStream.pipe(resize) : fileStream;
         }
       } else {
         ctx.status = 404;
