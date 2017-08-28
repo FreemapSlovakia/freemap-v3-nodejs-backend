@@ -4,6 +4,7 @@ const { promisify } = require('util');
 const calculate = require('etag');
 const { dbMiddleware } = require('~/database');
 const { acceptValidator } = require('~/requestValidators');
+const { PICTURES_DIR } = require('~/routers/gallery/constants');
 
 const statSync = promisify(fs.stat);
 
@@ -19,8 +20,7 @@ module.exports = function attachGetPictureHandler(router) {
       );
 
       if (rows.length) {
-        const pn = rows[0].pathname;
-        const pathname = pn.startsWith(':') ? `/freemap/datastore.fm/upload/gallery/${pn.substring(1)}` : `${global.rootDir}/user_data/pictures/${pn}`;
+        const pathname = `${PICTURES_DIR}/${rows[0].pathname}`;
         const stats = await statSync(pathname);
         ctx.status = 200;
         ctx.response.lastModified = stats.mtime;

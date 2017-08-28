@@ -5,6 +5,7 @@ const uuidBase62 = require('uuid-base62');
 const authenticator = require('~/authenticator');
 const { promisify } = require('util');
 const { execFile } = require('child_process');
+const { PICTURES_DIR } = require('~/routers/gallery/constants');
 
 const execFileAsync = promisify(execFile);
 
@@ -42,7 +43,7 @@ module.exports = function attachPostPictureHandler(router) {
 
       const name = uuidBase62.v4();
 
-      await execFileAsync('exiftran', ['-a', image.path, '-o', `${global.rootDir}/user_data/pictures/${name}.jpeg`]);
+      await execFileAsync('exiftran', ['-a', image.path, '-o', `${PICTURES_DIR}/${name}.jpeg`]);
 
       const { insertId } = await ctx.state.db.query(
         'INSERT INTO picture (pathname, userId, title, description, createdAt, takenAt, lat, lon) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',

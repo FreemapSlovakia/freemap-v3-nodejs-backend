@@ -13,5 +13,9 @@
     "consumerKey": "XsCiIfvjfhS6iBNR30H29ymmgRYAb3j98kjOyCUu",
     "consumerSecret": "eASOhF36wPcsRXPMS7baat26KCX2TsL2UHK7qAWV",
     "callback": "http://local.freemap.sk:8080/authCallback.html"
+  },
+  "dir": {
+    "pictures": "./user_data/pictures/",
+    "tracklogs": "./user_data/tracklogs"
   }
 }

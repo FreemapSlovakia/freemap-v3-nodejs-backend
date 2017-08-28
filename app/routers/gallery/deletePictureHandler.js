@@ -4,6 +4,7 @@ const { promisify } = require('util');
 const { unlink } = require('fs');
 
 const unlinkAsync = promisify(unlink);
+const { PICTURES_DIR } = require('~/routers/gallery/constants');
 
 module.exports = function attachDeletePictureHandler(router) {
   router.delete(
@@ -26,7 +27,7 @@ module.exports = function attachDeletePictureHandler(router) {
 
       await ctx.state.db.query('DELETE FROM picture WHERE id = ?', [ctx.params.id]);
 
-      await unlinkAsync(`${global.rootDir}/user_data/pictures/${rows[0].pathname}`);
+      await unlinkAsync(`${PICTURES_DIR}/${rows[0].pathname}`);
 
       ctx.status = 204;
     },
