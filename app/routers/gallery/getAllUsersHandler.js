@@ -8,8 +8,8 @@ module.exports = function attachGetAllUsersHandler(router) {
     acceptValidator('application/json'),
     dbMiddleware,
     async (ctx) => {
-      const rows = await ctx.state.db.query('SELECT DISTINCT userId AS id, user.name AS name FROM picture JOIN user ON (userId = user.id) ORDER BY user.name');
-      ctx.body = rows;
+      ctx.body = await ctx.state.db.query('SELECT userId AS id, user.name AS name, COUNT(*) AS count '
+        + 'FROM picture JOIN user ON (userId = user.id) GROUP BY userId ORDER BY user.name');
     },
   );
 };

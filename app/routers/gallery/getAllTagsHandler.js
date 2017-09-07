@@ -8,8 +8,7 @@ module.exports = function attachGetAllTagsHandler(router) {
     acceptValidator('application/json'),
     dbMiddleware,
     async (ctx) => {
-      const rows = await ctx.state.db.query('SELECT DISTINCT name FROM pictureTag ORDER BY name');
-      ctx.body = rows.map(row => row.name);
+      ctx.body = await ctx.state.db.query('SELECT name, count(*) AS count FROM pictureTag GROUP BY name ORDER BY name');
     },
   );
 };
