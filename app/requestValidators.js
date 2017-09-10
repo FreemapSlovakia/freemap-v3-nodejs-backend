@@ -73,9 +73,7 @@ function contentTypeValidator(type) {
 function queryAdapter(spec) {
   return async (ctx, next) => {
     Object.keys(spec).forEach((key) => {
-      if (key in ctx.query) {
-        ctx.query[key] = spec[key](ctx.query[key]);
-      }
+      ctx.query[key] = spec[key](ctx.query[key]);
     });
     await next();
   };
