@@ -19,8 +19,8 @@ async function initDatabase() {
   const scripts = [
     `CREATE TABLE IF NOT EXISTS user (
       id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-      osmId INT UNSIGNED NOT NULL UNIQUE,
-      name VARCHAR(255) CHARSET utf8 COLLATE utf8_general_ci UNIQUE NOT NULL,
+      osmId INT UNSIGNED NULL UNIQUE,
+      name VARCHAR(255) CHARSET utf8 COLLATE utf8_general_ci NOT NULL,
       isAdmin BOOL NOT NULL DEFAULT 0,
       createdAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
     ) ENGINE=InnoDB`,
@@ -78,7 +78,8 @@ async function initDatabase() {
   ];
 
   const updates = [
-    'ALTER TABLE user ADD COLUMN isAdmin BOOL NOT NULL DEFAULT 0',
+    'ALTER TABLE user MODIFY COLUMN name VARCHAR(255) CHARSET utf8 COLLATE utf8_general_ci NOT NULL',
+    'ALTER TABLE user MODIFY COLUMN osmId INT UNSIGNED NULL UNIQUE',
   ];
 
   const db = await pool.getConnection();
