@@ -36,10 +36,8 @@ module.exports = function authenticator(require, deep) {
         await next();
       } else if (auth.facebookAccessToken) {
         try {
-          console.log('XXXXXXXXXXXX', auth.facebookAccessToken);
           await fb.withAccessToken(auth.facebookAccessToken).api('/me', { fields: 'id' });
         } catch (e) {
-          console.log('EEEEEEEEE', e);
           if (require) {
             ctx.status = 401;
             ctx.set('WWW-Authenticate', 'Bearer realm="freemap"; error="invalid Facebook authorization"');
