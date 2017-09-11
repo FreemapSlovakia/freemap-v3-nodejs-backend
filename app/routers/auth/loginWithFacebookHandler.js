@@ -24,7 +24,7 @@ module.exports = function attachLoginWithFacebookHandler(router) {
 
       const { db } = ctx.state;
 
-      const users = await db.query('SELECT id FROM user WHERE facebookUserId = ?', [id]);
+      const users = await db.query('SELECT id, name FROM user WHERE facebookUserId = ?', [id]);
 
       const now = new Date();
 
