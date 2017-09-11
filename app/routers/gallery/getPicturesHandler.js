@@ -20,14 +20,25 @@ const bboxQueryValidator = queryValidator(Object.assign({
   bbox: v => v && v.length === 4 && v.every(x => !isNaN(x)) || 'invalid bbox',
 }), globalValidationRules);
 
+const orderQueryValidator = queryValidator(Object.assign({
+  orderBy: v => ['createdAt', 'takenAt', 'rating'].includes(v) || 'invalid orderBy',
+  direction: v => ['desc', 'asc'].includes(v) || 'invalid direction',
+  refId: v => v === null || !isNaN(v) || 'invalid refId',
+  refCreatedAt: v => v === null || !isNaN(v) || 'invalid refCreatedAt',
+  refTakenAt: v => v === null || !isNaN(v) || 'invalid refTakenAt',
+  refRating: v => v === null || !isNaN(v) || 'invalid refRating',
+}), globalValidationRules);
+
 const qvs = {
   radius: radiusQueryValidator,
   bbox: bboxQueryValidator,
+  order: orderQueryValidator,
 };
 
 const methods = {
   radius: byRadius,
   bbox: byBbox,
+  order: byOrder,
 };
 
 module.exports = function attachGetPicturesHandler(router) {
@@ -42,13 +53,18 @@ module.exports = function attachGetPicturesHandler(router) {
       bbox: x => (x === undefined ? null : x.split(',').map(parseFloat)),
       userId: x => (x ? parseInt(x, 10) : null),
 
+      refId: x => (x ? parseInt(x, 10) : null),
+      refCreatedAt: x => (x ? new Date(x) : null),
+      refTakenAt: x => (x ? new Date(x) : null),
+      refRating: x => (x ? parseFloat(x) : null),
+
       ratingFrom: x => (x ? parseFloat(x) : null),
       ratingTo: x => (x ? parseFloat(x) : null),
       takenAtFrom: x => (x ? new Date(x) : null),
       takenAtTo: x => (x ? new Date(x) : null),
     }),
     queryValidator({
-      by: v => ['radius', 'bbox'].includes(v) || '"by" must be one of "radius", "bbox"',
+      by: v => ['radius', 'bbox', 'order'].includes(v) || '"by" must be one of "radius", "bbox", "order"',
       userId: userId => !userId || userId > 0 || 'invalid userId',
     }),
     async (ctx, next) => {
@@ -116,4 +132,53 @@ async function byBbox(ctx) {
   const rows = await db.query(sql);
 
   ctx.body = rows.map(({ lat, lon }) => ({ lat, lon }));
+}
+
+async function byOrder(ctx) {
+  const { userId, tag, ratingFrom, ratingTo, takenAtFrom, takenAtTo,
+    orderBy, refId, refRating, refCreatedAt, refTakenAt, direction } = ctx.query;
+
+  const { db } = ctx.state;
+
+  const hv = [];
+  const wh = [];
+  if (ratingFrom !== null) {
+    hv.push(`rating >= ${ratingFrom}`);
+  }
+  if (ratingTo !== null) {
+    hv.push(`rating <= ${ratingTo}`);
+  }
+  if (refRating !== null) {
+    hv.push(`rating ${direction === 'asc' ? '>' : '<'}= ${refRating}`);
+  }
+  if (refCreatedAt !== null) {
+    wh.push(`rating ${direction === 'asc' ? '>' : '<'}= '${toSqlDate(refCreatedAt)}'`);
+  }
+  if (refTakenAt !== null) {
+    wh.push(`rating ${direction === 'asc' ? '>' : '<'}= '${toSqlDate(refTakenAt)}'`);
+  }
+  if (refId !== null) {
+    wh.push(`id > ${refId}`);
+  }
+  if (takenAtFrom !== null) {
+    wh.push(`takenAt >= '${toSqlDate(takenAtFrom)}'`);
+  }
+  if (takenAtTo !== null) {
+    wh.push(`takenAt <= '${toSqlDate(takenAtTo)}'`);
+  }
+  if (userId !== null) {
+    wh.push(`userId = ${userId}`);
+  }
+
+  const sql = `SELECT id, ${ratingFrom || ratingTo ? `, ${ratingSubquery}` : ''}
+    FROM picture
+    ${tag ? `JOIN pictureTag ON pictureTag.pictureId = picture.id AND name = ${db.escape(tag)}` : ''}
+    ${wh.length ? `WHERE ${wh.join(' AND ')}` : ''}
+    ${hv.length ? `HAVING ${hv.join(' AND ')}` : ''}    
+    ORDER BY ${orderBy}, id
+  `;
+
+  const rows = await db.query(sql);
+
+  ctx.body = rows.map(({ id }) => ({ id }));
 }
