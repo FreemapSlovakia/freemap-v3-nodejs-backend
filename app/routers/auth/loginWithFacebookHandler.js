@@ -20,7 +20,7 @@ module.exports = function attachLoginWithFacebookHandler(router) {
     dbMiddleware,
     async (ctx) => {
       const { accessToken } = ctx.request.body;
-      const { id, name, email } = await fb.withAccessToken(accessToken).api('/me', { fields: 'id,name,email' });
+      const { id, name: fbName, email } = await fb.withAccessToken(accessToken).api('/me', { fields: 'id,name,email' });
 
       const { db } = ctx.state;
 
@@ -29,13 +29,16 @@ module.exports = function attachLoginWithFacebookHandler(router) {
       const now = new Date();
 
       let userId;
+      let name;
       if (users.length) {
         userId = users[0].id;
+        name = users[0].name;
       } else {
         userId = (await db.query(
           'INSERT INTO user (facebookUserId, name, email, createdAt) VALUES (?, ?, ?, ?)',
-          [id, name, email, now],
+          [id, fbName, email, now],
         )).insertId;
+        name = fbName;
       }
 
       const authToken = uuidBase62.v4(); // TODO rather some crypro securerandom
@@ -45,7 +48,7 @@ module.exports = function attachLoginWithFacebookHandler(router) {
         [userId, now, authToken, accessToken],
       );
 
-      ctx.body = { authToken, name };
+      ctx.body = { id: userId, authToken, name };
     },
   );
 };

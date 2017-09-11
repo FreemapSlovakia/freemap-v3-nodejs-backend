@@ -43,25 +43,28 @@ module.exports = function attachLogin2Handler(router) {
 
       const result = await parseStringAsync(userDetails);
 
-      const { $: { display_name: name, id: osmId }, home } = result.osm.user[0];
+      const { $: { display_name: osmName, id: osmId }, home } = result.osm.user[0];
 
       const { lat, lon } = home && home.length && home[0].$ || {};
 
       const { db } = ctx.state;
 
-      const users = await db.query('SELECT id FROM user WHERE osmId = ?', [osmId]);
+      const users = await db.query('SELECT id, name FROM user WHERE osmId = ?', [osmId]);
 
       const now = new Date();
 
       let userId;
+      let name;
       if (users.length) {
         userId = users[0].id;
+        name = users[0].name;
         // TODO update name (and ensure osmId is the same)
       } else {
         userId = (await db.query(
           'INSERT INTO user (osmId, name, createdAt) VALUES (?, ?, ?)',
-          [osmId, name, now],
+          [osmId, osmName, now],
         )).insertId;
+        name = osmName;
       }
 
       const authToken = uuidBase62.v4(); // TODO rather some crypro securerandom
@@ -71,7 +74,7 @@ module.exports = function attachLogin2Handler(router) {
         [userId, now, authToken, permData.oauth_token, permData.oauth_token_secret],
       );
 
-      ctx.body = { authToken, name, lat, lon };
+      ctx.body = { id: userId, authToken, name, lat, lon };
     },
   );
 };
