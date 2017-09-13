@@ -11,7 +11,7 @@
   },
   "oauth": {
     "consumerKey": "XsCiIfvjfhS6iBNR30H29ymmgRYAb3j98kjOyCUu",
-    "consumerSecret": "eASOhF36wPcsRXPMS7baat26KCX2TsL2UHK7qAWV",
+    "consumerSecret": "***",
     "callback": "http://local.freemap.sk:9000/authCallback.html"
   },
   "dir": {
@@ -19,10 +19,10 @@
     "tracklogs": "./user_data/tracklogs"
   },
   "facebook": {
-    "appSecret": "37698bc96fc1186bdf41e376247a6665"
+    "appSecret": "***"
   },
   "google": {
     "clientId": "120698260366-tt592mqhut3931ct83667sfihdkv69jj.apps.googleusercontent.com",
-    "clientSecret": "***"
+    "clientSecret": "FNf925lZcdEnDJOADwSIjUjz"
   }
 }
