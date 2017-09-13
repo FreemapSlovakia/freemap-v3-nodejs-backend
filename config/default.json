@@ -20,5 +20,9 @@
   },
   "facebook": {
     "appSecret": "37698bc96fc1186bdf41e376247a6665"
+  },
+  "google": {
+    "clientId": "120698260366-tt592mqhut3931ct83667sfihdkv69jj.apps.googleusercontent.com",
+    "clientSecret": "***"
   }
 }

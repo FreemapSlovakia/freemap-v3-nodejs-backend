@@ -3,6 +3,7 @@ const config = require('config');
 const { parseString } = require('xml2js');
 const { promisify } = require('util');
 const fb = require('~/fb');
+const { verifyIdToken, clientId } = require('~/google');
 
 const parseStringAsync = promisify(parseString);
 
@@ -25,13 +26,28 @@ module.exports = function authenticator(require, deep) {
     }
 
     const authToken = m[1];
-    const auths = await ctx.state.db.query(`SELECT userId, osmAuthToken, osmAuthTokenSecret, facebookAccessToken, name, isAdmin
+    const auths = await ctx.state.db.query(`SELECT userId, osmAuthToken, osmAuthTokenSecret, facebookAccessToken, googleIdToken, name, isAdmin
       FROM auth INNER JOIN user ON (userId = id) WHERE authToken = ?`, [authToken]);
 
     let userDetails;
     if (auths.length) {
       const [auth] = auths;
       if (!deep) {
+        ctx.state.user = { id: auth.userId, isAdmin: !!auth.isAdmin, name: auth.name, authToken };
+        await next();
+      } else if (auth.googleIdToken) {
+        try {
+          await verifyIdToken(auth.googleIdToken, clientId);
+        } catch (e) {
+          if (require) {
+            ctx.status = 401;
+            ctx.set('WWW-Authenticate', 'Bearer realm="freemap"; error="invalid Facebook authorization"');
+          } else {
+            await next();
+          }
+          return;
+        }
+
         ctx.state.user = { id: auth.userId, isAdmin: !!auth.isAdmin, name: auth.name, authToken };
         await next();
       } else if (auth.facebookAccessToken) {

@@ -21,6 +21,7 @@ async function initDatabase() {
       id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
       osmId INT UNSIGNED NULL UNIQUE,
       facebookUserId VARCHAR(32) CHARSET latin1 COLLATE latin1_bin NULL UNIQUE,
+      googleUserId VARCHAR(32) CHARSET latin1 COLLATE latin1_bin NULL UNIQUE,
       name VARCHAR(255) CHARSET utf8 COLLATE utf8_general_ci NOT NULL,
       email VARCHAR(255) CHARSET utf8 COLLATE utf8_general_ci NULL,
       isAdmin BOOL NOT NULL DEFAULT 0,
@@ -81,11 +82,11 @@ async function initDatabase() {
   ];
 
   const updates = [
-    'ALTER TABLE user MODIFY COLUMN name VARCHAR(255) CHARSET utf8 COLLATE utf8_general_ci NOT NULL',
-    'ALTER TABLE user MODIFY COLUMN osmId INT UNSIGNED NULL UNIQUE',
     'ALTER TABLE user ADD COLUMN facebookUserId VARCHAR(32) CHARSET latin1 COLLATE latin1_bin NULL UNIQUE',
+    'ALTER TABLE user ADD COLUMN googleUserId VARCHAR(32) CHARSET latin1 COLLATE latin1_bin NULL UNIQUE',
     'ALTER TABLE user ADD COLUMN email VARCHAR(255) CHARSET utf8 COLLATE utf8_general_ci NULL',
     'ALTER TABLE auth ADD COLUMN facebookAccessToken VARCHAR(255) CHARSET latin1 COLLATE latin1_bin NULL',
+    'ALTER TABLE auth ADD COLUMN googleIdToken VARCHAR(4095) CHARSET latin1 COLLATE latin1_bin NULL',
   ];
 
   const db = await pool.getConnection();

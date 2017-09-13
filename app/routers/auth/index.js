@@ -5,6 +5,7 @@ const attachLogin2Handler = require('~/routers/auth/login2Handler');
 const attachLogoutHandler = require('~/routers/auth/logoutHandler');
 const attachValidateHandler = require('~/routers/auth/validateHandler');
 const attachLoginWithFacebookHandler = require('~/routers/auth/loginWithFacebookHandler');
+const attachLoginWithGoogleHandler = require('~/routers/auth/loginWithGoogleHandler');
 
 const router = new Router();
 
@@ -13,5 +14,6 @@ attachLogin2Handler(router);
 attachLogoutHandler(router);
 attachValidateHandler(router);
 attachLoginWithFacebookHandler(router);
+attachLoginWithGoogleHandler(router);
 
 module.exports = router;
