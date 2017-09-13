@@ -1,17 +1,6 @@
 const uuidBase62 = require('uuid-base62');
-const rp = require('request-promise-native');
-const qs = require('querystring');
-const config = require('config');
-const { parseString } = require('xml2js');
-const { promisify } = require('util');
 const { dbMiddleware } = require('~/database');
 const fb = require('~/fb');
-const requestTokenRegistry = require('./requestTokenRegistry');
-
-const parseStringAsync = promisify(parseString);
-
-const consumerKey = config.get('oauth.consumerKey');
-const consumerSecret = config.get('oauth.consumerSecret');
 
 module.exports = function attachLoginWithFacebookHandler(router) {
   router.post(
@@ -32,6 +21,7 @@ module.exports = function attachLoginWithFacebookHandler(router) {
       let name;
       if (users.length) {
         userId = users[0].id;
+        // eslint-disable-next-line
         name = users[0].name;
       } else {
         userId = (await db.query(
