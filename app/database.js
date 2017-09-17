@@ -35,6 +35,7 @@ async function initDatabase() {
       osmAuthToken VARCHAR(255) CHARSET latin1 COLLATE latin1_bin NULL UNIQUE,
       osmAuthTokenSecret VARCHAR(255) CHARSET latin1 COLLATE latin1_bin NULL,
       facebookAccessToken VARCHAR(255) CHARSET latin1 COLLATE latin1_bin NULL,
+      googleIdToken VARCHAR(4095) CHARSET latin1 COLLATE latin1_bin NULL,
       FOREIGN KEY (userId) REFERENCES user (id) ON DELETE CASCADE
     ) ENGINE=InnoDB`,
 
