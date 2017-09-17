@@ -3,11 +3,11 @@ const { acceptValidator, queryValidator, queryAdapter } = require('~/requestVali
 const { ratingSubquery } = require('./ratingConstants');
 
 const globalValidationRules = {
-  userId: v => v === null || !isNaN(v) || 'invalid userId',
-  ratingFrom: v => v === null || !isNaN(v) || 'invalid ratingFrom',
-  ratingTo: v => v === null || !isNaN(v) || 'invalid ratingTo',
-  takenAtFrom: v => v === null || !isNaN(v) || 'invalid takenAtFrom',
-  takenAtTo: v => v === null || !isNaN(v) || 'invalid takenAtTo',
+  userId: v => v === null || !Number.isNaN(v) || 'invalid userId',
+  ratingFrom: v => v === null || !Number.isNaN(v) || 'invalid ratingFrom',
+  ratingTo: v => v === null || !Number.isNaN(v) || 'invalid ratingTo',
+  takenAtFrom: v => v === null || !Number.isNaN(v) || 'invalid takenAtFrom',
+  takenAtTo: v => v === null || !Number.isNaN(v) || 'invalid takenAtTo',
 };
 
 const radiusQueryValidator = queryValidator(Object.assign({
@@ -17,16 +17,16 @@ const radiusQueryValidator = queryValidator(Object.assign({
 }), globalValidationRules);
 
 const bboxQueryValidator = queryValidator(Object.assign({
-  bbox: v => v && v.length === 4 && v.every(x => !isNaN(x)) || 'invalid bbox',
+  bbox: v => v && v.length === 4 && v.every(x => !Number.isNaN(x)) || 'invalid bbox',
 }), globalValidationRules);
 
 const orderQueryValidator = queryValidator(Object.assign({
   orderBy: v => ['createdAt', 'takenAt', 'rating'].includes(v) || 'invalid orderBy',
   direction: v => ['desc', 'asc'].includes(v) || 'invalid direction',
-  refId: v => v === null || !isNaN(v) || 'invalid refId',
-  refCreatedAt: v => v === null || !isNaN(v) || 'invalid refCreatedAt',
-  refTakenAt: v => v === null || !isNaN(v) || 'invalid refTakenAt',
-  refRating: v => v === null || !isNaN(v) || 'invalid refRating',
+  refId: v => v === null || !Number.isNaN(v) || 'invalid refId',
+  refCreatedAt: v => v === null || !Number.isNaN(v) || 'invalid refCreatedAt',
+  refTakenAt: v => v === null || !Number.isNaN(v) || 'invalid refTakenAt',
+  refRating: v => v === null || !Number.isNaN(v) || 'invalid refRating',
 }), globalValidationRules);
 
 const qvs = {
@@ -110,7 +110,7 @@ async function byRadius(ctx) {
 }
 
 function toSqlDate(d) {
-  return isNaN(d) ? d : d.toISOString().replace('T', ' ').replace(/(\.\d*)?Z$/, '');
+  return Number.isNaN(d) ? d : d.toISOString().replace('T', ' ').replace(/(\.\d*)?Z$/, '');
 }
 
 async function byBbox(ctx) {
