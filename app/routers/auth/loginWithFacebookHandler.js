@@ -8,6 +8,8 @@ module.exports = function attachLoginWithFacebookHandler(router) {
     // TODO validation
     dbMiddleware,
     async (ctx) => {
+      /* eslint-disable prefer-destructuring */
+
       const { accessToken } = ctx.request.body;
       const { id, name: fbName, email } = await fb.withAccessToken(accessToken).api('/me', { fields: 'id,name,email' });
 
@@ -19,16 +21,18 @@ module.exports = function attachLoginWithFacebookHandler(router) {
 
       let userId;
       let name;
+      let isAdmin;
       if (users.length) {
         userId = users[0].id;
-        // eslint-disable-next-line
         name = users[0].name;
+        isAdmin = users[0].isAdmin;
       } else {
         userId = (await db.query(
           'INSERT INTO user (facebookUserId, name, email, createdAt) VALUES (?, ?, ?, ?)',
           [id, fbName, email, now],
         )).insertId;
         name = fbName;
+        isAdmin = false;
       }
 
       const authToken = uuidBase62.v4(); // TODO rather some crypro securerandom
@@ -38,7 +42,7 @@ module.exports = function attachLoginWithFacebookHandler(router) {
         [userId, now, authToken, accessToken],
       );
 
-      ctx.body = { id: userId, authToken, name };
+      ctx.body = { id: userId, authToken, name, isAdmin };
     },
   );
 };

@@ -18,6 +18,8 @@ module.exports = function attachLogin2Handler(router) {
     // TODO validation
     dbMiddleware,
     async (ctx) => {
+      /* eslint-disable prefer-destructuring */
+
       const body = await rp.post({
         url: 'http://www.openstreetmap.org/oauth/access_token',
         oauth: {
@@ -55,9 +57,11 @@ module.exports = function attachLogin2Handler(router) {
 
       let userId;
       let name;
+      let isAdmin;
       if (users.length) {
         userId = users[0].id;
         name = users[0].name;
+        isAdmin = users[0].isAdmin;
         // TODO update name (and ensure osmId is the same)
       } else {
         userId = (await db.query(
@@ -65,6 +69,7 @@ module.exports = function attachLogin2Handler(router) {
           [osmId, osmName, now],
         )).insertId;
         name = osmName;
+        isAdmin = false;
       }
 
       const authToken = uuidBase62.v4(); // TODO rather some crypro securerandom
@@ -74,7 +79,7 @@ module.exports = function attachLogin2Handler(router) {
         [userId, now, authToken, permData.oauth_token, permData.oauth_token_secret],
       );
 
-      ctx.body = { id: userId, authToken, name, lat, lon };
+      ctx.body = { id: userId, authToken, name, isAdmin, lat, lon };
     },
   );
 };

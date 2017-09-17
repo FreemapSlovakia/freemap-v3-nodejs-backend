@@ -38,7 +38,7 @@ module.exports = function attachPostPictureHandler(router) {
     bodySchemaValidator(postPictureSchema, true),
     acceptValidator('application/json'),
     async (ctx) => {
-      const image = ctx.request.body.files.image;
+      const { image } = ctx.request.body.files;
       const { title, description, takenAt, position: { lat, lon }, tags = [] } = ctx.request.body.fields.meta;
 
       const name = uuidBase62.v4();
