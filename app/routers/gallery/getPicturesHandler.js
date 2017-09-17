@@ -23,10 +23,6 @@ const bboxQueryValidator = queryValidator(Object.assign({
 const orderQueryValidator = queryValidator(Object.assign({
   orderBy: v => ['createdAt', 'takenAt', 'rating'].includes(v) || 'invalid orderBy',
   direction: v => ['desc', 'asc'].includes(v) || 'invalid direction',
-  refId: v => v === null || !Number.isNaN(v) || 'invalid refId',
-  refCreatedAt: v => v === null || !Number.isNaN(v) || 'invalid refCreatedAt',
-  refTakenAt: v => v === null || !Number.isNaN(v) || 'invalid refTakenAt',
-  refRating: v => v === null || !Number.isNaN(v) || 'invalid refRating',
 }), globalValidationRules);
 
 const qvs = {
@@ -52,11 +48,6 @@ module.exports = function attachGetPicturesHandler(router) {
 
       bbox: x => (x === undefined ? null : x.split(',').map(parseFloat)),
       userId: x => (x ? parseInt(x, 10) : null),
-
-      refId: x => (x ? parseInt(x, 10) : null),
-      refCreatedAt: x => (x ? new Date(x) : null),
-      refTakenAt: x => (x ? new Date(x) : null),
-      refRating: x => (x ? parseFloat(x) : null),
 
       ratingFrom: x => (x ? parseFloat(x) : null),
       ratingTo: x => (x ? parseFloat(x) : null),
@@ -135,8 +126,7 @@ async function byBbox(ctx) {
 }
 
 async function byOrder(ctx) {
-  const { userId, tag, ratingFrom, ratingTo, takenAtFrom, takenAtTo,
-    orderBy, refId, refRating, refCreatedAt, refTakenAt, direction } = ctx.query;
+  const { userId, tag, ratingFrom, ratingTo, takenAtFrom, takenAtTo, orderBy, direction } = ctx.query;
 
   const { db } = ctx.state;
 
@@ -148,18 +138,6 @@ async function byOrder(ctx) {
   if (ratingTo !== null) {
     hv.push(`rating <= ${ratingTo}`);
   }
-  if (refRating !== null) {
-    hv.push(`rating ${direction === 'asc' ? '>' : '<'}= ${refRating}`);
-  }
-  if (refCreatedAt !== null) {
-    wh.push(`rating ${direction === 'asc' ? '>' : '<'}= '${toSqlDate(refCreatedAt)}'`);
-  }
-  if (refTakenAt !== null) {
-    wh.push(`rating ${direction === 'asc' ? '>' : '<'}= '${toSqlDate(refTakenAt)}'`);
-  }
-  if (refId !== null) {
-    wh.push(`id > ${refId}`);
-  }
   if (takenAtFrom !== null) {
     wh.push(`takenAt >= '${toSqlDate(takenAtFrom)}'`);
   }
@@ -170,13 +148,16 @@ async function byOrder(ctx) {
     wh.push(`userId = ${userId}`);
   }
 
-  const sql = `SELECT id, ${ratingFrom || ratingTo ? `, ${ratingSubquery}` : ''}
+  const sql = `SELECT id ${ratingFrom || ratingTo || orderBy === 'rating' ? `, ${ratingSubquery}` : ''}
     FROM picture
     ${tag ? `JOIN pictureTag ON pictureTag.pictureId = picture.id AND name = ${db.escape(tag)}` : ''}
     ${wh.length ? `WHERE ${wh.join(' AND ')}` : ''}
     ${hv.length ? `HAVING ${hv.join(' AND ')}` : ''}    
-    ORDER BY ${orderBy}, id
+    ORDER BY ${orderBy} ${direction}, id ${direction}
+    LIMIT 1000
   `;
+
+  console.log('QQQQQQQQQ', sql);
 
   const rows = await db.query(sql);
 
