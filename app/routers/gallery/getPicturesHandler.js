@@ -8,6 +8,8 @@ const globalValidationRules = {
   ratingTo: v => v === null || !Number.isNaN(v) || 'invalid ratingTo',
   takenAtFrom: v => v === null || !Number.isNaN(v) || 'invalid takenAtFrom',
   takenAtTo: v => v === null || !Number.isNaN(v) || 'invalid takenAtTo',
+  createdAtFrom: v => v === null || !Number.isNaN(v) || 'invalid createdAtFrom',
+  createdAtTo: v => v === null || !Number.isNaN(v) || 'invalid createdAtTo',
 };
 
 const radiusQueryValidator = queryValidator(Object.assign({
@@ -53,6 +55,8 @@ module.exports = function attachGetPicturesHandler(router) {
       ratingTo: x => (x ? parseFloat(x) : null),
       takenAtFrom: x => (x ? new Date(x) : null),
       takenAtTo: x => (x ? new Date(x) : null),
+      createdAtFrom: x => (x ? new Date(x) : null),
+      createdAtTo: x => (x ? new Date(x) : null),
     }),
     queryValidator({
       by: v => ['radius', 'bbox', 'order'].includes(v) || '"by" must be one of "radius", "bbox", "order"',
@@ -69,7 +73,7 @@ module.exports = function attachGetPicturesHandler(router) {
 };
 
 async function byRadius(ctx) {
-  const { lat, lon, distance, userId, tag, ratingFrom, ratingTo, takenAtFrom, takenAtTo } = ctx.query;
+  const { lat, lon, distance, userId, tag, ratingFrom, ratingTo, takenAtFrom, takenAtTo, createdAtFrom, createdAtTo } = ctx.query;
 
   // cca 1 degree
   const lat1 = lat - (distance / 43);
@@ -88,6 +92,8 @@ async function byRadius(ctx) {
       WHERE lat BETWEEN ${lat1} AND ${lat2} AND lon BETWEEN ${lon1} AND ${lon2}
       ${takenAtFrom ? `AND takenAt >= '${toSqlDate(takenAtFrom)}'` : ''}
       ${takenAtTo ? `AND takenAt <= '${toSqlDate(takenAtTo)}'` : ''}
+      ${createdAtFrom ? `AND createdAt >= '${toSqlDate(createdAtFrom)}'` : ''}
+      ${createdAtTo ? `AND createdAt <= '${toSqlDate(createdAtTo)}'` : ''}
       ${userId ? `AND userId = ${userId}` : ''}
       HAVING distance <= ${distance}
       ${ratingFrom === null ? '' : `AND rating >= ${ratingFrom}`}
@@ -105,7 +111,7 @@ function toSqlDate(d) {
 }
 
 async function byBbox(ctx) {
-  const { bbox: [minLon, minLat, maxLon, maxLat], userId, tag, ratingFrom, ratingTo, takenAtFrom, takenAtTo } = ctx.query;
+  const { bbox: [minLon, minLat, maxLon, maxLat], userId, tag, ratingFrom, ratingTo, takenAtFrom, takenAtTo, createdAtFrom, createdAtTo } = ctx.query;
 
   const { db } = ctx.state;
 
@@ -115,6 +121,8 @@ async function byBbox(ctx) {
     WHERE lat BETWEEN ${minLat} AND ${maxLat} AND lon BETWEEN ${minLon} AND ${maxLon}
     ${takenAtFrom ? `AND takenAt >= '${toSqlDate(takenAtFrom)}'` : ''}
     ${takenAtTo ? `AND takenAt <= '${toSqlDate(takenAtTo)}'` : ''}
+    ${createdAtFrom ? `AND createdAt >= '${toSqlDate(createdAtFrom)}'` : ''}
+    ${createdAtTo ? `AND createdAt <= '${toSqlDate(createdAtTo)}'` : ''}
     ${userId ? `AND userId = ${userId}` : ''}
     ${ratingFrom === null ? '' : `HAVING rating >= ${ratingFrom}`}
     ${ratingTo === null ? '' : `${ratingTo ? 'AND' : 'HAVING'} rating <= ${ratingTo}`}
@@ -126,7 +134,7 @@ async function byBbox(ctx) {
 }
 
 async function byOrder(ctx) {
-  const { userId, tag, ratingFrom, ratingTo, takenAtFrom, takenAtTo, orderBy, direction } = ctx.query;
+  const { userId, tag, ratingFrom, ratingTo, takenAtFrom, takenAtTo, createdAtFrom, createdAtTo, orderBy, direction } = ctx.query;
 
   const { db } = ctx.state;
 
@@ -143,6 +151,12 @@ async function byOrder(ctx) {
   }
   if (takenAtTo !== null) {
     wh.push(`takenAt <= '${toSqlDate(takenAtTo)}'`);
+  }
+  if (createdAtFrom !== null) {
+    wh.push(`createdAt >= '${toSqlDate(createdAtFrom)}'`);
+  }
+  if (createdAtTo !== null) {
+    wh.push(`createdAt <= '${toSqlDate(createdAtTo)}'`);
   }
   if (userId !== null) {
     wh.push(`userId = ${userId}`);
