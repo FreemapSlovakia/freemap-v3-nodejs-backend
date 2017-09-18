@@ -16,8 +16,15 @@ module.exports = function attachPostPictureHandler(router) {
     authenticator(true),
     contentTypeValidator('multipart/form-data'),
     async (ctx, next) => {
-      const { fields } = ctx.request.body;
-      if (fields && fields.meta) {
+      const { fields, files } = ctx.request.body;
+      if (!files || !files.image) {
+        ctx.status = 400;
+        ctx.body = {
+          error: 'missing_image_file',
+        };
+      } else if (files.image.size > 10 * 1024 * 1024) {
+        ctx.status = 413;
+      } else if (fields && fields.meta) {
         try {
           fields.meta = JSON.parse(ctx.request.body.fields.meta);
         } catch (e) {
