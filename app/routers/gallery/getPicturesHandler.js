@@ -20,6 +20,7 @@ const radiusQueryValidator = queryValidator(Object.assign({
 
 const bboxQueryValidator = queryValidator(Object.assign({
   bbox: v => v && v.length === 4 && v.every(x => !Number.isNaN(x)) || 'invalid bbox',
+  fields: v => !v || v.every(f => ['id', 'title', 'description', 'takenAt', 'createdAt', 'rating'].includes(f)) || 'invalid fields',
 }), globalValidationRules);
 
 const orderQueryValidator = queryValidator(Object.assign({
@@ -57,6 +58,7 @@ module.exports = function attachGetPicturesHandler(router) {
       takenAtTo: x => (x ? new Date(x) : null),
       createdAtFrom: x => (x ? new Date(x) : null),
       createdAtTo: x => (x ? new Date(x) : null),
+      fields: x => (typeof x === 'string' ? [x] : x),
     }),
     queryValidator({
       by: v => ['radius', 'bbox', 'order'].includes(v) || '"by" must be one of "radius", "bbox", "order"',
@@ -111,11 +113,16 @@ function toSqlDate(d) {
 }
 
 async function byBbox(ctx) {
-  const { bbox: [minLon, minLat, maxLon, maxLat], userId, tag, ratingFrom, ratingTo, takenAtFrom, takenAtTo, createdAtFrom, createdAtTo } = ctx.query;
+  const { bbox: [minLon, minLat, maxLon, maxLat], userId, tag, ratingFrom, ratingTo, takenAtFrom, takenAtTo, createdAtFrom, createdAtTo, fields } = ctx.query;
 
   const { db } = ctx.state;
 
-  const sql = `SELECT lat, lon ${ratingFrom || ratingTo ? `, ${ratingSubquery}` : ''}
+  const flds = ['lat', 'lon', ...(fields ? fields.filter(f => f !== 'rating') : [])];
+  if (ratingFrom || ratingTo) {
+    flds.push(ratingSubquery);
+  }
+
+  const sql = `SELECT ${flds.join(',')}
     FROM picture
     ${tag ? `JOIN pictureTag ON pictureTag.pictureId = picture.id AND name = ${db.escape(tag)}` : ''}
     WHERE lat BETWEEN ${minLat} AND ${maxLat} AND lon BETWEEN ${minLon} AND ${maxLon}
@@ -130,7 +137,7 @@ async function byBbox(ctx) {
 
   const rows = await db.query(sql);
 
-  ctx.body = rows.map(({ lat, lon }) => ({ lat, lon }));
+  ctx.body = fields && fields.includes('rating') ? rows : rows.map(row => Object.assign({}, row, { rating: undefined }));
 }
 
 async function byOrder(ctx) {
