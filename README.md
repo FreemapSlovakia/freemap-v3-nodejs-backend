@@ -19,7 +19,7 @@ npm run watch | ./node_modules/.bin/bunyan
 
 ## Running in production mode
 
-For development please create `config/development.json` configuration. It will inherint from `config/production.json`.
+For development please create `config/production.json` configuration. It will inherint from `config/default.json`.
 
 ```bash
 npm i
