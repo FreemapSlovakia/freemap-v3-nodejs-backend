@@ -10,7 +10,7 @@ API server for next freemap webapp.
 
 ## Running in development mode
 
-For development please create `config/development.json` configuration. It will inherint from `config/default.json`.
+Please create `config/development.json` configuration. It will inherint from `config/default.json`.
 
 ```bash
 npm i
@@ -19,7 +19,7 @@ npm run watch | ./node_modules/.bin/bunyan
 
 ## Running in production mode
 
-For development please create `config/production.json` configuration. It will inherint from `config/default.json`.
+Please create `config/production.json` configuration. It will inherint from `config/default.json`.
 
 ```bash
 npm i
