@@ -1,37 +1,42 @@
 # Freemap 3 API
 
-Part of backend for Freemap v3 written in node.js
+API server for next freemap webapp.
 
 ## Requirements
 
 * Node 8
+* MySQL Database Server
+* exiftran
 
 ## Running in development mode
 
-```
-sudo npm i -g bunyan
+For development please create `config/development.json` configuration. It will inherint from `config/default.json`.
+
+```bash
 npm i
-npm run watch | bunyan
+npm run watch | ./node_modules/.bin/bunyan
 ```
 
 ## Running in production mode
 
-```
-sudo npm i -g bunyan
+For development please create `config/development.json` configuration. It will inherint from `config/production.json`.
+
+```bash
 npm i
-NODE_ENV=production npm start | bunyan
+NODE_ENV=production npm start | ./node_modules/.bin/bunyan
 ```
+
+We strongly recommend to use `forever` command (installed with `npm i -g forever`).
 
 ## Running tests
 
-```
-sudo npm install -g mocha
+```bash
 npm i
-mocha test/
+./node_modules/.bin/mocha test/
 ```
 
-running single test:
+Running single test:
 
-```
-mocha test -g "POST /tracklogs should return uid"
+```bash
+./node_modules/.bin/mochamocha test -g "POST /tracklogs should return uid"
 ```
