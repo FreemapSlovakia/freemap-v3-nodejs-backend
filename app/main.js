@@ -35,15 +35,11 @@ router.use('/auth', authRouter.routes(), authRouter.allowedMethods());
 app.use(router.routes());
 
 initDatabase()
-  .then(
-    () => {
-      const port = config.get('http.port');
-      app.listen(port, () => {
-        logger.info(`Freemap v3 API listening on port ${port}.`);
-      });
-    },
-  ).catch(
-    (err) => {
-      logger.fatal({ err }, 'Error initializing database.');
-    },
-  );
+  .then(() => {
+    const port = config.get('http.port');
+    app.listen(port, () => {
+      logger.info(`Freemap v3 API listening on port ${port}.`);
+    });
+  }).catch((err) => {
+    logger.fatal({ err }, 'Error initializing database.');
+  });
