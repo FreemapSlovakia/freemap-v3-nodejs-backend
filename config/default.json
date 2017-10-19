@@ -9,20 +9,21 @@
     "user": "freemap",
     "password": "freemap"
   },
-  "oauth": {
-    "consumerKey": "XsCiIfvjfhS6iBNR30H29ymmgRYAb3j98kjOyCUu",
-    "consumerSecret": "***",
-    "callback": "http://local.freemap.sk:9000/authCallback.html"
-  },
   "dir": {
     "pictures": "./user_data/pictures/",
     "tracklogs": "./user_data/tracklogs"
+  },
+  "webBaseUrl": "http://local.freemap.sk:9000",
+  "mailgun": null,
+  "oauth": {
+    "consumerKey": "***",
+    "consumerSecret": "***"
   },
   "facebook": {
     "appSecret": "***"
   },
   "google": {
-    "clientId": "120698260366-tt592mqhut3931ct83667sfihdkv69jj.apps.googleusercontent.com",
+    "clientId": "***.apps.googleusercontent.com",
     "clientSecret": "***"
   }
 }

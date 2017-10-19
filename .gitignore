@@ -1,4 +1,4 @@
 node_modules
 console.out
 nohup.out
-
+config/development.json

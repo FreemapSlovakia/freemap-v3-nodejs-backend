@@ -5,7 +5,7 @@ const requestTokenRegistry = require('./requestTokenRegistry');
 
 const consumerKey = config.get('oauth.consumerKey');
 const consumerSecret = config.get('oauth.consumerSecret');
-const callback = config.get('oauth.callback');
+const webBaseUrl = config.get('webBaseUrl');
 
 module.exports = function attachLoginHandler(router) {
   router.post(
@@ -15,7 +15,7 @@ module.exports = function attachLoginHandler(router) {
       const body = await rp.post({
         url: 'http://www.openstreetmap.org/oauth/request_token',
         oauth: {
-          callback,
+          callback: `${webBaseUrl}/authCallback.html`,
           consumer_key: consumerKey,
           consumer_secret: consumerSecret,
         },
