@@ -1,0 +1,25 @@
+{
+  "type": "object",
+    "anyOf": [
+      {
+        "required": [
+          "name"
+        ]
+      },
+      {
+        "required": [
+          "email"
+        ]
+      }
+    ],
+    "properties": {
+    "name": {
+      "type": "string"
+    },
+    "email": {
+      "type": ["string", "null"],
+      "format": "email"
+    }
+  },
+  "additionalProperties": false
+}
