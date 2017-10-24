@@ -1,11 +1,7 @@
 const rp = require('request-promise-native');
 const config = require('config');
-const { parseString } = require('xml2js');
-const { promisify } = require('util');
 const fb = require('~/fb');
 const { verifyIdToken, clientId } = require('~/google');
-
-const parseStringAsync = promisify(parseString);
 
 const consumerKey = config.get('oauth.consumerKey');
 const consumerSecret = config.get('oauth.consumerSecret');
@@ -26,88 +22,73 @@ module.exports = function authenticator(require, deep) {
     }
 
     const authToken = m[1];
-    const auths = await ctx.state.db.query(
+    const [auth] = await ctx.state.db.query(
       `SELECT userId, osmAuthToken, osmAuthTokenSecret, facebookAccessToken, googleIdToken, name, email, isAdmin, lat, lon
         FROM auth INNER JOIN user ON (userId = id) WHERE authToken = ?`,
       [authToken],
     );
 
-    let userDetails;
-    if (auths.length) {
-      const [auth] = auths;
-      if (!deep) {
-        ctx.state.user = { id: auth.userId, isAdmin: !!auth.isAdmin, name: auth.name, authToken };
-        await next();
-      } else if (auth.googleIdToken) {
-        try {
-          await verifyIdToken(auth.googleIdToken, clientId);
-        } catch (e) {
-          if (require) {
-            ctx.status = 401;
-            ctx.set('WWW-Authenticate', 'Bearer realm="freemap"; error="invalid Google authorization"');
-          } else {
-            await next();
-          }
+    if (!auth) {
+      await bad('');
+      return;
+    }
+
+    const user = { id: auth.userId, isAdmin: !!auth.isAdmin, name: auth.name, authToken, lat: auth.lat, lon: auth.lon };
+
+    if (!deep) {
+      ctx.state.user = user;
+      await next();
+    } else if (auth.googleIdToken) {
+      try {
+        await verifyIdToken(auth.googleIdToken, clientId);
+      } catch (e) {
+        await bad('Google');
+        return;
+      }
+
+      ctx.state.user = user;
+      await next();
+    } else if (auth.facebookAccessToken) {
+      try {
+        await fb.withAccessToken(auth.facebookAccessToken).api('/me', { fields: 'id' });
+      } catch (e) {
+        await bad('Facebook');
+        return;
+      }
+
+      ctx.state.user = user;
+      await next();
+    } else if (auth.osmAuthToken) {
+      try {
+        await rp.get({
+          url: 'http://api.openstreetmap.org/api/0.6/user/details',
+          oauth: {
+            consumer_key: consumerKey,
+            consumer_secret: consumerSecret,
+            token: auth.osmAuthToken,
+            token_secret: auth.osmAuthTokenSecret,
+          },
+        });
+      } catch (e) {
+        if (e.name === 'StatusCodeError' && e.statusCode === 401) {
+          await bad('OSM');
           return;
         }
+      }
 
-        ctx.state.user = { id: auth.userId, isAdmin: !!auth.isAdmin, name: auth.name, authToken };
-        await next();
-      } else if (auth.facebookAccessToken) {
-        try {
-          await fb.withAccessToken(auth.facebookAccessToken).api('/me', { fields: 'id' });
-        } catch (e) {
-          if (require) {
-            ctx.status = 401;
-            ctx.set('WWW-Authenticate', 'Bearer realm="freemap"; error="invalid Facebook authorization"');
-          } else {
-            await next();
-          }
-          return;
-        }
+      ctx.state.user = user;
+      await next();
+    }
 
-        ctx.state.user = { id: auth.userId, isAdmin: !!auth.isAdmin, name: auth.name, authToken };
-        await next();
-      } else if (auth.osmAuthToken) {
-        try {
-          userDetails = await rp.get({
-            url: 'http://api.openstreetmap.org/api/0.6/user/details',
-            oauth: {
-              consumer_key: consumerKey,
-              consumer_secret: consumerSecret,
-              token: auth.osmAuthToken,
-              token_secret: auth.osmAuthTokenSecret,
-            },
-          });
-        } catch (e) {
-          if (e.name === 'StatusCodeError' && e.statusCode === 401) {
-            // TODO delete authToken from DB
+    async function bad(what) {
+      await ctx.state.db.query('DELETE FROM auth WHERE authToken = ?', [authToken]);
 
-            if (require) {
-              ctx.status = 401;
-              ctx.set('WWW-Authenticate', 'Bearer realm="freemap"; error="invalid OSM authorization"');
-            } else {
-              await next();
-            }
-            return;
-          }
-        }
-
-        const result = await parseStringAsync(userDetails);
-
-        const { /* $: { display_name: name, id: osmId }, */ home } = result.osm.user[0];
-        const { lat, lon } = home && home.length && home[0].$ || {};
-
-        // TODO update name in DB
-
-        ctx.state.user = { id: auth.userId, isAdmin: !!auth.isAdmin, name: auth.name, authToken };
+      if (require) {
+        ctx.status = 401;
+        ctx.set('WWW-Authenticate', `Bearer realm="freemap"; error="invalid ${what} authorization"`);
+      } else {
         await next();
       }
-    } else if (require) {
-      ctx.status = 401;
-      ctx.set('WWW-Authenticate', 'Bearer realm="freemap"; error="invalid token"');
-    } else {
-      next();
     }
   };
 };
