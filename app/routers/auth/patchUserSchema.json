@@ -1,24 +1,36 @@
 {
   "type": "object",
-    "anyOf": [
-      {
-        "required": [
-          "name"
-        ]
-      },
-      {
-        "required": [
-          "email"
-        ]
-      }
-    ],
-    "properties": {
+  "anyOf": [
+    {
+      "required": [
+        "name"
+      ]
+    },
+    {
+      "required": [
+        "email"
+      ]
+    },
+    {
+      "required": [
+        "lat",
+        "lon"
+      ]            
+    }
+  ],
+  "properties": {
     "name": {
       "type": "string"
     },
     "email": {
       "type": ["string", "null"],
       "format": "email"
+    },
+    "lat": {
+      "type": "number"
+    },
+    "lon": {
+      "type": "number"
     }
   },
   "additionalProperties": false

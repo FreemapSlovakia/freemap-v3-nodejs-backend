@@ -25,7 +25,9 @@ async function initDatabase() {
       name VARCHAR(255) CHARSET utf8 COLLATE utf8_general_ci NOT NULL,
       email VARCHAR(255) CHARSET utf8 COLLATE utf8_general_ci NULL,
       isAdmin BOOL NOT NULL DEFAULT 0,
-      createdAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+      createdAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      lat FLOAT(8, 6) NULL,
+      lon FLOAT(9, 6) NULL
     ) ENGINE=InnoDB`,
 
     `CREATE TABLE IF NOT EXISTS auth (
@@ -88,6 +90,8 @@ async function initDatabase() {
     'ALTER TABLE user ADD COLUMN email VARCHAR(255) CHARSET utf8 COLLATE utf8_general_ci NULL',
     'ALTER TABLE auth ADD COLUMN facebookAccessToken VARCHAR(255) CHARSET latin1 COLLATE latin1_bin NULL',
     'ALTER TABLE auth ADD COLUMN googleIdToken VARCHAR(4095) CHARSET latin1 COLLATE latin1_bin NULL',
+    'ALTER TABLE user ADD COLUMN lat FLOAT(8, 6) NULL',
+    'ALTER TABLE user ADD COLUMN lon FLOAT(9, 6) NULL',
   ];
 
   const db = await pool.getConnection();
