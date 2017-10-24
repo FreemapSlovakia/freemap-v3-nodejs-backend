@@ -65,8 +65,8 @@ module.exports = function attachLogin2Handler(router) {
         // TODO update name (and ensure osmId is the same)
       } else {
         userId = (await db.query(
-          'INSERT INTO user (osmId, name, createdAt) VALUES (?, ?, ?)',
-          [osmId, osmName, now],
+          'INSERT INTO user (osmId, name, createdAt, lat, lon) VALUES (?, ?, ?, ?, ?)',
+          [osmId, osmName, now, lat, lon],
         )).insertId;
         name = osmName;
         isAdmin = false;

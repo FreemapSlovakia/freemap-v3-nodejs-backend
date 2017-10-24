@@ -26,8 +26,11 @@ module.exports = function authenticator(require, deep) {
     }
 
     const authToken = m[1];
-    const auths = await ctx.state.db.query(`SELECT userId, osmAuthToken, osmAuthTokenSecret, facebookAccessToken, googleIdToken, name, isAdmin
-      FROM auth INNER JOIN user ON (userId = id) WHERE authToken = ?`, [authToken]);
+    const auths = await ctx.state.db.query(
+      `SELECT userId, osmAuthToken, osmAuthTokenSecret, facebookAccessToken, googleIdToken, name, email, isAdmin, lat, lon
+        FROM auth INNER JOIN user ON (userId = id) WHERE authToken = ?`,
+      [authToken],
+    );
 
     let userDetails;
     if (auths.length) {
@@ -97,7 +100,7 @@ module.exports = function authenticator(require, deep) {
 
         // TODO update name in DB
 
-        ctx.state.user = { id: auth.userId, isAdmin: !!auth.isAdmin, name: auth.name, authToken, lat, lon };
+        ctx.state.user = { id: auth.userId, isAdmin: !!auth.isAdmin, name: auth.name, authToken };
         await next();
       }
     } else if (require) {
