@@ -44,7 +44,7 @@ module.exports = function authenticator(require, deep) {
         } catch (e) {
           if (require) {
             ctx.status = 401;
-            ctx.set('WWW-Authenticate', 'Bearer realm="freemap"; error="invalid Facebook authorization"');
+            ctx.set('WWW-Authenticate', 'Bearer realm="freemap"; error="invalid Google authorization"');
           } else {
             await next();
           }
