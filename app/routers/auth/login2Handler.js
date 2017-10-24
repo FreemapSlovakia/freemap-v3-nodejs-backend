@@ -47,23 +47,27 @@ module.exports = function attachLogin2Handler(router) {
 
       const { $: { display_name: osmName, id: osmId }, home } = result.osm.user[0];
 
-      const { lat, lon } = home && home.length && home[0].$ || {};
+      const homeLocation = home && home.length && home[0].$ || {};
 
       const { db } = ctx.state;
 
-      const users = await db.query('SELECT id, name FROM user WHERE osmId = ?', [osmId]);
+      const [user] = await db.query('SELECT id, name, email, isAdmin, lat, lon FROM user WHERE osmId = ?', [osmId]);
 
       const now = new Date();
 
       let userId;
       let name;
+      let email;
       let isAdmin;
-      if (users.length) {
-        userId = users[0].id;
-        name = users[0].name;
-        isAdmin = users[0].isAdmin;
-        // TODO update name (and ensure osmId is the same)
+      let lat;
+      let lon;
+      if (user) {
+        ({ name, email, lat, lon } = user);
+        userId = user.id;
+        isAdmin = !!user.isAdmin;
+        // TODO ensure osmId is the same
       } else {
+        ({ lat, lon } = homeLocation);
         userId = (await db.query(
           'INSERT INTO user (osmId, name, createdAt, lat, lon) VALUES (?, ?, ?, ?, ?)',
           [osmId, osmName, now, lat, lon],
@@ -79,7 +83,7 @@ module.exports = function attachLogin2Handler(router) {
         [userId, now, authToken, permData.oauth_token, permData.oauth_token_secret],
       );
 
-      ctx.body = { id: userId, authToken, name, isAdmin, lat, lon };
+      ctx.body = { id: userId, authToken, name, email, isAdmin, lat, lon };
     },
   );
 };

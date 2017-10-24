@@ -16,23 +16,27 @@ module.exports = function attachLoginWithFacebookHandler(router) {
 
       const { db } = ctx.state;
 
-      const users = await db.query('SELECT id, name, isAdmin FROM user WHERE googleUserId = ?', [payload.sub]);
+      const [user] = await db.query('SELECT id, name, email, isAdmin, lat, lon FROM user WHERE googleUserId = ?', [payload.sub]);
 
       const now = new Date();
 
       let userId;
       let name;
+      let email;
       let isAdmin;
-      if (users.length) {
-        userId = users[0].id;
-        name = users[0].name;
-        isAdmin = !!users[0].isAdmin;
+      let lat;
+      let lon;
+      if (user) {
+        ({ name, email, lat, lon } = user);
+        userId = user.id;
+        isAdmin = !!user.isAdmin;
       } else {
         userId = (await db.query(
           'INSERT INTO user (googleUserId, name, email, createdAt) VALUES (?, ?, ?, ?)',
           [payload.sub, payload.name, payload.email, now],
         )).insertId;
         name = payload.name;
+        email = payload.email;
         isAdmin = false;
       }
 
@@ -43,7 +47,7 @@ module.exports = function attachLoginWithFacebookHandler(router) {
         [userId, now, authToken, idToken],
       );
 
-      ctx.body = { id: userId, authToken, name, isAdmin };
+      ctx.body = { id: userId, authToken, name, email, isAdmin, lat, lon };
     },
   );
 };
