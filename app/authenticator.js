@@ -33,7 +33,7 @@ module.exports = function authenticator(require, deep) {
       return;
     }
 
-    const user = { id: auth.userId, isAdmin: !!auth.isAdmin, name: auth.name, authToken, lat: auth.lat, lon: auth.lon };
+    const user = { id: auth.userId, isAdmin: !!auth.isAdmin, name: auth.name, authToken, lat: auth.lat, lon: auth.lon, email: auth.email };
 
     if (!deep) {
       ctx.state.user = user;
