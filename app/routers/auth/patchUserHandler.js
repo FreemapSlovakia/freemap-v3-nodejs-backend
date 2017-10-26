@@ -6,6 +6,7 @@ const { bodySchemaValidator } = require('~/requestValidators');
 module.exports = function attachPatchUserHandler(router) {
   router.patch(
     '/settings',
+    dbMiddleware,
     authenticator(true, false),
     bodySchemaValidator(patchUserSchema),
     dbMiddleware,
@@ -18,6 +19,8 @@ module.exports = function attachPatchUserHandler(router) {
         `UPDATE user SET ${keys.map(key => `${key} = ?`).join(', ')} WHERE id = ?`,
         [...keys.map(key => ctx.request.body[key]), ctx.state.user.id],
       );
+
+      ctx.status = 204;
     },
   );
 };
