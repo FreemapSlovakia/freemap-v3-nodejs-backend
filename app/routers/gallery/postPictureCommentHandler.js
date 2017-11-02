@@ -31,7 +31,7 @@ module.exports = function attachPostPictureCommentHandler(router) {
             [ctx.params.id],
           ),
           ctx.state.db.query(
-            'SELECT email FROM user JOIN pictureComment ON userId = user.id WHERE pictureId = ? AND userId <> ? AND email IS NOT NULL',
+            'SELECT DISTINCT email FROM user JOIN pictureComment ON userId = user.id WHERE pictureId = ? AND userId <> ? AND email IS NOT NULL',
             [ctx.params.id, ctx.state.user.id],
           ),
         );
@@ -54,7 +54,7 @@ module.exports = function attachPostPictureCommentHandler(router) {
           promises.push(sendMail(email, true));
         }
 
-        promises.push(...emails.map(to => sendMail(to, false)));
+        promises.push(...emails.map(({ email: to }) => sendMail(to, false)));
 
         await Promise.all(promises);
       }
