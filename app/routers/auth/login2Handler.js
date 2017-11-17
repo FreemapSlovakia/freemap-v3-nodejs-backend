@@ -1,4 +1,3 @@
-const uuidBase62 = require('uuid-base62');
 const rp = require('request-promise-native');
 const qs = require('querystring');
 const config = require('config');
@@ -6,6 +5,7 @@ const { parseString } = require('xml2js');
 const { promisify } = require('util');
 const { dbMiddleware } = require('~/database');
 const requestTokenRegistry = require('./requestTokenRegistry');
+const login = require('./loginProcessor');
 
 const parseStringAsync = promisify(parseString);
 
@@ -44,47 +44,14 @@ module.exports = function attachLogin2Handler(router) {
       const result = await parseStringAsync(userDetails);
 
       const { $: { display_name: osmName, id: osmId }, home } = result.osm.user[0];
-
-      const homeLocation = home && home.length && home[0].$ || {};
+      const { lat, lon } = home && home.length && home[0].$ || {};
 
       const { db } = ctx.state;
 
-      const [user] = await db.query('SELECT id, name, email, isAdmin, lat, lon, settings FROM user WHERE osmId = ?', [osmId]);
-
-      const now = new Date();
-
-      let userId;
-      let name;
-      let email;
-      let isAdmin;
-      let lat;
-      let lon;
-      let settings;
-      if (user) {
-        ({ name, email, lat, lon } = user);
-        settings = JSON.parse(user.settings);
-        userId = user.id;
-        isAdmin = !!user.isAdmin;
-        // TODO ensure osmId is the same
-      } else {
-        settings = ctx.request.body.settings || {};
-        ({ lat, lon } = homeLocation);
-        userId = (await db.query(
-          'INSERT INTO user (osmId, name, createdAt, lat, lon) VALUES (?, ?, ?, ?, ?)',
-          [osmId, osmName, now, lat, lon, JSON.stringify(settings)],
-        )).insertId;
-        name = osmName;
-        isAdmin = false;
-      }
-
-      const authToken = uuidBase62.v4(); // TODO rather some crypro securerandom
-
-      await db.query(
-        'INSERT INTO auth (userId, createdAt, authToken, osmAuthToken, osmAuthTokenSecret) VALUES (?, ?, ?, ?, ?)',
-        [userId, now, authToken, permData.oauth_token, permData.oauth_token_secret],
+      await login(
+        db, ctx, 'osmId', osmId, 'osmAuthToken, osmAuthTokenSecret',
+        [permData.oauth_token, permData.oauth_token_secret], osmName, null, lat, lon,
       );
-
-      ctx.body = { id: userId, authToken, name, email, isAdmin, lat, lon, settings };
     },
   );
 };
