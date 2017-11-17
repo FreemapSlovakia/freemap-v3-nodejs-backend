@@ -26,14 +26,17 @@ module.exports = function attachLoginWithFacebookHandler(router) {
       let isAdmin;
       let lat;
       let lon;
+      let settings;
       if (user) {
         ({ name, email, lat, lon } = user);
+        settings = JSON.parse(user.settings);
         userId = user.id;
         isAdmin = !!user.isAdmin;
       } else {
+        settings = ctx.request.body.settings || {};
         userId = (await db.query(
           'INSERT INTO user (googleUserId, name, email, createdAt) VALUES (?, ?, ?, ?)',
-          [payload.sub, payload.name, payload.email, now],
+          [payload.sub, payload.name, payload.email, now, JSON.stringify(settings)],
         )).insertId;
         name = payload.name;
         email = payload.email;
@@ -47,7 +50,7 @@ module.exports = function attachLoginWithFacebookHandler(router) {
         [userId, now, authToken, idToken],
       );
 
-      ctx.body = { id: userId, authToken, name, email, isAdmin, lat, lon };
+      ctx.body = { id: userId, authToken, name, email, isAdmin, lat, lon, settings };
     },
   );
 };

@@ -15,7 +15,7 @@
       "required": [
         "lat",
         "lon"
-      ]            
+      ]
     }
   ],
   "properties": {
@@ -31,6 +31,9 @@
     },
     "lon": {
       "type": "number"
+    },
+    "settings": {
+      "type": "object"
     }
   },
   "additionalProperties": false

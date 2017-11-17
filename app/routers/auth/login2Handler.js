@@ -18,8 +18,6 @@ module.exports = function attachLogin2Handler(router) {
     // TODO validation
     dbMiddleware,
     async (ctx) => {
-      /* eslint-disable prefer-destructuring */
-
       const body = await rp.post({
         url: 'http://www.openstreetmap.org/oauth/access_token',
         oauth: {
@@ -51,7 +49,7 @@ module.exports = function attachLogin2Handler(router) {
 
       const { db } = ctx.state;
 
-      const [user] = await db.query('SELECT id, name, email, isAdmin, lat, lon FROM user WHERE osmId = ?', [osmId]);
+      const [user] = await db.query('SELECT id, name, email, isAdmin, lat, lon, settings FROM user WHERE osmId = ?', [osmId]);
 
       const now = new Date();
 
@@ -61,16 +59,19 @@ module.exports = function attachLogin2Handler(router) {
       let isAdmin;
       let lat;
       let lon;
+      let settings;
       if (user) {
         ({ name, email, lat, lon } = user);
+        settings = JSON.parse(user.settings);
         userId = user.id;
         isAdmin = !!user.isAdmin;
         // TODO ensure osmId is the same
       } else {
+        settings = ctx.request.body.settings || {};
         ({ lat, lon } = homeLocation);
         userId = (await db.query(
           'INSERT INTO user (osmId, name, createdAt, lat, lon) VALUES (?, ?, ?, ?, ?)',
-          [osmId, osmName, now, lat, lon],
+          [osmId, osmName, now, lat, lon, JSON.stringify(settings)],
         )).insertId;
         name = osmName;
         isAdmin = false;
@@ -83,7 +84,7 @@ module.exports = function attachLogin2Handler(router) {
         [userId, now, authToken, permData.oauth_token, permData.oauth_token_secret],
       );
 
-      ctx.body = { id: userId, authToken, name, email, isAdmin, lat, lon };
+      ctx.body = { id: userId, authToken, name, email, isAdmin, lat, lon, settings };
     },
   );
 };

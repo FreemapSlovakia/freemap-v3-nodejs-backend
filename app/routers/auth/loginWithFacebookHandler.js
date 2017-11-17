@@ -15,7 +15,7 @@ module.exports = function attachLoginWithFacebookHandler(router) {
 
       const { db } = ctx.state;
 
-      const [user] = await db.query('SELECT id, name, email, isAdmin, lat, lon FROM user WHERE facebookUserId = ?', [id]);
+      const [user] = await db.query('SELECT id, name, email, isAdmin, lat, lon, settings FROM user WHERE facebookUserId = ?', [id]);
 
       const now = new Date();
 
@@ -25,14 +25,17 @@ module.exports = function attachLoginWithFacebookHandler(router) {
       let isAdmin;
       let lat;
       let lon;
+      let settings;
       if (user) {
         ({ name, email, lat, lon } = user);
+        settings = JSON.parse(user.settings);
         userId = user.id;
         isAdmin = !!user.isAdmin;
       } else {
+        settings = ctx.request.body.settings || {};
         userId = (await db.query(
-          'INSERT INTO user (facebookUserId, name, email, createdAt) VALUES (?, ?, ?, ?)',
-          [id, fbName, fbEmail, now],
+          'INSERT INTO user (facebookUserId, name, email, createdAt, settings) VALUES (?, ?, ?, ?, ?)',
+          [id, fbName, fbEmail, now, JSON.stringify(settings)],
         )).insertId;
         name = fbName;
         email = fbEmail;
@@ -46,7 +49,7 @@ module.exports = function attachLoginWithFacebookHandler(router) {
         [userId, now, authToken, accessToken],
       );
 
-      ctx.body = { id: userId, authToken, name, email, isAdmin, lat, lon };
+      ctx.body = { id: userId, authToken, name, email, isAdmin, lat, lon, settings };
     },
   );
 };

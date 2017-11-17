@@ -17,7 +17,7 @@ module.exports = function attachPatchUserHandler(router) {
 
       await ctx.state.db.query(
         `UPDATE user SET ${keys.map(key => `${key} = ?`).join(', ')} WHERE id = ?`,
-        [...keys.map(key => ctx.request.body[key]), ctx.state.user.id],
+        [...keys.map(key => (key === 'settings' ? JSON.stringify(ctx.request.body[key]) : ctx.request.body[key])), ctx.state.user.id],
       );
 
       ctx.status = 204;

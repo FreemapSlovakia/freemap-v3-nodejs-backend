@@ -23,7 +23,7 @@ module.exports = function authenticator(require, deep) {
 
     const authToken = m[1];
     const [auth] = await ctx.state.db.query(
-      `SELECT userId, osmAuthToken, osmAuthTokenSecret, facebookAccessToken, googleIdToken, name, email, isAdmin, lat, lon
+      `SELECT userId, osmAuthToken, osmAuthTokenSecret, facebookAccessToken, googleIdToken, name, email, isAdmin, lat, lon, settings
         FROM auth INNER JOIN user ON (userId = id) WHERE authToken = ?`,
       [authToken],
     );
@@ -33,7 +33,16 @@ module.exports = function authenticator(require, deep) {
       return;
     }
 
-    const user = { id: auth.userId, isAdmin: !!auth.isAdmin, name: auth.name, authToken, lat: auth.lat, lon: auth.lon, email: auth.email };
+    const user = {
+      id: auth.userId,
+      isAdmin: !!auth.isAdmin,
+      name: auth.name,
+      authToken,
+      lat: auth.lat,
+      lon: auth.lon,
+      email: auth.email,
+      settings: JSON.parse(auth.settings),
+    };
 
     if (!deep) {
       ctx.state.user = user;
