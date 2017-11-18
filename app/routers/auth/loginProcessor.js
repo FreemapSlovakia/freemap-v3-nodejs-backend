@@ -12,22 +12,26 @@ module.exports = async function login(db, ctx, dbField, dbValue, authFields, aut
   let lat;
   let lon;
   let settings;
+  let preventTips;
   if (user) {
     ({ name, email, lat, lon } = user);
     settings = JSON.parse(user.settings);
     userId = user.id;
     isAdmin = !!user.isAdmin;
+    preventTips = !!user.preventTips;
   } else {
     settings = ctx.request.body.settings || {};
     lat = lat0 || settings.lat;
     lon = lon0 || settings.lon;
     name = name0;
     email = email0;
+    isAdmin = false;
+    preventTips = false;
+
     userId = (await db.query(
       `INSERT INTO user (${dbField}, name, email, createdAt, lat, lon, settings) VALUES (?, ?, ?, ?, ?, ?, ?)`,
       [dbValue, name, email, now, lat, lon, JSON.stringify(settings)],
     )).insertId;
-    isAdmin = false;
   }
 
   const authToken = uuidBase62.v4(); // TODO rather some crypro securerandom
@@ -37,5 +41,5 @@ module.exports = async function login(db, ctx, dbField, dbValue, authFields, aut
     [userId, now, authToken, ...authValues],
   );
 
-  ctx.body = { id: userId, authToken, name, email, isAdmin, lat, lon, settings };
+  ctx.body = { id: userId, authToken, name, email, isAdmin, lat, lon, settings, preventTips };
 };

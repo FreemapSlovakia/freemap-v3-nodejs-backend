@@ -16,6 +16,16 @@
         "lat",
         "lon"
       ]
+    },
+    {
+      "required": [
+        "settings"
+      ]
+    },
+    {
+      "required": [
+        "preventTips"
+      ]
     }
   ],
   "properties": {
@@ -34,6 +44,9 @@
     },
     "settings": {
       "type": "object"
+    },
+    "preventTips": {
+      "type": "boolean"
     }
   },
   "additionalProperties": false

@@ -23,7 +23,7 @@ module.exports = function authenticator(require, deep) {
 
     const authToken = m[1];
     const [auth] = await ctx.state.db.query(
-      `SELECT userId, osmAuthToken, osmAuthTokenSecret, facebookAccessToken, googleIdToken, name, email, isAdmin, lat, lon, settings
+      `SELECT userId, osmAuthToken, osmAuthTokenSecret, facebookAccessToken, googleIdToken, name, email, isAdmin, lat, lon, settings, preventTips
         FROM auth INNER JOIN user ON (userId = id) WHERE authToken = ?`,
       [authToken],
     );
@@ -42,6 +42,7 @@ module.exports = function authenticator(require, deep) {
       lon: auth.lon,
       email: auth.email,
       settings: JSON.parse(auth.settings),
+      preventTips: !!auth.preventTips,
     };
 
     if (!deep) {

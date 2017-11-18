@@ -28,7 +28,8 @@ async function initDatabase() {
       createdAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
       lat FLOAT(8, 6) NULL,
       lon FLOAT(9, 6) NULL,
-      settings VARCHAR(4096) CHARSET utf8 COLLATE utf8_bin NOT NULL DEFAULT '{}'
+      settings VARCHAR(4096) CHARSET utf8 COLLATE utf8_bin NOT NULL DEFAULT '{}',
+      preventTips BOOL NOT NULL DEFAULT 0
     ) ENGINE=InnoDB`,
 
     `CREATE TABLE IF NOT EXISTS auth (
@@ -94,6 +95,7 @@ async function initDatabase() {
     'ALTER TABLE user ADD COLUMN lat FLOAT(8, 6) NULL',
     'ALTER TABLE user ADD COLUMN lon FLOAT(9, 6) NULL',
     "ALTER TABLE user ADD COLUMN settings VARCHAR(4096) CHARSET utf8 COLLATE utf8_bin NOT NULL DEFAULT '{}'",
+    'ALTER TABLE user ADD COLUMN preventTips BOOL NOT NULL DEFAULT 0',
   ];
 
   const db = await pool.getConnection();
