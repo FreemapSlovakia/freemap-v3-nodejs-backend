@@ -37,7 +37,7 @@ module.exports = async function login(db, ctx, dbField, dbValue, authFields, aut
   const authToken = uuidBase62.v4(); // TODO rather some crypro securerandom
 
   await db.query(
-    `INSERT INTO auth (userId, createdAt, authToken, ${authFields}) VALUES (?, ?, ?${authFields.split(',').map(() => ', ?')})`,
+    `INSERT INTO auth (userId, createdAt, authToken, ${authFields}) VALUES (?, ?, ?,${authFields.split(',').map(() => '?').join(',')})`,
     [userId, now, authToken, ...authValues],
   );
 
