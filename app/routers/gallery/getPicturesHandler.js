@@ -173,12 +173,10 @@ async function byOrder(ctx) {
     FROM picture
     ${tag ? `JOIN pictureTag ON pictureTag.pictureId = picture.id AND name = ${db.escape(tag)}` : ''}
     ${wh.length ? `WHERE ${wh.join(' AND ')}` : ''}
-    ${hv.length ? `HAVING ${hv.join(' AND ')}` : ''}    
+    ${hv.length ? `HAVING ${hv.join(' AND ')}` : ''}
     ORDER BY ${orderBy} ${direction}, id ${direction}
     LIMIT 1000
   `;
-
-  console.log('QQQQQQQQQ', sql);
 
   const rows = await db.query(sql);
 
