@@ -1,7 +1,7 @@
 const rp = require('request-promise-native');
 const config = require('config');
 const fb = require('~/fb');
-const { verifyIdToken, clientId } = require('~/google');
+const client = require('~/google');
 
 const consumerKey = config.get('oauth.consumerKey');
 const consumerSecret = config.get('oauth.consumerSecret');
@@ -50,7 +50,7 @@ module.exports = function authenticator(require, deep) {
       await next();
     } else if (auth.googleIdToken) {
       try {
-        await verifyIdToken(auth.googleIdToken, clientId);
+        await client.verifyIdToken({ idToken: auth.googleIdToken });
       } catch (e) {
         await bad('Google');
         return;
