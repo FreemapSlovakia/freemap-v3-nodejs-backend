@@ -14,6 +14,8 @@ const authRouter = require('~/routers/auth');
 
 const attachLoggerHandler = require('~/routers/loggerHandler');
 
+const fs = require('fs');
+
 const app = new Koa();
 
 app.use(koaBunyanLogger(logger.child({ module: 'koa' })));
@@ -39,8 +41,21 @@ app.use(router.routes());
 
 initDatabase()
   .then(() => {
+    /* eslint-disable global-require */
     const port = config.get('http.port');
-    app.listen(port, () => {
+    const ssl = config.get('http.ssl');
+
+    const server = ssl
+      ? require('https').createServer(
+        {
+          key: fs.readFileSync('ssl/freemap.sk.key'),
+          cert: fs.readFileSync('ssl/freemap.sk.pem'),
+        },
+        app.callback(),
+      )
+      : require('http').createServer(app.callback());
+
+    server.listen(port, () => {
       logger.info(`Freemap v3 API listening on port ${port}.`);
     });
   }).catch((err) => {
