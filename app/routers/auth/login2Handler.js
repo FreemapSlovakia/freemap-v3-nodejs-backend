@@ -19,7 +19,7 @@ module.exports = function attachLogin2Handler(router) {
     dbMiddleware,
     async (ctx) => {
       const body = await rp.post({
-        url: 'http://www.openstreetmap.org/oauth/access_token',
+        url: 'https://www.openstreetmap.org/oauth/access_token',
         oauth: {
           consumer_key: consumerKey,
           consumer_secret: consumerSecret,
@@ -32,7 +32,7 @@ module.exports = function attachLogin2Handler(router) {
       const permData = qs.parse(body);
 
       const userDetails = await rp.get({
-        url: 'http://api.openstreetmap.org/api/0.6/user/details',
+        url: 'https://api.openstreetmap.org/api/0.6/user/details',
         oauth: {
           consumer_key: consumerKey,
           consumer_secret: consumerSecret,

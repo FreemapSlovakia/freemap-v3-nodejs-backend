@@ -14,7 +14,7 @@
     "pictures": "./user_data/pictures/",
     "tracklogs": "./user_data/tracklogs"
   },
-  "webBaseUrl": "http://local.freemap.sk:9000",
+  "webBaseUrl": "https://local.freemap.sk:9000",
   "mailgun": null,
   "oauth": {
     "consumerKey": "***",

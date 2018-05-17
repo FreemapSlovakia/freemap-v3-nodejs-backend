@@ -71,7 +71,7 @@ module.exports = function authenticator(require, deep) {
     } else if (auth.osmAuthToken) {
       try {
         await rp.get({
-          url: 'http://api.openstreetmap.org/api/0.6/user/details',
+          url: 'https://api.openstreetmap.org/api/0.6/user/details',
           oauth: {
             consumer_key: consumerKey,
             consumer_secret: consumerSecret,
