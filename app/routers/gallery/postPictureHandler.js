@@ -16,7 +16,7 @@ module.exports = function attachPostPictureHandler(router) {
     authenticator(true),
     contentTypeValidator('multipart/form-data'),
     async (ctx, next) => {
-      const { fields, files } = ctx.request.body;
+      const { files } = ctx.request;
       if (!files || !files.image) {
         ctx.status = 400;
         ctx.body = {
@@ -24,15 +24,9 @@ module.exports = function attachPostPictureHandler(router) {
         };
       } else if (files.image.size > 10 * 1024 * 1024) {
         ctx.status = 413;
-      } else if (fields && fields.meta) {
-        try {
-          fields.meta = JSON.parse(ctx.request.body.fields.meta);
-        } catch (e) {
-          ctx.status = 400;
-          ctx.body = {
-            error: 'invalid_json_in_meta_field',
-          };
-          return;
+      } else if (ctx.request.body.meta) {
+        if (typeof ctx.request.body.meta === 'string') {
+          ctx.request.body.meta = JSON.parse(ctx.request.body.meta);
         }
         await next();
       } else {
@@ -45,8 +39,8 @@ module.exports = function attachPostPictureHandler(router) {
     bodySchemaValidator(postPictureSchema, true),
     acceptValidator('application/json'),
     async (ctx) => {
-      const { image } = ctx.request.body.files;
-      const { title, description, takenAt, position: { lat, lon }, tags = [] } = ctx.request.body.fields.meta;
+      const { image } = ctx.request.files;
+      const { title, description, takenAt, position: { lat, lon }, tags = [] } = ctx.request.body.meta;
 
       const name = uuidBase62.v4();
 

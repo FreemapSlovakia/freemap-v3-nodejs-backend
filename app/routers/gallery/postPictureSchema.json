@@ -1,62 +1,37 @@
 {
   "type": "object",
-  "required": ["fields", "files"],
+  "required": ["meta"],
   "properties": {
-    "fields": {
+    "meta": {
       "type": "object",
-      "required": ["meta"],
+      "required": ["position"],
       "properties": {
-        "meta": {
+        "position": {
           "type": "object",
-          "required": ["position"],
+          "required": ["lat", "lon"],
           "properties": {
-            "position": {
-              "type": "object",
-              "required": ["lat", "lon"],
-              "properties": {
-                "lat": {
-                  "type": "number"
-                },
-                "lon": {
-                  "type": "number"
-                }
-              }
+            "lat": {
+              "type": "number"
             },
-            "name": {
-              "type": ["string", "null"]
-            },
-            "description": {
-              "type": ["string", "null"]
-            },
-            "takenAt": {
-              "type": ["string", "null"],
-              "format": "date-time"
-            },
-            "tags": {
-              "type": ["array", "null"],
-              "items": {
-                "type": "string"
-              }
+            "lon": {
+              "type": "number"
             }
           }
-        }
-      }
-    },
-    "files": {
-      "type": "object",
-      "required": ["image"],
-      "image": {
-        "type": "object",
-        "required": ["path", "name", "type"],
-        "properties": {
-          "path": {
+        },
+        "name": {
+          "type": ["string", "null"]
+        },
+        "description": {
+          "type": ["string", "null"]
+        },
+        "takenAt": {
+          "type": ["string", "null"],
+          "format": "date-time"
+        },
+        "tags": {
+          "type": ["array", "null"],
+          "items": {
             "type": "string"
-          },
-          "name": {
-            "type": "string"
-          },
-          "type": {
-            "const": ["image/jpeg"]
           }
         }
       }
