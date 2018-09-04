@@ -12,7 +12,8 @@
   },
   "dir": {
     "pictures": "./user_data/pictures/",
-    "tracklogs": "./user_data/tracklogs"
+    "tracklogs": "./user_data/tracklogs",
+    "hgt": "/home/martin/hgt"
   },
   "webBaseUrl": "https://local.freemap.sk:9000",
   "mailgun": null,
