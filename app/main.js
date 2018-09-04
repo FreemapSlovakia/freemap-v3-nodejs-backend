@@ -11,6 +11,7 @@ const { initDatabase } = require('~/database');
 const tracklogsRouter = require('~/routers/tracklogs');
 const galleryRouter = require('~/routers/gallery');
 const authRouter = require('~/routers/auth');
+const geotoolsRouter = require('~/routers/geotools');
 
 const attachLoggerHandler = require('~/routers/loggerHandler');
 
@@ -35,6 +36,7 @@ const router = new Router();
 router.use('/tracklogs', tracklogsRouter.routes(), tracklogsRouter.allowedMethods());
 router.use('/gallery', galleryRouter.routes(), galleryRouter.allowedMethods());
 router.use('/auth', authRouter.routes(), authRouter.allowedMethods());
+router.use('/geotools', geotoolsRouter.routes(), geotoolsRouter.allowedMethods());
 attachLoggerHandler(router);
 
 app.use(router.routes());
