@@ -87,15 +87,6 @@ async function initDatabase() {
   ];
 
   const updates = [
-    'ALTER TABLE user ADD COLUMN facebookUserId VARCHAR(32) CHARSET latin1 COLLATE latin1_bin NULL UNIQUE',
-    'ALTER TABLE user ADD COLUMN googleUserId VARCHAR(32) CHARSET latin1 COLLATE latin1_bin NULL UNIQUE',
-    'ALTER TABLE user ADD COLUMN email VARCHAR(255) CHARSET utf8 COLLATE utf8_general_ci NULL',
-    'ALTER TABLE auth ADD COLUMN facebookAccessToken VARCHAR(255) CHARSET latin1 COLLATE latin1_bin NULL',
-    'ALTER TABLE auth ADD COLUMN googleIdToken VARCHAR(4095) CHARSET latin1 COLLATE latin1_bin NULL',
-    'ALTER TABLE user ADD COLUMN lat FLOAT(8, 6) NULL',
-    'ALTER TABLE user ADD COLUMN lon FLOAT(9, 6) NULL',
-    "ALTER TABLE user ADD COLUMN settings VARCHAR(4096) CHARSET utf8 COLLATE utf8_bin NOT NULL DEFAULT '{}'",
-    'ALTER TABLE user ADD COLUMN preventTips BOOL NOT NULL DEFAULT 0',
   ];
 
   const db = await pool.getConnection();
