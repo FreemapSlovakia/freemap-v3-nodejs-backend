@@ -12,8 +12,14 @@
   },
   "dir": {
     "pictures": "./user_data/pictures/",
-    "tracklogs": "./user_data/tracklogs",
-    "hgt": "/home/martin/hgt"
+    "tracklogs": "./user_data/tracklogs"
+  },
+  "elevation": {
+    "dir": "/home/martin/hgt",
+    "earthexplorer": {
+      "username": "***",
+      "password": "***"
+    }
   },
   "webBaseUrl": "https://local.freemap.sk:9000",
   "mailgun": null,

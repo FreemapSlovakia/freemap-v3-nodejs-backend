@@ -2,10 +2,10 @@ const Router = require('koa-router');
 const fs = require('fs');
 const utils = require('util');
 const config = require('config');
-const https = require('https');
 const { spawn } = require('child_process');
+const downloadGeoTiff = require('./downloader');
 
-const hgtDir = config.get('dir.hgt');
+const hgtDir = config.get('elevation.dir');
 
 const openAsync = utils.promisify(fs.open);
 const closeAsync = utils.promisify(fs.close);
@@ -29,59 +29,34 @@ router.get('/elevation', async (ctx) => {
     .map(async ([lat, lon]) => {
       const alat = Math.abs(lat);
       const alon = Math.abs(lon);
-      const key = `${lat >= 0 ? 'N' : 'E'}${Math.floor(alat).toString().padStart(2, '0')}`
-      + `${lon >= 0 ? 'E' : 'W'}${Math.floor(alon).toString().padStart(3, '0')}`;
+      const key = `${lat >= 0 ? 'N' : 'E'}${Math.floor(alat + (lat < 0 ? 1 : 0)).toString().padStart(2, '0')}`
+      + `${lon >= 0 ? 'E' : 'W'}${Math.floor(alon + (lon < 0 ? 1 : 0)).toString().padStart(3, '0')}`;
 
       let fd = fds[key];
 
       if (fd === undefined) {
-        const tifPath = `${hgtDir}/${key}.tif`;
         const hgtPath = `${hgtDir}/${key}.HGT`;
         try {
           fd = await openAsync(hgtPath, 'r');
         } catch (e) {
-          const file = fs.createWriteStream(tifPath);
-          await new Promise((resolve) => {
-            // TODO
-            https.get('https://dds.cr.usgs.gov/ltaauth/hsm/lta1/srtm_v3/tif/1arcsec/e126/s20_e126_1arc_v3.tif?id=cqkhssqm3ntt98de6ibb1361q0&iid=SRTM1S20E126V3&did=455881572&ver=production', (response) => {
-              response.on('end', () => {
-                resolve();
-              });
-              response.pipe(file);
-            });
-          });
-          file.close();
-
-          await new Promise((resolve, reject) => {
-            const child = spawn('gdal_translate', [tifPath, hgtPath]);
-            child.on('exit', (code) => {
-              if (code) {
-                reject(new Error(`Nonzero exit code: ${code}`));
-              } else {
-                resolve();
-              }
-            });
-            child.on('error', (err) => {
-              reject(err);
-            });
-          });
-
-          await unlinkAsync(tifPath);
-
+          await fetchSafe(key);
           fd = await openAsync(hgtPath, 'r');
         }
         fds[key] = fd;
       }
 
-      return [alat, alon, fd];
+      return [lat, lon, fd];
     }));
 
   ctx.response.body = await Promise.all(
-    items.map(async ([alat, alon, fd]) => {
+    items.map(async ([lat, lon, fd]) => {
+      const alat = Math.abs(lat);
+      const alon = Math.abs(lon);
+
       const latFrac = alat - Math.floor(alat);
       const lonFrac = alon - Math.floor(alon);
-      const y = (1 - latFrac) * 3600;
-      const x = lonFrac * 3600;
+      const y = (lat < 0 ? latFrac : (1 - latFrac)) * 3600;
+      const x = (lon < 0 ? (1 - lonFrac) : lonFrac) * 3600;
 
       const x0 = Math.floor(x);
       const y0 = Math.floor(y);
@@ -121,3 +96,43 @@ router.get('/elevation', async (ctx) => {
 module.exports = router;
 
 // rename 's/n(..)_e(...)_1arc_v3.tif.HGT/N$1E$2.HGT/' *.HGT
+
+const fetching = new Map();
+
+async function fetchSafe(key) {
+  let promise = fetching.get(key);
+  if (promise) {
+    return promise;
+  }
+  promise = fetch(key);
+  fetching.set(key, promise);
+  const val = await promise;
+  fetching.delete(key);
+  return val;
+}
+
+async function fetch(key) {
+  const tifPath = `${hgtDir}/${key}.tif`;
+  const hgtPath = `${hgtDir}/${key}.HGT`;
+  try {
+    await downloadGeoTiff(key, tifPath);
+
+    await new Promise((resolve, reject) => {
+      const child = spawn('gdal_translate', [tifPath, hgtPath]);
+      child.on('exit', (code) => {
+        if (code) {
+          reject(new Error(`Nonzero exit code: ${code}`));
+        } else {
+          resolve();
+        }
+      });
+      child.on('error', (err) => {
+        reject(err);
+      });
+    });
+
+    await unlinkAsync(tifPath);
+  } catch (e) {
+    await closeAsync(await openAsync(hgtPath, 'w+'));
+  }
+}

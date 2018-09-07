@@ -8,6 +8,7 @@
   },
   "dependencies": {
     "ajv": "6.5.3",
+    "axios": "0.18.0",
     "bunyan": "1.8.12",
     "config": "2.0.1",
     "etag": "1.8.1",
@@ -26,6 +27,7 @@
     "querystring": "0.2.0",
     "request": "2.88.0",
     "request-promise-native": "1.0.5",
+    "set-cookie-parser": "2.2.1",
     "sharp": "0.20.7",
     "uuid-base62": "0.1.0",
     "verror": "1.10.0",
