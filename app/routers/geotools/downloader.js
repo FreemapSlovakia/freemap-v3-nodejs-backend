@@ -26,15 +26,16 @@ class Cookies {
   }
 }
 
+// TODO login could be re-used for some time (or until auth error detected)
 module.exports = async function downloadGeoTiff(ref, dest) {
-  const indexResponse = await axios.get('https://ers.cr.earthexplorer.gov/');
+  const indexResponse = await axios.get('https://ers.cr.usgs.gov/');
   const m = indexResponse.data.match(/name="csrf_token" value="([^"]+)"/);
 
   const cookies = new Cookies();
   cookies.setCookies(indexResponse);
 
   const loginResponse = await axios.post(
-    'https://ers.cr.earthexplorer.gov/login/',
+    'https://ers.cr.usgs.gov/login/',
     querystring.stringify({
       username,
       password,
@@ -53,8 +54,8 @@ module.exports = async function downloadGeoTiff(ref, dest) {
   cookies.setCookies(loginResponse);
 
   const tifResponse = await axios.get(
-    // far north: https://earthexplorer.earthexplorer.gov/download/4980/GT30W060N90/GEOTIFF/EE
-    `https://earthexplorer.earthexplorer.gov/download/8360/SRTM1${ref}V3/GEOTIFF/EE`,
+    // far north: https://earthexplorer.usgs.gov/download/4980/GT30W060N90/GEOTIFF/EE
+    `https://earthexplorer.usgs.gov/download/8360/SRTM1${ref}V3/GEOTIFF/EE`,
     {
       headers: {
         cookie: cookies.getHeader(),
