@@ -13,24 +13,38 @@ const readAsync = utils.promisify(fs.read);
 const unlinkAsync = utils.promisify(fs.unlink);
 
 const router = new Router();
+const { acceptValidator } = require('~/requestValidators');
 
-// /elevation?coordinates=lat1,lon1,lat2,lon2,...
-router.get('/elevation', async (ctx) => {
+router.get('/elevation', compute);
+router.post('/elevation', acceptValidator('application/json'), compute);
+
+async function compute(ctx) {
   const { coordinates } = ctx.query;
-  if (!coordinates) {
-    ctx.response.body = [];
+  let cs;
+  if (ctx.method === 'GET' && coordinates && /^([^,]+,[^,]+)(,[^,]+,[^,]+)$/.test(coordinates)) {
+    cs = coordinates
+      .match(/[^,]+,[^,]+/g)
+      .map(pair => pair.split(',').map(c => Number.parseFloat(c)));
+  } else if (ctx.method === 'POST' && Array.isArray(ctx.request.body)) {
+    cs = ctx.request.body;
+  } else {
+    ctx.status = 400;
+    return;
+  }
+
+  if (!cs.every(x => Array.isArray(x) && x.length === 2 && x[0] >= -90 && x[0] <= 90 && x[1] >= -180 && x[1] <= 180)) {
+    ctx.status = 400;
+    return;
   }
 
   const fds = {};
   try {
-    const items = await Promise.all(coordinates
-      .match(/[^,]+,[^,]+/g)
-      .map(pair => pair.split(',').map(c => Number.parseFloat(c)))
-      .map(async ([lat, lon]) => {
+    const items = await Promise.all(
+      cs.map(async ([lat, lon]) => {
         const alat = Math.abs(lat);
         const alon = Math.abs(lon);
         const key = `${lat >= 0 ? 'N' : 'E'}${Math.floor(alat + (lat < 0 ? 1 : 0)).toString().padStart(2, '0')}`
-        + `${lon >= 0 ? 'E' : 'W'}${Math.floor(alon + (lon < 0 ? 1 : 0)).toString().padStart(3, '0')}`;
+          + `${lon >= 0 ? 'E' : 'W'}${Math.floor(alon + (lon < 0 ? 1 : 0)).toString().padStart(3, '0')}`;
 
         let fd = fds[key];
 
@@ -52,7 +66,7 @@ router.get('/elevation', async (ctx) => {
   } catch (e1) {
     await Promise.all(Object.values(fds).map(fd => closeAsync(fd)));
   }
-});
+}
 
 module.exports = router;
 
