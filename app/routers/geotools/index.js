@@ -37,7 +37,8 @@ async function compute(ctx) {
     return;
   }
 
-  const fds = {};
+  const allocated = new Set();
+  const fdMap = new Map();
   try {
     const items = await Promise.all(
       cs.map(async ([lat, lon]) => {
@@ -46,26 +47,31 @@ async function compute(ctx) {
         const key = `${lat >= 0 ? 'N' : 'E'}${Math.floor(alat + (lat < 0 ? 1 : 0)).toString().padStart(2, '0')}`
           + `${lon >= 0 ? 'E' : 'W'}${Math.floor(alon + (lon < 0 ? 1 : 0)).toString().padStart(3, '0')}`;
 
-        let fd = fds[key];
-
-        if (fd === undefined) {
+        if (!allocated.has(key)) {
+          allocated.add(key);
           const hgtPath = `${hgtDir}/${key}.HGT`;
+          let fd;
           try {
             fd = await openAsync(hgtPath, 'r');
           } catch (e) {
             await fetchSafe(key);
             fd = await openAsync(hgtPath, 'r');
           }
-          fds[key] = fd;
+          fdMap.set(key, fd);
         }
 
-        return [lat, lon, fd];
+        return [lat, lon, key];
       }),
     );
 
+    items.forEach((item) => {
+      // eslint-disable-next-line
+      item[2] = fdMap.get(item[2]);
+    });
+
     ctx.response.body = await Promise.all(items.map(computeElevation));
-  } catch (e1) {
-    await Promise.all(Object.values(fds).map(fd => closeAsync(fd)));
+  } finally {
+    await Promise.all([...fdMap.values()].map(fd => closeAsync(fd)));
   }
 }
 
