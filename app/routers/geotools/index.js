@@ -21,7 +21,7 @@ router.post('/elevation', acceptValidator('application/json'), compute);
 async function compute(ctx) {
   const { coordinates } = ctx.query;
   let cs;
-  if (ctx.method === 'GET' && coordinates && /^([^,]+,[^,]+)(,[^,]+,[^,]+)$/.test(coordinates)) {
+  if (ctx.method === 'GET' && coordinates && /^([^,]+,[^,]+)(,[^,]+,[^,]+)*$/.test(coordinates)) {
     cs = coordinates
       .match(/[^,]+,[^,]+/g)
       .map(pair => pair.split(',').map(c => Number.parseFloat(c)));
