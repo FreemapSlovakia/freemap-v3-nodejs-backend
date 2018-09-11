@@ -60,7 +60,8 @@ async function compute(ctx) {
         }
 
         return [lat, lon, fd];
-      }));
+      }),
+    );
 
     ctx.response.body = await Promise.all(items.map(computeElevation));
   } catch (e1) {
