@@ -10,6 +10,7 @@ const hgtDir = config.get('elevation.dir');
 const openAsync = utils.promisify(fs.open);
 const closeAsync = utils.promisify(fs.close);
 const readAsync = utils.promisify(fs.read);
+const fstatAsync = utils.promisify(fs.fstat);
 const unlinkAsync = utils.promisify(fs.unlink);
 
 const router = new Router();
@@ -50,6 +51,7 @@ async function compute(ctx) {
         if (!allocated.has(key)) {
           allocated.add(key);
           const hgtPath = `${hgtDir}/${key}.HGT`;
+
           let fd;
           try {
             fd = await openAsync(hgtPath, 'r');
@@ -57,7 +59,7 @@ async function compute(ctx) {
             await fetchSafe(key);
             fd = await openAsync(hgtPath, 'r');
           }
-          fdMap.set(key, fd);
+          fdMap.set(key, [fd, (await fstatAsync(fd)).size]);
         }
 
         return [lat, lon, key];
@@ -65,19 +67,20 @@ async function compute(ctx) {
     );
 
     items.forEach((item) => {
+      const f = fdMap.get(item[2]);
       // eslint-disable-next-line
-      item[2] = fdMap.get(item[2]);
+      item[2] = f[0];
+      // eslint-disable-next-line
+      item[3] = f[1];
     });
 
     ctx.response.body = await Promise.all(items.map(computeElevation));
   } finally {
-    await Promise.all([...fdMap.values()].map(fd => closeAsync(fd)));
+    await Promise.all([...fdMap.values()].map(([fd]) => closeAsync(fd)));
   }
 }
 
 module.exports = router;
-
-// rename 's/n(..)_e(...)_1arc_v3.tif.HGT/N$1E$2.HGT/' *.HGT
 
 const fetching = new Map();
 
@@ -119,14 +122,18 @@ async function fetch(key) {
   }
 }
 
-async function computeElevation([lat, lon, fd]) {
+async function computeElevation([lat, lon, fd, size]) {
+  // gdal_translate supports: 1201x1201, 3601x3601 or 1801x3601
+  const rx = size === 1801 * 3601 * 2 ? 1800 : size === 1201 * 1201 * 2 ? 1200 : 3600;
+  const ry = size === 1201 * 1201 * 2 ? 1200 : 3600;
+
   const alat = Math.abs(lat);
   const alon = Math.abs(lon);
 
   const latFrac = alat - Math.floor(alat);
   const lonFrac = alon - Math.floor(alon);
-  const y = (lat < 0 ? latFrac : (1 - latFrac)) * 3600;
-  const x = (lon < 0 ? (1 - lonFrac) : lonFrac) * 3600;
+  const y = (lat < 0 ? latFrac : (1 - latFrac)) * ry;
+  const x = (lon < 0 ? (1 - lonFrac) : lonFrac) * rx;
 
   const x0 = Math.floor(x);
   const y0 = Math.floor(y);
@@ -139,10 +146,10 @@ async function computeElevation([lat, lon, fd]) {
 
   const buffer = Buffer.alloc(8);
   await Promise.all([
-    readAsync(fd, buffer, 0, 2, (y0 * 3601 + x0) * 2),
-    readAsync(fd, buffer, 2, 2, (y1 * 3601 + x0) * 2),
-    readAsync(fd, buffer, 4, 2, (y0 * 3601 + x1) * 2),
-    readAsync(fd, buffer, 6, 2, (y1 * 3601 + x1) * 2),
+    readAsync(fd, buffer, 0, 2, (y0 * (rx + 1) + x0) * 2),
+    readAsync(fd, buffer, 2, 2, (y1 * (rx + 1) + x0) * 2),
+    readAsync(fd, buffer, 4, 2, (y0 * (rx + 1) + x1) * 2),
+    readAsync(fd, buffer, 6, 2, (y1 * (rx + 1) + x1) * 2),
   ]);
 
   const v00 = buffer.readInt16BE(0);
