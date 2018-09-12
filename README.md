@@ -6,7 +6,8 @@ API server for next freemap webapp.
 
 * Node 8
 * MySQL Database Server
-* exiftran
+* exiftran (for uploaded images processing)
+* gdal_translate (for geotiff to HGT conversion)
 
 ## Running in development mode
 
@@ -14,7 +15,7 @@ Please create `config/development.json` configuration. It will inherint from `co
 
 ```bash
 npm i
-npm run watch | ./node_modules/.bin/bunyan
+npm run watch | npx bunyan
 ```
 
 ## Running in production mode
@@ -23,7 +24,7 @@ Please create `config/production.json` configuration. It will inherint from `con
 
 ```bash
 npm i
-NODE_ENV=production npm start | ./node_modules/.bin/bunyan
+NODE_ENV=production npm start | npx bunyan
 ```
 
 We strongly recommend to use `forever` command (installed with `npm i -g forever`).
@@ -32,7 +33,7 @@ We strongly recommend to use `forever` command (installed with `npm i -g forever
 
 ```bash
 npm i
-./node_modules/.bin/mocha test/
+npx mocha test/
 ```
 
 Running single test:
