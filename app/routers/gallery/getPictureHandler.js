@@ -47,7 +47,7 @@ module.exports = function attachGetPictureHandler(router) {
         createdAt: createdAt.toISOString(),
         title,
         description,
-        takenAt: takenAt ? takenAt.toISOString() : null,
+        takenAt: takenAt instanceof Date && !Number.isNaN(takenAt) ? takenAt.toISOString() : null,
         lat,
         lon,
         user: userId && {
