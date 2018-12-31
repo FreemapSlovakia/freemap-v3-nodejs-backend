@@ -28,7 +28,7 @@ app.use(cors({
 }));
 
 app.use(koaBody({
-  jsonLimit: '5mb',
+  jsonLimit: '16mb',
   multipart: true,
 }));
 
