@@ -85,23 +85,22 @@ async function byRadius(ctx) {
 
   const { db } = ctx.state;
 
-  const sql =
-    `SELECT id,
-      (6371 * acos(cos(radians(${lat})) * cos(radians(lat)) * cos(radians(lon) - radians(${lon}) ) + sin(radians(${lat})) * sin(radians(lat)))) AS distance
-      ${ratingFrom || ratingTo ? `, ${ratingSubquery}` : ''}
-      FROM picture
-      ${tag ? `JOIN pictureTag ON pictureId = picture.id AND pictureTag.name = ${db.escape(tag)}` : ''}
-      WHERE lat BETWEEN ${lat1} AND ${lat2} AND lon BETWEEN ${lon1} AND ${lon2}
-      ${takenAtFrom ? `AND takenAt >= '${toSqlDate(takenAtFrom)}'` : ''}
-      ${takenAtTo ? `AND takenAt <= '${toSqlDate(takenAtTo)}'` : ''}
-      ${createdAtFrom ? `AND createdAt >= '${toSqlDate(createdAtFrom)}'` : ''}
-      ${createdAtTo ? `AND createdAt <= '${toSqlDate(createdAtTo)}'` : ''}
-      ${userId ? `AND userId = ${userId}` : ''}
-      HAVING distance <= ${distance}
-      ${ratingFrom === null ? '' : `AND rating >= ${ratingFrom}`}
-      ${ratingTo === null ? '' : `AND rating <= ${ratingTo}`}
-      ORDER BY distance
-      LIMIT 100`;
+  const sql = `SELECT id,
+    (6371 * acos(cos(radians(${lat})) * cos(radians(lat)) * cos(radians(lon) - radians(${lon}) ) + sin(radians(${lat})) * sin(radians(lat)))) AS distance
+    ${ratingFrom || ratingTo ? `, ${ratingSubquery}` : ''}
+    FROM picture
+    ${tag ? `JOIN pictureTag ON pictureId = picture.id AND pictureTag.name = ${db.escape(tag)}` : ''}
+    WHERE lat BETWEEN ${lat1} AND ${lat2} AND lon BETWEEN ${lon1} AND ${lon2}
+    ${takenAtFrom ? `AND takenAt >= '${toSqlDate(takenAtFrom)}'` : ''}
+    ${takenAtTo ? `AND takenAt <= '${toSqlDate(takenAtTo)}'` : ''}
+    ${createdAtFrom ? `AND createdAt >= '${toSqlDate(createdAtFrom)}'` : ''}
+    ${createdAtTo ? `AND createdAt <= '${toSqlDate(createdAtTo)}'` : ''}
+    ${userId ? `AND userId = ${userId}` : ''}
+    HAVING distance <= ${distance}
+    ${ratingFrom === null ? '' : `AND rating >= ${ratingFrom}`}
+    ${ratingTo === null ? '' : `AND rating <= ${ratingTo}`}
+    ORDER BY distance
+    LIMIT 100`;
 
   const rows = await db.query(sql);
 
