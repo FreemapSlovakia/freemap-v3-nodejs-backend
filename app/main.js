@@ -1,3 +1,5 @@
+const util = require('util');
+const fs = require('fs');
 const config = require('config');
 const koaBody = require('koa-body');
 const Koa = require('koa');
@@ -15,7 +17,7 @@ const geotoolsRouter = require('~/routers/geotools');
 
 const attachLoggerHandler = require('~/routers/loggerHandler');
 
-const fs = require('fs');
+const unlinkAsync = util.promisify(fs.unlink);
 
 const app = new Koa();
 
@@ -31,6 +33,22 @@ app.use(koaBody({
   jsonLimit: '16mb',
   multipart: true,
 }));
+
+// remove tmp uploaded files
+app.use(async (ctx, next) => {
+  await next();
+
+  if (ctx.request.files) {
+    const proms = [];
+    for (const field of Object.keys(ctx.request.files)) {
+      const files = ctx.request.files[field];
+      for (const file of Array.isArray(files) ? files : [files]) {
+        proms.push(unlinkAsync(file.path));
+      }
+    }
+    await Promise.all(proms);
+  }
+});
 
 const router = new Router();
 router.use('/tracklogs', tracklogsRouter.routes(), tracklogsRouter.allowedMethods());
