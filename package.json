@@ -7,17 +7,17 @@
     "node": "8.x"
   },
   "dependencies": {
-    "ajv": "6.8.1",
+    "ajv": "6.10.0",
     "axios": "0.18.0",
     "bunyan": "1.8.12",
     "config": "3.0.1",
     "etag": "1.8.1",
     "fb": "2.0.0",
     "fs-extra": "7.0.1",
-    "google-auth-library": "3.0.1",
+    "google-auth-library": "3.1.0",
     "kcors": "2.2.2",
     "koa": "2.7.0",
-    "koa-body": "4.0.7",
+    "koa-body": "4.1.0",
     "koa-bunyan-logger": "2.1.0",
     "koa-router": "7.4.0",
     "mailgun-js": "0.22.0",
@@ -26,7 +26,7 @@
     "promise-mysql": "3.3.1",
     "querystring": "0.2.0",
     "request": "2.88.0",
-    "request-promise-native": "1.0.5",
+    "request-promise-native": "1.0.7",
     "set-cookie-parser": "2.3.5",
     "sharp": "0.21.3",
     "uuid-base62": "0.1.0",
@@ -37,11 +37,11 @@
     "babel-eslint": "10.0.1",
     "chai": "4.2.0",
     "chakram": "1.5.0",
-    "eslint": "5.13.0",
+    "eslint": "5.15.1",
     "eslint-config-airbnb-base": "13.1.0",
     "eslint-import-resolver-babel-root-import": "0.0.2",
     "eslint-plugin-import": "2.16.0",
-    "nodemon": "1.18.9"
+    "nodemon": "1.18.10"
   },
   "scripts": {
     "start": "node index.js",
