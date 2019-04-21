@@ -7,7 +7,7 @@ module.exports = (router) => {
   router.delete(
     '/devices/:id',
     acceptValidator('application/json'),
-    dbMiddleware,
+    dbMiddleware(),
     authenticator(true),
     async (ctx) => {
       const [item] = await ctx.state.db.query('SELECT userId FROM trackingDevice WHERE id = ? FOR UPDATE', [ctx.params.id]);

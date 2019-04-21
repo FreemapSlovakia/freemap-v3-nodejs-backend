@@ -7,7 +7,7 @@ module.exports = function attachGetPictureHandler(router) {
   router.get(
     '/pictures/:id',
     acceptValidator('application/json'),
-    dbMiddleware,
+    dbMiddleware(),
     authenticator(false),
     async (ctx) => {
       const rows = await ctx.state.db.query(

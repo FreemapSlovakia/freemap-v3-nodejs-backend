@@ -7,7 +7,7 @@ module.exports = (router) => {
   router.post(
     '/track/:token',
     acceptValidator('application/json'),
-    dbMiddleware,
+    dbMiddleware(),
     authenticator(true),
     async (ctx) => {
       const [item] = await ctx.state.db.query(

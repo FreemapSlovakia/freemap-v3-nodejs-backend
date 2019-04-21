@@ -9,7 +9,7 @@ const { PICTURES_DIR } = require('~/routers/gallery/constants');
 module.exports = function attachDeletePictureHandler(router) {
   router.delete(
     '/pictures/:id',
-    dbMiddleware,
+    dbMiddleware(),
     authenticator(true),
     async (ctx) => {
       // TODO transaction

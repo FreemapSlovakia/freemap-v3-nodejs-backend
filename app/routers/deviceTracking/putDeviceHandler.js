@@ -7,7 +7,7 @@ module.exports = (router) => {
     '/devices/:id',
     acceptValidator('application/json'),
     // TODO bodySchemaValidator(putDeviceSchema, true),
-    dbMiddleware,
+    dbMiddleware(),
     authenticator(true),
     async (ctx) => {
       const [item] = await ctx.state.db.query(

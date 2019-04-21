@@ -8,7 +8,7 @@ module.exports = (router) => {
     '/devices/:id/access-tokens',
     acceptValidator('application/json'),
     // TODO bodySchemaValidator(postTokenCommentSchema, true),
-    dbMiddleware,
+    dbMiddleware(),
     authenticator(true),
     async (ctx) => {
       const [device] = await ctx.state.db.query(

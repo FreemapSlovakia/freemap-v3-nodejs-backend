@@ -5,14 +5,16 @@ const logger = require('~/logger');
 
 const pool = mysql.createPool(config.get('mysql'));
 
-async function dbMiddleware(ctx, next) {
-  const db = await pool.getConnection();
-  ctx.state.db = db;
-  try {
-    await next();
-  } finally {
-    pool.releaseConnection(db);
-  }
+function dbMiddleware() {
+  return async (ctx, next) => {
+    const db = await pool.getConnection();
+    ctx.state.db = db;
+    try {
+      await next();
+    } finally {
+      pool.releaseConnection(db);
+    }
+  };
 }
 
 async function initDatabase() {

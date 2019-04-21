@@ -6,7 +6,7 @@ module.exports = (router) => {
   router.get(
     '/devices/:id',
     acceptValidator('application/json'),
-    dbMiddleware,
+    dbMiddleware(),
     authenticator(true),
     async (ctx) => {
       const [item] = await ctx.state.db.query(

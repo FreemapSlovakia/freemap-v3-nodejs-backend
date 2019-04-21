@@ -12,7 +12,7 @@ module.exports = function attachGetPictureHandler(router) {
   router.get(
     '/pictures/:id/image',
     acceptValidator('image/jpeg'),
-    dbMiddleware,
+    dbMiddleware(),
     async (ctx) => {
       const rows = await ctx.state.db.query(
         'SELECT pathname FROM picture WHERE picture.id = ?',

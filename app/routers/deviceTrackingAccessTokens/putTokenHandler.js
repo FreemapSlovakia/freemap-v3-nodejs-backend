@@ -7,7 +7,7 @@ module.exports = (router) => {
     '/access-tokens/:id',
     acceptValidator('application/json'),
     // TODO bodySchemaValidator(putTokenSchema, true),
-    dbMiddleware,
+    dbMiddleware(),
     authenticator(true),
     async (ctx) => {
       const [item] = await ctx.state.db.query(

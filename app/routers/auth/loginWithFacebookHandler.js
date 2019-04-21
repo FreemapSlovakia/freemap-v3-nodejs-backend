@@ -7,7 +7,7 @@ module.exports = function attachLoginWithFacebookHandler(router) {
   router.post(
     '/login-fb',
     // TODO validation
-    dbMiddleware,
+    dbMiddleware(),
     async (ctx) => {
       const { accessToken } = ctx.request.body;
 

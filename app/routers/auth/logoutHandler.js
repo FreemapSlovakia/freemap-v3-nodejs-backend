@@ -4,7 +4,7 @@ const authenticator = require('~/authenticator');
 module.exports = function attachLogoutHandler(router) {
   router.post(
     '/logout',
-    dbMiddleware,
+    dbMiddleware(),
     authenticator(true),
     async (ctx) => {
       const { affectedRows } = await ctx.state.db.query('DELETE FROM auth WHERE authToken = ?', ctx.state.user.authToken);

@@ -67,7 +67,7 @@ module.exports = function attachGetPicturesHandler(router) {
     async (ctx, next) => {
       await qvs[ctx.query.by](ctx, next);
     },
-    dbMiddleware,
+    dbMiddleware(),
     async (ctx) => {
       await methods[ctx.query.by](ctx);
     },

@@ -16,7 +16,7 @@ module.exports = function attachLogin2Handler(router) {
   router.post(
     '/login2',
     // TODO validation
-    dbMiddleware,
+    dbMiddleware(),
     async (ctx) => {
       const body = await rp.post({
         url: 'https://www.openstreetmap.org/oauth/access_token',
