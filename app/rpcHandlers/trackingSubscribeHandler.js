@@ -2,20 +2,32 @@ const trackRegister = require('~/trackRegister');
 const { pool } = require('~/database');
 
 module.exports = (ctx) => {
-  const { token, minTime, maxCount } = ctx.params;
-
-  let websockets = trackRegister.get(token);
-  if (!websockets) {
-    websockets = new Set();
-    trackRegister.add(token, websockets);
-  }
-
-  websockets.add(ctx.websocket);
+  const { token, minTime, maxCount, deviceId } = ctx.params;
 
   (async () => {
     const db = await pool.getConnection();
+
+    async function isDeviceOwner() {
+      const [row] = await db.query('SELECT userId FROM trackingDevice WHERE deviceId = ?', [deviceId]);
+      return row && row.userId === ctx.user.id;
+    }
+
     try {
-      const params = [token];
+      if (!token && deviceId) {
+        if (!ctx.user || !ctx.user.isAdmin && !await isDeviceOwner()) {
+          ctx.respondError(403, 'forbidden');
+        }
+      }
+
+      let websockets = trackRegister.get(token || deviceId);
+      if (!websockets) {
+        websockets = new Set();
+        trackRegister.add(token, websockets);
+      }
+
+      websockets.add(ctx.websocket);
+
+      const params = [token || deviceId];
       if (minTime) {
         params.push(new Date(minTime));
       }
@@ -26,7 +38,7 @@ module.exports = (ctx) => {
       const result = maxCount === 0 ? [] : await db.query(
         `SELECT trackingPoint.id, lat, lon, createdAt
           FROM trackingPoint JOIN trackingAccessTokens ON trackingPoint.deviceId = trackingAccessTokens.deviceId
-          WHERE token = ? AND ${minTime ? 'AND createdAt >= ?' : ''}
+          WHERE (${token ? 'token' : 'deviceId'} = ?) AND ${minTime ? 'AND createdAt >= ?' : ''}
           ORDER BY trackingPoint.id
           ${maxCount ? 'LIMIT ?' : ''}`,
         params,

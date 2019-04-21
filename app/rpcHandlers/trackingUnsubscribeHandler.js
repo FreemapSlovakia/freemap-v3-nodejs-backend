@@ -1,14 +1,25 @@
 const trackRegister = require('~/trackRegister');
 
 module.exports = (ctx) => {
-  const { token } = ctx.params;
+  const { token, deviceId } = ctx.params;
 
-  const websockets = trackRegister.get(token);
-  if (websockets) {
-    websockets.delete(ctx.websocket);
+  function rm(key) {
+    const websockets = trackRegister.get(key);
+    if (websockets) {
+      websockets.delete(ctx.websocket);
+    }
+
+    if (websockets.size === 0) {
+      trackRegister.delete(key);
+    }
   }
-  if (websockets.size === 0) {
-    trackRegister.delete(token);
+
+  if (token) {
+    rm(token);
+  }
+
+  if (deviceId) {
+    rm(deviceId);
   }
 
   ctx.respondResult(null);
