@@ -84,6 +84,38 @@ async function initDatabase() {
       FOREIGN KEY (pictureId) REFERENCES picture (id) ON DELETE CASCADE,
       FOREIGN KEY (userId) REFERENCES user (id) ON DELETE CASCADE
     ) ENGINE=InnoDB`,
+
+    `CREATE TABLE IF NOT EXISTS trackingDevice (
+      id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+      userId INT UNSIGNED NOT NULL,
+      name VARCHAR(255) CHARSET utf8 COLLATE utf8_general_ci NOT NULL,
+      token VARCHAR(255) CHARSET ascii NOT NULL UNIQUE,
+      createdAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      CONSTRAINT tdUserFk FOREIGN KEY (userId) REFERENCES user (id) ON DELETE CASCADE
+    ) ENGINE=InnoDB`,
+
+    `CREATE TABLE IF NOT EXISTS trackingPoint (
+      id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+      deviceId INT UNSIGNED NOT NULL,
+      createdAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      lat FLOAT(8, 6) NULL,
+      lon FLOAT(9, 6) NULL,
+      note VARCHAR(255) CHARSET utf8 COLLATE utf8_general_ci NULL,
+      CONSTRAINT tpDeviceIdFk FOREIGN KEY (deviceId) REFERENCES trackingDevice (id) ON DELETE CASCADE,
+      INDEX tpCreatedAtIdx (createdAt)
+    ) ENGINE=InnoDB`,
+
+    `CREATE TABLE IF NOT EXISTS trackingAccessTokens (
+      id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+      deviceId INT UNSIGNED NOT NULL,
+      token VARCHAR(255) CHARSET ascii NOT NULL UNIQUE,
+      createdAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      validTo TIMESTAMP NULL,
+      listed BOOL NOT NULL DEFAULT false,
+      note VARCHAR(255) CHARSET utf8 COLLATE utf8_general_ci NULL,
+      CONSTRAINT tatDeviceIdFk FOREIGN KEY (deviceId) REFERENCES trackingDevice (id) ON DELETE CASCADE,
+      INDEX tatCreatedAtIdx (createdAt)
+    ) ENGINE=InnoDB`,
   ];
 
   const updates = [
