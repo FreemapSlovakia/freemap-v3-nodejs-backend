@@ -1,7 +1,8 @@
 const Router = require('koa-router');
 const trackRegister = require('~/trackRegister');
-const { pool } = require('~/database');
 const authenticator = require('~/authenticator');
+const trackingSubscribeHandler = require('~/rpcHandlers/trackingSubscribeHandler');
+const trackingUnsubscribeHandler = require('~/rpcHandlers/trackingUnsubscribeHandler');
 
 module.exports = (app) => {
   const wsRouter = new Router();
@@ -50,62 +51,17 @@ module.exports = (app) => {
 
       id = msg.id;
 
+      const rpcCtx = {
+        respondResult,
+        respondError,
+        params: msg.params,
+        user: ctx.user,
+      };
+
       if (msg.method === 'tracking.subscribe') {
-        const { token, minTime, maxCount } = msg.params;
-
-        let websockets = trackRegister.get(token);
-        if (!websockets) {
-          websockets = new Set();
-          trackRegister.add(token, websockets);
-        }
-
-        websockets.add(ctx.websocket);
-
-        (async () => {
-          const db = await pool.getConnection();
-          try {
-            const params = [token];
-            if (minTime) {
-              params.push(new Date(minTime));
-            }
-            if (maxCount) {
-              params.push(Number.parseInt(maxCount, 10));
-            }
-
-            const result = maxCount === 0 ? [] : await db.query(
-              `SELECT trackingPoint.id, lat, lon, createdAt
-                FROM trackingPoint JOIN trackingAccessTokens ON trackingPoint.deviceId = trackingAccessTokens.deviceId
-                WHERE token = ? AND ${minTime ? 'AND createdAt >= ?' : ''}
-                ORDER BY trackingPoint.id
-                ${maxCount ? 'LIMIT ?' : ''}`,
-              params,
-            );
-
-            respondResult(result.map(item => ({
-              id: item.id,
-              lat: item.lat,
-              lon: item.lon,
-              note: item.note,
-              ts: item.createdAt,
-            })));
-          } finally {
-            pool.releaseConnection(db);
-          }
-        })().catch((err) => {
-          respondError(500, err.message);
-        });
+        trackingSubscribeHandler(rpcCtx);
       } else if (msg.method === 'tracking.unsubscribe') {
-        const { token } = msg.params;
-
-        const websockets = trackRegister.get(token);
-        if (websockets) {
-          websockets.delete(ctx.websocket);
-        }
-        if (websockets.size === 0) {
-          trackRegister.delete(token);
-        }
-
-        respondResult(null);
+        trackingUnsubscribeHandler(rpcCtx);
       } else {
         respondError(-32601);
       }
