@@ -17,10 +17,10 @@ module.exports = (router) => {
       } else if (!ctx.state.user.isAdmin && ctx.state.user.id !== device.userId) {
         ctx.status = 403;
       } else {
-        ctx.body = await ctx.state.db.query(
+        ctx.body = (await ctx.state.db.query(
           'SELECT id, token, createdAt, validTo, note, listed FROM trackingAccessTokens WHERE deviceId = ?',
           [ctx.params.id],
-        );
+        )).map(item => ({ ...item, listed: !!item.listed }));
       }
     },
   );

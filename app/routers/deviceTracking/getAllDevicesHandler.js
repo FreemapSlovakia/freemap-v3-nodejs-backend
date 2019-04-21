@@ -9,7 +9,7 @@ module.exports = (router) => {
     dbMiddleware,
     async (ctx) => {
       ctx.body = await ctx.state.db.query(
-        'SELECT id, name, token, createdAt FROM trackingDevice WHERE userId = ?',
+        'SELECT id, name, token, createdAt, userId FROM trackingDevice WHERE userId = ?',
         [ctx.state.user.id],
       );
     },

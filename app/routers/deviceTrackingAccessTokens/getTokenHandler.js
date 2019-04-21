@@ -21,6 +21,7 @@ module.exports = (router) => {
       } else if (!ctx.state.user.isAdmin && ctx.state.user.id !== item.userId) {
         ctx.status = 403;
       } else {
+        item.listed = !!item.listed;
         ctx.body = item;
       }
     },
