@@ -7,9 +7,9 @@ module.exports = (router) => {
   router.post(
     '/devices/:id/access-tokens',
     acceptValidator('application/json'),
-    authenticator(true),
     // TODO bodySchemaValidator(postTokenCommentSchema, true),
     dbMiddleware,
+    authenticator(true),
     async (ctx) => {
       const [device] = await ctx.state.db.query(
         'SELECT userId FROM trackingDevice WHERE id = ?',

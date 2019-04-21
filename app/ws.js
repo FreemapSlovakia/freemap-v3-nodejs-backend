@@ -1,11 +1,12 @@
 const Router = require('koa-router');
 const trackRegister = require('~/trackRegister');
 const { pool } = require('~/database');
+const authenticator = require('~/authenticator');
 
 module.exports = (app) => {
   const wsRouter = new Router();
 
-  wsRouter.all('/ws', async (ctx) => {
+  wsRouter.all('/ws', authenticator(), async (ctx) => {
     ctx.websocket.on('message', (message) => {
       let id = null;
 
@@ -80,17 +81,13 @@ module.exports = (app) => {
               params,
             );
 
-            ctx.websocket.send(JSON.stringify({
-              jsonrpc: '2.0',
-              method: 'tracking.addPoint',
-              params: result.map(item => ({
-                id: item.id,
-                lat: item.lat,
-                lon: item.lon,
-                note: item.note,
-                ts: item.createdAt,
-              })),
-            }));
+            respondResult(result.map(item => ({
+              id: item.id,
+              lat: item.lat,
+              lon: item.lon,
+              note: item.note,
+              ts: item.createdAt,
+            })));
           } finally {
             pool.releaseConnection(db);
           }

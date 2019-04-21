@@ -6,9 +6,9 @@ module.exports = (router) => {
   router.post(
     '/devices/:id',
     acceptValidator('application/json'),
-    authenticator(true),
     // TODO bodySchemaValidator(putDeviceSchema, true),
     dbMiddleware,
+    authenticator(true),
     async (ctx) => {
       const [item] = await ctx.state.db.query(
         'SELECT userId FROM trackingDevice WHERE id = ?',

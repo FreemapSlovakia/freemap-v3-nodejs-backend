@@ -2,7 +2,6 @@ const { dbMiddleware } = require('~/database');
 const { acceptValidator } = require('~/requestValidators');
 const authenticator = require('~/authenticator');
 
-
 module.exports = (router) => {
   router.delete(
     '/access-tokens/:id',

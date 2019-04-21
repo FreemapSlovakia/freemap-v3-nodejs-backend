@@ -7,9 +7,9 @@ module.exports = (router) => {
   router.post(
     '/devices',
     acceptValidator('application/json'),
-    authenticator(true),
     // TODO bodySchemaValidator(postDeviceSchema, true),
     dbMiddleware,
+    authenticator(true),
     async (ctx) => {
       const token = uuidBase62.v4();
 
