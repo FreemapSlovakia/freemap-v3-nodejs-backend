@@ -11,5 +11,5 @@ module.exports = (ctx) => {
     trackRegister.delete(token);
   }
 
-  return null;
+  ctx.respondResult(null);
 };
