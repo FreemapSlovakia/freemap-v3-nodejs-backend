@@ -1,7 +1,7 @@
-const uuidBase62 = require('uuid-base62');
 const { dbMiddleware } = require('~/database');
 const { acceptValidator } = require('~/requestValidators');
 const authenticator = require('~/authenticator');
+const randomize = require('randomatic');
 
 module.exports = (router) => {
   router.post(
@@ -11,7 +11,7 @@ module.exports = (router) => {
     dbMiddleware(),
     authenticator(true),
     async (ctx) => {
-      const token = uuidBase62.v4();
+      const token = randomize('Aa0', 8);
 
       const { name, maxCount, maxAge } = ctx.request.body;
 

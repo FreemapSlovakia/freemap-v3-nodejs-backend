@@ -1,4 +1,4 @@
-const uuidBase62 = require('uuid-base62');
+const randomize = require('randomatic');
 const { dbMiddleware } = require('~/database');
 const { acceptValidator } = require('~/requestValidators');
 const authenticator = require('~/authenticator');
@@ -21,7 +21,7 @@ module.exports = (router) => {
       } else if (!ctx.state.user.isAdmin && ctx.state.user.id !== device.userId) {
         ctx.status = 403;
       } else {
-        const token = uuidBase62.v4();
+        const token = randomize('Aa0', 8);
         const { timeFrom, timeTo, note, listed = false } = ctx.request.body;
 
         const { insertId } = await ctx.state.db.query(

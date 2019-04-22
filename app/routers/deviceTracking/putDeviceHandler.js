@@ -1,4 +1,4 @@
-const uuidBase62 = require('uuid-base62');
+const randomize = require('randomatic');
 const { dbMiddleware } = require('~/database');
 const { acceptValidator } = require('~/requestValidators');
 const authenticator = require('~/authenticator');
@@ -25,7 +25,7 @@ module.exports = (router) => {
         let token;
 
         if (regenerateToken) {
-          token = uuidBase62.v4();
+          token = randomize('Aa0', 8);
         }
 
         await ctx.state.db.query(
