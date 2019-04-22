@@ -37,8 +37,11 @@ module.exports = (ctx) => {
 
       const result = maxCount === 0 ? [] : await db.query(
         `SELECT trackingPoint.id, lat, lon, createdAt
-          FROM trackingPoint JOIN trackingAccessTokens ON trackingPoint.deviceId = trackingAccessTokens.deviceId
-          WHERE (${token ? 'token' : 'deviceId'} = ?) AND ${minTime ? 'AND createdAt >= ?' : ''}
+          FROM trackingPoint JOIN trackingAccessTokens
+            ON trackingPoint.deviceId = trackingAccessTokens.deviceId
+              AND (validFrom IS NULL OR now() >= validFrom)
+              AND (validTo IS NULL OR now() < validTo)
+          WHERE (${token ? 'token' : 'deviceId'} = ?) ${minTime ? 'AND createdAt >= ?' : ''}
           ORDER BY trackingPoint.id
           ${maxCount ? 'LIMIT ?' : ''}`,
         params,

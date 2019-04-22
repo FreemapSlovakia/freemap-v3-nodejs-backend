@@ -10,7 +10,7 @@ module.exports = (router) => {
     authenticator(true),
     async (ctx) => {
       const [item] = await ctx.state.db.query(
-        `SELECT id, token, createdAt, validTo, note, listed
+        `SELECT id, token, createdAt, validFrom, validTo, note, listed
           FROM trackingAccessTokens JOIN trackingDevice ON (trackingAccessTokens.deviceId = trackingDevice.id)
           WHERE id = ?`,
         [ctx.params.id],

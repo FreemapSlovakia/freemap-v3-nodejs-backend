@@ -11,7 +11,7 @@ module.exports = (router) => {
     authenticator(true),
     async (ctx) => {
       const [item] = await ctx.state.db.query(
-        'SELECT id FROM trackingDevice WHERE token = ?',
+        'SELECT id, maxCount, maxAge FROM trackingDevice WHERE token = ?',
         [ctx.params.token],
       );
       if (!item) {
@@ -21,15 +21,30 @@ module.exports = (router) => {
       } else {
         const { lat, lon, note } = ctx.request.body;
         const now = new Date();
+        const { id, maxAge, maxCount } = item;
 
         const { insertId } = await ctx.state.db.query(
           'INSERT INTO trackingPoint (deviceId, lat, lon, note, createdAt) VALUES (?, ?, ?, ?, ?)',
-          [item.id, lat, lon, note, now],
+          [id, lat, lon, note, now],
         );
 
+        if (maxAge) {
+          await ctx.state.db.query(
+            'DELETE FROM trackingPoint WHERE deviceId = ? AND TIMESTAMPDIFF(SECOND(createdAt, now())) > ?',
+            [ctx.params.id, maxAge],
+          );
+        }
+
+        if (maxCount) {
+          await ctx.state.db.query(
+            'DELETE t FROM trackingPoint AS t JOIN (SELECT id FROM trackingPoint WHERE deviceId = ? ORDER BY id DESC OFFSET ?) tlimit ON t.id = tlimit.id',
+            [ctx.params.id, maxCount + 1],
+          );
+        }
+
         const rows = await ctx.state.db.query(
-          'SELECT token FROM trackingAccessTokens WHERE deviceId = ? AND validTo > ?',
-          [item.id, now],
+          'SELECT token FROM trackingAccessTokens WHERE deviceId = ? AND (validFrom IS NULL OR validFrom > ?) AND (validTo IS NULL OR validTo < ?)',
+          [id, now, now],
         );
 
         for (const { token } of rows) {

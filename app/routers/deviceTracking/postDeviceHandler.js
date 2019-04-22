@@ -13,9 +13,11 @@ module.exports = (router) => {
     async (ctx) => {
       const token = uuidBase62.v4();
 
+      const { name, maxCount, maxAge } = ctx.request.body;
+
       const { insertId } = await ctx.state.db.query(
-        'INSERT INTO trackingDevice (name, token, userId) VALUES (?, ?, ?)',
-        [ctx.request.body.name, token, ctx.state.user.id],
+        'INSERT INTO trackingDevice (name, token, userId, maxCount, maxAge) VALUES (?, ?, ?, ?, ?)',
+        [name, token, ctx.state.user.id, maxCount, maxAge],
       );
 
       ctx.body = { id: insertId, token };

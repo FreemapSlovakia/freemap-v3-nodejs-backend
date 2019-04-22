@@ -22,11 +22,11 @@ module.exports = (router) => {
         ctx.status = 403;
       } else {
         const token = uuidBase62.v4();
-        const { validTo, note, listed = false } = ctx.request.body;
+        const { validFrom, validTo, note, listed = false } = ctx.request.body;
 
         const { insertId } = await ctx.state.db.query(
-          'INSERT INTO trackingAccessToken (deviceId, token, validTo, note, listed) VALUES (?, ?, ?, ?)',
-          [ctx.params.id, token, validTo && new Date(validTo), note, listed],
+          'INSERT INTO trackingAccessToken (deviceId, token, validFrom, validTo, note, listed) VALUES (?, ?, ?, ?, ?, ?)',
+          [ctx.params.id, token, validFrom && new Date(validFrom), validTo && new Date(validTo), note, listed],
         );
 
         ctx.body = { id: insertId, token };

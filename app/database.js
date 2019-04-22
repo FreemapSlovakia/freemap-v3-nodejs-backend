@@ -92,6 +92,8 @@ async function initDatabase() {
       userId INT UNSIGNED NOT NULL,
       name VARCHAR(255) CHARSET utf8 COLLATE utf8_general_ci NOT NULL,
       token VARCHAR(255) CHARSET ascii NOT NULL UNIQUE,
+      maxCount INT UNSIGNED NULL,
+      maxAge INT UNSIGNED NULL,
       createdAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
       CONSTRAINT tdUserFk FOREIGN KEY (userId) REFERENCES user (id) ON DELETE CASCADE
     ) ENGINE=InnoDB`,
@@ -112,6 +114,7 @@ async function initDatabase() {
       deviceId INT UNSIGNED NOT NULL,
       token VARCHAR(255) CHARSET ascii NOT NULL UNIQUE,
       createdAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      validFrom TIMESTAMP NULL,
       validTo TIMESTAMP NULL,
       listed BOOL NOT NULL DEFAULT false,
       note VARCHAR(255) CHARSET utf8 COLLATE utf8_general_ci NULL,
