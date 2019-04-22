@@ -6,7 +6,7 @@ module.exports = (ctx) => {
   function rm(key) {
     const websockets = trackRegister.get(key);
     if (websockets) {
-      websockets.delete(ctx.websocket);
+      websockets.delete(ctx.ctx.websocket);
     }
 
     if (websockets.size === 0) {

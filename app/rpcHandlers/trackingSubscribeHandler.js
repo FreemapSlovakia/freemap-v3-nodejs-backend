@@ -7,25 +7,28 @@ module.exports = (ctx) => {
   (async () => {
     const db = await pool.getConnection();
 
+    const { user } = ctx.ctx;
+
     async function isDeviceOwner() {
       const [row] = await db.query('SELECT userId FROM trackingDevice WHERE deviceId = ?', [deviceId]);
-      return row && row.userId === ctx.user.id;
+      return row && row.userId === user.id;
     }
 
     try {
       if (!token && deviceId) {
-        if (!ctx.user || !ctx.user.isAdmin && !await isDeviceOwner()) {
+        if (!user || !user.isAdmin && !await isDeviceOwner()) {
           ctx.respondError(403, 'forbidden');
+          return;
         }
       }
 
       let websockets = trackRegister.get(token || deviceId);
       if (!websockets) {
         websockets = new Set();
-        trackRegister.add(token, websockets);
+        trackRegister.set(token || deviceId, websockets);
       }
 
-      websockets.add(ctx.websocket);
+      websockets.add(ctx.ctx.websocket);
 
       const params = [token || deviceId];
       if (minTime) {
@@ -35,17 +38,33 @@ module.exports = (ctx) => {
         params.push(Number.parseInt(maxCount, 10));
       }
 
-      const result = maxCount === 0 ? [] : await db.query(
-        `SELECT trackingPoint.id, lat, lon, trackingPoint.createdAt
-          FROM trackingPoint JOIN trackingAccessTokens
-            ON trackingPoint.deviceId = trackingAccessTokens.deviceId
-          WHERE (${token ? 'token' : 'deviceId'} = ?) ${minTime ? 'AND createdAt >= ?' : ''}
-            AND (timeFrom IS NULL OR trackingPoint.createdAt >= timeFrom)
-            AND (timeTo IS NULL OR trackingPoint.createdAt < timeTo)
-          ORDER BY trackingPoint.id
-          ${maxCount ? 'LIMIT ?' : ''}`,
-        params,
-      );
+      let result;
+
+      if (maxCount === 0) {
+        result = [];
+      } else if (deviceId) {
+        result = await db.query(
+          `SELECT id, lat, lon, note, createdAt
+            FROM trackingPoint
+            WHERE deviceId = ? ${minTime ? 'AND createdAt >= ?' : ''}
+            ORDER BY id
+            ${maxCount ? 'LIMIT ?' : ''}`,
+          params,
+        );
+      } else {
+        result = await db.query(
+          `SELECT trackingPoint.id, lat, lon, note, trackingPoint.createdAt
+            FROM trackingPoint JOIN trackingAccessTokens
+              ON trackingPoint.deviceId = trackingAccessTokens.deviceId
+            WHERE trackingAccessTokens.deviceId = ?
+              ${minTime ? 'AND trackingPoint.createdAt >= ?' : ''}
+              AND (timeFrom IS NULL OR trackingPoint.createdAt >= timeFrom)
+              AND (timeTo IS NULL OR trackingPoint.createdAt < timeTo)
+            ORDER BY trackingPoint.id
+            ${maxCount ? 'LIMIT ?' : ''}`,
+          params,
+        );
+      }
 
       ctx.respondResult(result.map(item => ({
         id: item.id,

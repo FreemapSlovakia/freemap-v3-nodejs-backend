@@ -55,7 +55,7 @@ module.exports = (app) => {
         respondResult,
         respondError,
         params: msg.params,
-        user: ctx.user,
+        ctx,
       };
 
       if (msg.method === 'tracking.subscribe') {

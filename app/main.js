@@ -64,7 +64,7 @@ router.use('/tracklogs', tracklogsRouter.routes(), tracklogsRouter.allowedMethod
 router.use('/gallery', galleryRouter.routes(), galleryRouter.allowedMethods());
 router.use('/auth', authRouter.routes(), authRouter.allowedMethods());
 router.use('/geotools', geotoolsRouter.routes(), geotoolsRouter.allowedMethods());
-router.use('/tracking/devices', trackingRouter.routes(), trackingRouter.allowedMethods());
+router.use('/tracking', trackingRouter.routes(), trackingRouter.allowedMethods());
 
 attachLoggerHandler(router);
 

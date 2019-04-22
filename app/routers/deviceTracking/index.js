@@ -7,5 +7,6 @@ require('./getAllDevicesHandler')(router);
 require('./getDeviceHandler')(router);
 require('./postDeviceHandler')(router);
 require('./putDeviceHandler')(router);
+require('./trackDeviceHandler')(router);
 
 module.exports = router;
