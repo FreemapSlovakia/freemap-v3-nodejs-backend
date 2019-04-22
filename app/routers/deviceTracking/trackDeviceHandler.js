@@ -43,7 +43,7 @@ module.exports = (router) => {
         }
 
         const rows = await ctx.state.db.query(
-          'SELECT token FROM trackingAccessTokens WHERE deviceId = ? AND (validFrom IS NULL OR validFrom > ?) AND (validTo IS NULL OR validTo < ?)',
+          'SELECT token FROM trackingAccessTokens WHERE deviceId = ? AND (timeFrom IS NULL OR timeFrom > ?) AND (timeTo IS NULL OR timeTo < ?)',
           [id, now, now],
         );
 
