@@ -4,7 +4,7 @@ const { acceptValidator } = require('~/requestValidators');
 const authenticator = require('~/authenticator');
 
 module.exports = (router) => {
-  router.post(
+  router.put(
     '/devices/:id',
     acceptValidator('application/json'),
     // TODO bodySchemaValidator(putDeviceSchema, true),
@@ -13,7 +13,7 @@ module.exports = (router) => {
     async (ctx) => {
       const [item] = await ctx.state.db.query(
         'SELECT userId FROM trackingDevice WHERE id = ?',
-        [ctx.request.body.name, ctx.params.id],
+        [ctx.params.id],
       );
 
       if (!item) {
@@ -35,14 +35,16 @@ module.exports = (router) => {
 
         if (maxAge) {
           await ctx.state.db.query(
-            'DELETE FROM trackingPoint WHERE deviceId = ? AND TIMESTAMPDIFF(SECOND(createdAt, now())) > ?',
+            'DELETE FROM trackingPoint WHERE deviceId = ? AND TIMESTAMPDIFF(SECOND, createdAt, now()) > ?',
             [ctx.params.id, maxAge],
           );
         }
 
         if (maxCount) {
           await ctx.state.db.query(
-            'DELETE t FROM trackingPoint AS t JOIN (SELECT id FROM trackingPoint WHERE deviceId = ? ORDER BY id DESC OFFSET ?) tlimit ON t.id = tlimit.id',
+            `DELETE t FROM trackingPoint AS t
+              JOIN (SELECT id FROM trackingPoint WHERE deviceId = ? ORDER BY id DESC LIMIT 18446744073709551615, ?) tlimit
+                ON t.id = tlimit.id`,
             [ctx.params.id, maxCount + 1],
           );
         }
