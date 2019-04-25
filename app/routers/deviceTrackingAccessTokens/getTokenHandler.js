@@ -12,7 +12,7 @@ module.exports = (router) => {
       const [item] = await ctx.state.db.query(
         `SELECT id, token, createdAt, timeFrom, timeTo, note, listed
           FROM trackingAccessTokens JOIN trackingDevice ON (trackingAccessTokens.deviceId = trackingDevice.id)
-          WHERE id = ?`,
+          WHERE id = ? ORDER BY id`,
         [ctx.params.id],
       );
 
