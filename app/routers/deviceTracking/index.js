@@ -9,4 +9,11 @@ require('./postDeviceHandler')(router);
 require('./putDeviceHandler')(router);
 require('./trackDeviceHandler')(router);
 
+require('./deleteTokenHandler')(router);
+require('./getAllTokensHandler')(router);
+require('./getPublicTokensHandler')(router);
+require('./getTokenHandler')(router);
+require('./postTokenHandler')(router);
+require('./putTokenHandler')(router);
+
 module.exports = router;

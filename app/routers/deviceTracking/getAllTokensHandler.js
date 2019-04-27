@@ -14,6 +14,8 @@ module.exports = (router) => {
         [ctx.params.id],
       );
 
+      console.log('FFFFFFFFFFF', ctx.params.id, device);
+
       if (!device) {
         ctx.state = 404;
       } else if (!ctx.state.user.isAdmin && ctx.state.user.id !== device.userId) {
