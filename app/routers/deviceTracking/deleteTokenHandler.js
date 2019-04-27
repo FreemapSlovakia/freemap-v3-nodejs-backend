@@ -11,7 +11,7 @@ module.exports = (router) => {
     async (ctx) => {
       const [item] = await ctx.state.db.query(
         `SELECT userId FROM trackingAccessToken JOIN trackingDevice ON (deviceId = trackingDevice.id)
-          WHERE trackingAccessToken.id = ? AND trackingDevice.id = ? FOR UPDATE`,
+          WHERE trackingAccessToken.id = ? FOR UPDATE`,
         [ctx.params.id],
       );
 
