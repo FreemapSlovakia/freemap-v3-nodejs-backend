@@ -54,9 +54,9 @@ module.exports = (ctx) => {
       } else {
         result = await db.query(
           `SELECT trackingPoint.id, lat, lon, note, trackingPoint.createdAt
-            FROM trackingPoint JOIN trackingAccessTokens
-              ON trackingPoint.deviceId = trackingAccessTokens.deviceId
-            WHERE trackingAccessTokens.deviceId = ?
+            FROM trackingPoint JOIN trackingAccessToken
+              ON trackingPoint.deviceId = trackingAccessToken.deviceId
+            WHERE trackingAccessToken.deviceId = ?
               ${minTime ? 'AND trackingPoint.createdAt >= ?' : ''}
               AND (timeFrom IS NULL OR trackingPoint.createdAt >= timeFrom)
               AND (timeTo IS NULL OR trackingPoint.createdAt < timeTo)

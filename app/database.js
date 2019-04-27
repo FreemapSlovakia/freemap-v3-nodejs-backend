@@ -109,7 +109,7 @@ async function initDatabase() {
       INDEX tpCreatedAtIdx (createdAt)
     ) ENGINE=InnoDB`,
 
-    `CREATE TABLE IF NOT EXISTS trackingAccessTokens (
+    `CREATE TABLE IF NOT EXISTS trackingAccessToken (
       id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
       deviceId INT UNSIGNED NOT NULL,
       token VARCHAR(255) CHARSET ascii NOT NULL UNIQUE,

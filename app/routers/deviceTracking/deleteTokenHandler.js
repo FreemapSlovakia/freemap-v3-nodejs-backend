@@ -10,8 +10,8 @@ module.exports = (router) => {
     authenticator(true),
     async (ctx) => {
       const [item] = await ctx.state.db.query(
-        `SELECT userId FROM trackingAccessTokens JOIN trackingDevice ON (deviceId = trackingDevice.id)
-          WHERE trackingAccessTokens.id = ? AND trackingDevice.id = ? FOR UPDATE`,
+        `SELECT userId FROM trackingAccessToken JOIN trackingDevice ON (deviceId = trackingDevice.id)
+          WHERE trackingAccessToken.id = ? AND trackingDevice.id = ? FOR UPDATE`,
         [ctx.params.id],
       );
 
@@ -20,7 +20,7 @@ module.exports = (router) => {
       } else if (!ctx.state.user.isAdmin && item.userId !== ctx.state.user.id) {
         ctx.status = 403;
       } else {
-        await ctx.state.db.query('DELETE FROM trackingAccessTokens WHERE id = ?', [ctx.params.id]);
+        await ctx.state.db.query('DELETE FROM trackingAccessToken WHERE id = ?', [ctx.params.id]);
         ctx.status = 204;
       }
     },
