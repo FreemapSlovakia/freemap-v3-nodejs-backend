@@ -2,7 +2,7 @@ const trackRegister = require('~/trackRegister');
 const { pool } = require('~/database');
 
 module.exports = (ctx) => {
-  const { token, minTime, maxCount, deviceId } = ctx.params;
+  const { token, fromTime, maxCount, maxAge, deviceId } = ctx.params;
 
   (async () => {
     const db = await pool.getConnection();
@@ -31,8 +31,11 @@ module.exports = (ctx) => {
       websockets.add(ctx.ctx.websocket);
 
       const params = [token || deviceId];
-      if (minTime) {
-        params.push(new Date(minTime));
+      if (fromTime) {
+        params.push(new Date(fromTime));
+      }
+      if (maxAge) {
+        params.push(Number.parseInt(maxAge, 10));
       }
       if (maxCount) {
         params.push(Number.parseInt(maxCount, 10));
@@ -40,13 +43,15 @@ module.exports = (ctx) => {
 
       let result;
 
-      if (maxCount === 0) {
+      if (maxCount === 0 || maxAge === 0) {
         result = [];
       } else if (deviceId) {
         result = await db.query(
           `SELECT id, lat, lon, note, createdAt
             FROM trackingPoint
-            WHERE deviceId = ? ${minTime ? 'AND createdAt >= ?' : ''}
+            WHERE deviceId = ?
+              ${fromTime ? 'AND createdAt >= ?' : ''}
+              ${maxAge ? 'AND trackingPoint.createdAt >= ?' : ''}
             ORDER BY id
             ${maxCount ? 'LIMIT ?' : ''}`,
           params,
@@ -57,7 +62,8 @@ module.exports = (ctx) => {
             FROM trackingPoint JOIN trackingAccessToken
               ON trackingPoint.deviceId = trackingAccessToken.deviceId
             WHERE trackingAccessToken.deviceId = ?
-              ${minTime ? 'AND trackingPoint.createdAt >= ?' : ''}
+              ${fromTime ? 'AND TIMESTAMPDIFF(SECOND, trackingPoint.createdAt, now()) < ?' : ''}
+              ${maxAge ? 'AND trackingPoint.createdAt >= ?' : ''}
               AND (timeFrom IS NULL OR trackingPoint.createdAt >= timeFrom)
               AND (timeTo IS NULL OR trackingPoint.createdAt < timeTo)
             ORDER BY trackingPoint.id
