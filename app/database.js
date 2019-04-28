@@ -104,7 +104,13 @@ async function initDatabase() {
       createdAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
       lat FLOAT(8, 6) NULL,
       lon FLOAT(9, 6) NULL,
-      note VARCHAR(255) CHARSET utf8 COLLATE utf8_general_ci NULL,
+      altitude FLOAT(4, 1) NULL,
+      speed FLOAT(4, 1) NULL,
+      accuracy FLOAT(4, 1) NULL,
+      bearing FLOAT NULL,
+      battery FLOAT(3) NULL,
+      gsmSignal FLOAT(3) NULL,
+      message VARCHAR(255) CHARSET utf8 COLLATE utf8_general_ci NULL,
       CONSTRAINT tpDeviceIdFk FOREIGN KEY (deviceId) REFERENCES trackingDevice (id) ON DELETE CASCADE,
       INDEX tpCreatedAtIdx (createdAt)
     ) ENGINE=InnoDB`,
@@ -116,7 +122,7 @@ async function initDatabase() {
       createdAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
       timeFrom TIMESTAMP NULL,
       timeTo TIMESTAMP NULL,
-      listed BOOL NOT NULL DEFAULT false,
+      listingLabel VARCHAR(255) CHARSET utf8 COLLATE utf8_general_ci NULL,
       note VARCHAR(255) CHARSET utf8 COLLATE utf8_general_ci NULL,
       CONSTRAINT tatDeviceIdFk FOREIGN KEY (deviceId) REFERENCES trackingDevice (id) ON DELETE CASCADE,
       INDEX tatCreatedAtIdx (createdAt)

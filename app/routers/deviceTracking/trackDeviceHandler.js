@@ -15,13 +15,14 @@ module.exports = (router) => {
       if (!item) {
         ctx.status = 404;
       } else {
-        const { lat, lon, note } = ctx.request.body;
+        const { lat, lon, altitude, speed, acc: accuracy, bearing, battery, gsm_signal: gsmSignal, message } = ctx.request.body;
         const now = new Date();
         const { id, maxAge, maxCount } = item;
 
         const { insertId } = await ctx.state.db.query(
-          'INSERT INTO trackingPoint (deviceId, lat, lon, note, createdAt) VALUES (?, ?, ?, ?, ?)',
-          [id, lat, lon, note, now],
+          `INSERT INTO trackingPoint (deviceId, lat, lon, altitude, speed, accuracy, bearing, battery, gsmSignal, message, createdAt)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [id, lat, lon, altitude, speed, accuracy, bearing, battery, gsmSignal, message, now],
         );
 
         if (maxAge) {
@@ -51,7 +52,7 @@ module.exports = (router) => {
                 jsonrpc: '2.0',
                 method: 'tracking.addPoint',
                 params: {
-                  id: insertId, lat, lon, note, [type]: key, ts: now.toISOString(),
+                  id: insertId, lat, lon, altitude, speed, accuracy, bearing, battery, gsmSignal, message, [type]: key, ts: now.toISOString(),
                 },
               }));
             }

@@ -22,11 +22,11 @@ module.exports = (router) => {
         ctx.status = 403;
       } else {
         const token = randomize('Aa0', 8);
-        const { timeFrom, timeTo, note, listed = false } = ctx.request.body;
+        const { timeFrom, timeTo, note, listingLabel } = ctx.request.body;
 
         const { insertId } = await ctx.state.db.query(
-          'INSERT INTO trackingAccessToken (deviceId, token, timeFrom, timeTo, note, listed) VALUES (?, ?, ?, ?, ?, ?)',
-          [ctx.params.id, token, timeFrom && new Date(timeFrom), timeTo && new Date(timeTo), note, listed],
+          'INSERT INTO trackingAccessToken (deviceId, token, timeFrom, timeTo, note, listingLabel) VALUES (?, ?, ?, ?, ?, ?)',
+          [ctx.params.id, token, timeFrom && new Date(timeFrom), timeTo && new Date(timeTo), note, listingLabel],
         );
 
         ctx.body = { id: insertId, token };

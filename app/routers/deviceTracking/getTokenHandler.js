@@ -10,7 +10,7 @@ module.exports = (router) => {
     authenticator(true),
     async (ctx) => {
       const [item] = await ctx.state.db.query(
-        `SELECT id, token, createdAt, timeFrom, timeTo, note, listed
+        `SELECT id, token, createdAt, timeFrom, timeTo, note, listingLabel
           FROM trackingAccessToken JOIN trackingDevice ON (trackingAccessToken.deviceId = trackingDevice.id)
           WHERE id = ? ORDER BY id`,
         [ctx.params.id],
@@ -21,7 +21,6 @@ module.exports = (router) => {
       } else if (!ctx.state.user.isAdmin && ctx.state.user.id !== item.userId) {
         ctx.status = 403;
       } else {
-        item.listed = !!item.listed;
         ctx.body = item;
       }
     },

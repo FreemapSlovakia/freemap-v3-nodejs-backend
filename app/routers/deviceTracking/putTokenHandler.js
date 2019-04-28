@@ -21,11 +21,11 @@ module.exports = (router) => {
       } else if (!ctx.state.user.isAdmin && item.userId !== ctx.state.user.id) {
         ctx.status = 403;
       } else {
-        const { timeFrom, timeTo, note, listed = false } = ctx.request.body;
+        const { timeFrom, timeTo, note, listingLabel } = ctx.request.body;
 
         await ctx.state.db.query(
-          'UPDATE trackingAccessToken SET note = ?, timeFrom = ?, timeTo = ?, listed = ? WHERE id = ?',
-          [note, timeFrom && new Date(timeFrom), timeTo && new Date(timeTo), listed, ctx.params.id],
+          'UPDATE trackingAccessToken SET note = ?, timeFrom = ?, timeTo = ?, listingLabel = ? WHERE id = ?',
+          [note, timeFrom && new Date(timeFrom), timeTo && new Date(timeTo), listingLabel, ctx.params.id],
         );
 
         ctx.status = 204;
