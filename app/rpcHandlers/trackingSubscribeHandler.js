@@ -2,6 +2,7 @@ const trackRegister = require('~/trackRegister');
 const { pool } = require('~/database');
 
 module.exports = (ctx) => {
+  // TODO validate ctx.params
   const { token, fromTime, maxCount, maxAge, deviceId } = ctx.params;
 
   (async () => {

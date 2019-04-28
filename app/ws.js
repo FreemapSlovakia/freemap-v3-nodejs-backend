@@ -3,6 +3,7 @@ const trackRegister = require('~/trackRegister');
 const authenticator = require('~/authenticator');
 const trackingSubscribeHandler = require('~/rpcHandlers/trackingSubscribeHandler');
 const trackingUnsubscribeHandler = require('~/rpcHandlers/trackingUnsubscribeHandler');
+const pingHandler = require('~/rpcHandlers/pingHandler');
 
 module.exports = (app) => {
   const wsRouter = new Router();
@@ -42,7 +43,6 @@ module.exports = (app) => {
       if (
         msg.jsonrpc !== '2.0'
         || typeof msg.method !== 'string'
-        || typeof msg.params !== 'object'
         || ('id' in msg && !['string', 'number'].includes(typeof msg.id))
       ) {
         respondError(-32600);
@@ -62,6 +62,8 @@ module.exports = (app) => {
         trackingSubscribeHandler(rpcCtx);
       } else if (msg.method === 'tracking.unsubscribe') {
         trackingUnsubscribeHandler(rpcCtx);
+      } else if (msg.method === 'ping') {
+        pingHandler(rpcCtx);
       } else {
         respondError(-32601);
       }
