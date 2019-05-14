@@ -48,7 +48,7 @@ module.exports = (ctx) => {
         result = [];
       } else if (deviceId) {
         result = await db.query(
-          `SELECT id, lat, lon, note, createdAt
+          `SELECT id, lat, lon, message, createdAt, altitude, speed, accuracy, bearing, battery, gsmSignal
             FROM trackingPoint
             WHERE deviceId = ?
               ${fromTime ? 'AND createdAt >= ?' : ''}
@@ -59,7 +59,7 @@ module.exports = (ctx) => {
         );
       } else {
         result = await db.query(
-          `SELECT trackingPoint.id, lat, lon, note, trackingPoint.createdAt
+          `SELECT trackingPoint.id, lat, lon, message, trackingPoint.createdAt, altitude, speed, accuracy, bearing, battery, gsmSignal
             FROM trackingPoint JOIN trackingAccessToken
               ON trackingPoint.deviceId = trackingAccessToken.deviceId
             WHERE trackingAccessToken.deviceId = ?
@@ -77,8 +77,15 @@ module.exports = (ctx) => {
         id: item.id,
         lat: item.lat,
         lon: item.lon,
-        note: item.note,
+        message: item.message,
         ts: item.createdAt,
+        altitude: item.altitude,
+        speed: item.speed,
+        accuracy: item.accuracy,
+        bearing: item.bearing,
+        battery: item.battery,
+        gsmSignal: item.gsmSignal,
+        [token ? 'token' : 'deviceId']: token || deviceId,
       })));
     } finally {
       pool.releaseConnection(db);
