@@ -25,9 +25,9 @@ const unlinkAsync = util.promisify(fs.unlink);
 const ssl = config.get('http.ssl');
 
 const app = websockify(new Koa(), {}, ssl ? {
-  key: fs.readFileSync('ssl/freemap.sk.key'),
-  cert: fs.readFileSync('ssl/freemap.sk.pem'),
-} : {});
+  key: fs.readFileSync(ssl.key),
+  cert: fs.readFileSync(ssl.cert),
+} : undefined);
 
 app.use(koaBunyanLogger(logger.child({ module: 'koa' })));
 app.use(koaBunyanLogger.requestIdContext());
