@@ -86,16 +86,16 @@ module.exports = (ctx) => {
 
       ctx.respondResult(result.map(item => ({
         id: item.id,
+        ts: item.createdAt,
         lat: item.lat,
         lon: item.lon,
-        message: item.message,
-        ts: item.createdAt,
-        altitude: item.altitude,
-        speed: item.speed,
-        accuracy: item.accuracy,
-        bearing: item.bearing,
-        battery: item.battery,
-        gsmSignal: item.gsmSignal,
+        message: ntu(item.message),
+        altitude: ntu(item.altitude),
+        speed: ntu(item.speed),
+        accuracy: ntu(item.accuracy),
+        bearing: ntu(item.bearing),
+        battery: ntu(item.battery),
+        gsmSignal: ntu(item.gsmSignal),
         [token ? 'token' : 'deviceId']: deviceId || token,
       })));
     } finally {
@@ -105,3 +105,7 @@ module.exports = (ctx) => {
     ctx.respondError(500, err.message);
   });
 };
+
+function ntu(x) {
+  return x === null ? undefined : x;
+}
