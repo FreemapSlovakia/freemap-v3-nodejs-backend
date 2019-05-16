@@ -10,30 +10,37 @@ module.exports = (ctx) => {
 
     const { user } = ctx.ctx;
 
-    async function isDeviceOwner() {
-      const [row] = await db.query('SELECT userId FROM trackingDevice WHERE deviceId = ?', [deviceId]);
-      return row && row.userId === user.id;
-    }
-
     try {
-      if (!token && deviceId) {
-        if (!user || !user.isAdmin && !await isDeviceOwner()) {
+      if (deviceId) {
+        const [row] = await db.query('SELECT userId FROM trackingDevice WHERE id = ?', [deviceId]);
+        if (!row) {
+          ctx.respondError(404, 'no such device');
+          return;
+        }
+
+        if (!user || !user.isAdmin && row.userId !== user.id) {
           ctx.respondError(403, 'forbidden');
+          return;
+        }
+      } else if (token) {
+        const [row] = await db.query('SELECT 1 FROM trackingAccessToken WHERE token = ?', token);
+        if (!row) {
+          ctx.respondError(404, 'no such token');
           return;
         }
       }
 
       // TODO check if token exists
 
-      let websockets = trackRegister.get(token || deviceId);
+      let websockets = trackRegister.get(deviceId || token);
       if (!websockets) {
         websockets = new Set();
-        trackRegister.set(token || deviceId, websockets);
+        trackRegister.set(deviceId || token, websockets);
       }
 
       websockets.add(ctx.ctx.websocket);
 
-      const params = [token || deviceId];
+      const params = [deviceId || token];
       if (fromTime) {
         params.push(new Date(fromTime));
       }
@@ -89,7 +96,7 @@ module.exports = (ctx) => {
         bearing: item.bearing,
         battery: item.battery,
         gsmSignal: item.gsmSignal,
-        [token ? 'token' : 'deviceId']: token || deviceId,
+        [token ? 'token' : 'deviceId']: deviceId || token,
       })));
     } finally {
       pool.releaseConnection(db);
