@@ -3,7 +3,7 @@ const { pool } = require('~/database');
 
 module.exports = (ctx) => {
   // TODO validate ctx.params
-  const { token, fromTime, maxCount, maxAge, deviceId } = ctx.params;
+  const { token, deviceId, fromTime, maxCount, maxAge } = ctx.params;
 
   (async () => {
     const db = await pool.getConnection();
@@ -22,6 +22,8 @@ module.exports = (ctx) => {
           return;
         }
       }
+
+      // TODO check if token exists
 
       let websockets = trackRegister.get(token || deviceId);
       if (!websockets) {
@@ -62,9 +64,9 @@ module.exports = (ctx) => {
           `SELECT trackingPoint.id, lat, lon, message, trackingPoint.createdAt, altitude, speed, accuracy, bearing, battery, gsmSignal
             FROM trackingPoint JOIN trackingAccessToken
               ON trackingPoint.deviceId = trackingAccessToken.deviceId
-            WHERE trackingAccessToken.deviceId = ?
-              ${fromTime ? 'AND TIMESTAMPDIFF(SECOND, trackingPoint.createdAt, now()) < ?' : ''}
-              ${maxAge ? 'AND trackingPoint.createdAt >= ?' : ''}
+            WHERE trackingAccessToken.token = ?
+              ${maxAge ? 'AND TIMESTAMPDIFF(SECOND, trackingPoint.createdAt, now()) < ?' : ''}
+              ${fromTime ? 'AND trackingPoint.createdAt >= ?' : ''}
               AND (timeFrom IS NULL OR trackingPoint.createdAt >= timeFrom)
               AND (timeTo IS NULL OR trackingPoint.createdAt < timeTo)
             ORDER BY trackingPoint.id
@@ -72,6 +74,8 @@ module.exports = (ctx) => {
           params,
         );
       }
+
+      // TODO skip nulls
 
       ctx.respondResult(result.map(item => ({
         id: item.id,
