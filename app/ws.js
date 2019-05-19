@@ -10,7 +10,13 @@ module.exports = (app) => {
   const wsRouter = new Router();
 
   wsRouter.all('/ws', dbMiddleware(), authenticator(), async (ctx) => {
+    const { pingInterval } = ctx.query;
+    const pinger = !pingInterval ? null : setInterval(() => {
+      ctx.websocket.send('ping');
+    }, 30000);
+
     ctx.websocket.on('message', (message) => {
+
       let id = null;
 
       function respondError(code, msg) {
@@ -71,6 +77,9 @@ module.exports = (app) => {
     });
 
     ctx.websocket.on('close', () => {
+      if (pinger) {
+        clearTimeout(pinger);
+      }
       for (const websockets of trackRegister.values()) {
         websockets.delete(ctx.websocket);
       }
