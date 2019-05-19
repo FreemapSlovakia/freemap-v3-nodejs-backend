@@ -8,20 +8,24 @@ const consumerSecret = config.get('oauth.consumerSecret');
 
 module.exports = function authenticator(require, deep) {
   return async function authorize(ctx, next) {
-    const ah = ctx.get('Authorization');
+    let { authToken } = ctx.query; // used in websockets
 
-    const m = /^bearer (.+)$/i.exec(ah || '');
-    if (!m) {
-      if (require) {
-        ctx.status = 401;
-        ctx.set('WWW-Authenticate', 'Bearer realm="freemap"; error="missing token"');
-      } else {
-        await next();
+    if (!authToken) {
+      const ah = ctx.get('Authorization');
+      const m = /^bearer (.+)$/i.exec(ah || '');
+      if (!m) {
+        if (require) {
+          ctx.status = 401;
+          ctx.set('WWW-Authenticate', 'Bearer realm="freemap"; error="missing token"');
+        } else {
+          await next();
+        }
+        return;
       }
-      return;
+
+      authToken = m[1];
     }
 
-    const authToken = m[1];
     const [auth] = await ctx.state.db.query(
       `SELECT userId, osmAuthToken, osmAuthTokenSecret, facebookAccessToken, googleIdToken, name, email, isAdmin, lat, lon, settings, preventTips
         FROM auth INNER JOIN user ON (userId = id) WHERE authToken = ?`,

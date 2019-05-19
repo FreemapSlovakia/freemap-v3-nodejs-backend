@@ -15,7 +15,7 @@ module.exports = (router) => {
       if (!item) {
         ctx.status = 404;
       } else {
-        const { lat, lon, altitude, speed, acc: accuracy, bearing, battery, gsm_signal: gsmSignal, message } = ctx.request.body;
+        const { lat, lon, alt: altitude, speed, acc: accuracy, bearing, battery, gsm_signal: gsmSignal, message } = ctx.request.body;
         const now = new Date();
         const { id, maxAge, maxCount } = item;
 

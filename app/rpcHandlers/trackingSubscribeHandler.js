@@ -8,7 +8,7 @@ module.exports = (ctx) => {
   (async () => {
     const db = await pool.getConnection();
 
-    const { user } = ctx.ctx;
+    const { user } = ctx.ctx.state || {};
 
     try {
       if (deviceId) {
