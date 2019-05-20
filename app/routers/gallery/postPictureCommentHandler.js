@@ -12,7 +12,7 @@ const mailgun = !mailgunConfig ? null : require('mailgun-js')(mailgunConfig);
 module.exports = function attachPostPictureCommentHandler(router) {
   router.post(
     '/pictures/:id/comments',
-    dbMiddleware,
+    dbMiddleware(),
     authenticator(true),
     bodySchemaValidator(postPictureCommentSchema, true),
     acceptValidator('application/json'),

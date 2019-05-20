@@ -6,10 +6,10 @@ const { bodySchemaValidator } = require('~/requestValidators');
 module.exports = function attachPatchUserHandler(router) {
   router.patch(
     '/settings',
-    dbMiddleware,
+    dbMiddleware(),
     authenticator(true, false),
     bodySchemaValidator(patchUserSchema),
-    dbMiddleware,
+    dbMiddleware(),
     async (ctx) => {
       const keys = Object.keys(ctx.request.body);
 

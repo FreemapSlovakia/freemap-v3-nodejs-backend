@@ -12,7 +12,7 @@ const execFileAsync = promisify(execFile);
 module.exports = function attachPostPictureHandler(router) {
   router.post(
     '/pictures',
-    dbMiddleware,
+    dbMiddleware(),
     authenticator(true),
     contentTypeValidator('multipart/form-data'),
     async (ctx, next) => {

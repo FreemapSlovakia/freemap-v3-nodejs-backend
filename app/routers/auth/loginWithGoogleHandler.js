@@ -7,7 +7,7 @@ module.exports = function attachLoginWithFacebookHandler(router) {
   router.post(
     '/login-google',
     // TODO validation
-    dbMiddleware,
+    dbMiddleware(),
     async (ctx) => {
       const { idToken } = ctx.request.body;
 

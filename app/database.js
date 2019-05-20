@@ -5,14 +5,16 @@ const logger = require('~/logger');
 
 const pool = mysql.createPool(config.get('mysql'));
 
-async function dbMiddleware(ctx, next) {
-  const db = await pool.getConnection();
-  ctx.state.db = db;
-  try {
-    await next();
-  } finally {
-    pool.releaseConnection(db);
-  }
+function dbMiddleware() {
+  return async (ctx, next) => {
+    const db = await pool.getConnection();
+    ctx.state.db = db;
+    try {
+      await next();
+    } finally {
+      pool.releaseConnection(db);
+    }
+  };
 }
 
 async function initDatabase() {
@@ -83,6 +85,47 @@ async function initDatabase() {
       PRIMARY KEY (pictureId, userId),
       FOREIGN KEY (pictureId) REFERENCES picture (id) ON DELETE CASCADE,
       FOREIGN KEY (userId) REFERENCES user (id) ON DELETE CASCADE
+    ) ENGINE=InnoDB`,
+
+    `CREATE TABLE IF NOT EXISTS trackingDevice (
+      id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+      userId INT UNSIGNED NOT NULL,
+      name VARCHAR(255) CHARSET utf8 COLLATE utf8_general_ci NOT NULL,
+      token VARCHAR(255) CHARSET ascii NOT NULL UNIQUE,
+      maxCount INT UNSIGNED NULL,
+      maxAge INT UNSIGNED NULL,
+      createdAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      CONSTRAINT tdUserFk FOREIGN KEY (userId) REFERENCES user (id) ON DELETE CASCADE
+    ) ENGINE=InnoDB`,
+
+    `CREATE TABLE IF NOT EXISTS trackingPoint (
+      id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+      deviceId INT UNSIGNED NOT NULL,
+      createdAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      lat FLOAT(8, 6) NULL,
+      lon FLOAT(9, 6) NULL,
+      altitude FLOAT(4, 1) NULL,
+      speed FLOAT(4, 1) NULL,
+      accuracy FLOAT(4, 1) NULL,
+      bearing FLOAT NULL,
+      battery FLOAT(3) NULL,
+      gsmSignal FLOAT(3) NULL,
+      message VARCHAR(255) CHARSET utf8 COLLATE utf8_general_ci NULL,
+      CONSTRAINT tpDeviceIdFk FOREIGN KEY (deviceId) REFERENCES trackingDevice (id) ON DELETE CASCADE,
+      INDEX tpCreatedAtIdx (createdAt)
+    ) ENGINE=InnoDB`,
+
+    `CREATE TABLE IF NOT EXISTS trackingAccessToken (
+      id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+      deviceId INT UNSIGNED NOT NULL,
+      token VARCHAR(255) CHARSET ascii NOT NULL UNIQUE,
+      createdAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      timeFrom TIMESTAMP NULL,
+      timeTo TIMESTAMP NULL,
+      listingLabel VARCHAR(255) CHARSET utf8 COLLATE utf8_general_ci NULL,
+      note VARCHAR(255) CHARSET utf8 COLLATE utf8_general_ci NULL,
+      CONSTRAINT tatDeviceIdFk FOREIGN KEY (deviceId) REFERENCES trackingDevice (id) ON DELETE CASCADE,
+      INDEX tatCreatedAtIdx (createdAt)
     ) ENGINE=InnoDB`,
   ];
 
