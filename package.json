@@ -13,8 +13,8 @@
     "config": "3.1.0",
     "etag": "1.8.1",
     "fb": "2.0.0",
-    "fs-extra": "7.0.1",
-    "google-auth-library": "3.1.2",
+    "fs-extra": "8.0.1",
+    "google-auth-library": "4.0.0",
     "kcors": "2.2.2",
     "koa": "2.7.0",
     "koa-body": "4.1.0",
@@ -24,13 +24,13 @@
     "mailgun-js": "0.22.0",
     "mysql": "2.17.1",
     "process-nextick-args": "2.0.0",
-    "promise-mysql": "3.3.1",
+    "promise-mysql": "3.3.2",
     "querystring": "0.2.0",
     "randomatic": "3.1.1",
     "request": "2.88.0",
     "request-promise-native": "1.0.7",
     "set-cookie-parser": "2.3.5",
-    "sharp": "0.22.0",
+    "sharp": "0.22.1",
     "uuid-base62": "0.1.0",
     "verror": "1.10.0",
     "xml2js": "0.4.19"
@@ -43,7 +43,7 @@
     "eslint-config-airbnb-base": "13.1.0",
     "eslint-import-resolver-babel-root-import": "0.0.2",
     "eslint-plugin-import": "2.17.2",
-    "nodemon": "1.18.11"
+    "nodemon": "1.19.0"
   },
   "scripts": {
     "start": "node index.js",
