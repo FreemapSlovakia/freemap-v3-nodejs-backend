@@ -12,7 +12,9 @@ module.exports = (app) => {
   wsRouter.all('/ws', dbMiddleware(), authenticator(), async (ctx) => {
     const { pingInterval } = ctx.query;
     const pinger = !pingInterval ? null : setInterval(() => {
-      ctx.websocket.send('ping');
+      if (ctx.websocket.readyState === 1) {
+        ctx.websocket.send('ping');
+      }
     }, 30000);
 
     ctx.websocket.on('message', (message) => {
@@ -20,22 +22,26 @@ module.exports = (app) => {
       let id = null;
 
       function respondError(code, msg) {
-        ctx.websocket.send(JSON.stringify({
-          jsonrpc: '2.0',
-          id,
-          error: {
-            code,
-            message: msg,
-          },
-        }));
+        if (ctx.websocket.readyState === 1) {
+          ctx.websocket.send(JSON.stringify({
+            jsonrpc: '2.0',
+            id,
+            error: {
+              code,
+              message: msg,
+            },
+          }));
+        }
       }
 
       function respondResult(result) {
-        ctx.websocket.send(JSON.stringify({
-          jsonrpc: '2.0',
-          id,
-          result,
-        }));
+        if (ctx.websocket.readyState === 1) {
+          ctx.websocket.send(JSON.stringify({
+            jsonrpc: '2.0',
+            id,
+            result,
+          }));
+        }
       }
 
       let msg;
