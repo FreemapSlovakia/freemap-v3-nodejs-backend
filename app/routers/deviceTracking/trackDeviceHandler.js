@@ -19,7 +19,8 @@ async function handler(ctx) {
   if (!item) {
     ctx.status = 404;
   } else {
-    const { lat, lon, alt: altitude, speed, acc: accuracy, bearing, battery, gsm_signal: gsmSignal, message } = ctx.request.body || ctx.request.query;
+    const q = ctx.method === 'POST' && ctx.request.type === 'application/x-www-form-urlencoded' ? ctx.request.body : ctx.query;
+    const { lat, lon, alt: altitude, speed, acc: accuracy, bearing, battery, gsm_signal: gsmSignal, message } = q;
     const now = new Date();
     const { id, maxAge, maxCount } = item;
 
