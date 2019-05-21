@@ -18,7 +18,6 @@ module.exports = (app) => {
     }, 30000);
 
     ctx.websocket.on('message', (message) => {
-
       let id = null;
 
       function respondError(code, msg) {
