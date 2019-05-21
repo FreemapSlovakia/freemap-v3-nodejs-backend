@@ -70,4 +70,4 @@ async function handler(ctx) {
 
     ctx.body = { id: insertId };
   }
-};
+}
