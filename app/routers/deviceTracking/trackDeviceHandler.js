@@ -33,6 +33,18 @@ async function handler(ctx) {
     const gsmSignal = q.gsm_signal === undefined ? null : Number.parseFloat(q.gsm_signal);
     const time = guessTime(q.time);
 
+    if (
+      Number.isNaN(lat) || lat < -90 || lat > 90 || Number.isNaN(lon) || lon < -180 || lon > 180
+        || Number.isNaN(battery) || battery !== null && (battery < 0 || battery > 100)
+        || Number.isNaN(gsmSignal) || gsmSignal !== null && (gsmSignal < 0 || gsmSignal > 100)
+        || Number.isNaN(bearing) || bearing !== null && (bearing < 0 || bearing > 360)
+        || Number.isNaN(accuracy) || accuracy !== null && accuracy < 0
+        || Number.isNaN(speed) || speed !== null && speed < 0
+    ) {
+      ctx.status = 400;
+      return;
+    }
+
     const now = new Date();
 
     const { id, maxAge, maxCount } = item;
