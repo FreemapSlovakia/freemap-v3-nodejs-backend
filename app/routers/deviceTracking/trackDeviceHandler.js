@@ -20,7 +20,18 @@ async function handler(ctx) {
     ctx.status = 404;
   } else {
     const q = ctx.method === 'POST' && ctx.request.type === 'application/x-www-form-urlencoded' ? ctx.request.body : ctx.query;
-    const { lat, lon, alt: altitude, speed, acc: accuracy, bearing, battery, gsm_signal: gsmSignal, message } = q;
+
+    const { message } = q;
+
+    const lat = Number.parseFloat(q.lat);
+    const lon = Number.parseFloat(q.lon);
+    const altitude = q.alt === undefined ? null : Number.parseFloat(q.alt);
+    const speed = q.speed === undefined ? null : Number.parseFloat(q.speed);
+    const accuracy = q.acc === undefined ? null : Number.parseFloat(q.acc);
+    const bearing = q.bearing === undefined ? null : Number.parseFloat(q.bearing);
+    const battery = q.battery === undefined ? null : Number.parseFloat(q.battery);
+    const gsmSignal = q.gsm_signal === undefined ? null : Number.parseFloat(q.gsm_signal);
+
     const now = new Date();
     const { id, maxAge, maxCount } = item;
 
