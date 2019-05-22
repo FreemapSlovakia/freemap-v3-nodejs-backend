@@ -8,10 +8,10 @@ module.exports = (ctx) => {
     const websockets = trackRegister.get(key);
     if (websockets) {
       websockets.delete(ctx.ctx.websocket);
-    }
 
-    if (websockets.size === 0) {
-      trackRegister.delete(key);
+      if (websockets.size === 0) {
+        trackRegister.delete(key);
+      }
     }
   }
 
