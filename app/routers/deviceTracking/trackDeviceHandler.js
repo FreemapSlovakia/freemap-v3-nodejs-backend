@@ -31,14 +31,16 @@ async function handler(ctx) {
     const bearing = q.bearing === undefined ? null : Number.parseFloat(q.bearing);
     const battery = q.battery === undefined ? null : Number.parseFloat(q.battery);
     const gsmSignal = q.gsm_signal === undefined ? null : Number.parseFloat(q.gsm_signal);
+    const time = guessTime(q.time);
 
     const now = new Date();
+
     const { id, maxAge, maxCount } = item;
 
     const { insertId } = await ctx.state.db.query(
       `INSERT INTO trackingPoint (deviceId, lat, lon, altitude, speed, accuracy, bearing, battery, gsmSignal, message, createdAt)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [id, lat, lon, altitude, speed, accuracy, bearing, battery, gsmSignal, message, now],
+      [id, lat, lon, altitude, speed, accuracy, bearing, battery, gsmSignal, message, time],
     );
 
     if (maxAge) {
@@ -68,7 +70,8 @@ async function handler(ctx) {
             jsonrpc: '2.0',
             method: 'tracking.addPoint',
             params: {
-              id: insertId, lat, lon, altitude, speed, accuracy, bearing, battery, gsmSignal, message, [type]: key, ts: now.toISOString(),
+              // TODO validate if time matches limits
+              id: insertId, lat, lon, altitude, speed, accuracy, bearing, battery, gsmSignal, message, [type]: key, ts: time.toISOString(),
             },
           }));
         }
@@ -82,4 +85,35 @@ async function handler(ctx) {
 
     ctx.body = { id: insertId };
   }
+}
+
+const min = new Date('2000-01-01');
+const max = new Date('3000-01-01');
+
+function guessTime(t) {
+  if (!t) {
+    return new Date();
+  }
+
+  const d1 = new Date(t);
+  if (max > d1 && d1 > min) {
+    return d1;
+  }
+
+  const n = Number.parseInt(t, 10);
+  if (Number.isNaN(n)) {
+    return new Date();
+  }
+
+  const d2 = new Date(t);
+  if (max > d2 && d2 > min) {
+    return d2;
+  }
+
+  const d3 = new Date(t * 1000);
+  if (max > d3 && d3 > min) {
+    return d3;
+  }
+
+  return new Date();
 }
