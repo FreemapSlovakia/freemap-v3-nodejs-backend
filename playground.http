@@ -1,0 +1,12 @@
+POST https://local.freemap.sk:3000/tracking/track/FN0VaEOV
+Content-Type: application/x-www-form-urlencoded
+
+lat=48.688453&lon=21.567285
+
+###
+POST https://local.freemap.sk:3000/tracking/track/zyogq8ZX
+Content-Type: application/x-www-form-urlencoded
+
+lat=48.588453&lon=21.578285
+
+###

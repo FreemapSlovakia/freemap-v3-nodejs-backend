@@ -33,8 +33,8 @@ async function handler(ctx) {
     const gsmSignal = q.gsm_signal === undefined ? null : Number.parseFloat(q.gsm_signal);
     const time = guessTime(q.time);
 
-    if (
-      Number.isNaN(lat) || lat < -90 || lat > 90 || Number.isNaN(lon) || lon < -180 || lon > 180
+    if (time === null
+        || Number.isNaN(lat) || lat < -90 || lat > 90 || Number.isNaN(lon) || lon < -180 || lon > 180
         || Number.isNaN(battery) || battery !== null && (battery < 0 || battery > 100)
         || Number.isNaN(gsmSignal) || gsmSignal !== null && (gsmSignal < 0 || gsmSignal > 100)
         || Number.isNaN(bearing) || bearing !== null && (bearing < 0 || bearing > 360)
@@ -99,12 +99,15 @@ async function handler(ctx) {
   }
 }
 
-const min = new Date('2000-01-01');
-const max = new Date('3000-01-01');
-
 function guessTime(t) {
+  const now = new Date();
+  const min = new Date();
+  min.setMonth(min.getMonth() - 1);
+  const max = new Date();
+  max.setDate(min.getDate() + 1);
+
   if (!t) {
-    return new Date();
+    return now;
   }
 
   const d1 = new Date(t);
@@ -114,7 +117,7 @@ function guessTime(t) {
 
   const n = Number.parseInt(t, 10);
   if (Number.isNaN(n)) {
-    return new Date();
+    return null;
   }
 
   const d2 = new Date(t);
@@ -127,5 +130,5 @@ function guessTime(t) {
     return d3;
   }
 
-  return new Date();
+  return null;
 }

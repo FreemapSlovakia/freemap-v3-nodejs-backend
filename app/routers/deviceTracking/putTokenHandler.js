@@ -1,12 +1,14 @@
 const { dbMiddleware } = require('~/database');
 const { acceptValidator } = require('~/requestValidators');
 const authenticator = require('~/authenticator');
+const { bodySchemaValidator } = require('~/requestValidators');
+const putTokenSchema = require('./putTokenSchema');
 
 module.exports = (router) => {
   router.put(
     '/access-tokens/:id',
     acceptValidator('application/json'),
-    // TODO bodySchemaValidator(putTokenSchema, true),
+    bodySchemaValidator(putTokenSchema, true),
     dbMiddleware(),
     authenticator(true),
     async (ctx) => {

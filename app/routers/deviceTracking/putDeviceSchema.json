@@ -1,0 +1,22 @@
+{
+  "type": "object",
+  "required": ["name"],
+  "properties": {
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 255
+    },
+    "maxCount": {
+      "type": ["number", "null"],
+      "min": 0
+    },
+    "maxAge": {
+      "type": ["number", "null"],
+      "min": 0
+    },
+    "regenerateToken": {
+      "type": ["boolean", "null"]
+    }
+  }
+}

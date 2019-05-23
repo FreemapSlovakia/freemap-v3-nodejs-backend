@@ -2,12 +2,14 @@ const randomize = require('randomatic');
 const { dbMiddleware } = require('~/database');
 const { acceptValidator } = require('~/requestValidators');
 const authenticator = require('~/authenticator');
+const { bodySchemaValidator } = require('~/requestValidators');
+const putDeviceSchema = require('./putDeviceSchema');
 
 module.exports = (router) => {
   router.put(
     '/devices/:id',
     acceptValidator('application/json'),
-    // TODO bodySchemaValidator(putDeviceSchema, true),
+    bodySchemaValidator(putDeviceSchema, true),
     dbMiddleware(),
     authenticator(true),
     async (ctx) => {

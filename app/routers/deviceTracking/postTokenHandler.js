@@ -2,12 +2,14 @@ const randomize = require('randomatic');
 const { dbMiddleware } = require('~/database');
 const { acceptValidator } = require('~/requestValidators');
 const authenticator = require('~/authenticator');
+const { bodySchemaValidator } = require('~/requestValidators');
+const postTokenSchema = require('./postTokenSchema');
 
 module.exports = (router) => {
   router.post(
     '/devices/:id/access-tokens',
     acceptValidator('application/json'),
-    // TODO bodySchemaValidator(postTokenCommentSchema, true),
+    bodySchemaValidator(postTokenSchema, true),
     dbMiddleware(),
     authenticator(true),
     async (ctx) => {
