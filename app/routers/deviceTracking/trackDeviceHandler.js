@@ -122,12 +122,13 @@ function guessTime(t) {
     return null;
   }
 
-  const d2 = new Date(t);
+  const d2 = new Date(n);
+
   if (max > d2 && d2 > min) {
     return d2;
   }
 
-  const d3 = new Date(t * 1000);
+  const d3 = new Date(n * 1000);
   if (max > d3 && d3 > min) {
     return d3;
   }
