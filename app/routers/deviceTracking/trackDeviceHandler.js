@@ -78,14 +78,16 @@ async function handler(ctx) {
       const websockets = trackRegister.get(key);
       if (websockets) {
         for (const ws of websockets) {
-          ws.send(JSON.stringify({
-            jsonrpc: '2.0',
-            method: 'tracking.addPoint',
-            params: {
-              // TODO validate if time matches limits
-              id: insertId, lat, lon, altitude, speed, accuracy, bearing, battery, gsmSignal, message, [type]: key, ts: time.toISOString(),
-            },
-          }));
+          if (ws.readyState === 1) {
+            ws.send(JSON.stringify({
+              jsonrpc: '2.0',
+              method: 'tracking.addPoint',
+              params: {
+                // TODO validate if time matches limits
+                id: insertId, lat, lon, altitude, speed, accuracy, bearing, battery, gsmSignal, message, [type]: key, ts: time.toISOString(),
+              },
+            }));
+          }
         }
       }
     };
