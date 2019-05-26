@@ -96,7 +96,6 @@ module.exports = (ctx) => {
         bearing: ntu(item.bearing),
         battery: ntu(item.battery),
         gsmSignal: ntu(item.gsmSignal),
-        [token ? 'token' : 'deviceId']: deviceId || token,
       })));
     } finally {
       pool.releaseConnection(db);
