@@ -11,18 +11,21 @@ module.exports = (app) => {
 
   wsRouter.all('/ws', dbMiddleware(), authenticator(), async (ctx) => {
     const { pingInterval } = ctx.query;
+
+    const ws = ctx.websocket;
+
     const pinger = !pingInterval ? null : setInterval(() => {
-      if (ctx.websocket.readyState === 1) {
-        ctx.websocket.send('ping');
+      if (ws.readyState === 1) {
+        ws.send('ping');
       }
     }, 30000);
 
-    ctx.websocket.on('message', (message) => {
+    ws.on('message', (message) => {
       let id = null;
 
       function respondError(code, msg) {
-        if (ctx.websocket.readyState === 1) {
-          ctx.websocket.send(JSON.stringify({
+        if (ws.readyState === 1) {
+          ws.send(JSON.stringify({
             jsonrpc: '2.0',
             id,
             error: {
@@ -34,8 +37,8 @@ module.exports = (app) => {
       }
 
       function respondResult(result) {
-        if (ctx.websocket.readyState === 1) {
-          ctx.websocket.send(JSON.stringify({
+        if (ws.readyState === 1) {
+          ws.send(JSON.stringify({
             jsonrpc: '2.0',
             id,
             result,
@@ -81,14 +84,17 @@ module.exports = (app) => {
       }
     });
 
-    ctx.websocket.on('close', () => {
+    const handleCloseOrError = () => {
       if (pinger) {
         clearTimeout(pinger);
       }
       for (const websockets of trackRegister.values()) {
-        websockets.delete(ctx.websocket);
+        websockets.delete(ws);
       }
-    });
+    };
+
+    ws.on('close', handleCloseOrError);
+    ws.on('error', handleCloseOrError);
   });
 
   app.ws
