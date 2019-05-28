@@ -22,7 +22,7 @@ module.exports = function attachPostPictureHandler(router) {
         ctx.body = {
           error: 'missing_image_file',
         };
-      } else if (files.image.size > 10 * 1024 * 1024) {
+      } else if (files.image.size > 20 * 1024 * 1024) {
         ctx.status = 413;
       } else if (ctx.request.body.meta) {
         if (typeof ctx.request.body.meta === 'string') {
