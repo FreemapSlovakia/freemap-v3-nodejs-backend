@@ -25,13 +25,13 @@ async function handler(ctx) {
 
     const lat = Number.parseFloat(q.lat);
     const lon = Number.parseFloat(q.lon);
-    const altitude = q.alt === undefined ? null : Number.parseFloat(q.alt);
+    const altitude = (q.alt || q.altitude) === undefined ? null : Number.parseFloat(q.alt || q.altitude);
     const speed = q.speed === undefined ? null : Number.parseFloat(q.speed);
-    const accuracy = q.acc === undefined ? null : Number.parseFloat(q.acc);
+    const accuracy = (q.acc || q.hdop) === undefined ? null : Number.parseFloat(q.acc || q.hdop);
     const bearing = q.bearing === undefined ? null : Number.parseFloat(q.bearing);
     const battery = q.battery === undefined ? null : Number.parseFloat(q.battery);
     const gsmSignal = q.gsm_signal === undefined ? null : Number.parseFloat(q.gsm_signal);
-    const time = guessTime(q.time);
+    const time = guessTime(q.time || q.timestamp);
 
     if (time === null
         || Number.isNaN(lat) || lat < -90 || lat > 90 || Number.isNaN(lon) || lon < -180 || lon > 180
