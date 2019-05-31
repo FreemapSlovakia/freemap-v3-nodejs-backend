@@ -104,9 +104,9 @@ async function handler(ctx) {
 function guessTime(t) {
   const now = new Date();
   const min = new Date();
-  min.setMonth(min.getMonth() - 1);
+  min.setDate(min.getDate() - 2);
   const max = new Date();
-  max.setDate(min.getDate() + 1);
+  max.setDate(max.getDate() + 1);
 
   if (!t) {
     return now;
