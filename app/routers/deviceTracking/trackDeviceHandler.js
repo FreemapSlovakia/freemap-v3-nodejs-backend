@@ -26,7 +26,8 @@ async function handler(ctx) {
     const lat = Number.parseFloat(q.lat);
     const lon = Number.parseFloat(q.lon);
     const altitude = (q.alt || q.altitude) === undefined ? null : Number.parseFloat(q.alt || q.altitude);
-    const speed = q.speed === undefined ? null : Number.parseFloat(q.speed);
+    const speedMs = q.speed === undefined ? null : Number.parseFloat(q.speed);
+    const speedKmh = q.speedKmh === undefined ? null : Number.parseFloat(q.speedKmh);
     const accuracy = (q.acc || q.hdop) === undefined ? null : Number.parseFloat(q.acc || q.hdop);
     const bearing = q.bearing === undefined ? null : Number.parseFloat(q.bearing);
     const battery = q.battery === undefined ? null : Number.parseFloat(q.battery);
@@ -39,7 +40,8 @@ async function handler(ctx) {
         || Number.isNaN(gsmSignal) || gsmSignal !== null && (gsmSignal < 0 || gsmSignal > 100)
         || Number.isNaN(bearing) || bearing !== null && (bearing < 0 || bearing > 360)
         || Number.isNaN(accuracy) || accuracy !== null && accuracy < 0
-        || Number.isNaN(speed) || speed !== null && speed < 0
+        || Number.isNaN(speedMs) || speedMs !== null && speedMs < 0
+        || Number.isNaN(speedKmh) || speedKmh !== null && speedKmh < 0
     ) {
       ctx.status = 400;
       return;
@@ -48,6 +50,8 @@ async function handler(ctx) {
     const now = new Date();
 
     const { id, maxAge, maxCount } = item;
+
+    const speed = typeof speedKmh === 'number' ? speedKmh / 3.6 : speedMs;
 
     const { insertId } = await ctx.state.db.query(
       `INSERT INTO trackingPoint (deviceId, lat, lon, altitude, speed, accuracy, bearing, battery, gsmSignal, message, createdAt)
