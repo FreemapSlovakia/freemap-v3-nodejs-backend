@@ -107,6 +107,7 @@ async function initDatabase() {
       altitude FLOAT NULL,
       speed FLOAT NULL,
       accuracy FLOAT NULL,
+      hdop FLOAT NULL,
       bearing FLOAT NULL,
       battery FLOAT NULL,
       gsmSignal FLOAT NULL,
@@ -130,6 +131,7 @@ async function initDatabase() {
   ];
 
   const updates = [
+    'ALTER TABLE trackingPoint ADD COLUMN hdop FLOAT NULL',
   ];
 
   const db = await pool.getConnection();

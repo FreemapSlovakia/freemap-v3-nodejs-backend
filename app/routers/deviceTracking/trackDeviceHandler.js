@@ -28,7 +28,8 @@ async function handler(ctx) {
     const altitude = (q.alt || q.altitude) === undefined ? null : Number.parseFloat(q.alt || q.altitude);
     const speedMs = q.speed === undefined ? null : Number.parseFloat(q.speed);
     const speedKmh = q.speedKmh === undefined ? null : Number.parseFloat(q.speedKmh);
-    const accuracy = (q.acc || q.hdop) === undefined ? null : Number.parseFloat(q.acc || q.hdop);
+    const accuracy = q.acc === undefined ? null : Number.parseFloat(q.acc);
+    const hdop = q.hdop === undefined ? null : Number.parseFloat(q.hdop);
     const bearing = q.bearing === undefined ? null : Number.parseFloat(q.bearing);
     const battery = q.battery === undefined ? null : Number.parseFloat(q.battery);
     const gsmSignal = q.gsm_signal === undefined ? null : Number.parseFloat(q.gsm_signal);
@@ -40,6 +41,7 @@ async function handler(ctx) {
         || Number.isNaN(gsmSignal) || gsmSignal !== null && (gsmSignal < 0 || gsmSignal > 100)
         || Number.isNaN(bearing) || bearing !== null && (bearing < 0 || bearing > 360)
         || Number.isNaN(accuracy) || accuracy !== null && accuracy < 0
+        || Number.isNaN(hdop) || hdop !== null && hdop < 0
         || Number.isNaN(speedMs) || speedMs !== null && speedMs < 0
         || Number.isNaN(speedKmh) || speedKmh !== null && speedKmh < 0
     ) {
@@ -54,9 +56,9 @@ async function handler(ctx) {
     const speed = typeof speedKmh === 'number' ? speedKmh / 3.6 : speedMs;
 
     const { insertId } = await ctx.state.db.query(
-      `INSERT INTO trackingPoint (deviceId, lat, lon, altitude, speed, accuracy, bearing, battery, gsmSignal, message, createdAt)
+      `INSERT INTO trackingPoint (deviceId, lat, lon, altitude, speed, accuracy, hdop, bearing, battery, gsmSignal, message, createdAt)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [id, lat, lon, altitude, speed, accuracy, bearing, battery, gsmSignal, message, time],
+      [id, lat, lon, altitude, speed, accuracy, hdop, bearing, battery, gsmSignal, message, time],
     );
 
     if (maxAge) {
@@ -88,7 +90,7 @@ async function handler(ctx) {
               method: 'tracking.addPoint',
               params: {
                 // TODO validate if time matches limits
-                id: insertId, lat, lon, altitude, speed, accuracy, bearing, battery, gsmSignal, message, [type]: key, ts: time.toISOString(),
+                id: insertId, lat, lon, altitude, speed, accuracy, hdop, bearing, battery, gsmSignal, message, [type]: key, ts: time.toISOString(),
               },
             }));
           }

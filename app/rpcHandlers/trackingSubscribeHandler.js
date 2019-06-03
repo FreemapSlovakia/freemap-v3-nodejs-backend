@@ -57,7 +57,7 @@ module.exports = (ctx) => {
         result = [];
       } else if (deviceId) {
         result = await db.query(
-          `SELECT id, lat, lon, message, createdAt, altitude, speed, accuracy, bearing, battery, gsmSignal
+          `SELECT id, lat, lon, message, createdAt, altitude, speed, accuracy, hdop, bearing, battery, gsmSignal
             FROM trackingPoint
             WHERE deviceId = ?
               ${fromTime ? 'AND createdAt >= ?' : ''}
@@ -68,7 +68,7 @@ module.exports = (ctx) => {
         );
       } else {
         result = await db.query(
-          `SELECT trackingPoint.id, lat, lon, message, trackingPoint.createdAt, altitude, speed, accuracy, bearing, battery, gsmSignal
+          `SELECT trackingPoint.id, lat, lon, message, trackingPoint.createdAt, altitude, speed, accuracy, hdop, bearing, battery, gsmSignal
             FROM trackingPoint JOIN trackingAccessToken
               ON trackingPoint.deviceId = trackingAccessToken.deviceId
             WHERE trackingAccessToken.token = ?
@@ -93,6 +93,7 @@ module.exports = (ctx) => {
         altitude: ntu(item.altitude),
         speed: ntu(item.speed),
         accuracy: ntu(item.accuracy),
+        hdop: ntu(item.hdop),
         bearing: ntu(item.bearing),
         battery: ntu(item.battery),
         gsmSignal: ntu(item.gsmSignal),
