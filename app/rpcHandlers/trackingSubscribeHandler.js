@@ -62,7 +62,7 @@ module.exports = (ctx) => {
             WHERE deviceId = ?
               ${fromTime ? 'AND createdAt >= ?' : ''}
               ${maxAge ? 'AND trackingPoint.createdAt >= ?' : ''}
-            ORDER BY id
+            ORDER BY id DESC
             ${maxCount ? 'LIMIT ?' : ''}`,
           params,
         );
@@ -76,7 +76,7 @@ module.exports = (ctx) => {
               ${fromTime ? 'AND trackingPoint.createdAt >= ?' : ''}
               AND (timeFrom IS NULL OR trackingPoint.createdAt >= timeFrom)
               AND (timeTo IS NULL OR trackingPoint.createdAt < timeTo)
-            ORDER BY trackingPoint.id
+            ORDER BY trackingPoint.id DESC
             ${maxCount ? 'LIMIT ?' : ''}`,
           params,
         );
@@ -84,7 +84,7 @@ module.exports = (ctx) => {
 
       // TODO skip nulls
 
-      ctx.respondResult(result.map(item => ({
+      ctx.respondResult(result.reverse().map(item => ({
         id: item.id,
         ts: item.createdAt,
         lat: item.lat,
