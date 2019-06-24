@@ -57,7 +57,7 @@ async function handler(ctx) {
 
     const { insertId } = await ctx.state.db.query(
       `INSERT INTO trackingPoint (deviceId, lat, lon, altitude, speed, accuracy, hdop, bearing, battery, gsmSignal, message, createdAt)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [id, lat, lon, altitude, speed, accuracy, hdop, bearing, battery, gsmSignal, message, time],
     );
 
