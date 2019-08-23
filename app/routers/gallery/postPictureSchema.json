@@ -1,14 +1,21 @@
 {
   "type": "object",
-  "required": ["meta"],
+  "required": [
+    "meta"
+  ],
   "properties": {
     "meta": {
       "type": "object",
-      "required": ["position"],
+      "required": [
+        "position"
+      ],
       "properties": {
         "position": {
           "type": "object",
-          "required": ["lat", "lon"],
+          "required": [
+            "lat",
+            "lon"
+          ],
           "properties": {
             "lat": {
               "type": "number"
@@ -19,17 +26,29 @@
           }
         },
         "name": {
-          "type": ["string", "null"]
+          "type": [
+            "string",
+            "null"
+          ]
         },
         "description": {
-          "type": ["string", "null"]
+          "type": [
+            "string",
+            "null"
+          ]
         },
         "takenAt": {
-          "type": ["string", "null"],
+          "type": [
+            "string",
+            "null"
+          ],
           "format": "date-time"
         },
         "tags": {
-          "type": ["array", "null"],
+          "type": [
+            "array",
+            "null"
+          ],
           "items": {
             "type": "string"
           }

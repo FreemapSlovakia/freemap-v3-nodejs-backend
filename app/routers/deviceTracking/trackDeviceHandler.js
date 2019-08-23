@@ -76,8 +76,10 @@ async function handler(ctx) {
     const speed = typeof speedKmh === 'number' ? speedKmh / 3.6 : speedMs;
 
     const { insertId } = await ctx.state.db.query(
-      `INSERT INTO trackingPoint (deviceId, lat, lon, altitude, speed, accuracy, hdop, bearing, battery, gsmSignal, message, createdAt)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO trackingPoint
+        (deviceId, lat, lon, altitude, speed, accuracy, hdop, bearing, battery, gsmSignal, message, createdAt)
+        VALUES
+        (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         id,
         lat,
@@ -103,13 +105,15 @@ async function handler(ctx) {
 
     if (maxCount) {
       await ctx.state.db.query(
-        'DELETE t FROM trackingPoint AS t JOIN (SELECT id FROM trackingPoint WHERE deviceId = ? ORDER BY id DESC LIMIT 18446744073709551615 OFFSET ?) tlimit ON t.id = tlimit.id',
+        `DELETE t FROM trackingPoint AS t JOIN
+          (SELECT id FROM trackingPoint WHERE deviceId = ? ORDER BY id DESC LIMIT 18446744073709551615 OFFSET ?) tlimit ON t.id = tlimit.id`,
         [id, maxCount + 1]
       );
     }
 
     const rows = await ctx.state.db.query(
-      'SELECT token FROM trackingAccessToken WHERE deviceId = ? AND (timeFrom IS NULL OR timeFrom > ?) AND (timeTo IS NULL OR timeTo < ?)',
+      `SELECT token FROM trackingAccessToken
+        WHERE deviceId = ? AND (timeFrom IS NULL OR timeFrom > ?) AND (timeTo IS NULL OR timeTo < ?)`,
       [id, now, now]
     );
 

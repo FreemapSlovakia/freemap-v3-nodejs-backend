@@ -23,7 +23,8 @@ module.exports = router => {
         ctx.status = 403;
       } else {
         ctx.body = await ctx.state.db.query(
-          'SELECT id, token, createdAt, timeFrom, timeTo, note, listingLabel FROM trackingAccessToken WHERE deviceId = ?',
+          `SELECT id, token, createdAt, timeFrom, timeTo, note, listingLabel
+            FROM trackingAccessToken WHERE deviceId = ?`,
           [ctx.params.id]
         );
       }

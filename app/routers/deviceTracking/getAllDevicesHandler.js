@@ -10,7 +10,9 @@ module.exports = router => {
     authenticator(true),
     async ctx => {
       ctx.body = await ctx.state.db.query(
-        'SELECT id, name, token, createdAt, maxCount, maxAge, userId FROM trackingDevice WHERE userId = ?',
+        `SELECT id, name, token, createdAt, maxCount, maxAge, userId
+          FROM trackingDevice
+          WHERE userId = ?`,
         [ctx.state.user.id]
       );
     }

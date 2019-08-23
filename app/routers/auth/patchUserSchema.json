@@ -33,7 +33,10 @@
       "type": "string"
     },
     "email": {
-      "type": ["string", "null"],
+      "type": [
+        "string",
+        "null"
+      ],
       "format": "email"
     },
     "lat": {

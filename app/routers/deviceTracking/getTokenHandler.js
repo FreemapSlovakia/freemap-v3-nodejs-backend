@@ -11,8 +11,10 @@ module.exports = router => {
     async ctx => {
       const [item] = await ctx.state.db.query(
         `SELECT id, token, createdAt, timeFrom, timeTo, note, listingLabel
-          FROM trackingAccessToken JOIN trackingDevice ON (trackingAccessToken.deviceId = trackingDevice.id)
-          WHERE id = ? ORDER BY id`,
+          FROM trackingAccessToken
+          JOIN trackingDevice ON (trackingAccessToken.deviceId = trackingDevice.id)
+          WHERE id = ?
+          ORDER BY id`,
         [ctx.params.id]
       );
 

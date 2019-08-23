@@ -31,7 +31,9 @@ module.exports = function attachGetPictureHandler(router) {
 
       const commentRows = await ctx.state.db.query(
         `SELECT pictureComment.id, pictureComment.createdAt, comment, user.name, userId
-          FROM pictureComment JOIN user ON (userId = user.id) WHERE pictureId = ? ORDER BY pictureComment.createdAt`,
+          FROM pictureComment JOIN user ON (userId = user.id)
+          WHERE pictureId = ?
+          ORDER BY pictureComment.createdAt`,
         [ctx.params.id]
       );
 

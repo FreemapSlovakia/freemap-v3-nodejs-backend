@@ -8,7 +8,9 @@ module.exports = router => {
     dbMiddleware(),
     async ctx => {
       ctx.body = await ctx.state.db.query(
-        'SELECT id, token, createdAt, timeFrom, timeTo, listingLabel FROM trackingAccessToken WHERE listingLabel IS NOT NULL',
+        `SELECT id, token, createdAt, timeFrom, timeTo, listingLabel
+          FROM trackingAccessToken
+          WHERE listingLabel IS NOT NULL`,
         [ctx.params.id]
       );
     }

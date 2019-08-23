@@ -27,6 +27,7 @@ module.exports = async function login(
   let lon;
   let settings;
   let preventTips;
+
   if (user) {
     ({ name, email, lat, lon } = user);
     settings = JSON.parse(user.settings);

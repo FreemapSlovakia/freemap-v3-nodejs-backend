@@ -22,7 +22,9 @@ module.exports = function attachLoginHandler(router) {
       });
 
       const reqData = qs.parse(body);
+
       requestTokenRegistry.set(reqData.oauth_token, reqData.oauth_token_secret);
+
       ctx.body = {
         redirect: `https://www.openstreetmap.org/oauth/authorize?${qs.stringify(
           { oauth_token: reqData.oauth_token }

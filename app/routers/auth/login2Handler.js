@@ -47,6 +47,7 @@ module.exports = function attachLogin2Handler(router) {
         $: { display_name: osmName, id: osmId },
         home
       } = result.osm.user[0];
+
       const { lat, lon } = (home && home.length && home[0].$) || {};
 
       const { db } = ctx.state;

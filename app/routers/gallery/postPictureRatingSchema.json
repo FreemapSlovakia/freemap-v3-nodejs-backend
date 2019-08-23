@@ -1,6 +1,8 @@
 {
   "type": "object",
-  "required": ["stars"],
+  "required": [
+    "stars"
+  ],
   "properties": {
     "stars": {
       "type": "integer",

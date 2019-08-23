@@ -30,7 +30,10 @@ module.exports = router => {
         const { timeFrom, timeTo, note, listingLabel } = ctx.request.body;
 
         const { insertId } = await ctx.state.db.query(
-          'INSERT INTO trackingAccessToken (deviceId, token, timeFrom, timeTo, note, listingLabel) VALUES (?, ?, ?, ?, ?, ?)',
+          `INSERT INTO trackingAccessToken
+            (deviceId, token, timeFrom, timeTo, note, listingLabel)
+            VALUES
+            (?, ?, ?, ?, ?, ?)`,
           [
             ctx.params.id,
             token,

@@ -13,8 +13,11 @@ module.exports = router => {
     authenticator(true),
     async ctx => {
       const [item] = await ctx.state.db.query(
-        `SELECT userId FROM trackingAccessToken JOIN trackingDevice ON (deviceId = trackingDevice.id)
-          WHERE trackingAccessToken.id = ? FOR UPDATE`,
+        `SELECT userId
+          FROM trackingAccessToken
+          JOIN trackingDevice ON (deviceId = trackingDevice.id)
+          WHERE trackingAccessToken.id = ?
+          FOR UPDATE`,
         [ctx.params.id]
       );
 
@@ -26,7 +29,9 @@ module.exports = router => {
         const { timeFrom, timeTo, note, listingLabel } = ctx.request.body;
 
         await ctx.state.db.query(
-          'UPDATE trackingAccessToken SET note = ?, timeFrom = ?, timeTo = ?, listingLabel = ? WHERE id = ?',
+          `UPDATE trackingAccessToken
+            SET note = ?, timeFrom = ?, timeTo = ?, listingLabel = ?
+            WHERE id = ?`,
           [
             note,
             timeFrom && new Date(timeFrom),

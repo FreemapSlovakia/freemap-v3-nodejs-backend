@@ -21,7 +21,8 @@ module.exports = function attachPostPictureCommentHandler(router) {
 
       const proms = [
         ctx.state.db.query(
-          'INSERT INTO pictureComment (pictureId, userId, comment, createdAt) VALUES (?, ?, ?, ?)',
+          `INSERT INTO pictureComment (pictureId, userId, comment, createdAt)
+            VALUES (?, ?, ?, ?)`,
           [ctx.params.id, ctx.state.user.id, comment, new Date()]
         )
       ];
@@ -29,11 +30,17 @@ module.exports = function attachPostPictureCommentHandler(router) {
       if (mailgun) {
         proms.push(
           ctx.state.db.query(
-            'SELECT email, title, userId FROM user JOIN picture ON userId = user.id WHERE picture.id = ?',
+            `SELECT email, title, userId
+              FROM user
+              JOIN picture ON userId = user.id
+              WHERE picture.id = ?`,
             [ctx.params.id]
           ),
           ctx.state.db.query(
-            'SELECT DISTINCT email FROM user JOIN pictureComment ON userId = user.id WHERE pictureId = ? AND userId <> ? AND email IS NOT NULL',
+            `SELECT DISTINCT email
+              FROM user
+              JOIN pictureComment ON userId = user.id
+              WHERE pictureId = ? AND userId <> ? AND email IS NOT NULL`,
             [ctx.params.id, ctx.state.user.id]
           )
         );

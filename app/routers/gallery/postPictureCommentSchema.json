@@ -1,6 +1,8 @@
 {
   "type": "object",
-  "required": ["comment"],
+  "required": [
+    "comment"
+  ],
   "properties": {
     "comment": {
       "type": "string",

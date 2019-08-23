@@ -45,7 +45,8 @@ module.exports = router => {
 
         if (maxAge) {
           await ctx.state.db.query(
-            'DELETE FROM trackingPoint WHERE deviceId = ? AND TIMESTAMPDIFF(SECOND, createdAt, now()) > ?',
+            `DELETE FROM trackingPoint
+              WHERE deviceId = ? AND TIMESTAMPDIFF(SECOND, createdAt, now()) > ?`,
             [ctx.params.id, maxAge]
           );
         }

@@ -62,7 +62,8 @@ module.exports = function attachPostPictureHandler(router) {
       ]);
 
       const { insertId } = await ctx.state.db.query(
-        'INSERT INTO picture (pathname, userId, title, description, createdAt, takenAt, lat, lon) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+        `INSERT INTO picture (pathname, userId, title, description, createdAt, takenAt, lat, lon)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           `${name}.jpeg`,
           ctx.state.user.id,
