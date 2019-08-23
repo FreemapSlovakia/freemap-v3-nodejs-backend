@@ -13,10 +13,10 @@ module.exports = function attachGetPictureHandler(router) {
     '/pictures/:id/image',
     acceptValidator('image/jpeg'),
     dbMiddleware(),
-    async (ctx) => {
+    async ctx => {
       const rows = await ctx.state.db.query(
         'SELECT pathname FROM picture WHERE picture.id = ?',
-        [ctx.params.id],
+        [ctx.params.id]
       );
 
       if (rows.length) {
@@ -26,20 +26,24 @@ module.exports = function attachGetPictureHandler(router) {
         ctx.response.lastModified = stats.mtime;
         ctx.append('Vary', 'Width');
         ctx.response.etag = calculate(stats, {
-          weak: true,
+          weak: true
         });
         ctx.type = 'image/jpeg';
         if (ctx.fresh) {
           ctx.status = 304;
         } else {
           const w = parseInt(ctx.headers.width || ctx.query.width || 'NaN', 10);
-          const resize = w ? sharp().resize(w).jpeg() : null;
+          const resize = w
+            ? sharp()
+                .resize(w)
+                .jpeg()
+            : null;
           const fileStream = fs.createReadStream(pathname);
           ctx.body = resize ? fileStream.pipe(resize) : fileStream;
         }
       } else {
         ctx.status = 404;
       }
-    },
+    }
   );
 };

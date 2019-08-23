@@ -1,3 +1,3 @@
-module.exports = (ctx) => {
+module.exports = ctx => {
   ctx.respondResult(null);
 };

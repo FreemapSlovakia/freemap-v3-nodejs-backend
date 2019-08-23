@@ -11,10 +11,13 @@ module.exports = function attachDeletePictureHandler(router) {
     '/pictures/:id',
     dbMiddleware(),
     authenticator(true),
-    async (ctx) => {
+    async ctx => {
       // TODO transaction
 
-      const rows = await ctx.state.db.query('SELECT pathname, userId FROM picture WHERE id = ? FOR UPDATE', [ctx.params.id]);
+      const rows = await ctx.state.db.query(
+        'SELECT pathname, userId FROM picture WHERE id = ? FOR UPDATE',
+        [ctx.params.id]
+      );
       if (rows.length === 0) {
         ctx.status = 404;
         return;
@@ -25,11 +28,13 @@ module.exports = function attachDeletePictureHandler(router) {
         return;
       }
 
-      await ctx.state.db.query('DELETE FROM picture WHERE id = ?', [ctx.params.id]);
+      await ctx.state.db.query('DELETE FROM picture WHERE id = ?', [
+        ctx.params.id
+      ]);
 
       await unlinkAsync(`${PICTURES_DIR}/${rows[0].pathname}`);
 
       ctx.status = 204;
-    },
+    }
   );
 };

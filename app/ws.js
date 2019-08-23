@@ -6,43 +6,49 @@ const trackingUnsubscribeHandler = require('~/rpcHandlers/trackingUnsubscribeHan
 const pingHandler = require('~/rpcHandlers/pingHandler');
 const { dbMiddleware } = require('~/database');
 
-module.exports = (app) => {
+module.exports = app => {
   const wsRouter = new Router();
 
-  wsRouter.all('/ws', dbMiddleware(), authenticator(), async (ctx) => {
+  wsRouter.all('/ws', dbMiddleware(), authenticator(), async ctx => {
     const { pingInterval } = ctx.query;
 
     const ws = ctx.websocket;
 
-    const pinger = !pingInterval ? null : setInterval(() => {
-      if (ws.readyState === 1) {
-        ws.send('ping');
-      }
-    }, 30000);
+    const pinger = !pingInterval
+      ? null
+      : setInterval(() => {
+          if (ws.readyState === 1) {
+            ws.send('ping');
+          }
+        }, 30000);
 
-    ws.on('message', (message) => {
+    ws.on('message', message => {
       let id = null;
 
       function respondError(code, msg) {
         if (ws.readyState === 1) {
-          ws.send(JSON.stringify({
-            jsonrpc: '2.0',
-            id,
-            error: {
-              code,
-              message: msg,
-            },
-          }));
+          ws.send(
+            JSON.stringify({
+              jsonrpc: '2.0',
+              id,
+              error: {
+                code,
+                message: msg
+              }
+            })
+          );
         }
       }
 
       function respondResult(result) {
         if (ws.readyState === 1) {
-          ws.send(JSON.stringify({
-            jsonrpc: '2.0',
-            id,
-            result,
-          }));
+          ws.send(
+            JSON.stringify({
+              jsonrpc: '2.0',
+              id,
+              result
+            })
+          );
         }
       }
 
@@ -56,9 +62,9 @@ module.exports = (app) => {
       }
 
       if (
-        msg.jsonrpc !== '2.0'
-        || typeof msg.method !== 'string'
-        || ('id' in msg && !['string', 'number'].includes(typeof msg.id))
+        msg.jsonrpc !== '2.0' ||
+        typeof msg.method !== 'string' ||
+        ('id' in msg && !['string', 'number'].includes(typeof msg.id))
       ) {
         respondError(-32600);
         return;
@@ -70,7 +76,7 @@ module.exports = (app) => {
         respondResult,
         respondError,
         params: msg.params,
-        ctx,
+        ctx
       };
 
       if (msg.method === 'tracking.subscribe') {
@@ -97,7 +103,5 @@ module.exports = (app) => {
     ws.on('error', handleCloseOrError);
   });
 
-  app.ws
-    .use(wsRouter.routes())
-    .use(wsRouter.allowedMethods());
+  app.ws.use(wsRouter.routes()).use(wsRouter.allowedMethods());
 };

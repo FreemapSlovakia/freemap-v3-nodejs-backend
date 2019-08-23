@@ -1,6 +1,6 @@
 const trackRegister = require('~/trackRegister');
 
-module.exports = (ctx) => {
+module.exports = ctx => {
   // TODO validate ctx.params
   const { token, deviceId } = ctx.params;
 

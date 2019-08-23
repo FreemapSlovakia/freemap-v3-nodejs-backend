@@ -22,7 +22,11 @@ router.post('/elevation', acceptValidator('application/json'), compute);
 async function compute(ctx) {
   const { coordinates } = ctx.query;
   let cs;
-  if (ctx.method === 'GET' && coordinates && /^([^,]+,[^,]+)(,[^,]+,[^,]+)*$/.test(coordinates)) {
+  if (
+    ctx.method === 'GET' &&
+    coordinates &&
+    /^([^,]+,[^,]+)(,[^,]+,[^,]+)*$/.test(coordinates)
+  ) {
     cs = coordinates
       .match(/[^,]+,[^,]+/g)
       .map(pair => pair.split(',').map(c => Number.parseFloat(c)));
@@ -33,7 +37,17 @@ async function compute(ctx) {
     return;
   }
 
-  if (!cs.every(x => Array.isArray(x) && x.length === 2 && x[0] >= -90 && x[0] <= 90 && x[1] >= -180 && x[1] <= 180)) {
+  if (
+    !cs.every(
+      x =>
+        Array.isArray(x) &&
+        x.length === 2 &&
+        x[0] >= -90 &&
+        x[0] <= 90 &&
+        x[1] >= -180 &&
+        x[1] <= 180
+    )
+  ) {
     ctx.status = 400;
     return;
   }
@@ -45,8 +59,13 @@ async function compute(ctx) {
       cs.map(async ([lat, lon]) => {
         const alat = Math.abs(lat);
         const alon = Math.abs(lon);
-        const key = `${lat >= 0 ? 'N' : 'E'}${Math.floor(alat + (lat < 0 ? 1 : 0)).toString().padStart(2, '0')}`
-          + `${lon >= 0 ? 'E' : 'W'}${Math.floor(alon + (lon < 0 ? 1 : 0)).toString().padStart(3, '0')}`;
+        const key =
+          `${lat >= 0 ? 'N' : 'E'}${Math.floor(alat + (lat < 0 ? 1 : 0))
+            .toString()
+            .padStart(2, '0')}` +
+          `${lon >= 0 ? 'E' : 'W'}${Math.floor(alon + (lon < 0 ? 1 : 0))
+            .toString()
+            .padStart(3, '0')}`;
 
         if (!allocated.has(key)) {
           allocated.add(key);
@@ -63,10 +82,10 @@ async function compute(ctx) {
         }
 
         return [lat, lon, key];
-      }),
+      })
     );
 
-    items.forEach((item) => {
+    items.forEach(item => {
       const f = fdMap.get(item[2]);
       // eslint-disable-next-line
       item[2] = f[0];
@@ -104,14 +123,14 @@ async function fetch(key) {
 
     await new Promise((resolve, reject) => {
       const child = spawn('gdal_translate', [tifPath, hgtPath]);
-      child.on('exit', (code) => {
+      child.on('exit', code => {
         if (code) {
           reject(new Error(`Nonzero exit code: ${code}`));
         } else {
           resolve();
         }
       });
-      child.on('error', (err) => {
+      child.on('error', err => {
         reject(err);
       });
     });
@@ -124,7 +143,8 @@ async function fetch(key) {
 
 async function computeElevation([lat, lon, fd, size]) {
   // gdal_translate supports: 1201x1201, 3601x3601 or 1801x3601
-  const rx = size === 1801 * 3601 * 2 ? 1800 : size === 1201 * 1201 * 2 ? 1200 : 3600;
+  const rx =
+    size === 1801 * 3601 * 2 ? 1800 : size === 1201 * 1201 * 2 ? 1200 : 3600;
   const ry = size === 1201 * 1201 * 2 ? 1200 : 3600;
 
   const alat = Math.abs(lat);
@@ -132,8 +152,8 @@ async function computeElevation([lat, lon, fd, size]) {
 
   const latFrac = alat - Math.floor(alat);
   const lonFrac = alon - Math.floor(alon);
-  const y = (lat < 0 ? latFrac : (1 - latFrac)) * ry;
-  const x = (lon < 0 ? (1 - lonFrac) : lonFrac) * rx;
+  const y = (lat < 0 ? latFrac : 1 - latFrac) * ry;
+  const x = (lon < 0 ? 1 - lonFrac : lonFrac) * rx;
 
   const x0 = Math.floor(x);
   const y0 = Math.floor(y);
@@ -149,7 +169,7 @@ async function computeElevation([lat, lon, fd, size]) {
     readAsync(fd, buffer, 0, 2, (y0 * (rx + 1) + x0) * 2),
     readAsync(fd, buffer, 2, 2, (y1 * (rx + 1) + x0) * 2),
     readAsync(fd, buffer, 4, 2, (y0 * (rx + 1) + x1) * 2),
-    readAsync(fd, buffer, 6, 2, (y1 * (rx + 1) + x1) * 2),
+    readAsync(fd, buffer, 6, 2, (y1 * (rx + 1) + x1) * 2)
   ]);
 
   const v00 = buffer.readInt16BE(0);
@@ -157,10 +177,12 @@ async function computeElevation([lat, lon, fd, size]) {
   const v10 = buffer.readInt16BE(4);
   const v11 = buffer.readInt16BE(6);
 
-  return (0
-    + v00 * wx0 * wy0
-    + v01 * wx0 * wy1
-    + v10 * wx1 * wy0
-    + v11 * wx1 * wy1
-  ) / (wx0 * wy0 + wx0 * wy1 + wx1 * wy0 + wx1 * wy1);
+  return (
+    (0 +
+      v00 * wx0 * wy0 +
+      v01 * wx0 * wy1 +
+      v10 * wx1 * wy0 +
+      v11 * wx1 * wy1) /
+    (wx0 * wy0 + wx0 * wy1 + wx1 * wy0 + wx1 * wy1)
+  );
 }

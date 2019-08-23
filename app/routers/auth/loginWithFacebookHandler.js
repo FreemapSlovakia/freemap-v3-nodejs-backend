@@ -8,12 +8,25 @@ module.exports = function attachLoginWithFacebookHandler(router) {
     '/login-fb',
     // TODO validation
     dbMiddleware(),
-    async (ctx) => {
+    async ctx => {
       const { accessToken } = ctx.request.body;
 
-      const { id, name, email } = await fb.withAccessToken(accessToken).api('/me', { fields: 'id,name,email' });
+      const { id, name, email } = await fb
+        .withAccessToken(accessToken)
+        .api('/me', { fields: 'id,name,email' });
 
-      await login(ctx.state.db, ctx, 'facebookUserId', id, 'facebookAccessToken', [accessToken], name, email, undefined, undefined);
-    },
+      await login(
+        ctx.state.db,
+        ctx,
+        'facebookUserId',
+        id,
+        'facebookAccessToken',
+        [accessToken],
+        name,
+        email,
+        undefined,
+        undefined
+      );
+    }
   );
 };

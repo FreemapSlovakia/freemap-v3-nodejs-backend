@@ -11,21 +11,23 @@ module.exports = function attachLoginHandler(router) {
   router.post(
     '/login',
     // TODO validation
-    async (ctx) => {
+    async ctx => {
       const body = await rp.post({
         url: 'https://www.openstreetmap.org/oauth/request_token',
         oauth: {
           callback: `${webBaseUrl}/authCallback.html`,
           consumer_key: consumerKey,
-          consumer_secret: consumerSecret,
-        },
+          consumer_secret: consumerSecret
+        }
       });
 
       const reqData = qs.parse(body);
       requestTokenRegistry.set(reqData.oauth_token, reqData.oauth_token_secret);
       ctx.body = {
-        redirect: `https://www.openstreetmap.org/oauth/authorize?${qs.stringify({ oauth_token: reqData.oauth_token })}`,
+        redirect: `https://www.openstreetmap.org/oauth/authorize?${qs.stringify(
+          { oauth_token: reqData.oauth_token }
+        )}`
       };
-    },
+    }
   );
 };

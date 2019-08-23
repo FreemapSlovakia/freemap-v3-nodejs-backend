@@ -2,16 +2,16 @@ const { dbMiddleware } = require('~/database');
 const { acceptValidator } = require('~/requestValidators');
 const authenticator = require('~/authenticator');
 
-module.exports = (router) => {
+module.exports = router => {
   router.get(
     '/devices/:id',
     acceptValidator('application/json'),
     dbMiddleware(),
     authenticator(true),
-    async (ctx) => {
+    async ctx => {
       const [item] = await ctx.state.db.query(
         'SELECT id, name, token, createdAt, maxCount, maxAge, userId FROM trackingDevice WHERE id = ? ORDER BY name',
-        [ctx.params.id],
+        [ctx.params.id]
       );
 
       if (!item) {
@@ -21,6 +21,6 @@ module.exports = (router) => {
       } else {
         ctx.body = item;
       }
-    },
+    }
   );
 };

@@ -127,12 +127,10 @@ async function initDatabase() {
       note VARCHAR(255) CHARSET utf8 COLLATE utf8_general_ci NULL,
       CONSTRAINT tatDeviceIdFk FOREIGN KEY (deviceId) REFERENCES trackingDevice (id) ON DELETE CASCADE,
       INDEX tatCreatedAtIdx (createdAt)
-    ) ENGINE=InnoDB`,
+    ) ENGINE=InnoDB`
   ];
 
-  const updates = [
-    'ALTER TABLE trackingPoint ADD COLUMN hdop FLOAT NULL',
-  ];
+  const updates = ['ALTER TABLE trackingPoint ADD COLUMN hdop FLOAT NULL'];
 
   const db = await pool.getConnection();
   try {

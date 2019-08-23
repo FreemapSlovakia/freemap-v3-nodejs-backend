@@ -20,5 +20,5 @@ module.exports = {
 
   set(key, value) {
     registry.set(key, { value, takenAt: Date.now() });
-  },
+  }
 };

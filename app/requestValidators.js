@@ -7,16 +7,20 @@ module.exports = {
   bodySchemaValidator,
   acceptValidator,
   contentTypeValidator,
-  queryAdapter,
+  queryAdapter
 };
 
 function queryValidator(spec) {
   return async (ctx, next) => {
     const errors = [];
-    Object.keys(spec).forEach((key) => {
+    Object.keys(spec).forEach(key => {
       const msg = spec[key](ctx.query[key], ctx);
       if (msg && typeof msg === 'string') {
-        errors.push(key in ctx.query ? `invalid parameter ${key}: ${msg}` : `missing parameter ${key}`);
+        errors.push(
+          key in ctx.query
+            ? `invalid parameter ${key}: ${msg}`
+            : `missing parameter ${key}`
+        );
       }
     });
 
@@ -24,7 +28,7 @@ function queryValidator(spec) {
       ctx.status = 400;
       ctx.body = {
         error: 'invalid_query_parameters',
-        detail: errors,
+        detail: errors
       };
     } else {
       await next();
@@ -42,7 +46,7 @@ function bodySchemaValidator(schema, ignoreType) {
       ctx.status = 400;
       ctx.body = {
         error: 'request_body_doesnt_match_schema',
-        detail: validate.errors,
+        detail: validate.errors
       };
     } else {
       await next();
@@ -72,7 +76,7 @@ function contentTypeValidator(type) {
 
 function queryAdapter(spec) {
   return async (ctx, next) => {
-    Object.keys(spec).forEach((key) => {
+    Object.keys(spec).forEach(key => {
       ctx.query[key] = spec[key](ctx.query[key]);
     });
     await next();

@@ -1,28 +1,15 @@
 {
-  "parser": "babel-eslint",
   "env": {
     "commonjs": true,
-    "es6": true
+    "es6": true,
+    "node": true
   },
-  "extends": [
-    "airbnb-base"
-  ],
+  "extends": ["plugin:prettier/recommended", "eslint:recommended"],
   "parserOptions": {
-    "ecmaVersion": 6,
-    "sourceType": "module",
-    "impliedStrict": true,
-    "ecmaFeatures": {
-      "jsx": true
-    }
+    "ecmaVersion": 2017
   },
   "rules": {
-    "no-mixed-operators": 0,
-    "no-use-before-define": 0,
-    "max-len": 0,
-    "object-curly-newline": 0,
-    "no-nested-ternary": 0,
-    "no-restricted-syntax": 0,
-    "prefer-destructuring": 0
+    "require-atomic-updates": 0
   },
   "settings": {
     "import/resolver": "babel-root-import"

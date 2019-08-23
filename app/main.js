@@ -24,23 +24,34 @@ const unlinkAsync = util.promisify(fs.unlink);
 
 const ssl = config.get('http.ssl');
 
-const app = websockify(new Koa(), {}, ssl ? {
-  key: fs.readFileSync(ssl.key),
-  cert: fs.readFileSync(ssl.cert),
-} : undefined);
+const app = websockify(
+  new Koa(),
+  {},
+  ssl
+    ? {
+        key: fs.readFileSync(ssl.key),
+        cert: fs.readFileSync(ssl.cert)
+      }
+    : undefined
+);
 
 app.use(koaBunyanLogger(logger.child({ module: 'koa' })));
 app.use(koaBunyanLogger.requestIdContext());
 app.use(koaBunyanLogger.requestLogger());
 
-app.use(cors({
-  origin: ctx => (/\.freemap\.sk(:\d+)?$/.test(ctx.header.origin) ? ctx.header.origin : null),
-}));
+app.use(
+  cors({
+    origin: ctx =>
+      /\.freemap\.sk(:\d+)?$/.test(ctx.header.origin) ? ctx.header.origin : null
+  })
+);
 
-app.use(koaBody({
-  jsonLimit: '16mb',
-  multipart: true,
-}));
+app.use(
+  koaBody({
+    jsonLimit: '16mb',
+    multipart: true
+  })
+);
 
 // remove tmp uploaded files
 app.use(async (ctx, next) => {
@@ -60,11 +71,23 @@ app.use(async (ctx, next) => {
 
 const router = new Router();
 
-router.use('/tracklogs', tracklogsRouter.routes(), tracklogsRouter.allowedMethods());
+router.use(
+  '/tracklogs',
+  tracklogsRouter.routes(),
+  tracklogsRouter.allowedMethods()
+);
 router.use('/gallery', galleryRouter.routes(), galleryRouter.allowedMethods());
 router.use('/auth', authRouter.routes(), authRouter.allowedMethods());
-router.use('/geotools', geotoolsRouter.routes(), geotoolsRouter.allowedMethods());
-router.use('/tracking', trackingRouter.routes(), trackingRouter.allowedMethods());
+router.use(
+  '/geotools',
+  geotoolsRouter.routes(),
+  geotoolsRouter.allowedMethods()
+);
+router.use(
+  '/tracking',
+  trackingRouter.routes(),
+  trackingRouter.allowedMethods()
+);
 
 attachLoggerHandler(router);
 
@@ -80,6 +103,7 @@ initDatabase()
     app.listen(port, () => {
       logger.info(`Freemap v3 API listening on port ${port}.`);
     });
-  }).catch((err) => {
+  })
+  .catch(err => {
     logger.fatal({ err }, 'Error initializing database.');
   });

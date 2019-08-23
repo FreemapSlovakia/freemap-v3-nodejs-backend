@@ -9,18 +9,14 @@ const { bodySchemaValidator } = require('~/requestValidators');
 const writeFileAsync = promisify(fs.writeFile);
 
 module.exports = function attachCreateTracklogHandler(router) {
-  router.post(
-    '/',
-    bodySchemaValidator(createTracklogSchema),
-    async (ctx) => {
-      const b64gpx = ctx.request.body.data;
-      const fileUID = uuidBase62.v4();
-      const filePath = `${TRACKLOGS_DIR}/${fileUID}.b64.gpx`;
+  router.post('/', bodySchemaValidator(createTracklogSchema), async ctx => {
+    const b64gpx = ctx.request.body.data;
+    const fileUID = uuidBase62.v4();
+    const filePath = `${TRACKLOGS_DIR}/${fileUID}.b64.gpx`;
 
-      await writeFileAsync(filePath, b64gpx);
+    await writeFileAsync(filePath, b64gpx);
 
-      ctx.status = 201;
-      ctx.body = { uid: fileUID };
-    },
-  );
+    ctx.status = 201;
+    ctx.body = { uid: fileUID };
+  });
 };

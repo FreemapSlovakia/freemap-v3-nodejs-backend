@@ -7,47 +7,52 @@
     "node": "8.x"
   },
   "dependencies": {
-    "ajv": "6.10.0",
-    "axios": "0.18.0",
+    "ajv": "6.10.2",
+    "axios": "0.19.0",
     "bunyan": "1.8.12",
-    "config": "3.1.0",
+    "config": "3.2.2",
     "etag": "1.8.1",
     "fb": "2.0.0",
-    "fs-extra": "8.0.1",
-    "google-auth-library": "4.0.0",
+    "fs-extra": "8.1.0",
+    "google-auth-library": "4.2.5",
     "kcors": "2.2.2",
-    "koa": "2.7.0",
-    "koa-body": "4.1.0",
+    "koa": "2.8.1",
+    "koa-body": "4.1.1",
     "koa-bunyan-logger": "2.1.0",
     "koa-router": "7.4.0",
     "koa-websocket": "5.0.1",
     "mailgun-js": "0.22.0",
     "mysql": "2.17.1",
-    "process-nextick-args": "2.0.0",
+    "process-nextick-args": "2.0.1",
     "promise-mysql": "3.3.2",
     "querystring": "0.2.0",
     "randomatic": "3.1.1",
     "request": "2.88.0",
     "request-promise-native": "1.0.7",
-    "set-cookie-parser": "2.3.5",
-    "sharp": "0.22.1",
+    "set-cookie-parser": "2.4.0",
+    "sharp": "0.23.0",
     "uuid-base62": "0.1.0",
     "verror": "1.10.0",
     "xml2js": "0.4.19"
   },
   "devDependencies": {
-    "babel-eslint": "10.0.1",
+    "babel-eslint": "10.0.2",
     "chai": "4.2.0",
     "chakram": "1.5.0",
-    "eslint": "5.16.0",
-    "eslint-config-airbnb-base": "13.1.0",
+    "eslint": "6.2.1",
+    "eslint-config-prettier": "6.1.0",
     "eslint-import-resolver-babel-root-import": "0.0.2",
-    "eslint-plugin-import": "2.17.2",
-    "nodemon": "1.19.0"
+    "eslint-plugin-prettier": "3.1.0",
+    "husky": "3.0.4",
+    "lint-staged": "9.2.3",
+    "nodemon": "1.19.1",
+    "prettier": "1.18.2"
   },
   "scripts": {
     "start": "node index.js",
-    "watch": "nodemon --watch app --watch config --watch index.js index.js"
+    "watch": "nodemon --watch app --watch config --watch index.js index.js",
+    "precommit": "lint-staged",
+    "fmt": "prettier --write './**/*.js'"
   },
   "repository": {
     "type": "git",
@@ -60,5 +65,11 @@
   "license": "Apache-2.0",
   "bugs": {
     "url": "https://github.com/FreemapSlovakia/ffreemap-v3-nodejs-backend/issues"
+  },
+  "lint-staged": {
+    "*.js": [
+      "prettier --write",
+      "git add"
+    ]
   }
 }

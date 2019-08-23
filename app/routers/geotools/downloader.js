@@ -22,7 +22,9 @@ class Cookies {
   }
 
   getHeader() {
-    return Object.keys(this.cookies).map(name => `${name}=${this.cookies[name]}`).join('; ');
+    return Object.keys(this.cookies)
+      .map(name => `${name}=${this.cookies[name]}`)
+      .join('; ');
   }
 }
 
@@ -39,16 +41,16 @@ module.exports = async function downloadGeoTiff(ref, dest) {
     querystring.stringify({
       username,
       password,
-      csrf_token: m[1],
+      csrf_token: m[1]
     }),
     {
       maxRedirects: 0,
       headers: {
         'content-type': 'application/x-www-form-urlencoded',
-        cookie: cookies.getHeader(),
+        cookie: cookies.getHeader()
       },
-      validateStatus: status => status === 302,
-    },
+      validateStatus: status => status === 302
+    }
   );
 
   cookies.setCookies(loginResponse);
@@ -58,11 +60,11 @@ module.exports = async function downloadGeoTiff(ref, dest) {
     `https://earthexplorer.usgs.gov/download/8360/SRTM1${ref}V3/GEOTIFF/EE`,
     {
       headers: {
-        cookie: cookies.getHeader(),
+        cookie: cookies.getHeader()
       },
       responseType: 'stream',
-      validateStatus: status => status === 200 || status === 500,
-    },
+      validateStatus: status => status === 200 || status === 500
+    }
   );
 
   tifResponse.data.pipe(fs.createWriteStream(dest));
@@ -70,7 +72,7 @@ module.exports = async function downloadGeoTiff(ref, dest) {
     tifResponse.data.on('end', () => {
       resolve();
     });
-    tifResponse.data.on('error', (err) => {
+    tifResponse.data.on('error', err => {
       reject(err);
     });
   });

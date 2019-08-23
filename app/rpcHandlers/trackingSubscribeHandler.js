@@ -1,7 +1,7 @@
 const trackRegister = require('~/trackRegister');
 const { pool } = require('~/database');
 
-module.exports = (ctx) => {
+module.exports = ctx => {
   // TODO validate ctx.params
   const { token, deviceId, fromTime, maxCount, maxAge } = ctx.params;
 
@@ -12,18 +12,24 @@ module.exports = (ctx) => {
 
     try {
       if (deviceId) {
-        const [row] = await db.query('SELECT userId FROM trackingDevice WHERE id = ?', [deviceId]);
+        const [row] = await db.query(
+          'SELECT userId FROM trackingDevice WHERE id = ?',
+          [deviceId]
+        );
         if (!row) {
           ctx.respondError(404, 'no such device');
           return;
         }
 
-        if (!user || !user.isAdmin && row.userId !== user.id) {
+        if (!user || (!user.isAdmin && row.userId !== user.id)) {
           ctx.respondError(403, 'forbidden');
           return;
         }
       } else if (token) {
-        const [row] = await db.query('SELECT 1 FROM trackingAccessToken WHERE token = ?', token);
+        const [row] = await db.query(
+          'SELECT 1 FROM trackingAccessToken WHERE token = ?',
+          token
+        );
         if (!row) {
           ctx.respondError(404, 'no such token');
           return;
@@ -64,7 +70,7 @@ module.exports = (ctx) => {
               ${maxAge ? 'AND trackingPoint.createdAt >= ?' : ''}
             ORDER BY id DESC
             ${maxCount ? 'LIMIT ?' : ''}`,
-          params,
+          params
         );
       } else {
         result = await db.query(
@@ -72,36 +78,42 @@ module.exports = (ctx) => {
             FROM trackingPoint JOIN trackingAccessToken
               ON trackingPoint.deviceId = trackingAccessToken.deviceId
             WHERE trackingAccessToken.token = ?
-              ${maxAge ? 'AND TIMESTAMPDIFF(SECOND, trackingPoint.createdAt, now()) < ?' : ''}
+              ${
+                maxAge
+                  ? 'AND TIMESTAMPDIFF(SECOND, trackingPoint.createdAt, now()) < ?'
+                  : ''
+              }
               ${fromTime ? 'AND trackingPoint.createdAt >= ?' : ''}
               AND (timeFrom IS NULL OR trackingPoint.createdAt >= timeFrom)
               AND (timeTo IS NULL OR trackingPoint.createdAt < timeTo)
             ORDER BY trackingPoint.id DESC
             ${maxCount ? 'LIMIT ?' : ''}`,
-          params,
+          params
         );
       }
 
       // TODO skip nulls
 
-      ctx.respondResult(result.reverse().map(item => ({
-        id: item.id,
-        ts: item.createdAt,
-        lat: item.lat,
-        lon: item.lon,
-        message: ntu(item.message),
-        altitude: ntu(item.altitude),
-        speed: ntu(item.speed),
-        accuracy: ntu(item.accuracy),
-        hdop: ntu(item.hdop),
-        bearing: ntu(item.bearing),
-        battery: ntu(item.battery),
-        gsmSignal: ntu(item.gsmSignal),
-      })));
+      ctx.respondResult(
+        result.reverse().map(item => ({
+          id: item.id,
+          ts: item.createdAt,
+          lat: item.lat,
+          lon: item.lon,
+          message: ntu(item.message),
+          altitude: ntu(item.altitude),
+          speed: ntu(item.speed),
+          accuracy: ntu(item.accuracy),
+          hdop: ntu(item.hdop),
+          bearing: ntu(item.bearing),
+          battery: ntu(item.battery),
+          gsmSignal: ntu(item.gsmSignal)
+        }))
+      );
     } finally {
       pool.releaseConnection(db);
     }
-  })().catch((err) => {
+  })().catch(err => {
     ctx.respondError(500, err.message);
   });
 };

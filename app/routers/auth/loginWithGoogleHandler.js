@@ -8,12 +8,25 @@ module.exports = function attachLoginWithFacebookHandler(router) {
     '/login-google',
     // TODO validation
     dbMiddleware(),
-    async (ctx) => {
+    async ctx => {
       const { idToken } = ctx.request.body;
 
-      const { sub, name, email } = (await client.verifyIdToken({ idToken })).getPayload(); // TODO catch error
+      const { sub, name, email } = (await client.verifyIdToken({
+        idToken
+      })).getPayload(); // TODO catch error
 
-      await login(ctx.state.db, ctx, 'googleUserId', sub, 'googleIdToken', [idToken], name, email, undefined, undefined);
-    },
+      await login(
+        ctx.state.db,
+        ctx,
+        'googleUserId',
+        sub,
+        'googleIdToken',
+        [idToken],
+        name,
+        email,
+        undefined,
+        undefined
+      );
+    }
   );
 };

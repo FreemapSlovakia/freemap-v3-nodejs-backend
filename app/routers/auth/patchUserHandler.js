@@ -10,17 +10,26 @@ module.exports = function attachPatchUserHandler(router) {
     authenticator(true, false),
     bodySchemaValidator(patchUserSchema),
     dbMiddleware(),
-    async (ctx) => {
+    async ctx => {
       const keys = Object.keys(ctx.request.body);
 
       // TODO validate duplicates
 
       await ctx.state.db.query(
-        `UPDATE user SET ${keys.map(key => `${key} = ?`).join(', ')} WHERE id = ?`,
-        [...keys.map(key => (key === 'settings' ? JSON.stringify(ctx.request.body[key]) : ctx.request.body[key])), ctx.state.user.id],
+        `UPDATE user SET ${keys
+          .map(key => `${key} = ?`)
+          .join(', ')} WHERE id = ?`,
+        [
+          ...keys.map(key =>
+            key === 'settings'
+              ? JSON.stringify(ctx.request.body[key])
+              : ctx.request.body[key]
+          ),
+          ctx.state.user.id
+        ]
       );
 
       ctx.status = 204;
-    },
+    }
   );
 };

@@ -1,5 +1,9 @@
 const { dbMiddleware } = require('~/database');
-const { acceptValidator, queryValidator, queryAdapter } = require('~/requestValidators');
+const {
+  acceptValidator,
+  queryValidator,
+  queryAdapter
+} = require('~/requestValidators');
 const { ratingSubquery } = require('./ratingConstants');
 
 const globalValidationRules = {
@@ -9,35 +13,58 @@ const globalValidationRules = {
   takenAtFrom: v => v === null || !Number.isNaN(v) || 'invalid takenAtFrom',
   takenAtTo: v => v === null || !Number.isNaN(v) || 'invalid takenAtTo',
   createdAtFrom: v => v === null || !Number.isNaN(v) || 'invalid createdAtFrom',
-  createdAtTo: v => v === null || !Number.isNaN(v) || 'invalid createdAtTo',
+  createdAtTo: v => v === null || !Number.isNaN(v) || 'invalid createdAtTo'
 };
 
-const radiusQueryValidator = queryValidator(Object.assign({
-  lat: v => v >= -90 && v <= 90 || 'lat must be between -90 and 90',
-  lon: v => v >= -180 && v <= 180 || 'lon must be between -180 and 180',
-  distance: v => v > 0 || 'distance must be positive',
-}), globalValidationRules);
+const radiusQueryValidator = queryValidator(
+  Object.assign({
+    lat: v => (v >= -90 && v <= 90) || 'lat must be between -90 and 90',
+    lon: v => (v >= -180 && v <= 180) || 'lon must be between -180 and 180',
+    distance: v => v > 0 || 'distance must be positive'
+  }),
+  globalValidationRules
+);
 
-const bboxQueryValidator = queryValidator(Object.assign({
-  bbox: v => v && v.length === 4 && v.every(x => !Number.isNaN(x)) || 'invalid bbox',
-  fields: v => !v || v.every(f => ['id', 'title', 'description', 'takenAt', 'createdAt', 'rating'].includes(f)) || 'invalid fields',
-}), globalValidationRules);
+const bboxQueryValidator = queryValidator(
+  Object.assign({
+    bbox: v =>
+      (v && v.length === 4 && v.every(x => !Number.isNaN(x))) || 'invalid bbox',
+    fields: v =>
+      !v ||
+      v.every(f =>
+        [
+          'id',
+          'title',
+          'description',
+          'takenAt',
+          'createdAt',
+          'rating'
+        ].includes(f)
+      ) ||
+      'invalid fields'
+  }),
+  globalValidationRules
+);
 
-const orderQueryValidator = queryValidator(Object.assign({
-  orderBy: v => ['createdAt', 'takenAt', 'rating'].includes(v) || 'invalid orderBy',
-  direction: v => ['desc', 'asc'].includes(v) || 'invalid direction',
-}), globalValidationRules);
+const orderQueryValidator = queryValidator(
+  Object.assign({
+    orderBy: v =>
+      ['createdAt', 'takenAt', 'rating'].includes(v) || 'invalid orderBy',
+    direction: v => ['desc', 'asc'].includes(v) || 'invalid direction'
+  }),
+  globalValidationRules
+);
 
 const qvs = {
   radius: radiusQueryValidator,
   bbox: bboxQueryValidator,
-  order: orderQueryValidator,
+  order: orderQueryValidator
 };
 
 const methods = {
   radius: byRadius,
   bbox: byBbox,
-  order: byOrder,
+  order: byOrder
 };
 
 module.exports = function attachGetPicturesHandler(router) {
@@ -58,30 +85,44 @@ module.exports = function attachGetPicturesHandler(router) {
       takenAtTo: x => (x ? new Date(x) : null),
       createdAtFrom: x => (x ? new Date(x) : null),
       createdAtTo: x => (x ? new Date(x) : null),
-      fields: x => (typeof x === 'string' ? [x] : x),
+      fields: x => (typeof x === 'string' ? [x] : x)
     }),
     queryValidator({
-      by: v => ['radius', 'bbox', 'order'].includes(v) || '"by" must be one of "radius", "bbox", "order"',
-      userId: userId => !userId || userId > 0 || 'invalid userId',
+      by: v =>
+        ['radius', 'bbox', 'order'].includes(v) ||
+        '"by" must be one of "radius", "bbox", "order"',
+      userId: userId => !userId || userId > 0 || 'invalid userId'
     }),
     async (ctx, next) => {
       await qvs[ctx.query.by](ctx, next);
     },
     dbMiddleware(),
-    async (ctx) => {
+    async ctx => {
       await methods[ctx.query.by](ctx);
-    },
+    }
   );
 };
 
 async function byRadius(ctx) {
-  const { lat, lon, distance, userId, tag, ratingFrom, ratingTo, takenAtFrom, takenAtTo, createdAtFrom, createdAtTo } = ctx.query;
+  const {
+    lat,
+    lon,
+    distance,
+    userId,
+    tag,
+    ratingFrom,
+    ratingTo,
+    takenAtFrom,
+    takenAtTo,
+    createdAtFrom,
+    createdAtTo
+  } = ctx.query;
 
   // cca 1 degree
-  const lat1 = lat - (distance / 43);
-  const lat2 = lat + (distance / 43);
-  const lon1 = lon - distance / Math.abs(Math.cos(lat * Math.PI / 180) * 43);
-  const lon2 = lon + distance / Math.abs(Math.cos(lat * Math.PI / 180) * 43);
+  const lat1 = lat - distance / 43;
+  const lat2 = lat + distance / 43;
+  const lon1 = lon - distance / Math.abs(Math.cos((lat * Math.PI) / 180) * 43);
+  const lon2 = lon + distance / Math.abs(Math.cos((lat * Math.PI) / 180) * 43);
 
   const { db } = ctx.state;
 
@@ -89,7 +130,13 @@ async function byRadius(ctx) {
     (6371 * acos(cos(radians(${lat})) * cos(radians(lat)) * cos(radians(lon) - radians(${lon}) ) + sin(radians(${lat})) * sin(radians(lat)))) AS distance
     ${ratingFrom || ratingTo ? `, ${ratingSubquery}` : ''}
     FROM picture
-    ${tag ? `JOIN pictureTag ON pictureId = picture.id AND pictureTag.name = ${db.escape(tag)}` : ''}
+    ${
+      tag
+        ? `JOIN pictureTag ON pictureId = picture.id AND pictureTag.name = ${db.escape(
+            tag
+          )}`
+        : ''
+    }
     WHERE lat BETWEEN ${lat1} AND ${lat2} AND lon BETWEEN ${lon1} AND ${lon2}
     ${takenAtFrom ? `AND takenAt >= '${toSqlDate(takenAtFrom)}'` : ''}
     ${takenAtTo ? `AND takenAt <= '${toSqlDate(takenAtTo)}'` : ''}
@@ -108,22 +155,48 @@ async function byRadius(ctx) {
 }
 
 function toSqlDate(d) {
-  return Number.isNaN(d) ? d : d.toISOString().replace('T', ' ').replace(/(\.\d*)?Z$/, '');
+  return Number.isNaN(d)
+    ? d
+    : d
+        .toISOString()
+        .replace('T', ' ')
+        .replace(/(\.\d*)?Z$/, '');
 }
 
 async function byBbox(ctx) {
-  const { bbox: [minLon, minLat, maxLon, maxLat], userId, tag, ratingFrom, ratingTo, takenAtFrom, takenAtTo, createdAtFrom, createdAtTo, fields } = ctx.query;
+  const {
+    bbox: [minLon, minLat, maxLon, maxLat],
+    userId,
+    tag,
+    ratingFrom,
+    ratingTo,
+    takenAtFrom,
+    takenAtTo,
+    createdAtFrom,
+    createdAtTo,
+    fields
+  } = ctx.query;
 
   const { db } = ctx.state;
 
-  const flds = ['lat', 'lon', ...(fields ? fields.filter(f => f !== 'rating') : [])];
+  const flds = [
+    'lat',
+    'lon',
+    ...(fields ? fields.filter(f => f !== 'rating') : [])
+  ];
   if (ratingFrom || ratingTo) {
     flds.push(ratingSubquery);
   }
 
   const sql = `SELECT ${flds.join(',')}
     FROM picture
-    ${tag ? `JOIN pictureTag ON pictureTag.pictureId = picture.id AND name = ${db.escape(tag)}` : ''}
+    ${
+      tag
+        ? `JOIN pictureTag ON pictureTag.pictureId = picture.id AND name = ${db.escape(
+            tag
+          )}`
+        : ''
+    }
     WHERE lat BETWEEN ${minLat} AND ${maxLat} AND lon BETWEEN ${minLon} AND ${maxLon}
     ${takenAtFrom ? `AND takenAt >= '${toSqlDate(takenAtFrom)}'` : ''}
     ${takenAtTo ? `AND takenAt <= '${toSqlDate(takenAtTo)}'` : ''}
@@ -131,16 +204,34 @@ async function byBbox(ctx) {
     ${createdAtTo ? `AND createdAt <= '${toSqlDate(createdAtTo)}'` : ''}
     ${userId ? `AND userId = ${userId}` : ''}
     ${ratingFrom === null ? '' : `HAVING rating >= ${ratingFrom}`}
-    ${ratingTo === null ? '' : `${ratingTo ? 'AND' : 'HAVING'} rating <= ${ratingTo}`}
+    ${
+      ratingTo === null
+        ? ''
+        : `${ratingTo ? 'AND' : 'HAVING'} rating <= ${ratingTo}`
+    }
   `;
 
   const rows = await db.query(sql);
 
-  ctx.body = fields && fields.includes('rating') ? rows : rows.map(row => Object.assign({}, row, { rating: undefined }));
+  ctx.body =
+    fields && fields.includes('rating')
+      ? rows
+      : rows.map(row => Object.assign({}, row, { rating: undefined }));
 }
 
 async function byOrder(ctx) {
-  const { userId, tag, ratingFrom, ratingTo, takenAtFrom, takenAtTo, createdAtFrom, createdAtTo, orderBy, direction } = ctx.query;
+  const {
+    userId,
+    tag,
+    ratingFrom,
+    ratingTo,
+    takenAtFrom,
+    takenAtTo,
+    createdAtFrom,
+    createdAtTo,
+    orderBy,
+    direction
+  } = ctx.query;
 
   const { db } = ctx.state;
 
@@ -168,9 +259,17 @@ async function byOrder(ctx) {
     wh.push(`userId = ${userId}`);
   }
 
-  const sql = `SELECT id ${ratingFrom || ratingTo || orderBy === 'rating' ? `, ${ratingSubquery}` : ''}
+  const sql = `SELECT id ${
+    ratingFrom || ratingTo || orderBy === 'rating' ? `, ${ratingSubquery}` : ''
+  }
     FROM picture
-    ${tag ? `JOIN pictureTag ON pictureTag.pictureId = picture.id AND name = ${db.escape(tag)}` : ''}
+    ${
+      tag
+        ? `JOIN pictureTag ON pictureTag.pictureId = picture.id AND name = ${db.escape(
+            tag
+          )}`
+        : ''
+    }
     ${wh.length ? `WHERE ${wh.join(' AND ')}` : ''}
     ${hv.length ? `HAVING ${hv.join(' AND ')}` : ''}
     ORDER BY ${orderBy} ${direction}, id ${direction}

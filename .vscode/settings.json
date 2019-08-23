@@ -1,0 +1,8 @@
+{
+  "editor.tabSize": 2,
+  "files.trimTrailingWhitespace": true,
+  "files.insertFinalNewline": true,
+  "html.format.preserveNewLines": false,
+  "editor.formatOnSave": true
+  // "javascript.validate.enable": false
+}

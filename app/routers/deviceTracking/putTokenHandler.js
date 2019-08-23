@@ -4,18 +4,18 @@ const authenticator = require('~/authenticator');
 const { bodySchemaValidator } = require('~/requestValidators');
 const putTokenSchema = require('./putTokenSchema');
 
-module.exports = (router) => {
+module.exports = router => {
   router.put(
     '/access-tokens/:id',
     acceptValidator('application/json'),
     bodySchemaValidator(putTokenSchema, true),
     dbMiddleware(),
     authenticator(true),
-    async (ctx) => {
+    async ctx => {
       const [item] = await ctx.state.db.query(
         `SELECT userId FROM trackingAccessToken JOIN trackingDevice ON (deviceId = trackingDevice.id)
           WHERE trackingAccessToken.id = ? FOR UPDATE`,
-        [ctx.params.id],
+        [ctx.params.id]
       );
 
       if (!item) {
@@ -27,11 +27,17 @@ module.exports = (router) => {
 
         await ctx.state.db.query(
           'UPDATE trackingAccessToken SET note = ?, timeFrom = ?, timeTo = ?, listingLabel = ? WHERE id = ?',
-          [note, timeFrom && new Date(timeFrom), timeTo && new Date(timeTo), listingLabel, ctx.params.id],
+          [
+            note,
+            timeFrom && new Date(timeFrom),
+            timeTo && new Date(timeTo),
+            listingLabel,
+            ctx.params.id
+          ]
         );
 
         ctx.status = 204;
       }
-    },
+    }
   );
 };
