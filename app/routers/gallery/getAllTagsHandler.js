@@ -8,8 +8,8 @@ module.exports = function attachGetAllTagsHandler(router) {
     dbMiddleware(),
     async ctx => {
       ctx.body = await ctx.state.db.query(
-        'SELECT name, count(*) AS count FROM pictureTag GROUP BY name ORDER BY name'
+        'SELECT name, count(*) AS count FROM pictureTag GROUP BY name ORDER BY name',
       );
-    }
+    },
   );
 };

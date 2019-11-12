@@ -15,7 +15,7 @@ module.exports = router => {
           JOIN trackingDevice ON (trackingAccessToken.deviceId = trackingDevice.id)
           WHERE id = ?
           ORDER BY id`,
-        [ctx.params.id]
+        [ctx.params.id],
       );
 
       if (!item) {
@@ -25,6 +25,6 @@ module.exports = router => {
       } else {
         ctx.body = item;
       }
-    }
+    },
   );
 };

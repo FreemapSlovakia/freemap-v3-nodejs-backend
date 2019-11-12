@@ -5,5 +5,5 @@ const ratingSubquery = `(SELECT ${ratingExp} FROM pictureRating WHERE pictureId 
 
 module.exports = {
   ratingExp,
-  ratingSubquery
+  ratingSubquery,
 };

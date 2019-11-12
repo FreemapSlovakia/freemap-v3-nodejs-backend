@@ -33,9 +33,9 @@ module.exports = app => {
               id,
               error: {
                 code,
-                message: msg
-              }
-            })
+                message: msg,
+              },
+            }),
           );
         }
       }
@@ -46,8 +46,8 @@ module.exports = app => {
             JSON.stringify({
               jsonrpc: '2.0',
               id,
-              result
-            })
+              result,
+            }),
           );
         }
       }
@@ -76,7 +76,7 @@ module.exports = app => {
         respondResult,
         respondError,
         params: msg.params,
-        ctx
+        ctx,
       };
 
       if (msg.method === 'tracking.subscribe') {

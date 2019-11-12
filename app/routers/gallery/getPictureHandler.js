@@ -21,7 +21,7 @@ module.exports = function attachGetPictureHandler(router) {
               : ''
           }
         FROM picture LEFT JOIN user ON userId = user.id WHERE picture.id = ?`,
-        [ctx.params.id]
+        [ctx.params.id],
       );
 
       if (rows.length === 0) {
@@ -34,7 +34,7 @@ module.exports = function attachGetPictureHandler(router) {
           FROM pictureComment JOIN user ON (userId = user.id)
           WHERE pictureId = ?
           ORDER BY pictureComment.createdAt`,
-        [ctx.params.id]
+        [ctx.params.id],
       );
 
       const comments = commentRows.map(
@@ -44,9 +44,9 @@ module.exports = function attachGetPictureHandler(router) {
           comment,
           user: {
             id: userId,
-            name
-          }
-        })
+            name,
+          },
+        }),
       );
 
       const {
@@ -61,7 +61,7 @@ module.exports = function attachGetPictureHandler(router) {
         name,
         tags,
         rating,
-        myStars
+        myStars,
       } = rows[0];
       ctx.body = {
         id: pictureId,
@@ -76,13 +76,13 @@ module.exports = function attachGetPictureHandler(router) {
         lon,
         user: userId && {
           id: userId,
-          name
+          name,
         },
         tags: tags ? tags.split('\n') : [],
         comments,
         rating,
-        myStars
+        myStars,
       };
-    }
+    },
   );
 };

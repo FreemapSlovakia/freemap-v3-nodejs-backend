@@ -24,7 +24,7 @@ module.exports = function attachGetTracklogHandler(router) {
     ctx.body = {
       uid: fileUID,
       data: b64gpx,
-      mediaType: 'application/gpx+xml'
+      mediaType: 'application/gpx+xml',
     };
   });
 };

@@ -23,13 +23,13 @@ module.exports = function attachPatchUserHandler(router) {
           ...keys.map(key =>
             key === 'settings'
               ? JSON.stringify(ctx.request.body[key])
-              : ctx.request.body[key]
+              : ctx.request.body[key],
           ),
-          ctx.state.user.id
-        ]
+          ctx.state.user.id,
+        ],
       );
 
       ctx.status = 204;
-    }
+    },
   );
 };

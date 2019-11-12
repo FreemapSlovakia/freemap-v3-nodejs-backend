@@ -25,8 +25,8 @@ module.exports = function attachLoginWithFacebookHandler(router) {
         name,
         email,
         undefined,
-        undefined
+        undefined,
       );
-    }
+    },
   );
 };

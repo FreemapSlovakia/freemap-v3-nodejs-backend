@@ -10,11 +10,11 @@ module.exports = async function login(
   name0,
   email0,
   lat0,
-  lon0
+  lon0,
 ) {
   const [user] = await db.query(
     `SELECT id, name, email, isAdmin, lat, lon, settings FROM user WHERE ${dbField} = ?`,
-    [dbValue]
+    [dbValue],
   );
 
   const now = new Date();
@@ -45,7 +45,7 @@ module.exports = async function login(
 
     userId = (await db.query(
       `INSERT INTO user (${dbField}, name, email, createdAt, lat, lon, settings) VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      [dbValue, name, email, now, lat, lon, JSON.stringify(settings)]
+      [dbValue, name, email, now, lat, lon, JSON.stringify(settings)],
     )).insertId;
   }
 
@@ -56,7 +56,7 @@ module.exports = async function login(
       .split(',')
       .map(() => '?')
       .join(',')})`,
-    [userId, now, authToken, ...authValues]
+    [userId, now, authToken, ...authValues],
   );
 
   ctx.body = {
@@ -68,6 +68,6 @@ module.exports = async function login(
     lat,
     lon,
     settings,
-    preventTips
+    preventTips,
   };
 };

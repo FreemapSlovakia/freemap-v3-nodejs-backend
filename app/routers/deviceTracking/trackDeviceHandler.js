@@ -10,7 +10,7 @@ module.exports = router => {
 async function handler(ctx) {
   const [item] = await ctx.state.db.query(
     'SELECT id, maxCount, maxAge FROM trackingDevice WHERE token = ?',
-    [ctx.params.token]
+    [ctx.params.token],
   );
   if (!item) {
     ctx.status = 404;
@@ -92,14 +92,14 @@ async function handler(ctx) {
         battery,
         gsmSignal,
         message,
-        time
-      ]
+        time,
+      ],
     );
 
     if (maxAge) {
       await ctx.state.db.query(
         'DELETE FROM trackingPoint WHERE deviceId = ? AND TIMESTAMPDIFF(SECOND, createdAt, now()) > ?',
-        [id, maxAge]
+        [id, maxAge],
       );
     }
 
@@ -107,14 +107,14 @@ async function handler(ctx) {
       await ctx.state.db.query(
         `DELETE t FROM trackingPoint AS t JOIN
           (SELECT id FROM trackingPoint WHERE deviceId = ? ORDER BY id DESC LIMIT 18446744073709551615 OFFSET ?) tlimit ON t.id = tlimit.id`,
-        [id, maxCount + 1]
+        [id, maxCount + 1],
       );
     }
 
     const rows = await ctx.state.db.query(
       `SELECT token FROM trackingAccessToken
         WHERE deviceId = ? AND (timeFrom IS NULL OR timeFrom > ?) AND (timeTo IS NULL OR timeTo < ?)`,
-      [id, now, now]
+      [id, now, now],
     );
 
     const notify = (type, key) => {
@@ -140,9 +140,9 @@ async function handler(ctx) {
                   gsmSignal,
                   message,
                   [type]: key,
-                  ts: time.toISOString()
-                }
-              })
+                  ts: time.toISOString(),
+                },
+              }),
             );
           }
         }

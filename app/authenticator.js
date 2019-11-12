@@ -18,7 +18,7 @@ module.exports = function authenticator(require, deep) {
           ctx.status = 401;
           ctx.set(
             'WWW-Authenticate',
-            'Bearer realm="freemap"; error="missing token"'
+            'Bearer realm="freemap"; error="missing token"',
           );
         } else {
           await next();
@@ -32,7 +32,7 @@ module.exports = function authenticator(require, deep) {
     const [auth] = await ctx.state.db.query(
       `SELECT userId, osmAuthToken, osmAuthTokenSecret, facebookAccessToken, googleIdToken, name, email, isAdmin, lat, lon, settings, preventTips
         FROM auth INNER JOIN user ON (userId = id) WHERE authToken = ?`,
-      [authToken]
+      [authToken],
     );
 
     if (!auth) {
@@ -49,7 +49,7 @@ module.exports = function authenticator(require, deep) {
       lon: auth.lon,
       email: auth.email,
       settings: JSON.parse(auth.settings),
-      preventTips: !!auth.preventTips
+      preventTips: !!auth.preventTips,
     };
 
     if (!deep) {
@@ -85,8 +85,8 @@ module.exports = function authenticator(require, deep) {
             consumer_key: consumerKey,
             consumer_secret: consumerSecret,
             token: auth.osmAuthToken,
-            token_secret: auth.osmAuthTokenSecret
-          }
+            token_secret: auth.osmAuthTokenSecret,
+          },
         });
       } catch (e) {
         if (e.name === 'StatusCodeError' && e.statusCode === 401) {
@@ -101,14 +101,14 @@ module.exports = function authenticator(require, deep) {
 
     async function bad(what) {
       await ctx.state.db.query('DELETE FROM auth WHERE authToken = ?', [
-        authToken
+        authToken,
       ]);
 
       if (require) {
         ctx.status = 401;
         ctx.set(
           'WWW-Authenticate',
-          `Bearer realm="freemap"; error="invalid ${what} authorization"`
+          `Bearer realm="freemap"; error="invalid ${what} authorization"`,
         );
       } else {
         await next();

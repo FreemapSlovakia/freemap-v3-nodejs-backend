@@ -25,8 +25,8 @@ module.exports = function attachLogin2Handler(router) {
           consumer_secret: consumerSecret,
           token: ctx.request.body.token,
           token_secret: requestTokenRegistry.get(ctx.request.body.token),
-          verifier: ctx.request.body.verifier
-        }
+          verifier: ctx.request.body.verifier,
+        },
       });
 
       const permData = qs.parse(body);
@@ -37,15 +37,15 @@ module.exports = function attachLogin2Handler(router) {
           consumer_key: consumerKey,
           consumer_secret: consumerSecret,
           token: permData.oauth_token,
-          token_secret: permData.oauth_token_secret
-        }
+          token_secret: permData.oauth_token_secret,
+        },
       });
 
       const result = await parseStringAsync(userDetails);
 
       const {
         $: { display_name: osmName, id: osmId },
-        home
+        home,
       } = result.osm.user[0];
 
       const { lat, lon } = (home && home.length && home[0].$) || {};
@@ -62,8 +62,8 @@ module.exports = function attachLogin2Handler(router) {
         osmName,
         null,
         lat,
-        lon
+        lon,
       );
-    }
+    },
   );
 };

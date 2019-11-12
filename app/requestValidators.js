@@ -7,7 +7,7 @@ module.exports = {
   bodySchemaValidator,
   acceptValidator,
   contentTypeValidator,
-  queryAdapter
+  queryAdapter,
 };
 
 function queryValidator(spec) {
@@ -19,7 +19,7 @@ function queryValidator(spec) {
         errors.push(
           key in ctx.query
             ? `invalid parameter ${key}: ${msg}`
-            : `missing parameter ${key}`
+            : `missing parameter ${key}`,
         );
       }
     });
@@ -28,7 +28,7 @@ function queryValidator(spec) {
       ctx.status = 400;
       ctx.body = {
         error: 'invalid_query_parameters',
-        detail: errors
+        detail: errors,
       };
     } else {
       await next();
@@ -46,7 +46,7 @@ function bodySchemaValidator(schema, ignoreType) {
       ctx.status = 400;
       ctx.body = {
         error: 'request_body_doesnt_match_schema',
-        detail: validate.errors
+        detail: validate.errors,
       };
     } else {
       await next();

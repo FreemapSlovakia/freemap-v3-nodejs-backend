@@ -18,7 +18,7 @@ module.exports = router => {
           JOIN trackingDevice ON (deviceId = trackingDevice.id)
           WHERE trackingAccessToken.id = ?
           FOR UPDATE`,
-        [ctx.params.id]
+        [ctx.params.id],
       );
 
       if (!item) {
@@ -37,12 +37,12 @@ module.exports = router => {
             timeFrom && new Date(timeFrom),
             timeTo && new Date(timeTo),
             listingLabel,
-            ctx.params.id
-          ]
+            ctx.params.id,
+          ],
         );
 
         ctx.status = 204;
       }
-    }
+    },
   );
 };

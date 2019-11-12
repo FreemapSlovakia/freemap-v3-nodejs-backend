@@ -5,7 +5,7 @@ const BACKEND_URL = 'http://localhost:3000';
 describe('Tracklogs', function() {
   it('POST /tracklogs should return uid', function() {
     const response = chakram.post(BACKEND_URL + '/tracklogs', {
-      data: 'data be here 1234'
+      data: 'data be here 1234',
     });
     return expect(response)
       .to.have.status(201)
@@ -38,7 +38,7 @@ describe('Tracklogs', function() {
   it('GET /tracklogs/<uid> should return existing record', function() {
     const data = 'MY GPX BE HERE';
     const createGxpResponse = chakram.post(BACKEND_URL + '/tracklogs', {
-      data
+      data,
     });
     return createGxpResponse.then(function(payload) {
       const uid = payload.body.uid;

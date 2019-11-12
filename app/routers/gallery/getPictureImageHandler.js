@@ -16,7 +16,7 @@ module.exports = function attachGetPictureHandler(router) {
     async ctx => {
       const rows = await ctx.state.db.query(
         'SELECT pathname FROM picture WHERE picture.id = ?',
-        [ctx.params.id]
+        [ctx.params.id],
       );
 
       if (rows.length) {
@@ -26,7 +26,7 @@ module.exports = function attachGetPictureHandler(router) {
         ctx.response.lastModified = stats.mtime;
         ctx.append('Vary', 'Width');
         ctx.response.etag = calculate(stats, {
-          weak: true
+          weak: true,
         });
         ctx.type = 'image/jpeg';
         if (ctx.fresh) {
@@ -44,6 +44,6 @@ module.exports = function attachGetPictureHandler(router) {
       } else {
         ctx.status = 404;
       }
-    }
+    },
   );
 };

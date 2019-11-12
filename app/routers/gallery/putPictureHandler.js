@@ -15,12 +15,12 @@ module.exports = function attachPutPictureHandler(router) {
         description,
         takenAt,
         position: { lat, lon },
-        tags = []
+        tags = [],
       } = ctx.request.body;
 
       const rows = await ctx.state.db.query(
         'SELECT userId FROM picture WHERE id = ? FOR UPDATE',
-        [ctx.params.id]
+        [ctx.params.id],
       );
       if (rows.length === 0) {
         ctx.status = 404;
@@ -41,8 +41,8 @@ module.exports = function attachPutPictureHandler(router) {
             takenAt ? new Date(takenAt) : null,
             lat,
             lon,
-            ctx.params.id
-          ]
+            ctx.params.id,
+          ],
         ),
         // delete missing tags
         ctx.state.db.query(
@@ -51,8 +51,8 @@ module.exports = function attachPutPictureHandler(router) {
               ? ` AND name NOT IN (${tags.map(() => '?').join(', ')})`
               : ''
           }`,
-          [ctx.params.id, ...tags]
-        )
+          [ctx.params.id, ...tags],
+        ),
       ];
 
       if (tags.length) {
@@ -61,13 +61,13 @@ module.exports = function attachPutPictureHandler(router) {
             `INSERT INTO pictureTag (name, pictureId) VALUES ${tags
               .map(() => '(?, ?)')
               .join(', ')} ON DUPLICATE KEY UPDATE name = name`,
-            [].concat(...tags.map(tag => [tag, ctx.params.id]))
-          )
+            [].concat(...tags.map(tag => [tag, ctx.params.id])),
+          ),
         );
       }
 
       await Promise.all(queries);
       ctx.status = 204;
-    }
+    },
   );
 };

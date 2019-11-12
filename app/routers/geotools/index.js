@@ -45,7 +45,7 @@ async function compute(ctx) {
         x[0] >= -90 &&
         x[0] <= 90 &&
         x[1] >= -180 &&
-        x[1] <= 180
+        x[1] <= 180,
     )
   ) {
     ctx.status = 400;
@@ -82,7 +82,7 @@ async function compute(ctx) {
         }
 
         return [lat, lon, key];
-      })
+      }),
     );
 
     items.forEach(item => {
@@ -169,7 +169,7 @@ async function computeElevation([lat, lon, fd, size]) {
     readAsync(fd, buffer, 0, 2, (y0 * (rx + 1) + x0) * 2),
     readAsync(fd, buffer, 2, 2, (y1 * (rx + 1) + x0) * 2),
     readAsync(fd, buffer, 4, 2, (y0 * (rx + 1) + x1) * 2),
-    readAsync(fd, buffer, 6, 2, (y1 * (rx + 1) + x1) * 2)
+    readAsync(fd, buffer, 6, 2, (y1 * (rx + 1) + x1) * 2),
   ]);
 
   const v00 = buffer.readInt16BE(0);

@@ -13,7 +13,7 @@ module.exports = router => {
         `SELECT id, name, token, createdAt, maxCount, maxAge, userId
           FROM trackingDevice
           WHERE id = ? ORDER BY name`,
-        [ctx.params.id]
+        [ctx.params.id],
       );
 
       if (!item) {
@@ -23,6 +23,6 @@ module.exports = router => {
       } else {
         ctx.body = item;
       }
-    }
+    },
   );
 };

@@ -13,8 +13,8 @@ module.exports = router => {
         `SELECT id, name, token, createdAt, maxCount, maxAge, userId
           FROM trackingDevice
           WHERE userId = ?`,
-        [ctx.state.user.id]
+        [ctx.state.user.id],
       );
-    }
+    },
   );
 };

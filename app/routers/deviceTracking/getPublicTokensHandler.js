@@ -11,8 +11,8 @@ module.exports = router => {
         `SELECT id, token, createdAt, timeFrom, timeTo, listingLabel
           FROM trackingAccessToken
           WHERE listingLabel IS NOT NULL`,
-        [ctx.params.id]
+        [ctx.params.id],
       );
-    }
+    },
   );
 };

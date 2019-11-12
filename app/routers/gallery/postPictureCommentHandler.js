@@ -23,8 +23,8 @@ module.exports = function attachPostPictureCommentHandler(router) {
         ctx.state.db.query(
           `INSERT INTO pictureComment (pictureId, userId, comment, createdAt)
             VALUES (?, ?, ?, ?)`,
-          [ctx.params.id, ctx.state.user.id, comment, new Date()]
-        )
+          [ctx.params.id, ctx.state.user.id, comment, new Date()],
+        ),
       ];
 
       if (mailgun) {
@@ -34,15 +34,15 @@ module.exports = function attachPostPictureCommentHandler(router) {
               FROM user
               JOIN picture ON userId = user.id
               WHERE picture.id = ?`,
-            [ctx.params.id]
+            [ctx.params.id],
           ),
           ctx.state.db.query(
             `SELECT DISTINCT email
               FROM user
               JOIN pictureComment ON userId = user.id
               WHERE pictureId = ? AND userId <> ? AND email IS NOT NULL`,
-            [ctx.params.id, ctx.state.user.id]
-          )
+            [ctx.params.id, ctx.state.user.id],
+          ),
         );
       }
 
@@ -57,13 +57,13 @@ module.exports = function attachPostPictureCommentHandler(router) {
             to,
             subject: `Komentár k fotke na ${webBaseUrl.replace(
               /^https?:\/\//,
-              ''
+              '',
             )}`,
             text: `Používateľ ${ctx.state.user.name} pridal komentár k ${
               own ? 'vašej ' : ''
             }fotke ${title ? `"${title} "` : ''}na ${webBaseUrl}/?image=${
               ctx.params.id
-            }:\n\n${comment}`
+            }:\n\n${comment}`,
           });
 
         const promises = [];
@@ -77,6 +77,6 @@ module.exports = function attachPostPictureCommentHandler(router) {
       }
 
       ctx.body = { id: insertId };
-    }
+    },
   );
 };

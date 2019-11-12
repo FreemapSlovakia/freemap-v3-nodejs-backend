@@ -11,7 +11,7 @@ module.exports = router => {
     async ctx => {
       const [item] = await ctx.state.db.query(
         'SELECT userId FROM trackingDevice WHERE id = ? FOR UPDATE',
-        [ctx.params.id]
+        [ctx.params.id],
       );
 
       if (!item) {
@@ -20,10 +20,10 @@ module.exports = router => {
         ctx.status = 403;
       } else {
         await ctx.state.db.query('DELETE FROM trackingDevice WHERE id = ?', [
-          ctx.params.id
+          ctx.params.id,
         ]);
         ctx.status = 204;
       }
-    }
+    },
   );
 };

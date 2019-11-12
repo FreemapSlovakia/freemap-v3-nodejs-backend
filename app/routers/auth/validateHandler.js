@@ -8,6 +8,6 @@ module.exports = function attachLogoutHandler(router) {
     authenticator(true, true),
     async ctx => {
       ctx.body = ctx.state.user;
-    }
+    },
   );
 };

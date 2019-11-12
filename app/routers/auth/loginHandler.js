@@ -17,8 +17,8 @@ module.exports = function attachLoginHandler(router) {
         oauth: {
           callback: `${webBaseUrl}/authCallback.html`,
           consumer_key: consumerKey,
-          consumer_secret: consumerSecret
-        }
+          consumer_secret: consumerSecret,
+        },
       });
 
       const reqData = qs.parse(body);
@@ -27,9 +27,9 @@ module.exports = function attachLoginHandler(router) {
 
       ctx.body = {
         redirect: `https://www.openstreetmap.org/oauth/authorize?${qs.stringify(
-          { oauth_token: reqData.oauth_token }
-        )}`
+          { oauth_token: reqData.oauth_token },
+        )}`,
       };
-    }
+    },
   );
 };

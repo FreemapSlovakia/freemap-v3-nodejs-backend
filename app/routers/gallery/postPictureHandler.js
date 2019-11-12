@@ -2,7 +2,7 @@ const { dbMiddleware } = require('~/database');
 const {
   acceptValidator,
   contentTypeValidator,
-  bodySchemaValidator
+  bodySchemaValidator,
 } = require('~/requestValidators');
 const postPictureSchema = require('./postPictureSchema');
 const uuidBase62 = require('uuid-base62');
@@ -24,7 +24,7 @@ module.exports = function attachPostPictureHandler(router) {
       if (!files || !files.image) {
         ctx.status = 400;
         ctx.body = {
-          error: 'missing_image_file'
+          error: 'missing_image_file',
         };
       } else if (files.image.size > 20 * 1024 * 1024) {
         ctx.status = 413;
@@ -36,7 +36,7 @@ module.exports = function attachPostPictureHandler(router) {
       } else {
         ctx.status = 400;
         ctx.body = {
-          error: 'missing_meta_field'
+          error: 'missing_meta_field',
         };
       }
     },
@@ -49,7 +49,7 @@ module.exports = function attachPostPictureHandler(router) {
         description,
         takenAt,
         position: { lat, lon },
-        tags = []
+        tags = [],
       } = ctx.request.body.meta;
 
       const name = uuidBase62.v4();
@@ -58,7 +58,7 @@ module.exports = function attachPostPictureHandler(router) {
         '-a',
         image.path,
         '-o',
-        `${PICTURES_DIR}/${name}.jpeg`
+        `${PICTURES_DIR}/${name}.jpeg`,
       ]);
 
       const { insertId } = await ctx.state.db.query(
@@ -72,8 +72,8 @@ module.exports = function attachPostPictureHandler(router) {
           new Date(),
           takenAt ? new Date(takenAt) : null,
           lat,
-          lon
-        ]
+          lon,
+        ],
       );
 
       if (tags.length) {
@@ -81,11 +81,11 @@ module.exports = function attachPostPictureHandler(router) {
           `INSERT INTO pictureTag (name, pictureId) VALUES ${tags
             .map(() => '(?, ?)')
             .join(', ')} ON DUPLICATE KEY UPDATE name = name`,
-          [].concat(...tags.map(tag => [tag, insertId]))
+          [].concat(...tags.map(tag => [tag, insertId])),
         );
       }
 
       ctx.body = { id: insertId };
-    }
+    },
   );
 };

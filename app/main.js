@@ -30,9 +30,9 @@ const app = websockify(
   ssl
     ? {
         key: fs.readFileSync(ssl.key),
-        cert: fs.readFileSync(ssl.cert)
+        cert: fs.readFileSync(ssl.cert),
       }
-    : undefined
+    : undefined,
 );
 
 app.use(koaBunyanLogger(logger.child({ module: 'koa' })));
@@ -42,15 +42,17 @@ app.use(koaBunyanLogger.requestLogger());
 app.use(
   cors({
     origin: ctx =>
-      /\.freemap\.sk(:\d+)?$/.test(ctx.header.origin) ? ctx.header.origin : null
-  })
+      /\.freemap\.sk(:\d+)?$/.test(ctx.header.origin)
+        ? ctx.header.origin
+        : null,
+  }),
 );
 
 app.use(
   koaBody({
     jsonLimit: '16mb',
-    multipart: true
-  })
+    multipart: true,
+  }),
 );
 
 // remove tmp uploaded files
@@ -74,19 +76,19 @@ const router = new Router();
 router.use(
   '/tracklogs',
   tracklogsRouter.routes(),
-  tracklogsRouter.allowedMethods()
+  tracklogsRouter.allowedMethods(),
 );
 router.use('/gallery', galleryRouter.routes(), galleryRouter.allowedMethods());
 router.use('/auth', authRouter.routes(), authRouter.allowedMethods());
 router.use(
   '/geotools',
   geotoolsRouter.routes(),
-  geotoolsRouter.allowedMethods()
+  geotoolsRouter.allowedMethods(),
 );
 router.use(
   '/tracking',
   trackingRouter.routes(),
-  trackingRouter.allowedMethods()
+  trackingRouter.allowedMethods(),
 );
 
 attachLoggerHandler(router);

@@ -12,8 +12,8 @@ module.exports = function attachGetAllUsersHandler(router) {
           FROM picture
           JOIN user ON userId = user.id
           GROUP BY userId
-          ORDER BY user.name`
+          ORDER BY user.name`,
       );
-    }
+    },
   );
 };

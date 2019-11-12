@@ -1,8 +1,6 @@
 {
   "type": "object",
-  "required": [
-    "name"
-  ],
+  "required": ["name"],
   "properties": {
     "name": {
       "type": "string",
@@ -10,24 +8,15 @@
       "maxLength": 255
     },
     "maxCount": {
-      "type": [
-        "number",
-        "null"
-      ],
+      "type": ["number", "null"],
       "min": 0
     },
     "maxAge": {
-      "type": [
-        "number",
-        "null"
-      ],
+      "type": ["number", "null"],
       "min": 0
     },
     "regenerateToken": {
-      "type": [
-        "boolean",
-        "null"
-      ]
+      "type": ["boolean", "null"]
     }
   }
 }

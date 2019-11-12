@@ -14,7 +14,7 @@ module.exports = ctx => {
       if (deviceId) {
         const [row] = await db.query(
           'SELECT userId FROM trackingDevice WHERE id = ?',
-          [deviceId]
+          [deviceId],
         );
         if (!row) {
           ctx.respondError(404, 'no such device');
@@ -28,7 +28,7 @@ module.exports = ctx => {
       } else if (token) {
         const [row] = await db.query(
           'SELECT 1 FROM trackingAccessToken WHERE token = ?',
-          token
+          token,
         );
         if (!row) {
           ctx.respondError(404, 'no such token');
@@ -70,7 +70,7 @@ module.exports = ctx => {
               ${maxAge ? 'AND trackingPoint.createdAt >= ?' : ''}
             ORDER BY id DESC
             ${maxCount ? 'LIMIT ?' : ''}`,
-          params
+          params,
         );
       } else {
         result = await db.query(
@@ -88,7 +88,7 @@ module.exports = ctx => {
               AND (timeTo IS NULL OR trackingPoint.createdAt < timeTo)
             ORDER BY trackingPoint.id DESC
             ${maxCount ? 'LIMIT ?' : ''}`,
-          params
+          params,
         );
       }
 
@@ -107,8 +107,8 @@ module.exports = ctx => {
           hdop: ntu(item.hdop),
           bearing: ntu(item.bearing),
           battery: ntu(item.battery),
-          gsmSignal: ntu(item.gsmSignal)
-        }))
+          gsmSignal: ntu(item.gsmSignal),
+        })),
       );
     } finally {
       pool.releaseConnection(db);

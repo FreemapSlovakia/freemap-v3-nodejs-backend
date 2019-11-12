@@ -15,7 +15,7 @@ module.exports = router => {
     async ctx => {
       const [device] = await ctx.state.db.query(
         'SELECT userId FROM trackingDevice WHERE id = ?',
-        [ctx.params.id]
+        [ctx.params.id],
       );
 
       if (!device) {
@@ -40,12 +40,12 @@ module.exports = router => {
             timeFrom && new Date(timeFrom),
             timeTo && new Date(timeTo),
             note,
-            listingLabel
-          ]
+            listingLabel,
+          ],
         );
 
         ctx.body = { id: insertId, token };
       }
-    }
+    },
   );
 };

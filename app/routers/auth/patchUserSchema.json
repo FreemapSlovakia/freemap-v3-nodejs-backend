@@ -2,30 +2,19 @@
   "type": "object",
   "anyOf": [
     {
-      "required": [
-        "name"
-      ]
+      "required": ["name"]
     },
     {
-      "required": [
-        "email"
-      ]
+      "required": ["email"]
     },
     {
-      "required": [
-        "lat",
-        "lon"
-      ]
+      "required": ["lat", "lon"]
     },
     {
-      "required": [
-        "settings"
-      ]
+      "required": ["settings"]
     },
     {
-      "required": [
-        "preventTips"
-      ]
+      "required": ["preventTips"]
     }
   ],
   "properties": {
@@ -33,10 +22,7 @@
       "type": "string"
     },
     "email": {
-      "type": [
-        "string",
-        "null"
-      ],
+      "type": ["string", "null"],
       "format": "email"
     },
     "lat": {

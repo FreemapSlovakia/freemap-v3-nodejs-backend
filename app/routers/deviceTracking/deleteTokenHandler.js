@@ -13,7 +13,7 @@ module.exports = router => {
         `SELECT userId FROM trackingAccessToken
           JOIN trackingDevice ON (deviceId = trackingDevice.id)
           WHERE trackingAccessToken.id = ? FOR UPDATE`,
-        [ctx.params.id]
+        [ctx.params.id],
       );
 
       if (!item) {
@@ -23,10 +23,10 @@ module.exports = router => {
       } else {
         await ctx.state.db.query(
           'DELETE FROM trackingAccessToken WHERE id = ?',
-          [ctx.params.id]
+          [ctx.params.id],
         );
         ctx.status = 204;
       }
-    }
+    },
   );
 };

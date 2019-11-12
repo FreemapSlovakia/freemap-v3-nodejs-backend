@@ -12,7 +12,7 @@ module.exports = function attachLoginWithFacebookHandler(router) {
       const { idToken } = ctx.request.body;
 
       const { sub, name, email } = (await client.verifyIdToken({
-        idToken
+        idToken,
       })).getPayload(); // TODO catch error
 
       await login(
@@ -25,8 +25,8 @@ module.exports = function attachLoginWithFacebookHandler(router) {
         name,
         email,
         undefined,
-        undefined
+        undefined,
       );
-    }
+    },
   );
 };
