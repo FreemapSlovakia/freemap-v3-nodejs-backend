@@ -1,21 +1,24 @@
 const trackRegister = require('~/trackRegister');
-const { pool } = require('~/database');
+const { poolPromise } = require('~/database');
 
 module.exports = ctx => {
   // TODO validate ctx.params
   const { token, deviceId, fromTime, maxCount, maxAge } = ctx.params;
 
   (async () => {
+    const pool = await poolPromise;
+
     const db = await pool.getConnection();
 
     const { user } = ctx.ctx.state || {};
 
     try {
       if (deviceId) {
-        const [row] = await db.query(
-          'SELECT userId FROM trackingDevice WHERE id = ?',
-          [deviceId],
-        );
+        const [
+          row,
+        ] = await db.query('SELECT userId FROM trackingDevice WHERE id = ?', [
+          deviceId,
+        ]);
         if (!row) {
           ctx.respondError(404, 'no such device');
           return;

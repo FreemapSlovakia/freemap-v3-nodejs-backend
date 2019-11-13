@@ -12,7 +12,9 @@ module.exports = async function login(
   lat0,
   lon0,
 ) {
-  const [user] = await db.query(
+  const [
+    user,
+  ] = await db.query(
     `SELECT id, name, email, isAdmin, lat, lon, settings FROM user WHERE ${dbField} = ?`,
     [dbValue],
   );
@@ -43,10 +45,12 @@ module.exports = async function login(
     isAdmin = false;
     preventTips = false;
 
-    userId = (await db.query(
-      `INSERT INTO user (${dbField}, name, email, createdAt, lat, lon, settings) VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      [dbValue, name, email, now, lat, lon, JSON.stringify(settings)],
-    )).insertId;
+    userId = (
+      await db.query(
+        `INSERT INTO user (${dbField}, name, email, createdAt, lat, lon, settings) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        [dbValue, name, email, now, lat, lon, JSON.stringify(settings)],
+      )
+    ).insertId;
   }
 
   const authToken = uuidBase62.v4(); // TODO rather some crypro securerandom

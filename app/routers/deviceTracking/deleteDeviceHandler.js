@@ -9,7 +9,9 @@ module.exports = router => {
     dbMiddleware(),
     authenticator(true),
     async ctx => {
-      const [item] = await ctx.state.db.query(
+      const [
+        item,
+      ] = await ctx.state.db.query(
         'SELECT userId FROM trackingDevice WHERE id = ? FOR UPDATE',
         [ctx.params.id],
       );

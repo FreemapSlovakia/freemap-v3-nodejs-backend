@@ -11,9 +11,11 @@ module.exports = function attachLoginWithFacebookHandler(router) {
     async ctx => {
       const { idToken } = ctx.request.body;
 
-      const { sub, name, email } = (await client.verifyIdToken({
-        idToken,
-      })).getPayload(); // TODO catch error
+      const { sub, name, email } = (
+        await client.verifyIdToken({
+          idToken,
+        })
+      ).getPayload(); // TODO catch error
 
       await login(
         ctx.state.db,

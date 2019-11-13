@@ -3,10 +3,11 @@ const mysql = require('promise-mysql');
 
 const logger = require('~/logger');
 
-const pool = mysql.createPool(config.get('mysql'));
+const poolPromise = mysql.createPool(config.get('mysql'));
 
 function dbMiddleware() {
   return async (ctx, next) => {
+    const pool = await poolPromise;
     const db = await pool.getConnection();
     ctx.state.db = db;
     try {
@@ -132,7 +133,9 @@ async function initDatabase() {
 
   const updates = ['ALTER TABLE trackingPoint ADD COLUMN hdop FLOAT NULL'];
 
+  const pool = await poolPromise;
   const db = await pool.getConnection();
+
   try {
     /* eslint-disable no-await-in-loop, no-restricted-syntax */
     for (const script of scripts) {
@@ -151,4 +154,4 @@ async function initDatabase() {
   }
 }
 
-module.exports = { pool, dbMiddleware, initDatabase };
+module.exports = { poolPromise, dbMiddleware, initDatabase };

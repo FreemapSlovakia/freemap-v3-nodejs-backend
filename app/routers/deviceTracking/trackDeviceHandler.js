@@ -8,7 +8,9 @@ module.exports = router => {
 };
 
 async function handler(ctx) {
-  const [item] = await ctx.state.db.query(
+  const [
+    item,
+  ] = await ctx.state.db.query(
     'SELECT id, maxCount, maxAge FROM trackingDevice WHERE token = ?',
     [ctx.params.token],
   );
