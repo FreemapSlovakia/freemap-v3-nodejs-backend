@@ -16,7 +16,7 @@ module.exports = router => {
       const [
         item,
       ] = await ctx.state.db.query(
-        'SELECT userId FROM trackingDevice WHERE id = ?',
+        'SELECT userId FROM trackingDevice WHERE id = ? FOR UPDATE',
         [ctx.params.id],
       );
 

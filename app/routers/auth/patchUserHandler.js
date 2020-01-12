@@ -11,7 +11,9 @@ module.exports = function attachPatchUserHandler(router) {
     bodySchemaValidator(patchUserSchema),
     dbMiddleware(),
     async ctx => {
-      const keys = Object.keys(ctx.request.body);
+      const { body } = ctx.request;
+
+      const keys = Object.keys(body);
 
       // TODO validate duplicates
 
@@ -21,9 +23,7 @@ module.exports = function attachPatchUserHandler(router) {
           .join(', ')} WHERE id = ?`,
         [
           ...keys.map(key =>
-            key === 'settings'
-              ? JSON.stringify(ctx.request.body[key])
-              : ctx.request.body[key],
+            key === 'settings' ? JSON.stringify(body[key]) : body[key],
           ),
           ctx.state.user.id,
         ],

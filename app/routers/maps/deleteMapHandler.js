@@ -3,26 +3,28 @@ const { acceptValidator } = require('~/requestValidators');
 const authenticator = require('~/authenticator');
 
 module.exports = router => {
-  router.get(
-    '/access-tokens/:id',
+  router.delete(
+    '/:id',
     acceptValidator('application/json'),
     dbMiddleware(),
     authenticator(true),
     async ctx => {
-      const [item] = await ctx.state.db.query(
-        `SELECT id, token, createdAt, timeFrom, timeTo, note, listingLabel
-          FROM trackingAccessToken
-          JOIN trackingDevice ON (trackingAccessToken.deviceId = trackingDevice.id)
-          WHERE id = ?`,
+      const [
+        item,
+      ] = await ctx.state.db.query(
+        'SELECT userId FROM map WHERE id = ? FOR UPDATE',
         [ctx.params.id],
       );
 
       if (!item) {
         ctx.status = 404;
-      } else if (!ctx.state.user.isAdmin && ctx.state.user.id !== item.userId) {
+      } else if (!ctx.state.user.isAdmin && item.userId !== ctx.state.user.id) {
         ctx.status = 403;
       } else {
-        ctx.body = item;
+        await ctx.state.db.query('DELETE FROM map WHERE id = ?', [
+          ctx.params.id,
+        ]);
+        ctx.status = 204;
       }
     },
   );

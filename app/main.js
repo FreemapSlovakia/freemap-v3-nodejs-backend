@@ -14,6 +14,7 @@ const attachWs = require('~/ws');
 
 const tracklogsRouter = require('~/routers/tracklogs');
 const galleryRouter = require('~/routers/gallery');
+const mapsRouter = require('~/routers/maps');
 const authRouter = require('~/routers/auth');
 const geotoolsRouter = require('~/routers/geotools');
 const trackingRouter = require('~/routers/deviceTracking');
@@ -90,6 +91,7 @@ router.use(
   trackingRouter.routes(),
   trackingRouter.allowedMethods(),
 );
+router.use('/maps', mapsRouter.routes(), mapsRouter.allowedMethods());
 
 attachLoggerHandler(router);
 

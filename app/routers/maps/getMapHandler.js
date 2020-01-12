@@ -4,24 +4,29 @@ const authenticator = require('~/authenticator');
 
 module.exports = router => {
   router.get(
-    '/access-tokens/:id',
+    '/:id',
     acceptValidator('application/json'),
     dbMiddleware(),
     authenticator(true),
     async ctx => {
       const [item] = await ctx.state.db.query(
-        `SELECT id, token, createdAt, timeFrom, timeTo, note, listingLabel
-          FROM trackingAccessToken
-          JOIN trackingDevice ON (trackingAccessToken.deviceId = trackingDevice.id)
+        `SELECT id, name, public, data, createdAt, userId
+          FROM map
           WHERE id = ?`,
         [ctx.params.id],
       );
 
       if (!item) {
         ctx.status = 404;
-      } else if (!ctx.state.user.isAdmin && ctx.state.user.id !== item.userId) {
+      } else if (
+        !item.public &&
+        !ctx.state.user.isAdmin &&
+        ctx.state.user.id !== item.userId
+      ) {
         ctx.status = 403;
       } else {
+        item.data = JSON.parse(item.data);
+        item.public = !!item.public;
         ctx.body = item;
       }
     },

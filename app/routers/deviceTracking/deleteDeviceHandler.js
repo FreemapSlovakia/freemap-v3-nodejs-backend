@@ -24,6 +24,7 @@ module.exports = router => {
         await ctx.state.db.query('DELETE FROM trackingDevice WHERE id = ?', [
           ctx.params.id,
         ]);
+
         ctx.status = 204;
       }
     },
