@@ -7,14 +7,14 @@
     "node": "8.x"
   },
   "dependencies": {
-    "ajv": "6.10.2",
+    "ajv": "6.11.0",
     "axios": "0.19.1",
     "bunyan": "1.8.12",
-    "config": "3.2.4",
+    "config": "3.2.5",
     "etag": "1.8.1",
     "fb": "2.0.0",
     "fs-extra": "8.1.0",
-    "google-auth-library": "5.8.0",
+    "google-auth-library": "5.9.1",
     "kcors": "2.2.2",
     "koa": "2.11.0",
     "koa-body": "4.1.1",
@@ -30,7 +30,7 @@
     "request": "2.88.0",
     "request-promise-native": "1.0.8",
     "set-cookie-parser": "2.4.1",
-    "sharp": "0.23.4",
+    "sharp": "0.24.0",
     "uuid-base62": "0.1.0",
     "verror": "1.10.0",
     "xml2js": "0.4.23"
@@ -43,7 +43,7 @@
     "eslint-config-prettier": "6.9.0",
     "eslint-import-resolver-babel-root-import": "0.0.2",
     "eslint-plugin-prettier": "3.1.2",
-    "husky": "4.0.7",
+    "husky": "4.0.10",
     "lint-staged": "9.5.0",
     "nodemon": "2.0.2",
     "prettier": "1.19.1"
