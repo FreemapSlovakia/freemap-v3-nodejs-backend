@@ -5,7 +5,7 @@ module.exports = function attachLogoutHandler(router) {
   router.post(
     '/validate',
     dbMiddleware(),
-    authenticator(true, true),
+    authenticator(true /*, true*/),
     async ctx => {
       ctx.body = ctx.state.user;
     },
