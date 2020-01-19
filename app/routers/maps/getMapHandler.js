@@ -7,7 +7,7 @@ module.exports = router => {
     '/:id',
     acceptValidator('application/json'),
     dbMiddleware(),
-    authenticator(true),
+    authenticator(false),
     async ctx => {
       const [item] = await ctx.state.db.query(
         `SELECT id, name, public, data, createdAt, userId
@@ -20,8 +20,8 @@ module.exports = router => {
         ctx.status = 404;
       } else if (
         !item.public &&
-        !ctx.state.user.isAdmin &&
-        ctx.state.user.id !== item.userId
+        (!ctx.state.user ||
+          (!ctx.state.user.isAdmin && ctx.state.user.id !== item.userId))
       ) {
         ctx.status = 403;
       } else {
