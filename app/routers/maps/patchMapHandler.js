@@ -12,11 +12,13 @@ module.exports = router => {
     dbMiddleware(),
     authenticator(true),
     async ctx => {
+      const id = Number(ctx.params.id);
+
       const [
         item,
       ] = await ctx.state.db.query(
         'SELECT userId FROM map WHERE id = ? FOR UPDATE',
-        [ctx.params.id],
+        [id],
       );
 
       if (!item) {
@@ -48,7 +50,7 @@ module.exports = router => {
           `UPDATE map SET ${fields
             .map(f => `${f} = ?`)
             .join(',')} WHERE id = ?`,
-          [...values, ctx.params.id],
+          [...values, id],
         );
 
         ctx.status = 204;

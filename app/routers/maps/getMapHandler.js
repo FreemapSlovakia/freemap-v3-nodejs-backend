@@ -13,7 +13,7 @@ module.exports = router => {
         `SELECT id, name, public, data, createdAt, userId
           FROM map
           WHERE id = ?`,
-        [ctx.params.id],
+        [Number(ctx.params.id)],
       );
 
       if (!item) {

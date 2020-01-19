@@ -136,7 +136,7 @@ async function initDatabase() {
       name VARCHAR(255) CHARSET utf8 COLLATE utf8_general_ci NULL,
       userId INT UNSIGNED NOT NULL,
       public BOOL NOT NULL DEFAULT 0,
-      data TEXT CHARSET utf8 COLLATE utf8_bin NOT NULL DEFAULT '{}',
+      data MEDIUMTEXT CHARSET utf8 COLLATE utf8_bin NOT NULL DEFAULT '{}',
       CONSTRAINT umUserFk FOREIGN KEY (userId) REFERENCES user (id) ON DELETE CASCADE,
       INDEX umCreatedAtIdx (createdAt)
     ) ENGINE=InnoDB`,
