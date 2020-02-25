@@ -37,7 +37,9 @@ const app = websockify(
 );
 
 app.use(koaBunyanLogger(logger.child({ module: 'koa' })));
+
 app.use(koaBunyanLogger.requestIdContext());
+
 app.use(koaBunyanLogger.requestLogger());
 
 app.use(
@@ -62,8 +64,10 @@ app.use(async (ctx, next) => {
 
   if (ctx.request.files) {
     const proms = [];
+
     for (const field of Object.keys(ctx.request.files)) {
       const files = ctx.request.files[field];
+
       for (const file of Array.isArray(files) ? files : [files]) {
         proms.push(unlinkAsync(file.path));
       }
@@ -79,18 +83,23 @@ router.use(
   tracklogsRouter.routes(),
   tracklogsRouter.allowedMethods(),
 );
+
 router.use('/gallery', galleryRouter.routes(), galleryRouter.allowedMethods());
+
 router.use('/auth', authRouter.routes(), authRouter.allowedMethods());
+
 router.use(
   '/geotools',
   geotoolsRouter.routes(),
   geotoolsRouter.allowedMethods(),
 );
+
 router.use(
   '/tracking',
   trackingRouter.routes(),
   trackingRouter.allowedMethods(),
 );
+
 router.use('/maps', mapsRouter.routes(), mapsRouter.allowedMethods());
 
 attachLoggerHandler(router);
@@ -105,7 +114,10 @@ initDatabase()
     const port = config.get('http.port');
 
     app.listen(port, () => {
-      logger.info(`Freemap v3 API listening on port ${port}.`);
+      logger.info(
+        { foo: 'bar', baz: 2, aaa: { bbb: 4 } },
+        `Freemap v3 API listening on port ${port}.`,
+      );
     });
   })
   .catch(err => {
