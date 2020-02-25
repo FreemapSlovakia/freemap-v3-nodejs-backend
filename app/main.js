@@ -114,10 +114,7 @@ initDatabase()
     const port = config.get('http.port');
 
     app.listen(port, () => {
-      logger.info(
-        { foo: 'bar', baz: 2, aaa: { bbb: 4 } },
-        `Freemap v3 API listening on port ${port}.`,
-      );
+      logger.info(`Freemap v3 API listening on port ${port}.`);
     });
   })
   .catch(err => {
