@@ -25,14 +25,15 @@ function queryValidator(spec) {
     });
 
     if (errors.length) {
-      ctx.status = 400;
       ctx.body = {
         error: 'invalid_query_parameters',
         detail: errors,
       };
-    } else {
-      await next();
+
+      ctx.throw(400);
     }
+
+    await next();
   };
 }
 
@@ -41,36 +42,39 @@ function bodySchemaValidator(schema, ignoreType) {
 
   return async (ctx, next) => {
     if (!ignoreType && !ctx.is('application/json')) {
-      ctx.status = 415;
-    } else if (!validate(ctx.request.body)) {
-      ctx.status = 400;
+      ctx.throw(415);
+    }
+
+    if (!validate(ctx.request.body)) {
       ctx.body = {
         error: 'request_body_doesnt_match_schema',
         detail: validate.errors,
       };
-    } else {
-      await next();
+
+      ctx.throw(400);
     }
+
+    await next();
   };
 }
 
 function acceptValidator(type) {
   return async (ctx, next) => {
-    if (ctx.accepts(type)) {
-      await next();
-    } else {
-      ctx.status = 406;
+    if (!ctx.accepts(type)) {
+      ctx.throw(406);
     }
+
+    await next();
   };
 }
 
 function contentTypeValidator(type) {
   return async (ctx, next) => {
-    if (ctx.is(type)) {
-      await next();
-    } else {
-      ctx.status = 415;
+    if (!ctx.is(type)) {
+      ctx.throw(415);
     }
+
+    await next();
   };
 }
 
@@ -79,6 +83,7 @@ function queryAdapter(spec) {
     Object.keys(spec).forEach(key => {
       ctx.query[key] = spec[key](ctx.query[key]);
     });
+
     await next();
   };
 }

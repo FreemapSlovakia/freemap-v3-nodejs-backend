@@ -1,3 +1,4 @@
+const SQL = require('sql-template-strings');
 const { dbMiddleware } = require('~/database');
 const {
   acceptValidator,
@@ -22,23 +23,30 @@ module.exports = function attachPostPictureHandler(router) {
     async (ctx, next) => {
       const { files } = ctx.request;
       if (!files || !files.image) {
-        ctx.status = 400;
         ctx.body = {
           error: 'missing_image_file',
         };
-      } else if (files.image.size > 20 * 1024 * 1024) {
-        ctx.status = 413;
-      } else if (ctx.request.body.meta) {
-        if (typeof ctx.request.body.meta === 'string') {
-          ctx.request.body.meta = JSON.parse(ctx.request.body.meta);
-        }
-        await next();
-      } else {
-        ctx.status = 400;
+
+        ctx.throw(400);
+      }
+
+      if (files.image.size > 20 * 1024 * 1024) {
+        ctx.throw(413);
+      }
+
+      if (!ctx.request.body.meta) {
         ctx.body = {
           error: 'missing_meta_field',
         };
+
+        ctx.throw(400);
       }
+
+      if (typeof ctx.request.body.meta === 'string') {
+        ctx.request.body.meta = JSON.parse(ctx.request.body.meta);
+      }
+
+      await next();
     },
     bodySchemaValidator(postPictureSchema, true),
     acceptValidator('application/json'),
@@ -61,20 +69,17 @@ module.exports = function attachPostPictureHandler(router) {
         `${PICTURES_DIR}/${name}.jpeg`,
       ]);
 
-      const { insertId } = await ctx.state.db.query(
-        `INSERT INTO picture (pathname, userId, title, description, createdAt, takenAt, lat, lon)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-        [
-          `${name}.jpeg`,
-          ctx.state.user.id,
-          title,
-          description,
-          new Date(),
-          takenAt ? new Date(takenAt) : null,
-          lat,
-          lon,
-        ],
-      );
+      const { insertId } = await ctx.state.db.query(SQL`
+        INSERT INTO picture SET
+          pathname = ${`${name}.jpeg`},
+          userId = ${ctx.state.user.id},
+          title = ${title},
+          description = ${description},
+          createdAt = ${new Date()},
+          takenAt = ${takenAt ? new Date(takenAt) : null},
+          lat = ${lat},
+          lon = ${lon}
+      `);
 
       if (tags.length) {
         await ctx.state.db.query(

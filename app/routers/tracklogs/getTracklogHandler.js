@@ -8,15 +8,15 @@ const existsAsync = promisify(fs.exists);
 module.exports = function attachGetTracklogHandler(router) {
   router.get('/:uid', async ctx => {
     const fileUID = ctx.params.uid;
+
     if (!/^[a-zA-Z0-9]*$/.test(fileUID)) {
-      ctx.status = 404;
-      return;
+      ctx.throw(404);
     }
 
     const filePath = `${TRACKLOGS_DIR}/${fileUID}.b64.gpx`;
+
     if (!(await existsAsync(filePath))) {
-      ctx.status = 404;
-      return;
+      ctx.throw(404);
     }
 
     const b64gpx = await readFileAsync(filePath, 'utf8');

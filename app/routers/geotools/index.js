@@ -33,8 +33,7 @@ async function compute(ctx) {
   } else if (ctx.method === 'POST' && Array.isArray(ctx.request.body)) {
     cs = ctx.request.body;
   } else {
-    ctx.status = 400;
-    return;
+    ctx.throw(400);
   }
 
   if (
@@ -48,8 +47,7 @@ async function compute(ctx) {
         x[1] <= 180,
     )
   ) {
-    ctx.status = 400;
-    return;
+    ctx.throw(400);
   }
 
   const allocated = new Set();

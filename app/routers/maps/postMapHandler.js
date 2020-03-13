@@ -1,3 +1,4 @@
+const SQL = require('sql-template-strings');
 const { dbMiddleware } = require('~/database');
 const { acceptValidator } = require('~/requestValidators');
 const authenticator = require('~/authenticator');
@@ -14,12 +15,13 @@ module.exports = router => {
     async ctx => {
       const { name, public, data } = ctx.request.body;
 
-      const {
-        insertId,
-      } = await ctx.state.db.query(
-        'INSERT INTO map (name, public, userId, data) VALUES (?, ?, ?, ?)',
-        [name, public, ctx.state.user.id, JSON.stringify(data)],
-      );
+      const { insertId } = await ctx.state.db.query(SQL`
+        INSERT INTO map SET
+          name = ${name},
+          public = ${public},
+          userId = ${ctx.state.user.id},
+          data = ${JSON.stringify(data)}
+      `);
 
       ctx.body = { id: insertId };
     },

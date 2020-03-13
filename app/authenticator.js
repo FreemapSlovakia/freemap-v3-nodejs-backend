@@ -1,3 +1,4 @@
+const SQL = require('sql-template-strings');
 const rp = require('request-promise-native');
 const config = require('config');
 const fb = require('~/fb');
@@ -12,28 +13,31 @@ module.exports = function authenticator(require, deep) {
 
     if (!authToken) {
       const ah = ctx.get('Authorization');
+
       const m = /^bearer (.+)$/i.exec(ah || '');
+
       if (!m) {
         if (require) {
-          ctx.status = 401;
           ctx.set(
             'WWW-Authenticate',
             'Bearer realm="freemap"; error="missing token"',
           );
-        } else {
-          await next();
+
+          ctx.throw(401);
         }
+
+        await next();
+
         return;
       }
 
       authToken = m[1];
     }
 
-    const [auth] = await ctx.state.db.query(
-      `SELECT userId, osmAuthToken, osmAuthTokenSecret, facebookAccessToken, googleIdToken, name, email, isAdmin, lat, lon, settings, preventTips
-        FROM auth INNER JOIN user ON (userId = id) WHERE authToken = ?`,
-      [authToken],
-    );
+    const [auth] = await ctx.state.db.query(SQL`
+      SELECT userId, osmAuthToken, osmAuthTokenSecret, facebookAccessToken, googleIdToken, name, email, isAdmin, lat, lon, settings, preventTips
+        FROM auth INNER JOIN user ON (userId = id) WHERE authToken = ${authToken}
+    `);
 
     if (!auth) {
       await bad('');
@@ -100,19 +104,20 @@ module.exports = function authenticator(require, deep) {
     }
 
     async function bad(what) {
-      await ctx.state.db.query('DELETE FROM auth WHERE authToken = ?', [
-        authToken,
-      ]);
+      await ctx.state.db.query(
+        SQL`DELETE FROM auth WHERE authToken = ${authToken}`,
+      );
 
       if (require) {
-        ctx.status = 401;
         ctx.set(
           'WWW-Authenticate',
           `Bearer realm="freemap"; error="invalid ${what} authorization"`,
         );
-      } else {
-        await next();
+
+        ctx.throw(401);
       }
+
+      await next();
     }
   };
 };

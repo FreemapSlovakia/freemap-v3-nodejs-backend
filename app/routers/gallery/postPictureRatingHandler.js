@@ -1,3 +1,4 @@
+const SQL = require('sql-template-strings');
 const { dbMiddleware } = require('~/database');
 const { bodySchemaValidator } = require('~/requestValidators');
 const postPictureRatingSchema = require('./postPictureRatingSchema');
@@ -12,18 +13,14 @@ module.exports = function attachPostPictureRatingHandler(router) {
     async ctx => {
       const { stars } = ctx.request.body;
 
-      await ctx.state.db.query(
-        `INSERT INTO pictureRating (pictureId, userId, stars, ratedAt)
-          VALUES (?, ?, ?, ?) ON DUPLICATE KEY UPDATE stars = ?, ratedAt = ?`,
-        [
-          ctx.params.id,
-          ctx.state.user.id,
-          stars,
-          new Date(),
-          stars,
-          new Date(),
-        ],
-      );
+      await ctx.state.db.query(SQL`
+        INSERT INTO pictureRating SET
+            pictureId = ${ctx.params.id},
+            userId = ${ctx.state.user.id},
+            stars = ${stars},
+            ratedAt = ${new Date()}
+          ON DUPLICATE KEY UPDATE stars = ${stars}, ratedAt = ${new Date()}
+      `);
 
       ctx.status = 204;
     },

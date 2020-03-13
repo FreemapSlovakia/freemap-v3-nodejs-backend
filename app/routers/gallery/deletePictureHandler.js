@@ -1,3 +1,4 @@
+const SQL = require('sql-template-strings');
 const { dbMiddleware } = require('~/database');
 const authenticator = require('~/authenticator');
 const { promisify } = require('util');
@@ -15,22 +16,20 @@ module.exports = function attachDeletePictureHandler(router) {
       // TODO transaction
 
       const rows = await ctx.state.db.query(
-        'SELECT pathname, userId FROM picture WHERE id = ? FOR UPDATE',
-        [ctx.params.id],
+        SQL`SELECT pathname, userId FROM picture WHERE id = ${ctx.params.id} FOR UPDATE`,
       );
+
       if (rows.length === 0) {
-        ctx.status = 404;
-        return;
+        ctx.throw(404);
       }
 
       if (!ctx.state.user.isAdmin && rows[0].userId !== ctx.state.user.id) {
-        ctx.status = 403;
-        return;
+        ctx.throw(403);
       }
 
-      await ctx.state.db.query('DELETE FROM picture WHERE id = ?', [
-        ctx.params.id,
-      ]);
+      await ctx.state.db.query(
+        SQL`DELETE FROM picture WHERE id = ${ctx.params.id}`,
+      );
 
       await unlinkAsync(`${PICTURES_DIR}/${rows[0].pathname}`);
 

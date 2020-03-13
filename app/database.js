@@ -9,7 +9,9 @@ function dbMiddleware() {
   return async (ctx, next) => {
     const pool = await poolPromise;
     const db = await pool.getConnection();
+
     ctx.state.db = db;
+
     try {
       await next();
     } finally {

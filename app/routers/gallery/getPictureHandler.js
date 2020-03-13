@@ -1,3 +1,4 @@
+const SQL = require('sql-template-strings');
 const { dbMiddleware } = require('~/database');
 const { acceptValidator } = require('~/requestValidators');
 const authenticator = require('~/authenticator');
@@ -11,31 +12,30 @@ module.exports = function attachGetPictureHandler(router) {
     authenticator(false),
     async ctx => {
       const rows = await ctx.state.db.query(
-        `SELECT picture.id AS pictureId, picture.createdAt, pathname, title, description, takenAt, picture.lat, picture.lon,
+        SQL`SELECT picture.id AS pictureId, picture.createdAt, pathname, title, description, takenAt, picture.lat, picture.lon,
           user.id as userId, user.name,
-          (SELECT GROUP_CONCAT(name SEPARATOR '\n') FROM pictureTag WHERE pictureId = picture.id) AS tags,
-          ${ratingSubquery}
-          ${
+          (SELECT GROUP_CONCAT(name SEPARATOR '\n') FROM pictureTag WHERE pictureId = picture.id) AS tags,`
+          .append(ratingSubquery)
+          .append(
             ctx.state.user
               ? `, (SELECT stars FROM pictureRating WHERE pictureId = picture.id AND userId = ${ctx.state.user.id}) AS myStars`
-              : ''
-          }
-        FROM picture LEFT JOIN user ON userId = user.id WHERE picture.id = ?`,
-        [ctx.params.id],
+              : '',
+          )
+          .append(
+            SQL`FROM picture LEFT JOIN user ON userId = user.id WHERE picture.id = ${ctx.params.id}`,
+          ),
       );
 
       if (rows.length === 0) {
-        ctx.status = 404;
-        return;
+        ctx.throw(404);
       }
 
-      const commentRows = await ctx.state.db.query(
-        `SELECT pictureComment.id, pictureComment.createdAt, comment, user.name, userId
+      const commentRows = await ctx.state.db.query(SQL`
+        SELECT pictureComment.id, pictureComment.createdAt, comment, user.name, userId
           FROM pictureComment JOIN user ON (userId = user.id)
-          WHERE pictureId = ?
-          ORDER BY pictureComment.createdAt`,
-        [ctx.params.id],
-      );
+          WHERE pictureId = ${ctx.params.id}
+          ORDER BY pictureComment.createdAt
+      `);
 
       const comments = commentRows.map(
         ({ id, createdAt, comment, userId, name }) => ({
@@ -63,6 +63,7 @@ module.exports = function attachGetPictureHandler(router) {
         rating,
         myStars,
       } = rows[0];
+
       ctx.body = {
         id: pictureId,
         createdAt: createdAt.toISOString(),

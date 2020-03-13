@@ -1,3 +1,4 @@
+const SQL = require('sql-template-strings');
 const uuidBase62 = require('uuid-base62');
 
 module.exports = async function login(
@@ -12,11 +13,10 @@ module.exports = async function login(
   lat0,
   lon0,
 ) {
-  const [
-    user,
-  ] = await db.query(
-    `SELECT id, name, email, isAdmin, lat, lon, settings FROM user WHERE ${dbField} = ?`,
-    [dbValue],
+  const [user] = await db.query(
+    SQL`SELECT id, name, email, isAdmin, lat, lon, settings FROM user WHERE `
+      .append(dbField)
+      .append(SQL` = ${dbValue}`),
   );
 
   const now = new Date();
@@ -47,8 +47,13 @@ module.exports = async function login(
 
     userId = (
       await db.query(
-        `INSERT INTO user (${dbField}, name, email, createdAt, lat, lon, settings) VALUES (?, ?, ?, ?, ?, ?, ?)`,
-        [dbValue, name, email, now, lat, lon, JSON.stringify(settings)],
+        SQL`INSERT INTO user SET `.append(dbField).append(SQL` = ${dbValue},
+          name = ${name},
+          email = ${email},
+          createdAt = ${now},
+          lat = ${lat},
+          lon = ${lon},
+          settings = ${JSON.stringify(settings)}`),
       )
     ).insertId;
   }

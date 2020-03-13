@@ -1,3 +1,4 @@
+const SQL = require('sql-template-strings');
 const config = require('config');
 const { dbMiddleware } = require('~/database');
 const { acceptValidator, bodySchemaValidator } = require('~/requestValidators');
@@ -20,29 +21,30 @@ module.exports = function attachPostPictureCommentHandler(router) {
       const { comment } = ctx.request.body;
 
       const proms = [
-        ctx.state.db.query(
-          `INSERT INTO pictureComment (pictureId, userId, comment, createdAt)
-            VALUES (?, ?, ?, ?)`,
-          [ctx.params.id, ctx.state.user.id, comment, new Date()],
-        ),
+        ctx.state.db.query(SQL`
+          INSERT INTO pictureComment SET
+            pictureId = ${ctx.params.id},
+            userId = ${ctx.state.user.id},
+            comment = ${comment},
+            createdAt = ${new Date()}
+        `),
       ];
 
       if (mailgun) {
         proms.push(
-          ctx.state.db.query(
-            `SELECT email, title, userId
+          ctx.state.db.query(SQL`
+            SELECT email, title, userId
               FROM user
               JOIN picture ON userId = user.id
-              WHERE picture.id = ?`,
-            [ctx.params.id],
-          ),
-          ctx.state.db.query(
-            `SELECT DISTINCT email
+              WHERE picture.id = ${ctx.params.id}
+          `),
+
+          ctx.state.db.query(SQL`
+            SELECT DISTINCT email
               FROM user
               JOIN pictureComment ON userId = user.id
-              WHERE pictureId = ? AND userId <> ? AND email IS NOT NULL`,
-            [ctx.params.id, ctx.state.user.id],
-          ),
+              WHERE pictureId = ${ctx.params.id} AND userId <> ${ctx.state.user.id} AND email IS NOT NULL
+          `),
         );
       }
 

@@ -1,3 +1,4 @@
+const SQL = require('sql-template-strings');
 const { dbMiddleware } = require('~/database');
 const { acceptValidator } = require('~/requestValidators');
 const authenticator = require('~/authenticator');
@@ -9,26 +10,27 @@ module.exports = router => {
     dbMiddleware(),
     authenticator(false),
     async ctx => {
-      const [item] = await ctx.state.db.query(
-        `SELECT id, name, public, data, createdAt, userId
+      const [item] = await ctx.state.db.query(SQL`
+        SELECT id, name, public, data, createdAt, userId
           FROM map
-          WHERE id = ?`,
-        [Number(ctx.params.id)],
-      );
+          WHERE id = ${Number(ctx.params.id)}
+      `);
 
       if (!item) {
-        ctx.status = 404;
-      } else if (
+        ctx.throw(404);
+      }
+
+      if (
         !item.public &&
         (!ctx.state.user ||
           (!ctx.state.user.isAdmin && ctx.state.user.id !== item.userId))
       ) {
-        ctx.status = 403;
-      } else {
-        item.data = JSON.parse(item.data);
-        item.public = !!item.public;
-        ctx.body = item;
+        ctx.throw(403);
       }
+
+      item.data = JSON.parse(item.data);
+      item.public = !!item.public;
+      ctx.body = item;
     },
   );
 };
