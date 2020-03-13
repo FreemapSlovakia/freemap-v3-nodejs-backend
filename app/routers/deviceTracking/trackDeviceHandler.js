@@ -120,6 +120,7 @@ async function handler(ctx) {
 
   const notify = (type, key) => {
     const websockets = trackRegister.get(key);
+
     if (websockets) {
       for (const ws of websockets) {
         if (ws.readyState === 1) {
@@ -153,6 +154,7 @@ async function handler(ctx) {
   for (const { token } of rows) {
     notify('token', token);
   }
+
   notify('deviceId', id);
 
   ctx.body = { id: insertId };
@@ -160,9 +162,13 @@ async function handler(ctx) {
 
 function guessTime(t) {
   const now = new Date();
+
   const min = new Date();
+
   min.setDate(min.getDate() - 2);
+
   const max = new Date();
+
   max.setDate(max.getDate() + 1);
 
   if (!t) {
@@ -170,11 +176,13 @@ function guessTime(t) {
   }
 
   const d1 = new Date(t);
+
   if (max > d1 && d1 > min) {
     return d1;
   }
 
   const n = Number.parseInt(t, 10);
+
   if (Number.isNaN(n)) {
     return null;
   }
@@ -186,6 +194,7 @@ function guessTime(t) {
   }
 
   const d3 = new Date(n * 1000);
+
   if (max > d3 && d3 > min) {
     return d3;
   }
