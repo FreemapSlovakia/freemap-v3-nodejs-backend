@@ -33,6 +33,7 @@ async function handler(ctx) {
     (q.alt || q.altitude) === undefined
       ? null
       : Number.parseFloat(q.alt || q.altitude);
+
   const speedMs = q.speed === undefined ? null : Number.parseFloat(q.speed);
 
   const speedKmh =
