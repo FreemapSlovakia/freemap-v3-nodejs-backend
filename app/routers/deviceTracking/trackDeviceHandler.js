@@ -111,7 +111,8 @@ async function handler(ctx) {
       DELETE t FROM trackingPoint AS t JOIN (
         SELECT id FROM trackingPoint WHERE deviceId = ${id}
           ORDER BY id DESC LIMIT 18446744073709551615 OFFSET ${maxCount + 1}
-      ) tlimit ON t.id = tlimit.id`);
+      ) tlimit ON t.id = tlimit.id
+    `);
   }
 
   const rows = await ctx.state.db.query(SQL`
