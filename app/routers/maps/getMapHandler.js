@@ -1,5 +1,5 @@
 const SQL = require('sql-template-strings');
-const { dbMiddleware } = require('~/database');
+const { pool } = require('~/database');
 const { acceptValidator } = require('~/requestValidators');
 const authenticator = require('~/authenticator');
 
@@ -7,10 +7,9 @@ module.exports = router => {
   router.get(
     '/:id',
     acceptValidator('application/json'),
-    dbMiddleware(),
     authenticator(false),
     async ctx => {
-      const [item] = await ctx.state.db.query(SQL`
+      const [item] = await pool.query(SQL`
         SELECT id, name, public, data, createdAt, userId
           FROM map
           WHERE id = ${Number(ctx.params.id)}
@@ -29,7 +28,9 @@ module.exports = router => {
       }
 
       item.data = JSON.parse(item.data);
+
       item.public = !!item.public;
+
       ctx.body = item;
     },
   );

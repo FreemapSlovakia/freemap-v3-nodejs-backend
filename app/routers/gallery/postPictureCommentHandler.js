@@ -1,6 +1,6 @@
 const SQL = require('sql-template-strings');
 const config = require('config');
-const { dbMiddleware } = require('~/database');
+const { runInTransaction } = require('~/database');
 const { acceptValidator, bodySchemaValidator } = require('~/requestValidators');
 const postPictureCommentSchema = require('./postPictureCommentSchema');
 const authenticator = require('~/authenticator');
@@ -13,15 +13,17 @@ const mailgun = !mailgunConfig ? null : require('mailgun-js')(mailgunConfig);
 module.exports = function attachPostPictureCommentHandler(router) {
   router.post(
     '/pictures/:id/comments',
-    dbMiddleware(),
     authenticator(true),
     bodySchemaValidator(postPictureCommentSchema, true),
     acceptValidator('application/json'),
+    runInTransaction(),
     async ctx => {
+      const conn = ctx.state.dbConn;
+
       const { comment } = ctx.request.body;
 
       const proms = [
-        ctx.state.db.query(SQL`
+        conn.query(SQL`
           INSERT INTO pictureComment SET
             pictureId = ${ctx.params.id},
             userId = ${ctx.state.user.id},
@@ -32,14 +34,14 @@ module.exports = function attachPostPictureCommentHandler(router) {
 
       if (mailgun) {
         proms.push(
-          ctx.state.db.query(SQL`
+          conn.query(SQL`
             SELECT email, title, userId
               FROM user
               JOIN picture ON userId = user.id
               WHERE picture.id = ${ctx.params.id}
           `),
 
-          ctx.state.db.query(SQL`
+          conn.query(SQL`
             SELECT DISTINCT email
               FROM user
               JOIN pictureComment ON userId = user.id

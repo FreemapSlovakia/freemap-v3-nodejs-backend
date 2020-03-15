@@ -1,5 +1,5 @@
 const SQL = require('sql-template-strings');
-const { dbMiddleware } = require('~/database');
+const { runInTransaction } = require('~/database');
 const {
   acceptValidator,
   contentTypeValidator,
@@ -17,7 +17,6 @@ const execFileAsync = promisify(execFile);
 module.exports = function attachPostPictureHandler(router) {
   router.post(
     '/pictures',
-    dbMiddleware(),
     authenticator(true),
     contentTypeValidator('multipart/form-data'),
     async (ctx, next) => {
@@ -50,8 +49,12 @@ module.exports = function attachPostPictureHandler(router) {
     },
     bodySchemaValidator(postPictureSchema, true),
     acceptValidator('application/json'),
+    runInTransaction(),
     async ctx => {
+      const conn = ctx.state.dbConn;
+
       const { image } = ctx.request.files;
+
       const {
         title,
         description,
@@ -69,7 +72,7 @@ module.exports = function attachPostPictureHandler(router) {
         `${PICTURES_DIR}/${name}.jpeg`,
       ]);
 
-      const { insertId } = await ctx.state.db.query(SQL`
+      const { insertId } = await conn.query(SQL`
         INSERT INTO picture SET
           pathname = ${`${name}.jpeg`},
           userId = ${ctx.state.user.id},
@@ -82,7 +85,7 @@ module.exports = function attachPostPictureHandler(router) {
       `);
 
       if (tags.length) {
-        await ctx.state.db.query(
+        await conn.query(
           `INSERT INTO pictureTag (name, pictureId) VALUES ${tags
             .map(() => '(?, ?)')
             .join(', ')} ON DUPLICATE KEY UPDATE name = name`,

@@ -1,5 +1,5 @@
 const SQL = require('sql-template-strings');
-const { dbMiddleware } = require('~/database');
+const { pool } = require('~/database');
 const { acceptValidator } = require('~/requestValidators');
 const authenticator = require('~/authenticator');
 const randomize = require('randomatic');
@@ -11,14 +11,13 @@ module.exports = router => {
     '/devices',
     acceptValidator('application/json'),
     bodySchemaValidator(postDeviceSchema, true),
-    dbMiddleware(),
     authenticator(true),
     async ctx => {
       const token = randomize('Aa0', 8);
 
       const { name, maxCount, maxAge } = ctx.request.body;
 
-      const { insertId } = await ctx.state.db.query(SQL`
+      const { insertId } = await pool.query(SQL`
         INSERT INTO trackingDevice SET
           name = ${name},
           token = ${token},

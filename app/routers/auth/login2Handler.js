@@ -3,7 +3,6 @@ const qs = require('querystring');
 const config = require('config');
 const { parseString } = require('xml2js');
 const { promisify } = require('util');
-const { dbMiddleware } = require('~/database');
 const requestTokenRegistry = require('./requestTokenRegistry');
 const login = require('./loginProcessor');
 
@@ -16,7 +15,6 @@ module.exports = function attachLogin2Handler(router) {
   router.post(
     '/login2',
     // TODO validation
-    dbMiddleware(),
     async ctx => {
       const body = await rp.post({
         url: 'https://www.openstreetmap.org/oauth/access_token',

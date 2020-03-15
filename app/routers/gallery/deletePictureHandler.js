@@ -1,5 +1,5 @@
 const SQL = require('sql-template-strings');
-const { dbMiddleware } = require('~/database');
+const { runInTransaction } = require('~/database');
 const authenticator = require('~/authenticator');
 const { promisify } = require('util');
 const { unlink } = require('fs');
@@ -10,12 +10,12 @@ const { PICTURES_DIR } = require('~/routers/gallery/constants');
 module.exports = function attachDeletePictureHandler(router) {
   router.delete(
     '/pictures/:id',
-    dbMiddleware(),
     authenticator(true),
+    runInTransaction(),
     async ctx => {
-      // TODO transaction
+      const conn = ctx.state.dbConn;
 
-      const rows = await ctx.state.db.query(
+      const rows = await conn.query(
         SQL`SELECT pathname, userId FROM picture WHERE id = ${ctx.params.id} FOR UPDATE`,
       );
 
@@ -27,9 +27,7 @@ module.exports = function attachDeletePictureHandler(router) {
         ctx.throw(403);
       }
 
-      await ctx.state.db.query(
-        SQL`DELETE FROM picture WHERE id = ${ctx.params.id}`,
-      );
+      await conn.query(SQL`DELETE FROM picture WHERE id = ${ctx.params.id}`);
 
       await unlinkAsync(`${PICTURES_DIR}/${rows[0].pathname}`);
 

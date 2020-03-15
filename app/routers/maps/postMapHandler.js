@@ -1,5 +1,5 @@
 const SQL = require('sql-template-strings');
-const { dbMiddleware } = require('~/database');
+const { pool } = require('~/database');
 const { acceptValidator } = require('~/requestValidators');
 const authenticator = require('~/authenticator');
 const { bodySchemaValidator } = require('~/requestValidators');
@@ -10,12 +10,11 @@ module.exports = router => {
     '/',
     acceptValidator('application/json'),
     bodySchemaValidator(postMapSchema, true),
-    dbMiddleware(),
     authenticator(true),
     async ctx => {
       const { name, public, data } = ctx.request.body;
 
-      const { insertId } = await ctx.state.db.query(SQL`
+      const { insertId } = await pool.query(SQL`
         INSERT INTO map SET
           name = ${name},
           public = ${public},

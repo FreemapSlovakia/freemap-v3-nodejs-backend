@@ -1,24 +1,9 @@
 const config = require('config');
-const mysql = require('promise-mysql');
+const { createPool } = require('mariadb');
 
 const logger = require('~/logger');
 
-const poolPromise = mysql.createPool(config.get('mysql'));
-
-function dbMiddleware() {
-  return async (ctx, next) => {
-    const pool = await poolPromise;
-    const db = await pool.getConnection();
-
-    ctx.state.db = db;
-
-    try {
-      await next();
-    } finally {
-      pool.releaseConnection(db);
-    }
-  };
-}
+const pool = createPool(config.get('mysql'));
 
 async function initDatabase() {
   const scripts = [
@@ -146,11 +131,9 @@ async function initDatabase() {
 
   const updates = [];
 
-  const pool = await poolPromise;
   const db = await pool.getConnection();
 
   try {
-    /* eslint-disable no-await-in-loop, no-restricted-syntax */
     for (const script of scripts) {
       await db.query(script);
     }
@@ -163,8 +146,30 @@ async function initDatabase() {
       }
     }
   } finally {
-    pool.releaseConnection(db);
+    db.release();
   }
 }
 
-module.exports = { poolPromise, dbMiddleware, initDatabase };
+function runInTransaction() {
+  return async (ctx, next) => {
+    const conn = await pool.getConnection();
+
+    try {
+      await conn.beginTransaction();
+
+      const old = ctx.state.dbConn;
+
+      ctx.state.dbConn = conn;
+
+      await next();
+
+      ctx.state.dbConn = old;
+
+      await conn.commit();
+    } finally {
+      conn.release();
+    }
+  };
+}
+
+module.exports = { pool, initDatabase, runInTransaction };

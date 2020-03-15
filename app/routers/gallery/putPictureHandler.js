@@ -1,5 +1,5 @@
 const SQL = require('sql-template-strings');
-const { dbMiddleware } = require('~/database');
+const { runInTransaction } = require('~/database');
 const { bodySchemaValidator } = require('~/requestValidators');
 const putPictureSchema = require('./putPictureSchema');
 const authenticator = require('~/authenticator');
@@ -7,10 +7,12 @@ const authenticator = require('~/authenticator');
 module.exports = function attachPutPictureHandler(router) {
   router.put(
     '/pictures/:id',
-    dbMiddleware(),
     authenticator(true),
     bodySchemaValidator(putPictureSchema),
+    runInTransaction(),
     async ctx => {
+      const conn = ctx.state.dbConn;
+
       const {
         title,
         description,
@@ -19,7 +21,7 @@ module.exports = function attachPutPictureHandler(router) {
         tags = [],
       } = ctx.request.body;
 
-      const rows = await ctx.state.db.query(
+      const rows = await conn.query(
         SQL`SELECT userId FROM picture WHERE id = ${ctx.params.id} FOR UPDATE`,
       );
 
@@ -32,7 +34,7 @@ module.exports = function attachPutPictureHandler(router) {
       }
 
       const queries = [
-        ctx.state.db.query(SQL`
+        conn.query(SQL`
           UPDATE picture SET
             title = ${title},
             description = ${description},
@@ -43,7 +45,7 @@ module.exports = function attachPutPictureHandler(router) {
         `),
 
         // delete missing tags
-        ctx.state.db.query(
+        conn.query(
           `DELETE FROM pictureTag WHERE pictureId = ?
             ${
               tags.length
@@ -56,7 +58,7 @@ module.exports = function attachPutPictureHandler(router) {
 
       if (tags.length) {
         queries.push(
-          ctx.state.db.query(
+          conn.query(
             `INSERT INTO pictureTag (name, pictureId)
               VALUES ${tags.map(() => '(?, ?)').join(', ')}
               ON DUPLICATE KEY UPDATE name = name`,

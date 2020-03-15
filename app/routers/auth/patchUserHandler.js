@@ -1,4 +1,4 @@
-const { dbMiddleware } = require('~/database');
+const { pool } = require('~/database');
 const authenticator = require('~/authenticator');
 const patchUserSchema = require('./patchUserSchema');
 const { bodySchemaValidator } = require('~/requestValidators');
@@ -6,10 +6,8 @@ const { bodySchemaValidator } = require('~/requestValidators');
 module.exports = function attachPatchUserHandler(router) {
   router.patch(
     '/settings',
-    dbMiddleware(),
     authenticator(true, false),
     bodySchemaValidator(patchUserSchema),
-    dbMiddleware(),
     async ctx => {
       const { body } = ctx.request;
 
@@ -17,7 +15,7 @@ module.exports = function attachPatchUserHandler(router) {
 
       // TODO validate duplicates
 
-      await ctx.state.db.query(
+      await pool.query(
         `UPDATE user SET ${keys
           .map(key => `${key} = ?`)
           .join(', ')} WHERE id = ?`,

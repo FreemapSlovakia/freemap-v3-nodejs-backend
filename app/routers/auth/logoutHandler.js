@@ -1,10 +1,10 @@
 const SQL = require('sql-template-strings');
-const { dbMiddleware } = require('~/database');
+const { pool } = require('~/database');
 const authenticator = require('~/authenticator');
 
 module.exports = function attachLogoutHandler(router) {
-  router.post('/logout', dbMiddleware(), authenticator(true), async ctx => {
-    const { affectedRows } = await ctx.state.db.query(
+  router.post('/logout', authenticator(true), async ctx => {
+    const { affectedRows } = await pool.query(
       SQL`DELETE FROM auth WHERE authToken = ${ctx.state.user.authToken}`,
     );
 

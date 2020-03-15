@@ -3,7 +3,7 @@ const sharp = require('sharp');
 const fs = require('fs');
 const { promisify } = require('util');
 const calculate = require('etag');
-const { dbMiddleware } = require('~/database');
+const { pool } = require('~/database');
 const { acceptValidator } = require('~/requestValidators');
 const { PICTURES_DIR } = require('~/routers/gallery/constants');
 
@@ -13,9 +13,8 @@ module.exports = function attachGetPictureHandler(router) {
   router.get(
     '/pictures/:id/image',
     acceptValidator('image/jpeg'),
-    dbMiddleware(),
     async ctx => {
-      const rows = await ctx.state.db.query(
+      const rows = await pool.query(
         SQL`SELECT pathname FROM picture WHERE picture.id = ${ctx.params.id}`,
       );
 

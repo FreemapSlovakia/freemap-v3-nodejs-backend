@@ -1,5 +1,5 @@
 const SQL = require('sql-template-strings');
-const { dbMiddleware } = require('~/database');
+const { runInTransaction } = require('~/database');
 const { acceptValidator } = require('~/requestValidators');
 const authenticator = require('~/authenticator');
 const { bodySchemaValidator } = require('~/requestValidators');
@@ -10,12 +10,14 @@ module.exports = router => {
     '/:id',
     acceptValidator('application/json'),
     bodySchemaValidator(patchMapSchema, true),
-    dbMiddleware(),
     authenticator(true),
+    runInTransaction(),
     async ctx => {
+      const conn = ctx.state.dbConn;
+
       const id = Number(ctx.params.id);
 
-      const [item] = await ctx.state.db.query(
+      const [item] = await conn.query(
         SQL`SELECT userId FROM map WHERE id = ${id} FOR UPDATE`,
       );
 
@@ -49,7 +51,7 @@ module.exports = router => {
         query.append(i ? ',' : ' ').append(parts[i]);
       }
 
-      await ctx.state.db.query(query.append(SQL`WHERE id = ${id}`));
+      await conn.query(query.append(SQL`WHERE id = ${id}`));
 
       ctx.status = 204;
     },

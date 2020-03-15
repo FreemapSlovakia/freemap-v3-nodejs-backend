@@ -1,4 +1,3 @@
-const { dbMiddleware } = require('~/database');
 const fb = require('~/fb');
 
 const login = require('./loginProcessor');
@@ -7,7 +6,6 @@ module.exports = function attachLoginWithFacebookHandler(router) {
   router.post(
     '/login-fb',
     // TODO validation
-    dbMiddleware(),
     async ctx => {
       const { accessToken } = ctx.request.body;
 

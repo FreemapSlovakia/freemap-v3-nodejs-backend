@@ -1,4 +1,3 @@
-const { dbMiddleware } = require('~/database');
 const client = require('~/google');
 
 const login = require('./loginProcessor');
@@ -7,7 +6,6 @@ module.exports = function attachLoginWithFacebookHandler(router) {
   router.post(
     '/login-google',
     // TODO validation
-    dbMiddleware(),
     async ctx => {
       const { idToken } = ctx.request.body;
 

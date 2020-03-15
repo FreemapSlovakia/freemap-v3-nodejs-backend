@@ -1,4 +1,4 @@
-const { dbMiddleware } = require('~/database');
+const { pool } = require('~/database');
 const {
   acceptValidator,
   queryValidator,
@@ -96,7 +96,6 @@ module.exports = function attachGetPicturesHandler(router) {
     async (ctx, next) => {
       await qvs[ctx.query.by](ctx, next);
     },
-    dbMiddleware(),
     async ctx => {
       await methods[ctx.query.by](ctx);
     },
@@ -124,15 +123,13 @@ async function byRadius(ctx) {
   const lon1 = lon - distance / Math.abs(Math.cos((lat * Math.PI) / 180) * 43);
   const lon2 = lon + distance / Math.abs(Math.cos((lat * Math.PI) / 180) * 43);
 
-  const { db } = ctx.state;
-
   const sql = `SELECT id,
     (6371 * acos(cos(radians(${lat})) * cos(radians(lat)) * cos(radians(lon) - radians(${lon}) ) + sin(radians(${lat})) * sin(radians(lat)))) AS distance
     ${ratingFrom || ratingTo ? `, ${ratingSubquery}` : ''}
     FROM picture
     ${
       tag
-        ? `JOIN pictureTag ON pictureId = picture.id AND pictureTag.name = ${db.escape(
+        ? `JOIN pictureTag ON pictureId = picture.id AND pictureTag.name = ${pool.escape(
             tag,
           )}`
         : ''
@@ -149,7 +146,7 @@ async function byRadius(ctx) {
     ORDER BY distance
     LIMIT 100`;
 
-  const rows = await db.query(sql);
+  const rows = await pool.query(sql);
 
   ctx.body = rows.map(({ id }) => ({ id }));
 }
@@ -177,8 +174,6 @@ async function byBbox(ctx) {
     fields,
   } = ctx.query;
 
-  const { db } = ctx.state;
-
   const flds = [
     'lat',
     'lon',
@@ -192,7 +187,7 @@ async function byBbox(ctx) {
     FROM picture
     ${
       tag
-        ? `JOIN pictureTag ON pictureTag.pictureId = picture.id AND name = ${db.escape(
+        ? `JOIN pictureTag ON pictureTag.pictureId = picture.id AND name = ${pool.escape(
             tag,
           )}`
         : ''
@@ -211,7 +206,7 @@ async function byBbox(ctx) {
     }
   `;
 
-  const rows = await db.query(sql);
+  const rows = await pool.query(sql);
 
   ctx.body =
     fields && fields.includes('rating')
@@ -232,8 +227,6 @@ async function byOrder(ctx) {
     orderBy,
     direction,
   } = ctx.query;
-
-  const { db } = ctx.state;
 
   const hv = [];
   const wh = [];
@@ -265,7 +258,7 @@ async function byOrder(ctx) {
     FROM picture
     ${
       tag
-        ? `JOIN pictureTag ON pictureTag.pictureId = picture.id AND name = ${db.escape(
+        ? `JOIN pictureTag ON pictureTag.pictureId = picture.id AND name = ${pool.escape(
             tag,
           )}`
         : ''
@@ -276,7 +269,7 @@ async function byOrder(ctx) {
     LIMIT 1000
   `;
 
-  const rows = await db.query(sql);
+  const rows = await pool.query(sql);
 
   ctx.body = rows.map(({ id }) => ({ id }));
 }

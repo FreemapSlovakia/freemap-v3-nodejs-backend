@@ -1,5 +1,5 @@
 const SQL = require('sql-template-strings');
-const { dbMiddleware } = require('~/database');
+const { runInTransaction } = require('~/database');
 const { acceptValidator } = require('~/requestValidators');
 const authenticator = require('~/authenticator');
 const { bodySchemaValidator } = require('~/requestValidators');
@@ -10,16 +10,18 @@ module.exports = router => {
     '/access-tokens/:id',
     acceptValidator('application/json'),
     bodySchemaValidator(putTokenSchema, true),
-    dbMiddleware(),
     authenticator(true),
+    runInTransaction(),
     async ctx => {
-      const [item] = await ctx.state.db.query(SQL`
-        SELECT userId
-          FROM trackingAccessToken
-          JOIN trackingDevice ON (deviceId = trackingDevice.id)
-          WHERE trackingAccessToken.id = ${ctx.params.id}
-          FOR UPDATE
-      `);
+      const conn = ctx.state.dbConn;
+
+      const [item] = await conn.query(SQL`
+          SELECT userId
+            FROM trackingAccessToken
+            JOIN trackingDevice ON (deviceId = trackingDevice.id)
+            WHERE trackingAccessToken.id = ${ctx.params.id}
+            FOR UPDATE
+        `);
 
       if (!item) {
         ctx.throw(404);
@@ -31,14 +33,14 @@ module.exports = router => {
 
       const { timeFrom, timeTo, note, listingLabel } = ctx.request.body;
 
-      await ctx.state.db.query(SQL`
-          UPDATE trackingAccessToken SET
-            note = ${note},
-            timeFrom = ${timeFrom && new Date(timeFrom)},
-            timeTo = ${timeTo && new Date(timeTo)},
-            listingLabel = ${listingLabel}
-            WHERE id = ${ctx.params.id}
-        `);
+      await conn.query(SQL`
+            UPDATE trackingAccessToken SET
+              note = ${note},
+              timeFrom = ${timeFrom && new Date(timeFrom)},
+              timeTo = ${timeTo && new Date(timeTo)},
+              listingLabel = ${listingLabel}
+              WHERE id = ${ctx.params.id}
+          `);
 
       ctx.status = 204;
     },

@@ -1,5 +1,5 @@
 const SQL = require('sql-template-strings');
-const { dbMiddleware } = require('~/database');
+const { pool } = require('~/database');
 const { acceptValidator } = require('~/requestValidators');
 const authenticator = require('~/authenticator');
 
@@ -7,10 +7,9 @@ module.exports = router => {
   router.get(
     '/devices/:id/access-tokens',
     acceptValidator('application/json'),
-    dbMiddleware(),
     authenticator(true),
     async ctx => {
-      const [device] = await ctx.state.db.query(
+      const [device] = await pool.query(
         SQL`SELECT userId FROM trackingDevice WHERE id = ${ctx.params.id}`,
       );
 
@@ -22,7 +21,7 @@ module.exports = router => {
         ctx.throw(403);
       }
 
-      ctx.body = await ctx.state.db.query(SQL`
+      ctx.body = await pool.query(SQL`
         SELECT id, token, createdAt, timeFrom, timeTo, note, listingLabel
           FROM trackingAccessToken WHERE deviceId = ${ctx.params.id}
       `);

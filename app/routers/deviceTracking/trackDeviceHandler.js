@@ -1,15 +1,17 @@
 const SQL = require('sql-template-strings');
-const { dbMiddleware } = require('~/database');
+const { runInTransaction } = require('~/database');
 const trackRegister = require('~/trackRegister');
 
 module.exports = router => {
   for (const method of ['post', 'get']) {
-    router[method]('/track/:token', dbMiddleware(), handler);
+    router[method]('/track/:token', runInTransaction(), handler);
   }
 };
 
 async function handler(ctx) {
-  const [item] = await ctx.state.db.query(
+  const conn = ctx.state.dbConn;
+
+  const [item] = await conn.query(
     SQL`SELECT id, maxCount, maxAge FROM trackingDevice WHERE token = ${ctx.params.token}`,
   );
 
@@ -84,7 +86,7 @@ async function handler(ctx) {
 
   const speed = typeof speedKmh === 'number' ? speedKmh / 3.6 : speedMs;
 
-  const { insertId } = await ctx.state.db.query(SQL`
+  const { insertId } = await conn.query(SQL`
     INSERT INTO trackingPoint SET
       deviceId = ${id},
       lat = ${lat},
@@ -101,13 +103,13 @@ async function handler(ctx) {
   `);
 
   if (maxAge) {
-    await ctx.state.db.query(
+    await conn.query(
       SQL`DELETE FROM trackingPoint WHERE deviceId = ${id} AND TIMESTAMPDIFF(SECOND, createdAt, now()) > ${maxAge}`,
     );
   }
 
   if (maxCount) {
-    await ctx.state.db.query(SQL`
+    await conn.query(SQL`
       DELETE t FROM trackingPoint AS t JOIN (
         SELECT id FROM trackingPoint WHERE deviceId = ${id}
           ORDER BY id DESC LIMIT 18446744073709551615 OFFSET ${maxCount + 1}
@@ -115,7 +117,7 @@ async function handler(ctx) {
     `);
   }
 
-  const rows = await ctx.state.db.query(SQL`
+  const rows = await conn.query(SQL`
     SELECT token FROM trackingAccessToken
       WHERE deviceId = ${id} AND (timeFrom IS NULL OR timeFrom > ${now}) AND (timeTo IS NULL OR timeTo < ${now})
   `);

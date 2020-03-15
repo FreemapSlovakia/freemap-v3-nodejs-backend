@@ -1,6 +1,6 @@
 const SQL = require('sql-template-strings');
 const randomize = require('randomatic');
-const { dbMiddleware } = require('~/database');
+const { pool } = require('~/database');
 const { acceptValidator } = require('~/requestValidators');
 const authenticator = require('~/authenticator');
 const { bodySchemaValidator } = require('~/requestValidators');
@@ -11,10 +11,9 @@ module.exports = router => {
     '/devices/:id/access-tokens',
     acceptValidator('application/json'),
     bodySchemaValidator(postTokenSchema, true),
-    dbMiddleware(),
     authenticator(true),
     async ctx => {
-      const [device] = await ctx.state.db.query(
+      const [device] = await pool.query(
         SQL`SELECT userId FROM trackingDevice WHERE id = ${ctx.params.id}`,
       );
 
@@ -29,7 +28,7 @@ module.exports = router => {
       const token = randomize('Aa0', 8);
       const { timeFrom, timeTo, note, listingLabel } = ctx.request.body;
 
-      const { insertId } = await ctx.state.db.query(SQL`
+      const { insertId } = await pool.query(SQL`
         INSERT INTO trackingAccessToken SET
           deviceId = ${ctx.params.id},
           token = ${token},

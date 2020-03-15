@@ -1,5 +1,5 @@
 const SQL = require('sql-template-strings');
-const { dbMiddleware } = require('~/database');
+const { pool } = require('~/database');
 const { acceptValidator } = require('~/requestValidators');
 const authenticator = require('~/authenticator');
 const { ratingSubquery } = require('./ratingConstants');
@@ -8,10 +8,9 @@ module.exports = function attachGetPictureHandler(router) {
   router.get(
     '/pictures/:id',
     acceptValidator('application/json'),
-    dbMiddleware(),
     authenticator(false),
     async ctx => {
-      const rows = await ctx.state.db.query(
+      const rows = await pool.query(
         SQL`SELECT picture.id AS pictureId, picture.createdAt, pathname, title, description, takenAt, picture.lat, picture.lon,
           user.id as userId, user.name,
           (SELECT GROUP_CONCAT(name SEPARATOR '\n') FROM pictureTag WHERE pictureId = picture.id) AS tags,`
@@ -30,7 +29,7 @@ module.exports = function attachGetPictureHandler(router) {
         ctx.throw(404);
       }
 
-      const commentRows = await ctx.state.db.query(SQL`
+      const commentRows = await pool.query(SQL`
         SELECT pictureComment.id, pictureComment.createdAt, comment, user.name, userId
           FROM pictureComment JOIN user ON (userId = user.id)
           WHERE pictureId = ${ctx.params.id}

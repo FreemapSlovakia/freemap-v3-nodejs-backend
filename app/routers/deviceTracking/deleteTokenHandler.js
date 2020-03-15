@@ -1,5 +1,5 @@
 const SQL = require('sql-template-strings');
-const { dbMiddleware } = require('~/database');
+const { runInTransaction } = require('~/database');
 const { acceptValidator } = require('~/requestValidators');
 const authenticator = require('~/authenticator');
 
@@ -7,10 +7,12 @@ module.exports = router => {
   router.delete(
     '/access-tokens/:id',
     acceptValidator('application/json'),
-    dbMiddleware(),
     authenticator(true),
+    runInTransaction(),
     async ctx => {
-      const [item] = await ctx.state.db.query(SQL`
+      const conn = ctx.state.dbConn;
+
+      const [item] = await conn.query(SQL`
         SELECT userId FROM trackingAccessToken
           JOIN trackingDevice ON (deviceId = trackingDevice.id)
           WHERE trackingAccessToken.id = ${ctx.params.id} FOR UPDATE
@@ -24,7 +26,7 @@ module.exports = router => {
         ctx.throw(403);
       }
 
-      await ctx.state.db.query(
+      await conn.query(
         SQL`DELETE FROM trackingAccessToken WHERE id = ${ctx.params.id}`,
       );
 

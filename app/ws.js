@@ -4,12 +4,11 @@ const authenticator = require('~/authenticator');
 const trackingSubscribeHandler = require('~/rpcHandlers/trackingSubscribeHandler');
 const trackingUnsubscribeHandler = require('~/rpcHandlers/trackingUnsubscribeHandler');
 const pingHandler = require('~/rpcHandlers/pingHandler');
-const { dbMiddleware } = require('~/database');
 
 module.exports = app => {
   const wsRouter = new Router();
 
-  wsRouter.all('/ws', dbMiddleware(), authenticator(), async ctx => {
+  wsRouter.all('/ws', authenticator(), async ctx => {
     const { pingInterval } = ctx.query;
 
     const ws = ctx.websocket;

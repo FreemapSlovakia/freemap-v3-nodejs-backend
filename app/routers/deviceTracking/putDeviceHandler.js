@@ -1,6 +1,6 @@
 const SQL = require('sql-template-strings');
 const randomize = require('randomatic');
-const { dbMiddleware } = require('~/database');
+const { runInTransaction } = require('~/database');
 const { acceptValidator } = require('~/requestValidators');
 const authenticator = require('~/authenticator');
 const { bodySchemaValidator } = require('~/requestValidators');
@@ -11,12 +11,14 @@ module.exports = router => {
     '/devices/:id',
     acceptValidator('application/json'),
     bodySchemaValidator(putDeviceSchema, true),
-    dbMiddleware(),
     authenticator(true),
+    runInTransaction(),
     async ctx => {
       const { id } = ctx.params;
 
-      const [item] = await ctx.state.db.query(
+      const conn = ctx.state.dbConn;
+
+      const [item] = await conn.query(
         SQL`SELECT userId FROM trackingDevice WHERE id = ${id} FOR UPDATE`,
       );
 
@@ -35,26 +37,26 @@ module.exports = router => {
         token = randomize('Aa0', 8);
       }
 
-      await ctx.state.db.query(
+      await conn.query(
         SQL`UPDATE trackingDevice SET name = ${name}, maxCount = ${maxCount}, maxAge = ${maxAge}`
           .append(regenerateToken ? SQL`, token = ${token}` : '')
           .append(SQL`WHERE id = ${id}`),
       );
 
       if (maxAge) {
-        await ctx.state.db.query(SQL`
-          DELETE FROM trackingPoint WHERE deviceId = ${id} AND TIMESTAMPDIFF(SECOND, createdAt, now()) > ${maxAge}
-        `);
+        await conn.query(SQL`
+        DELETE FROM trackingPoint WHERE deviceId = ${id} AND TIMESTAMPDIFF(SECOND, createdAt, now()) > ${maxAge}
+      `);
       }
 
       if (maxCount) {
-        await ctx.state.db.query(SQL`
-          DELETE t FROM trackingPoint AS t
-            JOIN (
-              SELECT id FROM trackingPoint WHERE deviceId = ${id}
-                ORDER BY id DESC LIMIT 18446744073709551615, ${maxCount + 1}
-            ) tlimit ON t.id = tlimit.id
-        `);
+        await conn.query(SQL`
+        DELETE t FROM trackingPoint AS t
+          JOIN (
+            SELECT id FROM trackingPoint WHERE deviceId = ${id}
+              ORDER BY id DESC LIMIT 18446744073709551615, ${maxCount + 1}
+          ) tlimit ON t.id = tlimit.id
+      `);
       }
 
       ctx.body = { token };
