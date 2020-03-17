@@ -1,3 +1,5 @@
+import 'source-map-support/register';
+
 import { promises as fs, readFileSync } from 'fs';
 import config from 'config';
 import koaBody from 'koa-body';
