@@ -10,7 +10,6 @@
     "start": "node build/index.js",
     "build": "tsc",
     "dist": "sh ./scripts/dist.sh",
-    "deploy": "npm run build && npm run dist && eb deploy",
     "watch": "concurrently -k -p \"[{name}]\" -n \"TypeScript,Node\" -c \"cyan.bold,green.bold\" \"npm run watch-ts\" \"npm run watch-node\"",
     "watch-node": "env $(cat .env | grep -v \"#\" | xargs) nodemon build/index.js | pino-pretty -t -i hostname,pid",
     "watch-ts": "tsc -w",
