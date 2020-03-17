@@ -2,8 +2,6 @@ import Router from '@koa/router';
 
 import { bodySchemaValidator } from '../requestValidators';
 
-const levels = ['trace', 'debug', 'info', 'warn', 'error', 'fatal'];
-
 const levelsAsConst = [
   'trace',
   'debug',
@@ -12,6 +10,8 @@ const levelsAsConst = [
   'error',
   'fatal',
 ] as const;
+
+const levels: string[] = levelsAsConst.map(level => level);
 
 type LogLevelString = typeof levelsAsConst[number];
 
