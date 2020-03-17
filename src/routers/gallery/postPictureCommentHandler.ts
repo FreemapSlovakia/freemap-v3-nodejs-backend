@@ -1,16 +1,20 @@
 import Router from '@koa/router';
 import { SQL } from 'sql-template-strings';
-import config from 'config';
 import Mailgun from 'mailgun-js';
 import { runInTransaction } from '../../database';
 import { acceptValidator, bodySchemaValidator } from '../../requestValidators';
 import { authenticator } from '../../authenticator';
 import { PoolConnection } from 'mariadb';
+import { getEnv } from '../../env';
 
-const webBaseUrl = config.get('webBaseUrl') as string;
-const mailgunConfig = config.get('mailgun') as Mailgun.ConstructorParams;
+const webBaseUrl = getEnv('WEB_BASE_URL');
 
-const mailgun = !mailgunConfig ? null : Mailgun(mailgunConfig);
+const mailgun = !getEnv('MAILGIN_ENABLE', '')
+  ? null
+  : Mailgun({
+      apiKey: getEnv('MAILGIN_API_KEY'),
+      domain: getEnv('MAILGIN_DOMAIN'),
+    });
 
 export function attachPostPictureCommentHandler(router: Router) {
   router.post(

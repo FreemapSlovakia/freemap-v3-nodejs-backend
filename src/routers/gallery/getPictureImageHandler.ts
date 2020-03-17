@@ -5,7 +5,7 @@ import { promises as fs, createReadStream } from 'fs';
 import calculate from 'etag';
 import { pool } from '../../database';
 import { acceptValidator } from '../../requestValidators';
-import { PICTURES_DIR } from '../../routers/gallery/constants';
+import { picturesDir } from '../../routers/gallery/constants';
 
 export function attachGetPictureImageHandler(router: Router) {
   router.get(
@@ -20,7 +20,7 @@ export function attachGetPictureImageHandler(router: Router) {
         ctx.throw(404, 'no such picture');
       }
 
-      const pathname = `${PICTURES_DIR}/${rows[0].pathname}`;
+      const pathname = `${picturesDir}/${rows[0].pathname}`;
 
       let stats;
 

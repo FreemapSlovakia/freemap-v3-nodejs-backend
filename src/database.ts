@@ -1,9 +1,15 @@
-import config from 'config';
 import { createPool } from 'mariadb';
 import { Middleware } from 'koa';
 import { appLogger } from './logger';
+import { getEnv } from './env';
 
-export const pool = createPool(config.get('mysql'));
+export const pool = createPool({
+  host: getEnv('MARIADB_HOST'),
+  port: Number(getEnv('MARIADB_PORT', '3306')),
+  database: getEnv('MARIADB_DATABASE'),
+  user: getEnv('MARIADB_USER'),
+  password: getEnv('MARIADB_PASSWORD'),
+});
 
 const logger = appLogger.child({ module: 'db' });
 

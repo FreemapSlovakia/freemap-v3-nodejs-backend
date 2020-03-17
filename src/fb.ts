@@ -1,4 +1,4 @@
 import { Facebook } from 'fb';
-import config from 'config';
+import { getEnv } from './env';
 
-export const fb = new Facebook({ appSecret: config.get('facebook.appSecret') });
+export const fb = new Facebook({ appSecret: getEnv('FACEBOOK_APP_SECRET') });

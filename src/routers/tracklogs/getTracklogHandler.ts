@@ -1,6 +1,6 @@
 import Router from '@koa/router';
 import { promises as fs } from 'fs';
-import { TRACKLOGS_DIR } from '../tracklogs/constants';
+import { tracklogsDir } from '../tracklogs/constants';
 
 export function attachGetTracklogHandler(router: Router) {
   router.get('/:uid', async ctx => {
@@ -10,7 +10,7 @@ export function attachGetTracklogHandler(router: Router) {
       ctx.throw(400, 'invalid id format');
     }
 
-    const filePath = `${TRACKLOGS_DIR}/${fileUID}.b64.gpx`;
+    const filePath = `${tracklogsDir}/${fileUID}.b64.gpx`;
 
     try {
       await fs.stat(filePath);

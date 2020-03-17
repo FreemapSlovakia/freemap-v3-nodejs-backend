@@ -11,7 +11,7 @@ import uuidBase62 from 'uuid-base62';
 import { authenticator } from '../../authenticator';
 import { promisify } from 'util';
 import { execFile } from 'child_process';
-import { PICTURES_DIR } from '../../routers/gallery/constants';
+import { picturesDir } from '../../routers/gallery/constants';
 
 const execFileAsync = promisify(execFile);
 
@@ -114,7 +114,7 @@ export function attachPostPictureHandler(router: Router) {
         '-a',
         image.path,
         '-o',
-        `${PICTURES_DIR}/${name}.jpeg`,
+        `${picturesDir}/${name}.jpeg`,
       ]);
 
       const { insertId } = await conn.query(SQL`

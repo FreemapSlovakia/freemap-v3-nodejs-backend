@@ -1,8 +1,3 @@
-import path from 'path';
-import config from 'config';
+import { getEnv } from '../../env';
 
-const picturesDir = config.get('dir.pictures') as string;
-
-export const PICTURES_DIR = path.resolve(__dirname, '../../..', picturesDir);
-
-console.log(PICTURES_DIR);
+export const picturesDir = getEnv('PICTURES_DIRECTORY');

@@ -3,7 +3,7 @@ import { promises as fs } from 'fs';
 import Router from '@koa/router';
 import { runInTransaction } from '../../database';
 import { authenticator } from '../../authenticator';
-import { PICTURES_DIR } from '../gallery/constants';
+import { picturesDir } from '../gallery/constants';
 
 export function attachDeletePictureHandler(router: Router) {
   router.delete(
@@ -27,7 +27,7 @@ export function attachDeletePictureHandler(router: Router) {
 
       await conn.query(SQL`DELETE FROM picture WHERE id = ${ctx.params.id}`);
 
-      await fs.unlink(`${PICTURES_DIR}/${rows[0].pathname}`);
+      await fs.unlink(`${picturesDir}/${rows[0].pathname}`);
 
       ctx.status = 204;
     },

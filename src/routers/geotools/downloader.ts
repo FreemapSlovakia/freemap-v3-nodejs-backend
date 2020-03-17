@@ -2,10 +2,11 @@ import fs from 'fs';
 import axios, { AxiosResponse } from 'axios';
 import parseSetCookie from 'set-cookie-parser';
 import querystring from 'querystring';
-import config from 'config';
+import { getEnv } from '../../env';
 
-const username = config.get('elevation.earthexplorer.username') as string;
-const password = config.get('elevation.earthexplorer.password') as string;
+const username = getEnv('EARTHEXPLORER_USERNAME');
+
+const password = getEnv('EARTHEXPLORER_PASSWORD');
 
 class Cookies {
   cookies: { [name: string]: string };

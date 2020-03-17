@@ -1,12 +1,12 @@
 import Router from '@koa/router';
 import { promises as fs } from 'fs';
-import config from 'config';
 import { spawn } from 'child_process';
 import { downloadGeoTiff } from './downloader';
 import { ParameterizedContext } from 'koa';
 import { acceptValidator } from '../../requestValidators';
+import { getEnv } from '../../env';
 
-const hgtDir = config.get('elevation.dir');
+const hgtDir = getEnv('ELEVATION_DATA_DIRECTORY');
 
 const router = new Router();
 

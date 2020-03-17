@@ -1,12 +1,14 @@
 import Router from '@koa/router';
 import rp from 'request-promise-native';
 import qs from 'querystring';
-import config from 'config';
 import { requestTokenRegistry } from './requestTokenRegistry';
+import { getEnv } from '../../env';
 
-const consumerKey = config.get('oauth.consumerKey') as string;
-const consumerSecret = config.get('oauth.consumerSecret') as string;
-const webBaseUrl = config.get('webBaseUrl') as string;
+const consumerKey = getEnv('OAUTH_CONSUMER_KEY');
+
+const consumerSecret = getEnv('OAUTH_CONSUMER_SECRET');
+
+const webBaseUrl = getEnv('WEB_BASE_URL');
 
 export function attachLoginHandler(router: Router) {
   router.post(

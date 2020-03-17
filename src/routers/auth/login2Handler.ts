@@ -2,16 +2,17 @@ import Router from '@koa/router';
 
 import rp from 'request-promise-native';
 import qs from 'querystring';
-import config from 'config';
 import { parseString } from 'xml2js';
 import { promisify } from 'util';
 import { requestTokenRegistry } from './requestTokenRegistry';
 import { login } from './loginProcessor';
+import { getEnv } from '../../env';
 
 const parseStringAsync = promisify(parseString);
 
-const consumerKey = config.get('oauth.consumerKey') as string;
-const consumerSecret = config.get('oauth.consumerSecret') as string;
+const consumerKey = getEnv('OAUTH_CONSUMER_KEY');
+
+const consumerSecret = getEnv('OAUTH_CONSUMER_SECRET');
 
 export function attachLogin2Handler(router: Router) {
   router.post(

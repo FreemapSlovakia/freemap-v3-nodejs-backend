@@ -1,6 +1,3 @@
-import path from 'path';
-import config from 'config';
+import { getEnv } from '../../env';
 
-const tracklogsDir = config.get('dir.tracklogs') as string;
-
-export const TRACKLOGS_DIR = path.resolve(__dirname, '../../..', tracklogsDir);
+export const tracklogsDir = getEnv('TRACKLOGS_DIRECTORY');

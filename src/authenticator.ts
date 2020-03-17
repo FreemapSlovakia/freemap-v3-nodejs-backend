@@ -2,13 +2,14 @@ import { Middleware } from 'koa';
 
 import { SQL } from 'sql-template-strings';
 import rp from 'request-promise-native';
-import config from 'config';
 import { fb } from './fb';
 import { googleClient } from './google';
 import { pool } from './database';
+import { getEnv } from './env';
 
-const consumerKey = config.get('oauth.consumerKey') as string;
-const consumerSecret = config.get('oauth.consumerSecret') as string;
+const consumerKey = getEnv('OAUTH_CONSUMER_KEY');
+
+const consumerSecret = getEnv('OAUTH_CONSUMER_SECRET');
 
 export function authenticator(require?: boolean, deep?: boolean): Middleware {
   return async function authorize(ctx, next) {

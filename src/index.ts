@@ -1,7 +1,6 @@
 import 'source-map-support/register';
 
 import { promises as fs, readFileSync } from 'fs';
-import config from 'config';
 import koaBody from 'koa-body';
 import Koa from 'koa';
 import Router from '@koa/router';
@@ -20,18 +19,17 @@ import { authRouter } from './routers/auth';
 import { geotoolsRouter } from './routers/geotools';
 import { trackingRouter } from './routers/deviceTracking';
 import { attachLoggerHandler } from './routers/loggerHandler';
+import { getEnv } from './env';
 
 const logger = appLogger.child({ module: 'app' });
-
-const ssl = config.get('http.ssl') as any;
 
 const app = websockify(
   new Koa(),
   {},
-  ssl
+  getEnv('HTTP_SSL_ENABLE', '')
     ? {
-        key: readFileSync(ssl.key),
-        cert: readFileSync(ssl.cert),
+        key: readFileSync(getEnv('HTTP_SSL_KEY')),
+        cert: readFileSync(getEnv('HTTP_SSL_CERT')),
       }
     : undefined,
 );
@@ -126,8 +124,7 @@ attachWs(app);
 
 initDatabase()
   .then(() => {
-    /* eslint-disable global-require */
-    const port = config.get('http.port');
+    const port = getEnv('HTTP_PORT');
 
     app.listen(port, () => {
       logger.info(`Freemap v3 API listening on port ${port}.`);
