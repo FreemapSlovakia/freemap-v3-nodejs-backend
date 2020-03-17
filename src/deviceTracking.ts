@@ -88,7 +88,7 @@ export async function storeTrackPoint(
       WHERE deviceId = ${id} AND (timeFrom IS NULL OR timeFrom > ${now}) AND (timeTo IS NULL OR timeTo < ${now})
   `);
 
-  const notify = (type: string, key: string) => {
+  const notify = (type: string, key: string | number) => {
     const websockets = trackRegister.get(key);
 
     if (websockets) {
