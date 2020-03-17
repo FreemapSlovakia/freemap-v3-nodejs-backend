@@ -45,7 +45,7 @@ app.use(
     updateRequestLogFields(rd): any {
       return {
         method: rd.req.method,
-        path: rd.req.url,
+        url: rd.req.url,
         userAgent: rd.req.headers['user-agent'],
       };
     },
