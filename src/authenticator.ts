@@ -1,5 +1,4 @@
 import { Middleware } from 'koa';
-
 import { SQL } from 'sql-template-strings';
 import rp from 'request-promise-native';
 import { fb } from './fb';

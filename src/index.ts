@@ -1,5 +1,4 @@
 import 'source-map-support/register';
-
 import { promises as fs, readFileSync } from 'fs';
 import koaBody from 'koa-body';
 import Koa from 'koa';
@@ -7,11 +6,9 @@ import Router from '@koa/router';
 import cors from 'kcors';
 import koaBunyanLogger from 'koa-bunyan-logger';
 import websockify from 'koa-websocket';
-
 import { appLogger } from './logger';
 import { initDatabase } from './database';
 import { attachWs } from './ws';
-
 import { tracklogsRouter } from './routers/tracklogs';
 import { galleryRouter } from './routers/gallery';
 import { mapsRouter } from './routers/maps';

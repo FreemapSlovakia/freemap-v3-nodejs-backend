@@ -1,5 +1,4 @@
 import Router from '@koa/router';
-
 import { SQL } from 'sql-template-strings';
 import { runInTransaction } from '../../database';
 import {
