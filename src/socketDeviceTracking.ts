@@ -169,7 +169,7 @@ export function startSocketDeviceTracking() {
           // args: 352672101572147HSOP4F
           // args: 352672101572147 (imei) HSOP4F
 
-          connection.write(`${deviceId}AP01HSO`);
+          connection.write(`${deviceId}AP01HSO${args.slice(19)}`);
         }
 
         conn.commit();
