@@ -26,7 +26,7 @@ export function authenticator(require?: boolean, deep?: boolean): Middleware {
             'Bearer realm="freemap"; error="missing token"',
           );
 
-          ctx.throw(401);
+          ctx.throw(401, 'missing token');
         }
 
         await next();
@@ -118,7 +118,7 @@ export function authenticator(require?: boolean, deep?: boolean): Middleware {
           `Bearer realm="freemap"; error="invalid ${what} authorization"`,
         );
 
-        ctx.throw(401);
+        ctx.throw(401, `invalid ${what} authorization`);
       }
 
       await next();

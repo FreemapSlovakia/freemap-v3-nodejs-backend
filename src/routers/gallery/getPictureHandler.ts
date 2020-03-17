@@ -27,7 +27,7 @@ export function attachGetPictureHandler(router: Router) {
       );
 
       if (rows.length === 0) {
-        ctx.throw(404);
+        ctx.throw(404, 'no such picture');
       }
 
       const commentRows = await pool.query(SQL`

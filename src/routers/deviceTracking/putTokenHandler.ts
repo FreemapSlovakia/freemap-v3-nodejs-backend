@@ -47,7 +47,7 @@ export function attachPutTokenHandler(router: Router) {
         `);
 
       if (!item) {
-        ctx.throw(404);
+        ctx.throw(404, 'no such tracking access token');
       }
 
       if (!ctx.state.user.isAdmin && item.userId !== ctx.state.user.id) {

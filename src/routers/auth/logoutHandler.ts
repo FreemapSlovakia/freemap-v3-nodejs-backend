@@ -15,7 +15,7 @@ export function attachLogoutHandler(router: Router) {
         'Bearer realm="freemap"; error="invalid token"',
       );
 
-      ctx.throw(401);
+      ctx.throw(401, 'invalid token');
     }
 
     ctx.status = 204;

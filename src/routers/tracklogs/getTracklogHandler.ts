@@ -7,7 +7,7 @@ export function attachGetTracklogHandler(router: Router) {
     const fileUID = ctx.params.uid;
 
     if (!/^[a-zA-Z0-9]*$/.test(fileUID)) {
-      ctx.throw(404);
+      ctx.throw(400, 'invalid id format');
     }
 
     const filePath = `${TRACKLOGS_DIR}/${fileUID}.b64.gpx`;
@@ -15,7 +15,7 @@ export function attachGetTracklogHandler(router: Router) {
     try {
       await fs.stat(filePath);
     } catch {
-      ctx.throw(404);
+      ctx.throw(404, 'gpx file not found');
     }
 
     const b64gpx = await fs.readFile(filePath, 'utf8');

@@ -18,7 +18,7 @@ async function handler(ctx: ParameterizedContext) {
   );
 
   if (!item) {
-    ctx.throw(404);
+    ctx.throw(404, 'no such tracking device');
   }
 
   const q =
@@ -79,7 +79,7 @@ async function handler(ctx: ParameterizedContext) {
     Number.isNaN(speedKmh) ||
     (speedKmh !== null && speedKmh < 0)
   ) {
-    ctx.throw(400);
+    ctx.throw(400, 'one or more values provided are not valid');
   }
 
   const now = new Date();

@@ -41,7 +41,7 @@ export function attachPatchMapHandler(router: Router) {
       );
 
       if (!item) {
-        ctx.throw(404);
+        ctx.throw(404, 'no such map');
       }
 
       if (!ctx.state.user.isAdmin && item.userId !== ctx.state.user.id) {

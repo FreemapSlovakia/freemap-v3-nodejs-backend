@@ -17,7 +17,7 @@ export function attachGetPictureImageHandler(router: Router) {
       );
 
       if (!rows.length) {
-        ctx.throw(404);
+        ctx.throw(404, 'no such picture');
       }
 
       const pathname = `${PICTURES_DIR}/${rows[0].pathname}`;
@@ -27,7 +27,7 @@ export function attachGetPictureImageHandler(router: Router) {
       try {
         stats = await fs.stat(pathname);
       } catch {
-        ctx.throw(404);
+        ctx.throw(404, 'missing picture file');
       }
 
       ctx.status = 200;

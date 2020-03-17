@@ -15,7 +15,7 @@ export function attachGetAllTokensHandler(router: Router) {
       );
 
       if (!device) {
-        ctx.throw(404);
+        ctx.throw(404, 'no such tracking device');
       }
 
       if (!ctx.state.user.isAdmin && ctx.state.user.id !== device.userId) {

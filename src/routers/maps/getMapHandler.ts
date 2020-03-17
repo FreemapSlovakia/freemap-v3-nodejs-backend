@@ -17,7 +17,7 @@ export function attachGetMapHandler(router: Router) {
       `);
 
       if (!item) {
-        ctx.throw(404);
+        ctx.throw(404, 'no such map');
       }
 
       if (

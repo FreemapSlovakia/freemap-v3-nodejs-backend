@@ -27,7 +27,7 @@ async function compute(ctx: ParameterizedContext) {
   } else if (ctx.method === 'POST' && Array.isArray(ctx.request.body)) {
     cs = ctx.request.body;
   } else {
-    ctx.throw(400);
+    ctx.throw(400, 'invalid request parameters');
   }
 
   if (
@@ -41,7 +41,7 @@ async function compute(ctx: ParameterizedContext) {
         x[1] <= 180,
     )
   ) {
-    ctx.throw(400);
+    ctx.throw(400, 'coordinate not in valid range');
   }
 
   const allocated = new Set<string>();

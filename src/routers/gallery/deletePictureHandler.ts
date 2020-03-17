@@ -18,7 +18,7 @@ export function attachDeletePictureHandler(router: Router) {
       );
 
       if (rows.length === 0) {
-        ctx.throw(404);
+        ctx.throw(404, 'no such picture');
       }
 
       if (!ctx.state.user.isAdmin && rows[0].userId !== ctx.state.user.id) {
