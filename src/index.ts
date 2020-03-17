@@ -40,7 +40,23 @@ app.use(koaBunyanLogger(appLogger.child({ module: 'koa' })));
 
 app.use(koaBunyanLogger.requestIdContext());
 
-app.use(koaBunyanLogger.requestLogger());
+app.use(
+  koaBunyanLogger.requestLogger({
+    updateRequestLogFields(rd): any {
+      return {
+        method: rd.req.method,
+        path: rd.req.url,
+        userAgent: rd.req.headers['user-agent'],
+      };
+    },
+    updateResponseLogFields(rd): any {
+      return {
+        // status: (rd.res as any).statusCode,
+        duration: (rd as any).duration,
+      };
+    },
+  }),
+);
 
 app.use(
   cors({
