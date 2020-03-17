@@ -11,7 +11,13 @@ const logger = appLogger.child({ module: 'socketDeviceTracking' });
 let id = 0;
 
 export function startSocketDeviceTracking() {
-  return net.createServer(connection => {
+  const port = getEnv('TRACKING_SOCKET_PORT', '');
+
+  if (!port) {
+    return null;
+  }
+
+  const server = net.createServer(connection => {
     let imei: string;
 
     const connLogger = logger.child({ id });
@@ -201,11 +207,9 @@ export function startSocketDeviceTracking() {
     return slices;
   }
 
-  const port = getEnv('TRACKING_SOCKET_PORT', '');
+  server.listen(Number(port), () => {
+    logger.info(`Device tracking socket listening on port ${port}.`);
+  });
 
-  if (port) {
-    server.listen(Number(port), () => {
-      logger.info(`Device tracking socket listening on port ${port}.`);
-    });
-  }
+  return server;
 }
