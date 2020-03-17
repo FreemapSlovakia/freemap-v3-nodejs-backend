@@ -4,10 +4,12 @@ import {
   acceptValidator,
   queryValidator,
   queryAdapter,
+  ValidationRules,
 } from '../../requestValidators';
 import { ratingSubquery } from './ratingConstants';
+import { Middleware, ParameterizedContext } from 'koa';
 
-const globalValidationRules = {
+const globalValidationRules: ValidationRules = {
   userId: v => v === null || !Number.isNaN(v) || 'invalid userId',
   ratingFrom: v => v === null || !Number.isNaN(v) || 'invalid ratingFrom',
   ratingTo: v => v === null || !Number.isNaN(v) || 'invalid ratingTo',
@@ -17,52 +19,53 @@ const globalValidationRules = {
   createdAtTo: v => v === null || !Number.isNaN(v) || 'invalid createdAtTo',
 };
 
+const radiusQueryValidationRules: ValidationRules = {
+  lat: v => (v >= -90 && v <= 90) || 'lat must be between -90 and 90',
+  lon: v => (v >= -180 && v <= 180) || 'lon must be between -180 and 180',
+  distance: v => v > 0 || 'distance must be positive',
+};
+
 const radiusQueryValidator = queryValidator(
-  Object.assign({
-    lat: v => (v >= -90 && v <= 90) || 'lat must be between -90 and 90',
-    lon: v => (v >= -180 && v <= 180) || 'lon must be between -180 and 180',
-    distance: v => v > 0 || 'distance must be positive',
-  }),
-  globalValidationRules,
+  Object.assign(radiusQueryValidationRules, globalValidationRules),
 );
+
+const bboxQueryValidationRules: ValidationRules = {
+  bbox: v =>
+    (v && v.length === 4 && v.every((x: any) => !Number.isNaN(x))) ||
+    'invalid bbox',
+  fields: v =>
+    !v ||
+    v.every((f: any) =>
+      ['id', 'title', 'description', 'takenAt', 'createdAt', 'rating'].includes(
+        f,
+      ),
+    ) ||
+    'invalid fields',
+};
 
 const bboxQueryValidator = queryValidator(
-  Object.assign({
-    bbox: v =>
-      (v && v.length === 4 && v.every(x => !Number.isNaN(x))) || 'invalid bbox',
-    fields: v =>
-      !v ||
-      v.every(f =>
-        [
-          'id',
-          'title',
-          'description',
-          'takenAt',
-          'createdAt',
-          'rating',
-        ].includes(f),
-      ) ||
-      'invalid fields',
-  }),
-  globalValidationRules,
+  Object.assign(globalValidationRules, bboxQueryValidationRules),
 );
+
+const orderQueryValidationRules: ValidationRules = {
+  orderBy: v =>
+    ['createdAt', 'takenAt', 'rating'].includes(v) || 'invalid orderBy',
+  direction: v => ['desc', 'asc'].includes(v) || 'invalid direction',
+};
 
 const orderQueryValidator = queryValidator(
-  Object.assign({
-    orderBy: v =>
-      ['createdAt', 'takenAt', 'rating'].includes(v) || 'invalid orderBy',
-    direction: v => ['desc', 'asc'].includes(v) || 'invalid direction',
-  }),
-  globalValidationRules,
+  Object.assign(orderQueryValidationRules, globalValidationRules),
 );
 
-const qvs = {
+const qvs: { [name: string]: Middleware } = {
   radius: radiusQueryValidator,
   bbox: bboxQueryValidator,
   order: orderQueryValidator,
 };
 
-const methods = {
+const methods: {
+  [name: string]: (ctx: ParameterizedContext) => Promise<void>;
+} = {
   radius: byRadius,
   bbox: byBbox,
   order: byOrder,
@@ -95,15 +98,15 @@ export function attachGetPicturesHandler(router: Router) {
       userId: userId => !userId || userId > 0 || 'invalid userId',
     }),
     async (ctx, next) => {
-      await qvs[ctx.query.by](ctx, next);
+      await qvs[ctx.query.by as string](ctx, next);
     },
     async ctx => {
-      await methods[ctx.query.by](ctx);
+      await methods[ctx.query.by as string](ctx);
     },
   );
 }
 
-async function byRadius(ctx) {
+async function byRadius(ctx: ParameterizedContext) {
   const {
     lat,
     lon,
@@ -149,10 +152,10 @@ async function byRadius(ctx) {
 
   const rows = await pool.query(sql);
 
-  ctx.body = rows.map(({ id }) => ({ id }));
+  ctx.body = rows.map((row: any) => ({ id: row.id }));
 }
 
-function toSqlDate(d) {
+function toSqlDate(d: any) {
   return Number.isNaN(d)
     ? d
     : d
@@ -161,7 +164,7 @@ function toSqlDate(d) {
         .replace(/(\.\d*)?Z$/, '');
 }
 
-async function byBbox(ctx) {
+async function byBbox(ctx: ParameterizedContext) {
   const {
     bbox: [minLon, minLat, maxLon, maxLat],
     userId,
@@ -178,7 +181,7 @@ async function byBbox(ctx) {
   const flds = [
     'lat',
     'lon',
-    ...(fields ? fields.filter(f => f !== 'rating') : []),
+    ...(fields ? fields.filter((f: any) => f !== 'rating') : []),
   ];
   if (ratingFrom || ratingTo) {
     flds.push(ratingSubquery);
@@ -212,10 +215,10 @@ async function byBbox(ctx) {
   ctx.body =
     fields && fields.includes('rating')
       ? rows
-      : rows.map(row => Object.assign({}, row, { rating: undefined }));
+      : rows.map((row: any) => Object.assign({}, row, { rating: undefined }));
 }
 
-async function byOrder(ctx) {
+async function byOrder(ctx: ParameterizedContext) {
   const {
     userId,
     tag,
@@ -272,5 +275,5 @@ async function byOrder(ctx) {
 
   const rows = await pool.query(sql);
 
-  ctx.body = rows.map(({ id }) => ({ id }));
+  ctx.body = rows.map((row: any) => ({ id: row.id }));
 }

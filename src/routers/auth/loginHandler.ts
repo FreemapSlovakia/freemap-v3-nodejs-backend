@@ -2,7 +2,7 @@ import Router from '@koa/router';
 import rp from 'request-promise-native';
 import qs from 'querystring';
 import config from 'config';
-import requestTokenRegistry from './requestTokenRegistry';
+import { requestTokenRegistry } from './requestTokenRegistry';
 
 const consumerKey = config.get('oauth.consumerKey') as string;
 const consumerSecret = config.get('oauth.consumerSecret') as string;
@@ -24,7 +24,10 @@ export function attachLoginHandler(router: Router) {
 
       const reqData = qs.parse(body);
 
-      requestTokenRegistry.set(reqData.oauth_token, reqData.oauth_token_secret);
+      requestTokenRegistry.set(
+        reqData.oauth_token as string,
+        reqData.oauth_token_secret as string,
+      );
 
       ctx.body = {
         redirect: `https://www.openstreetmap.org/oauth/authorize?${qs.stringify(

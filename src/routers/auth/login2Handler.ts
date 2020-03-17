@@ -5,8 +5,8 @@ import qs from 'querystring';
 import config from 'config';
 import { parseString } from 'xml2js';
 import { promisify } from 'util';
-import requestTokenRegistry from './requestTokenRegistry';
-import login from './loginProcessor';
+import { requestTokenRegistry } from './requestTokenRegistry';
+import { login } from './loginProcessor';
 
 const parseStringAsync = promisify(parseString);
 

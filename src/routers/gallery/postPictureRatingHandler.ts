@@ -1,8 +1,8 @@
 import Router from '@koa/router';
-import SQL from 'sql-template-strings';
+import { SQL } from 'sql-template-strings';
 import { pool } from '../../database';
 import { bodySchemaValidator } from '../../requestValidators';
-import authenticator from '../../authenticator';
+import { authenticator } from '../../authenticator';
 
 export function attachPostPictureRatingHandler(router: Router) {
   router.post(

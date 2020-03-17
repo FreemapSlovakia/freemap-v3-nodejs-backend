@@ -11,7 +11,7 @@ function cleanup() {
   });
 }
 
-const requestTokenRegistry = {
+export const requestTokenRegistry = {
   get(key: string): string | null {
     const item = registry.get(key);
     registry.delete(key);
@@ -22,5 +22,3 @@ const requestTokenRegistry = {
     registry.set(key, { value, takenAt: Date.now() });
   },
 };
-
-export default requestTokenRegistry;

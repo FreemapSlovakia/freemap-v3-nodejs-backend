@@ -1,6 +1,6 @@
 import Router from '@koa/router';
 
-import SQL from 'sql-template-strings';
+import { SQL } from 'sql-template-strings';
 import { runInTransaction } from '../../database';
 import {
   acceptValidator,
@@ -8,7 +8,7 @@ import {
   bodySchemaValidator,
 } from '../../requestValidators';
 import uuidBase62 from 'uuid-base62';
-import authenticator from '../../authenticator';
+import { authenticator } from '../../authenticator';
 import { promisify } from 'util';
 import { execFile } from 'child_process';
 import { PICTURES_DIR } from '../../routers/gallery/constants';
@@ -132,7 +132,7 @@ export function attachPostPictureHandler(router: Router) {
           `INSERT INTO pictureTag (name, pictureId) VALUES ${tags
             .map(() => '(?, ?)')
             .join(', ')} ON DUPLICATE KEY UPDATE name = name`,
-          [].concat(...tags.map(tag => [tag, insertId])),
+          [].concat(...tags.map((tag: any) => [tag, insertId])),
         );
       }
 

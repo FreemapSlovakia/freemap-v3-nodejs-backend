@@ -1,13 +1,13 @@
 import Router from '@koa/router';
 
-import SQL from 'sql-template-strings';
+import { SQL } from 'sql-template-strings';
 import randomize from 'randomatic';
 import { pool } from '../../database';
 import { acceptValidator } from '../../requestValidators';
-import authenticator from '../../authenticator';
+import { authenticator } from '../../authenticator';
 import { bodySchemaValidator } from '../../requestValidators';
 
-export default (router: Router) => {
+export function attachPostTokenHandler(router: Router) {
   router.post(
     '/devices/:id/access-tokens',
     acceptValidator('application/json'),
@@ -65,4 +65,4 @@ export default (router: Router) => {
       ctx.body = { id: insertId, token };
     },
   );
-};
+}

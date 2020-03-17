@@ -1,11 +1,12 @@
 import Router from '@koa/router';
-import trackRegister from './trackRegister';
-import authenticator from './authenticator';
+import { trackRegister } from './trackRegister';
+import { authenticator } from './authenticator';
 import { trackingSubscribeHandler } from './rpcHandlers/trackingSubscribeHandler';
 import { trackingUnsubscribeHandler } from './rpcHandlers/trackingUnsubscribeHandler';
-import pingHandler from './rpcHandlers/pingHandler';
+import { pingHandler } from './rpcHandlers/pingHandler';
 import KoaWebsocket from 'koa-websocket';
 import * as ws from 'ws';
+import { RpcContext } from './rpcHandlerTypes';
 
 export function attachWs(app: KoaWebsocket.App) {
   const wsRouter = new Router();
@@ -77,7 +78,7 @@ export function attachWs(app: KoaWebsocket.App) {
 
       id = msg.id;
 
-      const rpcCtx = {
+      const rpcCtx: RpcContext = {
         respondResult,
         respondError,
         params: msg.params,
@@ -108,5 +109,5 @@ export function attachWs(app: KoaWebsocket.App) {
     ws.on('error', handleCloseOrError);
   });
 
-  app.ws.use(wsRouter.routes()).use(wsRouter.allowedMethods());
+  app.ws.use(wsRouter.routes() as any).use(wsRouter.allowedMethods() as any);
 }

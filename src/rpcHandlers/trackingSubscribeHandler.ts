@@ -1,9 +1,10 @@
-import SQL from 'sql-template-strings';
+import { SQL } from 'sql-template-strings';
 import * as ws from 'ws';
-import trackRegister from '../trackRegister';
+import { trackRegister } from '../trackRegister';
 import { pool } from '../database';
+import { RpcContext } from '../rpcHandlerTypes';
 
-export function trackingSubscribeHandler(ctx) {
+export function trackingSubscribeHandler(ctx: RpcContext) {
   // TODO validate ctx.params
   const { token, deviceId, fromTime, maxCount, maxAge } = ctx.params;
 

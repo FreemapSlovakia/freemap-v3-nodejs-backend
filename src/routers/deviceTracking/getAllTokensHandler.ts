@@ -1,10 +1,10 @@
 import Router from '@koa/router';
-import SQL from 'sql-template-strings';
+import { SQL } from 'sql-template-strings';
 import { pool } from '../../database';
 import { acceptValidator } from '../../requestValidators';
-import authenticator from '../../authenticator';
+import { authenticator } from '../../authenticator';
 
-export default (router: Router) => {
+export function attachGetAllTokensHandler(router: Router) {
   router.get(
     '/devices/:id/access-tokens',
     acceptValidator('application/json'),
@@ -28,4 +28,4 @@ export default (router: Router) => {
       `);
     },
   );
-};
+}

@@ -1,9 +1,9 @@
 import { ParameterizedContext } from 'koa';
 import { pool } from '../../database';
-import SQL from 'sql-template-strings';
+import { SQL } from 'sql-template-strings';
 import { randomBytes } from 'crypto';
 
-export default async function login(
+export async function login(
   ctx: ParameterizedContext,
   dbField: string,
   dbValue: string,

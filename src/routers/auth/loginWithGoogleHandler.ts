@@ -1,6 +1,6 @@
 import Router from '@koa/router';
-import client from '../../google';
-import login from './loginProcessor';
+import { googleClient } from '../../google';
+import { login } from './loginProcessor';
 
 export function attachLoginWithGoogleHandler(router: Router) {
   router.post(
@@ -10,7 +10,7 @@ export function attachLoginWithGoogleHandler(router: Router) {
       const { idToken } = ctx.request.body;
 
       const { sub, name, email } = (
-        await client.verifyIdToken({
+        await googleClient.verifyIdToken({
           idToken,
           audience: 'not-a-real-client-id',
         })

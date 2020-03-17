@@ -1,10 +1,10 @@
 import Router from '@koa/router';
-import SQL from 'sql-template-strings';
+import { SQL } from 'sql-template-strings';
 import config from 'config';
 import Mailgun from 'mailgun-js';
 import { runInTransaction } from '../../database';
 import { acceptValidator, bodySchemaValidator } from '../../requestValidators';
-import authenticator from '../../authenticator';
+import { authenticator } from '../../authenticator';
 import { PoolConnection } from 'mariadb';
 
 const webBaseUrl = config.get('webBaseUrl') as string;

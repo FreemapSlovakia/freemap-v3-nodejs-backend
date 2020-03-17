@@ -1,18 +1,15 @@
 import { Middleware } from 'koa';
 
-import SQL from 'sql-template-strings';
+import { SQL } from 'sql-template-strings';
 import rp from 'request-promise-native';
 import config from 'config';
-import fb from './fb';
-import client from './google';
+import { fb } from './fb';
+import { googleClient } from './google';
 
 const consumerKey = config.get('oauth.consumerKey') as string;
 const consumerSecret = config.get('oauth.consumerSecret') as string;
 
-export default function authenticator(
-  require?: boolean,
-  deep?: boolean,
-): Middleware {
+export function authenticator(require?: boolean, deep?: boolean): Middleware {
   return async function authorize(ctx, next) {
     let { authToken } = ctx.query; // used in websockets
 
@@ -66,7 +63,7 @@ export default function authenticator(
       await next();
     } else if (auth.googleIdToken) {
       try {
-        await client.verifyIdToken({
+        await googleClient.verifyIdToken({
           idToken: auth.googleIdToken,
           audience: 'not-a-real-client-id',
         });

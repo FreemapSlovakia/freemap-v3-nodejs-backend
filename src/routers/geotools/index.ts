@@ -4,11 +4,11 @@ import config from 'config';
 import { spawn } from 'child_process';
 import { downloadGeoTiff } from './downloader';
 import { ParameterizedContext } from 'koa';
+import { acceptValidator } from '../../requestValidators';
 
 const hgtDir = config.get('elevation.dir');
 
 const router = new Router();
-const { acceptValidator } = require('~/requestValidators');
 
 router.get('/elevation', compute);
 router.post('/elevation', acceptValidator('application/json'), compute);

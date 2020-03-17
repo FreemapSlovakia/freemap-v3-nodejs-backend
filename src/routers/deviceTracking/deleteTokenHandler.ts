@@ -1,10 +1,10 @@
 import Router from '@koa/router';
-import SQL from 'sql-template-strings';
+import { SQL } from 'sql-template-strings';
 import { runInTransaction } from '../../database';
 import { acceptValidator } from '../../requestValidators';
-import authenticator from '../../authenticator';
+import { authenticator } from '../../authenticator';
 
-export default (router: Router) => {
+export function attachDeleteTokenHandler(router: Router) {
   router.delete(
     '/access-tokens/:id',
     acceptValidator('application/json'),
@@ -34,4 +34,4 @@ export default (router: Router) => {
       ctx.status = 204;
     },
   );
-};
+}

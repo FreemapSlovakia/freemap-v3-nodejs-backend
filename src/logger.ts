@@ -1,6 +1,6 @@
-const bunyan = require('bunyan');
+import bunyan from 'bunyan';
 
-export default bunyan.createLogger({
+export const appLogger = bunyan.createLogger({
   name: 'freemap-api',
   serializers: bunyan.stdSerializers,
 });

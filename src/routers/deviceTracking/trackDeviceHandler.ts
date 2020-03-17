@@ -1,14 +1,14 @@
 import Router from '@koa/router';
 import { ParameterizedContext } from 'koa';
-import SQL from 'sql-template-strings';
+import { SQL } from 'sql-template-strings';
 import { runInTransaction } from '../../database';
-import trackRegister from '../../trackRegister';
+import { trackRegister } from '../../trackRegister';
 
-export default (router: Router) => {
+export function attachTrackDeviceHandler(router: Router) {
   for (const method of ['post', 'get'] as const) {
     router[method]('/track/:token', runInTransaction(), handler);
   }
-};
+}
 
 async function handler(ctx: ParameterizedContext) {
   const conn = ctx.state.dbConn;

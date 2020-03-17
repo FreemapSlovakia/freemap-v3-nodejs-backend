@@ -1,8 +1,8 @@
-import SQL from 'sql-template-strings';
+import { SQL } from 'sql-template-strings';
 import { promises as fs } from 'fs';
 import Router from '@koa/router';
 import { runInTransaction } from '../../database';
-import authenticator from '../../authenticator';
+import { authenticator } from '../../authenticator';
 import { PICTURES_DIR } from '../gallery/constants';
 
 export function attachDeletePictureHandler(router: Router) {

@@ -2,7 +2,7 @@ import Router from '@koa/router';
 import { pool } from '../../database';
 import { acceptValidator } from '../../requestValidators';
 
-export default (router: Router) => {
+export function attachGetPublicTokensHandler(router: Router) {
   router.get(
     '/access-tokens',
     acceptValidator('application/json'),
@@ -14,4 +14,4 @@ export default (router: Router) => {
       );
     },
   );
-};
+}

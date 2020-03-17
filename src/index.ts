@@ -7,7 +7,7 @@ import cors from 'kcors';
 import koaBunyanLogger from 'koa-bunyan-logger';
 import websockify from 'koa-websocket';
 
-import logger from './logger';
+import { appLogger } from './logger';
 import { initDatabase } from './database';
 import { attachWs } from './ws';
 
@@ -16,9 +16,10 @@ import { galleryRouter } from './routers/gallery';
 import { mapsRouter } from './routers/maps';
 import { authRouter } from './routers/auth';
 import { geotoolsRouter } from './routers/geotools';
-import trackingRouter from './routers/deviceTracking';
+import { trackingRouter } from './routers/deviceTracking';
+import { attachLoggerHandler } from './routers/loggerHandler';
 
-import attachLoggerHandler from './routers/loggerHandler';
+const logger = appLogger.child({ module: 'app' });
 
 const ssl = config.get('http.ssl') as any;
 
@@ -33,7 +34,7 @@ const app = websockify(
     : undefined,
 );
 
-app.use(koaBunyanLogger(logger.child({ module: 'koa' })));
+app.use(koaBunyanLogger(appLogger.child({ module: 'koa' })));
 
 app.use(koaBunyanLogger.requestIdContext());
 

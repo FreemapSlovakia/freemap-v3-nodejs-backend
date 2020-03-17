@@ -1,6 +1,6 @@
 import Router from '@koa/router';
 import { pool } from '../../database';
-import authenticator from '../../authenticator';
+import { authenticator } from '../../authenticator';
 import { bodySchemaValidator } from '../../requestValidators';
 
 export function attachPatchUserHandler(router: Router) {

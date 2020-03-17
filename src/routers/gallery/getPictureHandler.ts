@@ -1,8 +1,8 @@
 import Router from '@koa/router';
-import SQL from 'sql-template-strings';
+import { SQL } from 'sql-template-strings';
 import { pool } from '../../database';
 import { acceptValidator } from '../../requestValidators';
-import authenticator from '../../authenticator';
+import { authenticator } from '../../authenticator';
 import { ratingSubquery } from './ratingConstants';
 
 export function attachGetPictureHandler(router: Router) {
@@ -22,7 +22,7 @@ export function attachGetPictureHandler(router: Router) {
               : '',
           )
           .append(
-            SQL`FROM picture LEFT JOIN user ON userId = user.id WHERE picture.id = ${ctx.params.id}`,
+            SQL` FROM picture LEFT JOIN user ON userId = user.id WHERE picture.id = ${ctx.params.id}`,
           ),
       );
 

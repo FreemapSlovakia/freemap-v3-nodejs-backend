@@ -1,6 +1,7 @@
-import trackRegister from '../trackRegister';
+import { trackRegister } from '../trackRegister';
+import { RpcContext } from '../rpcHandlerTypes';
 
-export function trackingUnsubscribeHandler(ctx) {
+export function trackingUnsubscribeHandler(ctx: RpcContext) {
   // TODO validate ctx.params
   const { token, deviceId } = ctx.params;
 

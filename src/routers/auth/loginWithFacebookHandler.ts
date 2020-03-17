@@ -1,6 +1,6 @@
 import Router from '@koa/router';
-import fb from '../../fb';
-import login from './loginProcessor';
+import { fb } from '../../fb';
+import { login } from './loginProcessor';
 
 export function attachLoginWithFacebookHandler(router: Router) {
   router.post(

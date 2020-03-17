@@ -1,11 +1,15 @@
-import { Middleware } from 'koa';
+import { Middleware, ParameterizedContext } from 'koa';
 
 import Ajv from 'ajv';
 import { JSONSchema7 } from 'json-schema';
 
 const ajv = new Ajv();
 
-export function queryValidator(spec): Middleware {
+export type ValidationRules = {
+  [name: string]: (v: any, ctx?: ParameterizedContext) => true | string;
+};
+
+export function queryValidator(spec: ValidationRules): Middleware {
   return async (ctx, next) => {
     const errors: string[] = [];
     Object.keys(spec).forEach(key => {
@@ -76,7 +80,11 @@ export function contentTypeValidator(...type: string[]): Middleware {
   };
 }
 
-export function queryAdapter(spec): Middleware {
+export type AdapterRules = {
+  [name: string]: (v: string) => any;
+};
+
+export function queryAdapter(spec: AdapterRules): Middleware {
   return async (ctx, next) => {
     Object.keys(spec).forEach(key => {
       ctx.query[key] = spec[key](ctx.query[key]);

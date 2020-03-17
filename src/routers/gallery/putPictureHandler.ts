@@ -1,9 +1,9 @@
 import Router from '@koa/router';
 
-import SQL from 'sql-template-strings';
+import { SQL } from 'sql-template-strings';
 import { runInTransaction } from '../../database';
 import { bodySchemaValidator } from '../../requestValidators';
-import authenticator from '../../authenticator';
+import { authenticator } from '../../authenticator';
 
 export function attachPutPictureHandler(router: Router) {
   router.put(

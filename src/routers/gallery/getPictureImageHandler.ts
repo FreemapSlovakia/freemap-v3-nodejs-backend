@@ -1,7 +1,7 @@
 import Router from '@koa/router';
-import SQL from 'sql-template-strings';
+import { SQL } from 'sql-template-strings';
 import sharp from 'sharp';
-import { promises as fs } from 'fs';
+import { promises as fs, createReadStream } from 'fs';
 import calculate from 'etag';
 import { pool } from '../../database';
 import { acceptValidator } from '../../requestValidators';
@@ -54,7 +54,7 @@ export function attachGetPictureImageHandler(router: Router) {
             .jpeg()
         : null;
 
-      const fileStream = fs.createReadStream(pathname);
+      const fileStream = createReadStream(pathname);
 
       ctx.body = resize ? fileStream.pipe(resize) : fileStream;
     },

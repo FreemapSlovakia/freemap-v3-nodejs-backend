@@ -1,9 +1,11 @@
 import config from 'config';
 import { createPool } from 'mariadb';
 import { Middleware } from 'koa';
-import logger from './logger';
+import { appLogger } from './logger';
 
 export const pool = createPool(config.get('mysql'));
+
+const logger = appLogger.child({ module: 'db' });
 
 export async function initDatabase() {
   const scripts = [
