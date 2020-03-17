@@ -125,7 +125,7 @@ export async function storeTrackPoint(
     notify('token', token);
   }
 
-  notify('deviceId', String(id));
+  notify('deviceId', id);
 
   return insertId;
 }
