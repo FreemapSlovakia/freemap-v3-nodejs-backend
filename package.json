@@ -4,13 +4,24 @@
   "description": "",
   "main": "index.js",
   "engines": {
-    "node": "8.x"
+    "node": "10.x"
+  },
+  "scripts": {
+    "start": "node build/index.js",
+    "build": "tsc",
+    "dist": "sh ./scripts/dist.sh",
+    "deploy": "npm run build && npm run dist && eb deploy",
+    "watch": "concurrently -k -p \"[{name}]\" -n \"TypeScript,Node\" -c \"cyan.bold,green.bold\" \"npm run watch-ts\" \"npm run watch-node\"",
+    "watch-node": "env $(cat .env | grep -v \"#\" | xargs) nodemon build/index.js | pino-pretty -t -i hostname,pid",
+    "watch-ts": "tsc -w",
+    "precommit": "lint-staged"
   },
   "dependencies": {
+    "@koa/router": "8.0.8",
     "ajv": "6.12.0",
     "axios": "0.19.2",
     "bunyan": "1.8.12",
-    "config": "3.3.0",
+    "concurrently": "5.1.0",
     "etag": "1.8.1",
     "fb": "2.0.0",
     "fs-extra": "8.1.0",
@@ -19,7 +30,6 @@
     "koa": "2.11.0",
     "koa-body": "4.1.1",
     "koa-bunyan-logger": "2.1.0",
-    "koa-router": "8.0.8",
     "koa-websocket": "6.0.0",
     "mailgun-js": "0.22.0",
     "mariadb": "2.2.0",
@@ -30,12 +40,26 @@
     "request-promise-native": "1.0.8",
     "set-cookie-parser": "2.4.3",
     "sharp": "0.25.1",
+    "source-map-support": "0.5.16",
     "sql-template-strings": "2.2.2",
     "uuid-base62": "0.1.0",
-    "verror": "1.10.0",
     "xml2js": "0.4.23"
   },
   "devDependencies": {
+    "@types/config": "0.0.36",
+    "@types/sharp": "0.24.0",
+    "@types/etag": "1.8.0",
+    "@types/json-schema": "7.0.4",
+    "@types/kcors": "2.2.3",
+    "@types/koa": "^2.11.2",
+    "@types/koa-bunyan-logger": "2.1.2",
+    "@types/koa-websocket": "5.0.4",
+    "@types/koa__router": "^8.0.2",
+    "@types/mailgun-js": "0.22.4",
+    "@types/node": "^13.7.6",
+    "@types/request-promise-native": "1.0.17",
+    "@types/set-cookie-parser": "0.0.6",
+    "@types/xml2js": "0.4.5",
     "babel-eslint": "10.1.0",
     "chai": "4.2.0",
     "chakram": "1.5.0",
@@ -46,13 +70,8 @@
     "husky": "4.2.3",
     "lint-staged": "10.0.8",
     "nodemon": "2.0.2",
-    "prettier": "1.19.1"
-  },
-  "scripts": {
-    "start": "node index.js",
-    "watch": "nodemon --watch app --watch config --watch index.js index.js",
-    "precommit": "lint-staged",
-    "fmt": "prettier --write './**/*.js'"
+    "prettier": "1.19.1",
+    "typescript": "^3.8.2"
   },
   "repository": {
     "type": "git",
