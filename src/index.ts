@@ -17,6 +17,7 @@ import { geotoolsRouter } from './routers/geotools';
 import { trackingRouter } from './routers/deviceTracking';
 import { attachLoggerHandler } from './routers/loggerHandler';
 import { getEnv } from './env';
+import { startSocketDeviceTracking } from './socketDeviceTracking';
 
 const logger = appLogger.child({ module: 'app' });
 
@@ -127,6 +128,8 @@ initDatabase()
     app.listen(port, () => {
       logger.info(`Freemap v3 API listening on port ${port}.`);
     });
+
+    startSocketDeviceTracking();
   })
   .catch(err => {
     logger.fatal({ err }, 'Error initializing database.');
