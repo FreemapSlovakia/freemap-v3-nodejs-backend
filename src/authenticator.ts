@@ -5,6 +5,7 @@ import rp from 'request-promise-native';
 import config from 'config';
 import { fb } from './fb';
 import { googleClient } from './google';
+import { pool } from './database';
 
 const consumerKey = config.get('oauth.consumerKey') as string;
 const consumerSecret = config.get('oauth.consumerSecret') as string;
@@ -36,7 +37,7 @@ export function authenticator(require?: boolean, deep?: boolean): Middleware {
       authToken = m[1];
     }
 
-    const [auth] = await ctx.state.db.query(SQL`
+    const [auth] = await pool.query(SQL`
       SELECT userId, osmAuthToken, osmAuthTokenSecret, facebookAccessToken, googleIdToken, name, email, isAdmin, lat, lon, settings, preventTips
         FROM auth INNER JOIN user ON (userId = id) WHERE authToken = ${authToken}
     `);
@@ -109,9 +110,7 @@ export function authenticator(require?: boolean, deep?: boolean): Middleware {
     }
 
     async function bad(what: string) {
-      await ctx.state.db.query(
-        SQL`DELETE FROM auth WHERE authToken = ${authToken}`,
-      );
+      await pool.query(SQL`DELETE FROM auth WHERE authToken = ${authToken}`);
 
       if (require) {
         ctx.set(
