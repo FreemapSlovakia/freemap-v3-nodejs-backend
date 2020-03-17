@@ -2,6 +2,19 @@ import Router from '@koa/router';
 
 import { bodySchemaValidator } from '../requestValidators';
 
+const levels = ['trace', 'debug', 'info', 'warn', 'error', 'fatal'];
+
+const levelsAsConst = [
+  'trace',
+  'debug',
+  'info',
+  'warn',
+  'error',
+  'fatal',
+] as const;
+
+type LogLevelString = typeof levelsAsConst[number];
+
 export function attachLoggerHandler(router: Router) {
   router.post(
     '/logger',
@@ -11,7 +24,7 @@ export function attachLoggerHandler(router: Router) {
       properties: {
         level: {
           type: 'string',
-          enum: ['trace', 'debug', 'info', 'warn', 'error', 'fatal'],
+          enum: levels,
         },
         message: {
           type: 'string',
@@ -33,12 +46,8 @@ export function attachLoggerHandler(router: Router) {
   );
 }
 
-const levels = ['trace', 'debug', 'info', 'warn', 'error', 'fatal'] as const;
-
-type LogLevelString = typeof levels[number];
-
 function validateLevel(level: string): LogLevelString {
-  if (!['trace', 'debug', 'info', 'warn', 'error', 'fatal'].includes(level)) {
+  if (!levels.includes(level)) {
     throw new Error('invalid loglevel');
   }
 
