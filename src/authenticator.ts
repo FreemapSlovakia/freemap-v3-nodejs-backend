@@ -66,8 +66,7 @@ export function authenticator(require?: boolean, deep?: boolean): Middleware {
       try {
         await googleClient.verifyIdToken({
           idToken: auth.googleIdToken,
-          audience: 'not-a-real-client-id',
-        });
+        } as any);
       } catch (e) {
         await bad('Google');
         return;

@@ -44,10 +44,11 @@ app.use(
         userAgent: rd.req.headers['user-agent'],
       };
     },
-    updateResponseLogFields(rd): any {
+    updateResponseLogFields(rd: any): any {
       return {
+        err: rd.err,
         // status: (rd.res as any).statusCode,
-        duration: (rd as any).duration,
+        duration: rd.duration,
       };
     },
   }),

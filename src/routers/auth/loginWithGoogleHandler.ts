@@ -12,8 +12,7 @@ export function attachLoginWithGoogleHandler(router: Router) {
       const { sub, name, email } = (
         await googleClient.verifyIdToken({
           idToken,
-          audience: 'not-a-real-client-id',
-        })
+        } as any)
       ).getPayload(); // TODO catch error
 
       await login(
