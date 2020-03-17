@@ -70,7 +70,7 @@ export function attachPatchMapHandler(router: Router) {
         query.append(i ? ',' : ' ').append(parts[i]);
       }
 
-      await conn.query(query.append(SQL`WHERE id = ${id}`));
+      await conn.query(query.append(SQL` WHERE id = ${id}`));
 
       ctx.status = 204;
     },

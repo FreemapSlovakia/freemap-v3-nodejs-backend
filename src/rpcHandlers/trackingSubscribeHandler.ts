@@ -53,11 +53,13 @@ export function trackingSubscribeHandler(ctx: RpcContext) {
         SQL`SELECT id, lat, lon, message, createdAt, altitude, speed, accuracy, hdop, bearing, battery, gsmSignal
             FROM trackingPoint
             WHERE deviceId = ${deviceId || token}`
-          .append(fromTime ? SQL`AND createdAt >= ${new Date(fromTime)}` : '')
+          .append(fromTime ? SQL` AND createdAt >= ${new Date(fromTime)}` : '')
           .append(
-            maxAge ? SQL`AND trackingPoint.createdAt >= ${Number(maxAge)}` : '',
+            maxAge
+              ? SQL` AND trackingPoint.createdAt >= ${Number(maxAge)}`
+              : '',
           )
-          .append('ORDER BY id DESC')
+          .append(' ORDER BY id DESC')
           .append(maxCount ? SQL` LIMIT ${Number(maxCount)}` : ''),
       );
     } else {
@@ -69,14 +71,14 @@ export function trackingSubscribeHandler(ctx: RpcContext) {
           `
           .append(
             maxAge
-              ? SQL`AND TIMESTAMPDIFF(SECOND, trackingPoint.createdAt, now()) < ${new Date(
+              ? SQL` AND TIMESTAMPDIFF(SECOND, trackingPoint.createdAt, now()) < ${new Date(
                   fromTime,
                 )}`
               : '',
           )
           .append(
             fromTime
-              ? SQL`AND trackingPoint.createdAt >= ${Number(maxAge)}`
+              ? SQL` AND trackingPoint.createdAt >= ${Number(maxAge)}`
               : '',
           )
           .append(

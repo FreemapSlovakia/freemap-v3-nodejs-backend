@@ -65,7 +65,7 @@ export function attachPutDeviceHandler(router: Router) {
       await conn.query(
         SQL`UPDATE trackingDevice SET name = ${name}, maxCount = ${maxCount}, maxAge = ${maxAge}`
           .append(regenerateToken ? SQL`, token = ${token}` : '')
-          .append(SQL`WHERE id = ${id}`),
+          .append(SQL` WHERE id = ${id}`),
       );
 
       if (maxAge) {
