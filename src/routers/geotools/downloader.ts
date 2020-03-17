@@ -4,10 +4,6 @@ import parseSetCookie from 'set-cookie-parser';
 import querystring from 'querystring';
 import { getEnv } from '../../env';
 
-const username = getEnv('EARTHEXPLORER_USERNAME');
-
-const password = getEnv('EARTHEXPLORER_PASSWORD');
-
 class Cookies {
   cookies: { [name: string]: string };
 
@@ -34,16 +30,18 @@ class Cookies {
 // TODO login could be re-used for some time (or until auth error detected)
 export async function downloadGeoTiff(ref: string, dest: fs.PathLike) {
   const indexResponse = await axios.get('https://ers.cr.usgs.gov/');
+
   const m = indexResponse.data.match(/name="csrf_token" value="([^"]+)"/);
 
   const cookies = new Cookies();
+
   cookies.setCookies(indexResponse);
 
   const loginResponse = await axios.post(
     'https://ers.cr.usgs.gov/login/',
     querystring.stringify({
-      username,
-      password,
+      username: getEnv('EARTHEXPLORER_USERNAME'),
+      password: getEnv('EARTHEXPLORER_PASSWORD'),
       csrf_token: m[1],
     }),
     {
