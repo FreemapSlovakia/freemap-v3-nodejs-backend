@@ -41,6 +41,7 @@
     "request-promise-native": "1.0.8",
     "set-cookie-parser": "2.4.3",
     "sharp": "0.25.1",
+    "source-map-support": "0.5.16",
     "sql-template-strings": "2.2.2",
     "uuid-base62": "0.1.0",
     "xml2js": "0.4.23"
