@@ -29,7 +29,8 @@ export function queryValidator(spec: ValidationRules): Middleware {
         detail: errors,
       };
 
-      ctx.throw(400);
+      ctx.status = 400;
+      return;
     }
 
     await next();
@@ -53,7 +54,8 @@ export function bodySchemaValidator(
         detail: validate.errors,
       };
 
-      ctx.throw(400);
+      ctx.status = 400;
+      return;
     }
 
     await next();

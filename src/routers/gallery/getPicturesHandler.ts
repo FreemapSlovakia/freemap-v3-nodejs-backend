@@ -25,9 +25,10 @@ const radiusQueryValidationRules: ValidationRules = {
   distance: v => v > 0 || 'distance must be positive',
 };
 
-const radiusQueryValidator = queryValidator(
-  Object.assign(radiusQueryValidationRules, globalValidationRules),
-);
+const radiusQueryValidator = queryValidator({
+  ...radiusQueryValidationRules,
+  ...globalValidationRules,
+});
 
 const bboxQueryValidationRules: ValidationRules = {
   bbox: v =>
@@ -43,9 +44,10 @@ const bboxQueryValidationRules: ValidationRules = {
     'invalid fields',
 };
 
-const bboxQueryValidator = queryValidator(
-  Object.assign(globalValidationRules, bboxQueryValidationRules),
-);
+const bboxQueryValidator = queryValidator({
+  ...globalValidationRules,
+  ...bboxQueryValidationRules,
+});
 
 const orderQueryValidationRules: ValidationRules = {
   orderBy: v =>
@@ -53,9 +55,10 @@ const orderQueryValidationRules: ValidationRules = {
   direction: v => ['desc', 'asc'].includes(v) || 'invalid direction',
 };
 
-const orderQueryValidator = queryValidator(
-  Object.assign(orderQueryValidationRules, globalValidationRules),
-);
+const orderQueryValidator = queryValidator({
+  ...orderQueryValidationRules,
+  ...globalValidationRules,
+});
 
 const qvs: { [name: string]: Middleware } = {
   radius: radiusQueryValidator,

@@ -27,7 +27,8 @@ export function attachPostPictureHandler(router: Router) {
           error: 'missing_image_file',
         };
 
-        ctx.throw(400);
+        ctx.status = 400;
+        return;
       }
 
       if (files.image.size > 20 * 1024 * 1024) {
@@ -39,7 +40,8 @@ export function attachPostPictureHandler(router: Router) {
           error: 'missing_meta_field',
         };
 
-        ctx.throw(400);
+        ctx.status = 400;
+        return;
       }
 
       if (typeof ctx.request.body.meta === 'string') {
