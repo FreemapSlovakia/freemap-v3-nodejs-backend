@@ -1,19 +1,60 @@
 import net from 'net';
+import { getEnv } from './env';
+import { SQL } from 'sql-template-strings';
+import { storeTrackPoint } from './deviceTracking';
+import { pool } from './database';
+import { PoolConnection } from 'mariadb';
+import { appLogger } from './logger';
+
+const logger = appLogger.child({ module: 'socketDeviceTracking' });
+
+let id = 0;
 
 const server = net.createServer(connection => {
-  let imei;
+  let imei: string;
 
-  connection.on('data', data => {
-    const msg = data.toString();
+  const connLogger = logger.child({ id });
 
-    console.log('DATA', msg);
+  id++;
 
-    const result = /^\((.{12})([AB][A-Z]\d\d)(.*).*\)$/.exec(msg);
+  connLogger.info(
+    { remoteAddress: connection.remoteAddress },
+    'Connection opened.',
+  );
 
-    if (result) {
+  connection.on('data', async data => {
+    let conn: PoolConnection;
+
+    try {
+      const msg = data.toString();
+
+      connLogger.debug(`Data: ${msg}`);
+
+      const result = /^\((.{12})([AB][A-Z]\d\d)(.*).*\)$/.exec(msg);
+
+      if (!result) {
+        connection.end();
+        return;
+      }
+
       const [, deviceId, command, args] = result;
 
-      console.log({ deviceId, command, args });
+      connLogger.debug({ deviceId, command, args }, 'Received command.');
+
+      conn = await pool.getConnection();
+
+      conn.beginTransaction();
+
+      const [item] = await conn.query(
+        SQL`SELECT id, maxCount, maxAge FROM trackingDevice WHERE token IN (${`did:${deviceId}`}`
+          .append(imei ? SQL`, ${`imei:${imei}`}` : '')
+          .append(')'),
+      );
+
+      if (!item) {
+        connection.end();
+        return;
+      }
 
       if (command === 'BR00') {
         // args: 200313A4842.4669N02114.1758E014.4174559353.24,00000000L00000000
@@ -48,6 +89,10 @@ const server = net.createServer(connection => {
           mileData,
         ] = slices;
 
+        if (avail !== 'A') {
+          return;
+        }
+
         const date = new Date(
           Number(`20${yy}`),
           Number(mm) - 1,
@@ -63,36 +108,62 @@ const server = net.createServer(connection => {
         const lon =
           (loni === 'W' ? -1 : 1) * (Number(lond) + Number(lonm) / 60);
 
-        console.log('GPS', {
-          avail, // A - valid, V - invalid
-          date,
+        connLogger.debug(
+          {
+            avail, // A - valid, V - invalid
+            date,
+            lat,
+            lon,
+            speed: Number(speed),
+            orientation: Number(orientation),
+          },
+          'Got GPS data.',
+        );
+
+        storeTrackPoint(
+          conn,
+          item.id,
+          item.maxAge,
+          item.maxCount,
+          Number(speed),
+          null,
           lat,
           lon,
-          speed: Number(speed),
-          orientation: Number(orientation),
-        });
-      }
-
-      if (command === 'BP00') {
+          null,
+          null,
+          null,
+          Number(orientation),
+          null,
+          null,
+          null,
+          date,
+        );
+      } else if (command === 'BP00') {
         imei = args.slice(0, 15);
         // args: 352672101572147HSOP4F
         // args: 352672101572147 (imei) HSOP4F
 
         connection.write(`${deviceId}AP01HSO`);
       }
+
+      conn.commit();
+    } finally {
+      if (conn) {
+        conn.release();
+      }
     }
   });
 
-  connection.on('error', error => {
-    console.log('ERROR', error);
+  connection.on('error', err => {
+    connLogger.error({ err }, 'Socket error.');
   });
 
   connection.on('end', () => {
-    console.log('END');
+    connLogger.debug('Socket ended.');
   });
 
-  connection.on('close', c => {
-    console.log('CLOSE', c);
+  connection.on('close', closeResult => {
+    connLogger.debug({ closeResult }, 'Socket closed.');
   });
 });
 
@@ -110,4 +181,10 @@ function split(string: string, indexes: number[]) {
   return slices;
 }
 
-server.listen(3030);
+const port = getEnv('TRACKING_SOCKET_PORT', '');
+
+if (port) {
+  server.listen(Number(port), () => {
+    logger.info(`Device tracking socket listening on port ${port}.`);
+  });
+}
