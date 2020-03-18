@@ -52,9 +52,9 @@ export async function login(
           name = ${name},
           email = ${email},
           createdAt = ${now},
-          lat = ${lat},
-          lon = ${lon},
-          settings = ${JSON.stringify(settings)}`),
+          lat = ${lat ?? null},
+          lon = ${lon ?? null},
+          settings = ${JSON.stringify(settings) ?? null}`),
       )
     ).insertId;
   }
