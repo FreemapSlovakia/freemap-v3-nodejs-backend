@@ -1,5 +1,6 @@
 import Router from '@koa/router';
-import { promises as fs } from 'fs';
+import { promisify } from 'util';
+import { promises as fs, fstat } from 'fs';
 import { spawn } from 'child_process';
 import { downloadGeoTiff } from './downloader';
 import { ParameterizedContext } from 'koa';
@@ -9,6 +10,8 @@ import { getEnv } from '../../env';
 const hgtDir = getEnv('ELEVATION_DATA_DIRECTORY');
 
 const router = new Router();
+
+const fstatAsync = promisify(fstat);
 
 router.get('/elevation', compute);
 router.post('/elevation', acceptValidator('application/json'), compute);
@@ -70,7 +73,7 @@ async function compute(ctx: ParameterizedContext) {
             await fetchSafe(key);
             fd = await fs.open(hgtPath, 'r');
           }
-          fdMap.set(key, [fd, (await fs.fstat(fd)).size]);
+          fdMap.set(key, [fd, (await fstatAsync(fd.fd)).size]);
         }
 
         return [lat, lon, key];
