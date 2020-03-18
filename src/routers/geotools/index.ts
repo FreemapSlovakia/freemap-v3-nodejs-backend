@@ -1,6 +1,6 @@
 import Router from '@koa/router';
 import { promisify } from 'util';
-import { promises as fs, fstat } from 'fs';
+import { promises as fs, fstat, read } from 'fs';
 import { spawn } from 'child_process';
 import { downloadGeoTiff } from './downloader';
 import { ParameterizedContext } from 'koa';
@@ -12,6 +12,7 @@ const hgtDir = getEnv('ELEVATION_DATA_DIRECTORY');
 const router = new Router();
 
 const fstatAsync = promisify(fstat);
+const readAsync = promisify(read);
 
 router.get('/elevation', compute);
 router.post('/elevation', acceptValidator('application/json'), compute);
@@ -170,10 +171,10 @@ async function computeElevation([lat, lon, fd, size]: [
 
   const buffer = Buffer.alloc(8);
   await Promise.all([
-    fs.read(fd, buffer, 0, 2, (y0 * (rx + 1) + x0) * 2),
-    fs.read(fd, buffer, 2, 2, (y1 * (rx + 1) + x0) * 2),
-    fs.read(fd, buffer, 4, 2, (y0 * (rx + 1) + x1) * 2),
-    fs.read(fd, buffer, 6, 2, (y1 * (rx + 1) + x1) * 2),
+    readAsync(fd.fd, buffer, 0, 2, (y0 * (rx + 1) + x0) * 2),
+    readAsync(fd.fd, buffer, 2, 2, (y1 * (rx + 1) + x0) * 2),
+    readAsync(fd.fd, buffer, 4, 2, (y0 * (rx + 1) + x1) * 2),
+    readAsync(fd.fd, buffer, 6, 2, (y1 * (rx + 1) + x1) * 2),
   ]);
 
   const v00 = buffer.readInt16BE(0);
