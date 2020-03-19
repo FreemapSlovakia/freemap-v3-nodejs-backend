@@ -48,44 +48,34 @@ export function trackingSubscribeHandler(ctx: RpcContext) {
 
     if (maxCount === 0 || maxAge === 0) {
       result = [];
-    } else if (deviceId) {
-      result = await pool.query(
-        SQL`SELECT id, lat, lon, message, createdAt, altitude, speed, accuracy, hdop, bearing, battery, gsmSignal
-            FROM trackingPoint
-            WHERE deviceId = ${deviceId || token}`
-          .append(fromTime ? SQL` AND createdAt >= ${new Date(fromTime)}` : '')
-          .append(
-            maxAge
-              ? SQL` AND trackingPoint.createdAt >= ${Number(maxAge)}`
-              : '',
-          )
-          .append(' ORDER BY id DESC')
-          .append(maxCount ? SQL` LIMIT ${Number(maxCount)}` : ''),
-      );
     } else {
       result = await pool.query(
-        SQL`SELECT trackingPoint.id, lat, lon, message, trackingPoint.createdAt, altitude, speed, accuracy, hdop, bearing, battery, gsmSignal
-            FROM trackingPoint JOIN trackingAccessToken
-              ON trackingPoint.deviceId = trackingAccessToken.deviceId
-              WHERE trackingAccessToken.token = ${deviceId || token}
-          `
+        SQL`SELECT trackingPoint.id, lat, lon, message, trackingPoint.createdAt, altitude, speed, accuracy, hdop, bearing, battery, gsmSignal`
+          .append(
+            deviceId
+              ? SQL` FROM trackingPoint WHERE deviceId = ${deviceId}`
+              : SQL` FROM trackingPoint JOIN trackingAccessToken
+                        ON trackingPoint.deviceId = trackingAccessToken.deviceId
+                        WHERE trackingAccessToken.token = ${token}`,
+          )
+          .append(
+            fromTime
+              ? SQL` AND trackingPoint.createdAt >= ${new Date(fromTime)}`
+              : '',
+          )
           .append(
             maxAge
-              ? SQL` AND TIMESTAMPDIFF(SECOND, trackingPoint.createdAt, now()) < ${new Date(
-                  fromTime,
+              ? SQL` AND TIMESTAMPDIFF(SECOND, trackingPoint.createdAt, now()) < ${Number(
+                  maxAge,
                 )}`
               : '',
           )
           .append(
-            fromTime
-              ? SQL` AND trackingPoint.createdAt >= ${Number(maxAge)}`
+            token
+              ? ` AND (timeFrom IS NULL OR trackingPoint.createdAt >= timeFrom)
+                  AND (timeTo IS NULL OR trackingPoint.createdAt < timeTo)
+                  ORDER BY trackingPoint.id DESC`
               : '',
-          )
-          .append(
-            ` AND (timeFrom IS NULL OR trackingPoint.createdAt >= timeFrom)
-                AND (timeTo IS NULL OR trackingPoint.createdAt < timeTo)
-                ORDER BY trackingPoint.id DESC
-              `,
           )
           .append(maxCount ? SQL` LIMIT ${Number(maxCount)}` : ''),
       );
