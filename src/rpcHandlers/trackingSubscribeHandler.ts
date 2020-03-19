@@ -49,36 +49,45 @@ export function trackingSubscribeHandler(ctx: RpcContext) {
     if (maxCount === 0 || maxAge === 0) {
       result = [];
     } else {
-      result = await pool.query(
-        SQL`SELECT trackingPoint.id, lat, lon, message, trackingPoint.createdAt, altitude, speed, accuracy, hdop, bearing, battery, gsmSignal`
-          .append(
-            deviceId
-              ? SQL` FROM trackingPoint WHERE deviceId = ${deviceId}`
-              : SQL` FROM trackingPoint JOIN trackingAccessToken
-                        ON trackingPoint.deviceId = trackingAccessToken.deviceId
-                        WHERE trackingAccessToken.token = ${token}`,
-          )
-          .append(
-            fromTime
-              ? SQL` AND trackingPoint.createdAt >= ${new Date(fromTime)}`
-              : '',
-          )
-          .append(
-            maxAge
-              ? SQL` AND TIMESTAMPDIFF(SECOND, trackingPoint.createdAt, now()) < ${Number(
-                  maxAge,
-                )}`
-              : '',
-          )
-          .append(
-            token
-              ? ` AND (timeFrom IS NULL OR trackingPoint.createdAt >= timeFrom)
-                  AND (timeTo IS NULL OR trackingPoint.createdAt < timeTo)
-                  ORDER BY trackingPoint.id DESC`
-              : '',
-          )
-          .append(maxCount ? SQL` LIMIT ${Number(maxCount)}` : ''),
+      const query = SQL`
+        SELECT trackingPoint.id, lat, lon, message, trackingPoint.createdAt, altitude, speed, accuracy, hdop, bearing, battery, gsmSignal
+        FROM trackingPoint`;
+
+      query.append(
+        deviceId
+          ? SQL` WHERE deviceId = ${deviceId}`
+          : SQL` JOIN trackingAccessToken
+                    ON trackingPoint.deviceId = trackingAccessToken.deviceId
+                    WHERE trackingAccessToken.token = ${token}`,
       );
+
+      if (fromTime) {
+        query.append(
+          SQL` AND trackingPoint.createdAt >= ${new Date(fromTime)}`,
+        );
+      }
+
+      if (maxAge) {
+        query.append(
+          SQL` AND TIMESTAMPDIFF(SECOND, trackingPoint.createdAt, now()) < ${Number(
+            maxAge,
+          )}`,
+        );
+      }
+
+      if (token) {
+        query.append(
+          ` AND (timeFrom IS NULL OR trackingPoint.createdAt >= timeFrom)
+            AND (timeTo IS NULL OR trackingPoint.createdAt < timeTo)
+            ORDER BY trackingPoint.id DESC`,
+        );
+      }
+
+      if (maxCount) {
+        query.append(maxCount ? SQL` LIMIT ${Number(maxCount)}` : '');
+      }
+
+      result = await pool.query(query);
     }
 
     // TODO skip nulls
