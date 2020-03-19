@@ -54,7 +54,7 @@ export async function login(
           createdAt = ${now},
           lat = ${lat ?? null},
           lon = ${lon ?? null},
-          settings = ${JSON.stringify(settings) ?? null}`),
+          settings = ${JSON.stringify(settings)}`),
       )
     ).insertId;
   }
