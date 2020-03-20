@@ -80,10 +80,11 @@ export function trackingSubscribeHandler(ctx: RpcContext) {
       if (token) {
         query.append(
           ` AND (timeFrom IS NULL OR trackingPoint.createdAt >= timeFrom)
-            AND (timeTo IS NULL OR trackingPoint.createdAt < timeTo)
-            ORDER BY trackingPoint.id`,
+            AND (timeTo IS NULL OR trackingPoint.createdAt < timeTo)`,
         );
       }
+
+      query.append(' ORDER BY trackingPoint.id');
 
       if (maxCount) {
         query.append(maxCount ? SQL` LIMIT ${Number(maxCount)}` : '');
