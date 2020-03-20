@@ -17,11 +17,13 @@ export function trackingSubscribeHandler(ctx: RpcContext) {
       );
 
       if (!row) {
-        ctx.ctx.throw(404, 'no such device');
+        ctx.respondError(404, 'no such device');
+        return;
       }
 
       if (!user || (!user.isAdmin && row.userId !== user.id)) {
-        ctx.ctx.throw(403, 'forbidden');
+        ctx.respondError(403, 'forbidden');
+        return;
       }
     } else if (token) {
       const [row] = await pool.query(
@@ -79,7 +81,7 @@ export function trackingSubscribeHandler(ctx: RpcContext) {
         query.append(
           ` AND (timeFrom IS NULL OR trackingPoint.createdAt >= timeFrom)
             AND (timeTo IS NULL OR trackingPoint.createdAt < timeTo)
-            ORDER BY trackingPoint.id DESC`,
+            ORDER BY trackingPoint.id`,
         );
       }
 
@@ -93,7 +95,7 @@ export function trackingSubscribeHandler(ctx: RpcContext) {
     // TODO skip nulls
 
     ctx.respondResult(
-      result.reverse().map((item: any) => ({
+      result.map((item: any) => ({
         id: item.id,
         ts: item.createdAt,
         lat: item.lat,
