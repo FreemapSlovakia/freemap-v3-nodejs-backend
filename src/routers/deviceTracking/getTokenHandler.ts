@@ -11,10 +11,10 @@ export function attachGetTokenHandler(router: Router) {
     authenticator(true),
     async ctx => {
       const [item] = await pool.query(SQL`
-        SELECT id, token, createdAt, timeFrom, timeTo, note, listingLabel
+        SELECT trackingAccessToken.id, userId, trackingAccessToken.token, trackingAccessToken.createdAt, timeFrom, timeTo, note, listingLabel
           FROM trackingAccessToken
           JOIN trackingDevice ON (trackingAccessToken.deviceId = trackingDevice.id)
-          WHERE id = ${ctx.params.id}
+          WHERE trackingAccessToken.id = ${ctx.params.id}
       `);
 
       if (!item) {
