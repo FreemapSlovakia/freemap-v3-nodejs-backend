@@ -35,20 +35,22 @@ export function attachPostDeviceHandler(router: Router) {
     ),
     authenticator(true),
     async ctx => {
-      const token = randomize('Aa0', 8);
+      const token1 = /^(imei|did:).*/.test(ctx.request.body.token ?? '')
+        ? ctx.request.body.token
+        : randomize('Aa0', 8);
 
       const { name, maxCount, maxAge } = ctx.request.body;
 
       const { insertId } = await pool.query(SQL`
         INSERT INTO trackingDevice SET
           name = ${name},
-          token = ${token},
+          token = ${token1},
           userId = ${ctx.state.user.id},
           maxCount = ${maxCount},
           maxAge = ${maxAge}
       `);
 
-      ctx.body = { id: insertId, token };
+      ctx.body = { id: insertId, token: token1 };
     },
   );
 }
