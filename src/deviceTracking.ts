@@ -68,17 +68,17 @@ export async function storeTrackPoint(
       createdAt = ${time}
   `);
 
-  if (maxAge) {
+  if (maxAge != null) {
     await conn.query(
       SQL`DELETE FROM trackingPoint WHERE deviceId = ${id} AND TIMESTAMPDIFF(SECOND, createdAt, now()) > ${maxAge}`,
     );
   }
 
-  if (maxCount) {
+  if (maxCount != null) {
     await conn.query(SQL`
       DELETE t FROM trackingPoint AS t JOIN (
         SELECT id FROM trackingPoint WHERE deviceId = ${id}
-          ORDER BY id DESC LIMIT 18446744073709551615 OFFSET ${maxCount + 1}
+          ORDER BY id DESC LIMIT 18446744073709551615 OFFSET ${maxCount}
       ) tlimit ON t.id = tlimit.id
     `);
   }
