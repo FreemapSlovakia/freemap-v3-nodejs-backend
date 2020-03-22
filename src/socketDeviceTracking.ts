@@ -146,7 +146,7 @@ export function startSocketDeviceTracking() {
             'Got GPS data.',
           );
 
-          storeTrackPoint(
+          await storeTrackPoint(
             conn,
             item.id,
             item.maxAge,

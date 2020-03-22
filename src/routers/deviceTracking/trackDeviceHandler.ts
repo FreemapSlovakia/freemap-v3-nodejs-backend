@@ -57,7 +57,7 @@ async function handler(ctx: ParameterizedContext) {
   const time = guessTime(q.time || q.timestamp);
 
   try {
-    const id = storeTrackPoint(
+    const id = await storeTrackPoint(
       conn,
       item.id,
       item.maxAge,
@@ -72,7 +72,7 @@ async function handler(ctx: ParameterizedContext) {
       bearing,
       battery,
       gsmSignal,
-      message,
+      message ?? null,
       time,
     );
 
