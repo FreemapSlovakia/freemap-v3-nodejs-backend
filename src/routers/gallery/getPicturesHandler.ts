@@ -10,19 +10,20 @@ import { ratingSubquery } from './ratingConstants';
 import { Middleware, ParameterizedContext } from 'koa';
 
 const globalValidationRules: ValidationRules = {
-  userId: v => v === null || !Number.isNaN(v) || 'invalid userId',
-  ratingFrom: v => v === null || !Number.isNaN(v) || 'invalid ratingFrom',
-  ratingTo: v => v === null || !Number.isNaN(v) || 'invalid ratingTo',
-  takenAtFrom: v => v === null || !Number.isNaN(v) || 'invalid takenAtFrom',
-  takenAtTo: v => v === null || !Number.isNaN(v) || 'invalid takenAtTo',
-  createdAtFrom: v => v === null || !Number.isNaN(v) || 'invalid createdAtFrom',
-  createdAtTo: v => v === null || !Number.isNaN(v) || 'invalid createdAtTo',
+  userId: (v) => v === null || !Number.isNaN(v) || 'invalid userId',
+  ratingFrom: (v) => v === null || !Number.isNaN(v) || 'invalid ratingFrom',
+  ratingTo: (v) => v === null || !Number.isNaN(v) || 'invalid ratingTo',
+  takenAtFrom: (v) => v === null || !Number.isNaN(v) || 'invalid takenAtFrom',
+  takenAtTo: (v) => v === null || !Number.isNaN(v) || 'invalid takenAtTo',
+  createdAtFrom: (v) =>
+    v === null || !Number.isNaN(v) || 'invalid createdAtFrom',
+  createdAtTo: (v) => v === null || !Number.isNaN(v) || 'invalid createdAtTo',
 };
 
 const radiusQueryValidationRules: ValidationRules = {
-  lat: v => (v >= -90 && v <= 90) || 'lat must be between -90 and 90',
-  lon: v => (v >= -180 && v <= 180) || 'lon must be between -180 and 180',
-  distance: v => v > 0 || 'distance must be positive',
+  lat: (v) => (v >= -90 && v <= 90) || 'lat must be between -90 and 90',
+  lon: (v) => (v >= -180 && v <= 180) || 'lon must be between -180 and 180',
+  distance: (v) => v > 0 || 'distance must be positive',
 };
 
 const radiusQueryValidator = queryValidator({
@@ -31,10 +32,10 @@ const radiusQueryValidator = queryValidator({
 });
 
 const bboxQueryValidationRules: ValidationRules = {
-  bbox: v =>
+  bbox: (v) =>
     (v && v.length === 4 && v.every((x: any) => !Number.isNaN(x))) ||
     'invalid bbox',
-  fields: v =>
+  fields: (v) =>
     !v ||
     v.every((f: any) =>
       ['id', 'title', 'description', 'takenAt', 'createdAt', 'rating'].includes(
@@ -50,9 +51,9 @@ const bboxQueryValidator = queryValidator({
 });
 
 const orderQueryValidationRules: ValidationRules = {
-  orderBy: v =>
+  orderBy: (v) =>
     ['createdAt', 'takenAt', 'rating'].includes(v) || 'invalid orderBy',
-  direction: v => ['desc', 'asc'].includes(v) || 'invalid direction',
+  direction: (v) => ['desc', 'asc'].includes(v) || 'invalid direction',
 };
 
 const orderQueryValidator = queryValidator({
@@ -83,27 +84,27 @@ export function attachGetPicturesHandler(router: Router) {
       lon: parseFloat,
       distance: parseFloat,
 
-      bbox: x => (x === undefined ? null : x.split(',').map(parseFloat)),
-      userId: x => (x ? parseInt(x, 10) : null),
+      bbox: (x) => (x === undefined ? null : x.split(',').map(parseFloat)),
+      userId: (x) => (x ? parseInt(x, 10) : null),
 
-      ratingFrom: x => (x ? parseFloat(x) : null),
-      ratingTo: x => (x ? parseFloat(x) : null),
-      takenAtFrom: x => (x ? new Date(x) : null),
-      takenAtTo: x => (x ? new Date(x) : null),
-      createdAtFrom: x => (x ? new Date(x) : null),
-      createdAtTo: x => (x ? new Date(x) : null),
-      fields: x => (typeof x === 'string' ? [x] : x),
+      ratingFrom: (x) => (x ? parseFloat(x) : null),
+      ratingTo: (x) => (x ? parseFloat(x) : null),
+      takenAtFrom: (x) => (x ? new Date(x) : null),
+      takenAtTo: (x) => (x ? new Date(x) : null),
+      createdAtFrom: (x) => (x ? new Date(x) : null),
+      createdAtTo: (x) => (x ? new Date(x) : null),
+      fields: (x) => (typeof x === 'string' ? [x] : x),
     }),
     queryValidator({
-      by: v =>
+      by: (v) =>
         ['radius', 'bbox', 'order'].includes(v) ||
         '"by" must be one of "radius", "bbox", "order"',
-      userId: userId => !userId || userId > 0 || 'invalid userId',
+      userId: (userId) => !userId || userId > 0 || 'invalid userId',
     }),
     async (ctx, next) => {
       await qvs[ctx.query.by as string](ctx, next);
     },
-    async ctx => {
+    async (ctx) => {
       await methods[ctx.query.by as string](ctx);
     },
   );
@@ -151,7 +152,7 @@ async function byRadius(ctx: ParameterizedContext) {
     ${ratingFrom === null ? '' : `AND rating >= ${ratingFrom}`}
     ${ratingTo === null ? '' : `AND rating <= ${ratingTo}`}
     ORDER BY distance
-    LIMIT 100`;
+    LIMIT 1000`;
 
   const rows = await pool.query(sql);
 
