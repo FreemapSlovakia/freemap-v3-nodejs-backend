@@ -84,13 +84,15 @@ export function trackingSubscribeHandler(ctx: RpcContext) {
         );
       }
 
-      query.append(' ORDER BY trackingPoint.id');
+      query.append(' ORDER BY trackingPoint.id DESC');
 
       if (maxCount) {
         query.append(maxCount ? SQL` LIMIT ${Number(maxCount)}` : '');
       }
 
       result = await pool.query(query);
+
+      result.reverse();
     }
 
     // TODO skip nulls
@@ -111,7 +113,7 @@ export function trackingSubscribeHandler(ctx: RpcContext) {
         gsmSignal: ntu(item.gsmSignal),
       })),
     );
-  })().catch(err => {
+  })().catch((err) => {
     ctx.respondError(500, err.message);
   });
 }
