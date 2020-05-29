@@ -148,6 +148,7 @@ async function byRadius(ctx: ParameterizedContext) {
     ${createdAtFrom ? `AND createdAt >= '${toSqlDate(createdAtFrom)}'` : ''}
     ${createdAtTo ? `AND createdAt <= '${toSqlDate(createdAtTo)}'` : ''}
     ${userId ? `AND userId = ${userId}` : ''}
+    ${tag === '' ? 'AND id NOT IN (SELECT pictureId FROM pictureTag)' : ''}
     HAVING distance <= ${distance}
     ${ratingFrom === null ? '' : `AND rating >= ${ratingFrom}`}
     ${ratingTo === null ? '' : `AND rating <= ${ratingTo}`}
@@ -206,6 +207,7 @@ async function byBbox(ctx: ParameterizedContext) {
     ${createdAtFrom ? `AND createdAt >= '${toSqlDate(createdAtFrom)}'` : ''}
     ${createdAtTo ? `AND createdAt <= '${toSqlDate(createdAtTo)}'` : ''}
     ${userId ? `AND userId = ${userId}` : ''}
+    ${tag === '' ? 'AND id NOT IN (SELECT pictureId FROM pictureTag)' : ''}
     ${ratingFrom === null ? '' : `HAVING rating >= ${ratingFrom}`}
     ${
       ratingTo === null
@@ -258,6 +260,9 @@ async function byOrder(ctx: ParameterizedContext) {
   }
   if (userId !== null) {
     wh.push(`userId = ${userId}`);
+  }
+  if (tag === '') {
+    wh.push('id NOT IN (SELECT pictureId FROM pictureTag)');
   }
 
   const sql = `SELECT id ${
