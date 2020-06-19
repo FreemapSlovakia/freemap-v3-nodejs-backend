@@ -1,11 +1,11 @@
 import Router from '@koa/router';
 import { promisify } from 'util';
-import { promises as fs, fstat, read } from 'fs';
-import { spawn } from 'child_process';
-import { downloadGeoTiff } from './downloader';
+import { promises as fs, fstat, read, createWriteStream, rename } from 'fs';
 import { ParameterizedContext } from 'koa';
 import { acceptValidator } from '../../requestValidators';
 import { getEnv } from '../../env';
+import unzipper from 'unzipper';
+import got from 'got';
 
 const hgtDir = getEnv('ELEVATION_DATA_DIRECTORY');
 
@@ -27,7 +27,7 @@ async function compute(ctx: ParameterizedContext) {
   ) {
     cs = coordinates
       .match(/[^,]+,[^,]+/g)
-      .map(pair => pair.split(',').map(c => Number.parseFloat(c)));
+      .map((pair) => pair.split(',').map((c) => Number.parseFloat(c)));
   } else if (ctx.method === 'POST' && Array.isArray(ctx.request.body)) {
     cs = ctx.request.body;
   } else {
@@ -36,7 +36,7 @@ async function compute(ctx: ParameterizedContext) {
 
   if (
     !cs.every(
-      x =>
+      (x) =>
         Array.isArray(x) &&
         x.length === 2 &&
         x[0] >= -90 &&
@@ -81,7 +81,7 @@ async function compute(ctx: ParameterizedContext) {
       }),
     );
 
-    items.forEach(item => {
+    items.forEach((item) => {
       const f = fdMap.get(item[2]);
       item[2] = f[0];
       item[3] = f[1];
@@ -116,29 +116,53 @@ async function fetchSafe(key: string) {
 }
 
 async function fetch(key: string) {
-  const tifPath = `${hgtDir}/${key}.tif`;
-  const hgtPath = `${hgtDir}/${key}.HGT`;
-  try {
-    await downloadGeoTiff(key, tifPath);
+  const fname = `${hgtDir}/${key}.HGT`;
 
-    await new Promise((resolve, reject) => {
-      const child = spawn('gdal_translate', [tifPath, hgtPath]);
-      child.on('exit', code => {
-        if (code) {
-          reject(new Error(`Nonzero exit code: ${code}`));
-        } else {
-          resolve();
-        }
-      });
-      child.on('error', err => {
-        reject(err);
-      });
-    });
+  const temp = `${fname}.tmp`;
 
-    await fs.unlink(tifPath);
-  } catch (e) {
-    await (await fs.open(hgtPath, 'w+')).close();
-  }
+  await new Promise((resolve, reject) => {
+    const ws = createWriteStream(temp);
+
+    ws.on('finish', () => resolve());
+
+    ws.on('error', () => reject());
+
+    got.stream
+      .get(
+        `https://e4ftl01.cr.usgs.gov/MEASURES/SRTMGL1.003/2000.02.11/${key}.SRTMGL1.hgt.zip`,
+        {
+          hooks: {
+            beforeRedirect: [
+              (options, response) => {
+                if (
+                  options.url.href.startsWith(
+                    'https://urs.earthdata.nasa.gov/oauth/authorize',
+                  )
+                ) {
+                  options.headers.authorization = `Basic ${Buffer.from(
+                    getEnv('URS_EARTHDATA_NASA_USERNAME') +
+                      ':' +
+                      getEnv('URS_EARTHDATA_NASA_PASSWORD'),
+                  ).toString('base64')}`;
+                }
+
+                const c = response.headers['set-cookie'];
+
+                const m = c && /^(DATA=.*?);/.exec(c[0]);
+
+                if (m && m[1]) {
+                  options.headers.cookie = m[1];
+                }
+              },
+            ],
+          },
+        },
+      )
+      .pipe(unzipper.ParseOne())
+      .pipe(ws);
+  });
+
+  await fs.rename(temp, fname);
 }
 
 async function computeElevation([lat, lon, fd, size]: [

@@ -17,7 +17,6 @@
   "dependencies": {
     "@koa/router": "9.0.1",
     "ajv": "6.12.2",
-    "axios": "0.19.2",
     "bunyan": "1.8.12",
     "concurrently": "5.2.0",
     "etag": "1.8.1",
