@@ -31,7 +31,7 @@ export function attachPostMapHandler(router: Router) {
       true,
     ),
     authenticator(true),
-    async ctx => {
+    async (ctx) => {
       const { name, public: pub, data } = ctx.request.body;
 
       const { insertId } = await pool.query(SQL`

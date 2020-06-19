@@ -44,7 +44,7 @@ export function attachPutPictureHandler(router: Router) {
       },
     }),
     runInTransaction(),
-    async ctx => {
+    async (ctx) => {
       const conn = ctx.state.dbConn;
 
       const {

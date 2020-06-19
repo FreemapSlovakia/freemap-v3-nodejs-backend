@@ -10,7 +10,7 @@ export function attachDeleteDeviceHandler(router: Router) {
     acceptValidator('application/json'),
     authenticator(true),
     runInTransaction(),
-    async ctx => {
+    async (ctx) => {
       const conn = ctx.state.dbConn;
 
       const [item] = await conn.query(

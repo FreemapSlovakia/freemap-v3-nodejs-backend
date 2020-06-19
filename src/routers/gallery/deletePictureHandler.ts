@@ -10,7 +10,7 @@ export function attachDeletePictureHandler(router: Router) {
     '/pictures/:id',
     authenticator(true),
     runInTransaction(),
-    async ctx => {
+    async (ctx) => {
       const conn = ctx.state.dbConn;
 
       const rows = await conn.query(

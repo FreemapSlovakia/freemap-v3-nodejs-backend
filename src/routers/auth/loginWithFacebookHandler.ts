@@ -6,7 +6,7 @@ export function attachLoginWithFacebookHandler(router: Router) {
   router.post(
     '/login-fb',
     // TODO validation
-    async ctx => {
+    async (ctx) => {
       const { accessToken }: { accessToken: string } = ctx.request.body;
 
       const { id, name, email } = await fb

@@ -22,7 +22,7 @@ export function attachPostPictureRatingHandler(router: Router) {
       },
       true,
     ),
-    async ctx => {
+    async (ctx) => {
       const { stars } = ctx.request.body;
 
       await pool.query(SQL`

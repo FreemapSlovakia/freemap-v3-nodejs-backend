@@ -31,7 +31,7 @@ export function attachPatchMapHandler(router: Router) {
     ),
     authenticator(true),
     runInTransaction(),
-    async ctx => {
+    async (ctx) => {
       const conn = ctx.state.dbConn;
 
       const id = Number(ctx.params.id);

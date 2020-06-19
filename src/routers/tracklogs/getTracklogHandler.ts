@@ -3,7 +3,7 @@ import { promises as fs } from 'fs';
 import { tracklogsDir } from '../tracklogs/constants';
 
 export function attachGetTracklogHandler(router: Router) {
-  router.get('/:uid', async ctx => {
+  router.get('/:uid', async (ctx) => {
     const fileUID = ctx.params.uid;
 
     if (!/^[a-zA-Z0-9]*$/.test(fileUID)) {

@@ -12,7 +12,7 @@ export type ValidationRules = {
 export function queryValidator(spec: ValidationRules): Middleware {
   return async (ctx, next) => {
     const errors: string[] = [];
-    Object.keys(spec).forEach(key => {
+    Object.keys(spec).forEach((key) => {
       const msg = spec[key](ctx.query[key], ctx);
       if (msg && typeof msg === 'string') {
         errors.push(
@@ -88,7 +88,7 @@ export type AdapterRules = {
 
 export function queryAdapter(spec: AdapterRules): Middleware {
   return async (ctx, next) => {
-    Object.keys(spec).forEach(key => {
+    Object.keys(spec).forEach((key) => {
       ctx.query[key] = spec[key](ctx.query[key]);
     });
 

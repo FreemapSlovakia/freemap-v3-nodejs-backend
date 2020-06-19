@@ -6,7 +6,7 @@ export function attachGetAllPictureUsers(router: Router) {
   router.get(
     '/picture-users',
     acceptValidator('application/json'),
-    async ctx => {
+    async (ctx) => {
       ctx.body = await pool.query(
         `SELECT userId AS id, user.name AS name, COUNT(*) AS count
           FROM picture

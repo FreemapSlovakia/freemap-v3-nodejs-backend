@@ -17,7 +17,7 @@ export function attachCreateTracklogHandler(router: Router) {
         },
       },
     }),
-    async ctx => {
+    async (ctx) => {
       const b64gpx = ctx.request.body.data;
       const fileUID = uuidBase62.v4();
       const filePath = `${tracklogsDir}/${fileUID}.b64.gpx`;

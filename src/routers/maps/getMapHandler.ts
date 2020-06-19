@@ -9,7 +9,7 @@ export function attachGetMapHandler(router: Router) {
     '/:id',
     acceptValidator('application/json'),
     authenticator(false),
-    async ctx => {
+    async (ctx) => {
       const [item] = await pool.query(SQL`
         SELECT id, name, public, data, createdAt, userId
           FROM map

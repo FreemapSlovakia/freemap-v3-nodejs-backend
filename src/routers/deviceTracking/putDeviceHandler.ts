@@ -38,7 +38,7 @@ export function attachPutDeviceHandler(router: Router) {
     ),
     authenticator(true),
     runInTransaction(),
-    async ctx => {
+    async (ctx) => {
       const { id } = ctx.params;
 
       const conn = ctx.state.dbConn;

@@ -35,7 +35,7 @@ export function attachPutTokenHandler(router: Router) {
     ),
     authenticator(true),
     runInTransaction(),
-    async ctx => {
+    async (ctx) => {
       const conn = ctx.state.dbConn;
 
       const [item] = await conn.query(SQL`

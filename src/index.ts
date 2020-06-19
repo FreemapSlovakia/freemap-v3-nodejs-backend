@@ -57,7 +57,7 @@ app.use(
 
 app.use(
   cors({
-    origin: ctx =>
+    origin: (ctx) =>
       /\.freemap\.sk(:\d+)?$/.test(ctx.header.origin)
         ? ctx.header.origin
         : null,
@@ -131,6 +131,6 @@ initDatabase()
 
     startSocketDeviceTracking();
   })
-  .catch(err => {
+  .catch((err) => {
     logger.fatal({ err }, 'Error initializing database.');
   });

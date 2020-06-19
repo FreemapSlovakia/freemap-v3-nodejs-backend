@@ -36,7 +36,7 @@ export function attachPostTokenHandler(router: Router) {
       true,
     ),
     authenticator(true),
-    async ctx => {
+    async (ctx) => {
       const [device] = await pool.query(
         SQL`SELECT userId FROM trackingDevice WHERE id = ${ctx.params.id}`,
       );

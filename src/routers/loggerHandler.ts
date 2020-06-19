@@ -11,7 +11,7 @@ const levelsAsConst = [
   'fatal',
 ] as const;
 
-const levels: string[] = levelsAsConst.map(level => level);
+const levels: string[] = levelsAsConst.map((level) => level);
 
 type LogLevelString = typeof levelsAsConst[number];
 
@@ -34,7 +34,7 @@ export function attachLoggerHandler(router: Router) {
         },
       },
     }),
-    async ctx => {
+    async (ctx) => {
       const { level, message, details = {} } = ctx.request.body;
       ctx.log[validateLevel(level)](
         Object.assign({ subModule: 'client' }, details),

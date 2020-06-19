@@ -6,7 +6,7 @@ export function attachLoginWithGoogleHandler(router: Router) {
   router.post(
     '/login-google',
     // TODO validation
-    async ctx => {
+    async (ctx) => {
       const { idToken } = ctx.request.body;
 
       const { sub, name, email } = (

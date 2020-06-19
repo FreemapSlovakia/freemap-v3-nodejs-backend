@@ -9,7 +9,7 @@ export function attachGetAllTokensHandler(router: Router) {
     '/devices/:id/access-tokens',
     acceptValidator('application/json'),
     authenticator(true),
-    async ctx => {
+    async (ctx) => {
       const [device] = await pool.query(
         SQL`SELECT userId FROM trackingDevice WHERE id = ${ctx.params.id}`,
       );

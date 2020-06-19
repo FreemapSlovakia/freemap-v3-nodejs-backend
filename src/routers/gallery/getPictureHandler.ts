@@ -10,7 +10,7 @@ export function attachGetPictureHandler(router: Router) {
     '/pictures/:id',
     acceptValidator('application/json'),
     authenticator(false),
-    async ctx => {
+    async (ctx) => {
       const rows = await pool.query(
         SQL`SELECT picture.id AS pictureId, picture.createdAt, pathname, title, description, takenAt, picture.lat, picture.lon,
           user.id as userId, user.name,

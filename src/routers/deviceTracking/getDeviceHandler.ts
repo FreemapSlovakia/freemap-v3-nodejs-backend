@@ -9,7 +9,7 @@ export function attachGetDeviceHandler(router: Router) {
     '/devices/:id',
     acceptValidator('application/json'),
     authenticator(true),
-    async ctx => {
+    async (ctx) => {
       const [item] = await pool.query(SQL`
         SELECT id, name, token, createdAt, maxCount, maxAge, userId
           FROM trackingDevice

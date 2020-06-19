@@ -11,7 +11,7 @@ export function attachGetPictureImageHandler(router: Router) {
   router.get(
     '/pictures/:id/image',
     acceptValidator('image/jpeg'),
-    async ctx => {
+    async (ctx) => {
       const rows = await pool.query(
         SQL`SELECT pathname FROM picture WHERE picture.id = ${ctx.params.id}`,
       );
@@ -48,11 +48,7 @@ export function attachGetPictureImageHandler(router: Router) {
 
       const w = parseInt(ctx.headers.width || ctx.query.width || 'NaN', 10);
 
-      const resize = w
-        ? sharp()
-            .resize(w)
-            .jpeg()
-        : null;
+      const resize = w ? sharp().resize(w).jpeg() : null;
 
       const fileStream = createReadStream(pathname);
 

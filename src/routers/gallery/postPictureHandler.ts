@@ -94,7 +94,7 @@ export function attachPostPictureHandler(router: Router) {
     ),
     acceptValidator('application/json'),
     runInTransaction(),
-    async ctx => {
+    async (ctx) => {
       const conn = ctx.state.dbConn;
 
       const { image } = ctx.request.files;

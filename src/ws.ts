@@ -11,7 +11,7 @@ import { RpcContext } from './rpcHandlerTypes';
 export function attachWs(app: KoaWebsocket.App) {
   const wsRouter = new Router();
 
-  wsRouter.all('/ws', authenticator(), async ctx => {
+  wsRouter.all('/ws', authenticator(), async (ctx) => {
     const { pingInterval } = ctx.query;
 
     const ws = ctx.websocket as ws;
@@ -24,7 +24,7 @@ export function attachWs(app: KoaWebsocket.App) {
           }
         }, 30000);
 
-    ws.on('message', message => {
+    ws.on('message', (message) => {
       let id: number | string | null = null;
 
       function respondError(code: number, msg: string) {

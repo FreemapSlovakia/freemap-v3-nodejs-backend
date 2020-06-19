@@ -9,7 +9,7 @@ export function attachGetAllMapsHandler(router: Router) {
     '/',
     acceptValidator('application/json'),
     authenticator(true),
-    async ctx => {
+    async (ctx) => {
       ctx.body = await pool.query(SQL`
         SELECT id, name, public, createdAt, userId
           FROM map

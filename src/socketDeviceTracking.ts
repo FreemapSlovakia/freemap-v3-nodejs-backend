@@ -17,7 +17,7 @@ export function startSocketDeviceTracking() {
     return null;
   }
 
-  const server = net.createServer(connection => {
+  const server = net.createServer((connection) => {
     let imei: string;
 
     const connLogger = logger.child({ id });
@@ -29,7 +29,7 @@ export function startSocketDeviceTracking() {
       'Connection opened.',
     );
 
-    connection.on('data', async data => {
+    connection.on('data', async (data) => {
       let conn: PoolConnection;
 
       try {
@@ -180,7 +180,7 @@ export function startSocketDeviceTracking() {
       }
     });
 
-    connection.on('error', err => {
+    connection.on('error', (err) => {
       connLogger.error({ err }, 'Socket error.');
     });
 
@@ -188,7 +188,7 @@ export function startSocketDeviceTracking() {
       connLogger.debug('Socket ended.');
     });
 
-    connection.on('close', closeResult => {
+    connection.on('close', (closeResult) => {
       connLogger.debug({ closeResult }, 'Socket closed.');
     });
   });

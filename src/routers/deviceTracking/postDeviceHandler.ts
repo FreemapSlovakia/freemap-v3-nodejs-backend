@@ -34,7 +34,7 @@ export function attachPostDeviceHandler(router: Router) {
       true,
     ),
     authenticator(true),
-    async ctx => {
+    async (ctx) => {
       const token1 = /^(imei|did:).*/.test(ctx.request.body.token ?? '')
         ? ctx.request.body.token
         : randomize('Aa0', 8);

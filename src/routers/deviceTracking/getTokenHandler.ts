@@ -9,7 +9,7 @@ export function attachGetTokenHandler(router: Router) {
     '/access-tokens/:id',
     acceptValidator('application/json'),
     authenticator(true),
-    async ctx => {
+    async (ctx) => {
       const [item] = await pool.query(SQL`
         SELECT trackingAccessToken.id, userId, trackingAccessToken.token, trackingAccessToken.createdAt, timeFrom, timeTo, note, listingLabel
           FROM trackingAccessToken

@@ -4,7 +4,7 @@ import { pool } from '../../database';
 import { authenticator } from '../../authenticator';
 
 export function attachLogoutHandler(router: Router) {
-  router.post('/logout', authenticator(true), async ctx => {
+  router.post('/logout', authenticator(true), async (ctx) => {
     const { affectedRows } = await pool.query(
       SQL`DELETE FROM auth WHERE authToken = ${ctx.state.user.authToken}`,
     );

@@ -17,7 +17,7 @@ export function attachLogin2Handler(router: Router) {
   router.post(
     '/login2',
     // TODO validation
-    async ctx => {
+    async (ctx) => {
       const body = await rp.post({
         url: 'https://www.openstreetmap.org/oauth/access_token',
         oauth: {

@@ -49,7 +49,7 @@ export function attachPatchUserHandler(router: Router) {
       },
       additionalProperties: false,
     }),
-    async ctx => {
+    async (ctx) => {
       const { body } = ctx.request;
 
       const keys = Object.keys(body);
@@ -58,10 +58,10 @@ export function attachPatchUserHandler(router: Router) {
 
       await pool.query(
         `UPDATE user SET ${keys
-          .map(key => `${key} = ?`)
+          .map((key) => `${key} = ?`)
           .join(', ')} WHERE id = ?`,
         [
-          ...keys.map(key =>
+          ...keys.map((key) =>
             key === 'settings' ? JSON.stringify(body[key]) : body[key],
           ),
           ctx.state.user.id,
