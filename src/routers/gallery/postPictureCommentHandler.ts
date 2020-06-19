@@ -1,20 +1,13 @@
 import Router from '@koa/router';
 import { SQL } from 'sql-template-strings';
-import Mailgun from 'mailgun-js';
 import { runInTransaction } from '../../database';
 import { acceptValidator, bodySchemaValidator } from '../../requestValidators';
 import { authenticator } from '../../authenticator';
 import { PoolConnection } from 'mariadb';
 import { getEnv } from '../../env';
+import got from 'got';
 
 const webBaseUrl = getEnv('WEB_BASE_URL');
-
-const mailgun = !getEnv('MAILGIN_ENABLE', '')
-  ? null
-  : Mailgun({
-      apiKey: getEnv('MAILGIN_API_KEY'),
-      domain: getEnv('MAILGIN_DOMAIN'),
-    });
 
 export function attachPostPictureCommentHandler(router: Router) {
   router.post(
@@ -36,7 +29,7 @@ export function attachPostPictureCommentHandler(router: Router) {
     ),
     acceptValidator('application/json'),
     runInTransaction(),
-    async ctx => {
+    async (ctx) => {
       const conn = ctx.state.dbConn as PoolConnection;
 
       const { comment } = ctx.request.body;
@@ -51,7 +44,7 @@ export function attachPostPictureCommentHandler(router: Router) {
         `),
       ];
 
-      if (mailgun) {
+      if (getEnv('MAILGIN_ENABLE', '')) {
         proms.push(
           conn.query(SQL`
             SELECT email, title, userId
@@ -75,19 +68,26 @@ export function attachPostPictureCommentHandler(router: Router) {
         const [{ email, title, userId }] = picInfo;
 
         const sendMail = (to: string, own: boolean) =>
-          mailgun.messages().send({
-            from: 'Freemap Fotky <noreply@freemap.sk>',
-            to,
-            subject: `Komentár k fotke na ${webBaseUrl.replace(
-              /^https?:\/\//,
-              '',
-            )}`,
-            text: `Používateľ ${ctx.state.user.name} pridal komentár k ${
-              own ? 'vašej ' : ''
-            }fotke ${title ? `"${title} "` : ''}na ${webBaseUrl}/?image=${
-              ctx.params.id
-            }:\n\n${comment}`,
-          });
+          got.post(
+            `https://api.mailgun.net/v3/${getEnv('MAILGIN_DOMAIN')}/messages`,
+            {
+              username: 'api',
+              password: getEnv('MAILGIN_API_KEY'),
+              form: {
+                from: 'Freemap Fotky <noreply@freemap.sk>',
+                to,
+                subject: `Komentár k fotke na ${webBaseUrl.replace(
+                  /^https?:\/\//,
+                  '',
+                )}`,
+                text: `Používateľ ${ctx.state.user.name} pridal komentár k ${
+                  own ? 'vašej ' : ''
+                }fotke ${title ? `"${title} "` : ''}na ${webBaseUrl}/?image=${
+                  ctx.params.id
+                }:\n\n${comment}`,
+              },
+            },
+          );
 
         const promises = [];
         if (email && userId !== ctx.state.user.id) {
