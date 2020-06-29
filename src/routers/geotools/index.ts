@@ -125,7 +125,7 @@ async function fetch(key: string) {
 
     ws.on('finish', () => resolve());
 
-    ws.on('error', () => reject());
+    ws.on('error', (e) => reject(e));
 
     got.stream
       .get(
@@ -158,6 +158,7 @@ async function fetch(key: string) {
           },
         },
       )
+      .on('error', (e) => reject(e))
       .pipe(unzipper.ParseOne())
       .pipe(ws);
   });
