@@ -132,6 +132,10 @@ async function fetch(key: string) {
 
     ws.on('error', (e) => reject(e));
 
+    const unzipOne = unzipper.ParseOne();
+
+    unzipOne.on('error', (e) => reject(e));
+
     got.stream
       .get(
         `https://e4ftl01.cr.usgs.gov/MEASURES/SRTMGL1.003/2000.02.11/${key}.SRTMGL1.hgt.zip`,
@@ -164,7 +168,7 @@ async function fetch(key: string) {
         },
       )
       .on('error', (e) => reject(e))
-      .pipe(unzipper.ParseOne())
+      .pipe(unzipOne)
       .pipe(ws);
   });
 
