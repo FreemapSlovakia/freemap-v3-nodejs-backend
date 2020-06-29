@@ -71,8 +71,13 @@ async function compute(ctx: ParameterizedContext) {
           try {
             fd = await fs.open(hgtPath, 'r');
           } catch (e) {
-            await fetchSafe(key);
-            fd = await fs.open(hgtPath, 'r');
+            try {
+              await fetchSafe(key);
+              fd = await fs.open(hgtPath, 'r');
+            } catch (e) {
+              await (await fs.open(hgtPath, 'w')).close();
+              fd = await fs.open(hgtPath, 'r');
+            }
           }
           fdMap.set(key, [fd, (await fstatAsync(fd.fd)).size]);
         }
