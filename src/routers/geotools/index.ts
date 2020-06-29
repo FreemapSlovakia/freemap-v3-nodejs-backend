@@ -186,9 +186,8 @@ async function fetch(key: string) {
   } finally {
     if (ws) {
       ws.close();
+      await fs.unlink(temp);
     }
-
-    await fs.unlink(temp);
   }
 }
 
