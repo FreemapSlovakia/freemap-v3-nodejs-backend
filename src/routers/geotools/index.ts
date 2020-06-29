@@ -1,6 +1,13 @@
 import Router from '@koa/router';
 import { promisify } from 'util';
-import { promises as fs, fstat, read, createWriteStream, rename } from 'fs';
+import {
+  promises as fs,
+  fstat,
+  read,
+  createWriteStream,
+  rename,
+  WriteStream,
+} from 'fs';
 import { ParameterizedContext } from 'koa';
 import { acceptValidator } from '../../requestValidators';
 import { getEnv } from '../../env';
@@ -125,54 +132,64 @@ async function fetch(key: string) {
 
   const temp = `${fname}.tmp`;
 
-  await new Promise((resolve, reject) => {
-    const ws = createWriteStream(temp);
+  let ws: WriteStream;
 
-    ws.on('finish', () => resolve());
+  try {
+    await new Promise((resolve, reject) => {
+      ws = createWriteStream(temp);
 
-    ws.on('error', (e) => reject(e));
+      ws.on('finish', () => resolve());
 
-    const unzipOne = unzipper.ParseOne();
+      ws.on('error', (e) => reject(e));
 
-    unzipOne.on('error', (e) => reject(e));
+      const unzipOne = unzipper.ParseOne();
 
-    got.stream
-      .get(
-        `https://e4ftl01.cr.usgs.gov/MEASURES/SRTMGL1.003/2000.02.11/${key}.SRTMGL1.hgt.zip`,
-        {
-          hooks: {
-            beforeRedirect: [
-              (options, response) => {
-                if (
-                  options.url.href.startsWith(
-                    'https://urs.earthdata.nasa.gov/oauth/authorize',
-                  )
-                ) {
-                  options.headers.authorization = `Basic ${Buffer.from(
-                    getEnv('URS_EARTHDATA_NASA_USERNAME') +
-                      ':' +
-                      getEnv('URS_EARTHDATA_NASA_PASSWORD'),
-                  ).toString('base64')}`;
-                }
+      unzipOne.on('error', (e) => reject(e));
 
-                const c = response.headers['set-cookie'];
+      got.stream
+        .get(
+          `https://e4ftl01.cr.usgs.gov/MEASURES/SRTMGL1.003/2000.02.11/${key}.SRTMGL1.hgt.zip`,
+          {
+            hooks: {
+              beforeRedirect: [
+                (options, response) => {
+                  if (
+                    options.url.href.startsWith(
+                      'https://urs.earthdata.nasa.gov/oauth/authorize',
+                    )
+                  ) {
+                    options.headers.authorization = `Basic ${Buffer.from(
+                      getEnv('URS_EARTHDATA_NASA_USERNAME') +
+                        ':' +
+                        getEnv('URS_EARTHDATA_NASA_PASSWORD'),
+                    ).toString('base64')}`;
+                  }
 
-                const m = c && /^(DATA=.*?);/.exec(c[0]);
+                  const c = response.headers['set-cookie'];
 
-                if (m && m[1]) {
-                  options.headers.cookie = m[1];
-                }
-              },
-            ],
+                  const m = c && /^(DATA=.*?);/.exec(c[0]);
+
+                  if (m && m[1]) {
+                    options.headers.cookie = m[1];
+                  }
+                },
+              ],
+            },
           },
-        },
-      )
-      .on('error', (e) => reject(e))
-      .pipe(unzipOne)
-      .pipe(ws);
-  });
+        )
+        .on('error', (e) => reject(e))
+        .pipe(unzipOne)
+        .pipe(ws);
+    });
 
-  await fs.rename(temp, fname);
+    await fs.rename(temp, fname);
+  } finally {
+    if (ws) {
+      ws.close();
+    }
+
+    await fs.unlink(temp);
+  }
 }
 
 async function computeElevation([lat, lon, fd, size]: [
