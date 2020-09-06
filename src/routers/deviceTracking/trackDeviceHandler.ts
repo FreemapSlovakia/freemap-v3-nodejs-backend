@@ -22,10 +22,7 @@ async function handler(ctx: ParameterizedContext) {
   }
 
   const q =
-    ctx.method === 'POST' &&
-    ctx.request.type === 'application/x-www-form-urlencoded'
-      ? ctx.request.body
-      : ctx.query;
+    ctx.query?.lat && ctx.query?.lon ? ctx.query : ctx.request.body || {};
 
   const { message } = q;
 
@@ -49,7 +46,10 @@ async function handler(ctx: ParameterizedContext) {
 
   const bearing = q.bearing === undefined ? null : Number.parseFloat(q.bearing);
 
-  const battery = q.battery === undefined ? null : Number.parseFloat(q.battery);
+  const battery =
+    (q.battery || q.batt) === undefined
+      ? null
+      : Number.parseFloat(q.battery || q.batt);
 
   const gsmSignal =
     q.gsm_signal === undefined ? null : Number.parseFloat(q.gsm_signal);
