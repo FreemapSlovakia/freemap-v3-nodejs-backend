@@ -119,7 +119,7 @@ function guessTime(t: string) {
     return d2;
   }
 
-  const d3 = new Date(n * 1000);
+  const d3 = new Date((n < 1546300800 ? n + 619315200 : n) * 1000);
 
   if (max > d3 && d3 > min) {
     return d3;
