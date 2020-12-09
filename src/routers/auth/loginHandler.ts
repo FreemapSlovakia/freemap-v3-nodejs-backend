@@ -32,7 +32,7 @@ export function attachLoginHandler(router: Router) {
       const body = await rp.post({
         url: 'https://www.openstreetmap.org/oauth/request_token',
         oauth: {
-          callback: `${webBaseUrl ?? defaultWebBaseUrl}/authCallback.html`,
+          callback: `${webBaseUrl}/authCallback.html`,
           consumer_key: consumerKey,
           consumer_secret: consumerSecret,
         },

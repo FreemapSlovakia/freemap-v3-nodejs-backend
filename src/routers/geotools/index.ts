@@ -135,7 +135,7 @@ async function fetch(key: string) {
   let ws: WriteStream;
 
   try {
-    await new Promise((resolve, reject) => {
+    await new Promise<void>((resolve, reject) => {
       ws = createWriteStream(temp);
 
       ws.on('finish', () => resolve());
