@@ -7,7 +7,7 @@ import { PoolConnection } from 'mariadb';
 import { getEnv } from '../../env';
 import got from 'got';
 
-const webBaseUrl = getEnv('WEB_BASE_URL');
+const webBaseUrls = getEnv('WEB_BASE_URL').split(',');
 
 export function attachPostPictureCommentHandler(router: Router) {
   router.post(
@@ -18,6 +18,10 @@ export function attachPostPictureCommentHandler(router: Router) {
         type: 'object',
         required: ['comment'],
         properties: {
+          webBaseUrl: {
+            type: 'string',
+            format: 'uri',
+          },
           comment: {
             type: 'string',
             minLength: 1,
@@ -32,7 +36,19 @@ export function attachPostPictureCommentHandler(router: Router) {
     async (ctx) => {
       const conn = ctx.state.dbConn as PoolConnection;
 
-      const { comment } = ctx.request.body;
+      const { comment, webBaseUrl: webBaseUrlCandidate } = ctx.request.body;
+
+      let webBaseUrl: string;
+
+      if (webBaseUrlCandidate !== undefined) {
+        if (!webBaseUrls.includes(webBaseUrlCandidate)) {
+          ctx.throw(403, 'invalid webBaseUrl');
+        }
+
+        webBaseUrl = webBaseUrlCandidate;
+      } else {
+        webBaseUrl = webBaseUrls[0];
+      }
 
       const proms: Promise<any>[] = [
         conn.query(SQL`

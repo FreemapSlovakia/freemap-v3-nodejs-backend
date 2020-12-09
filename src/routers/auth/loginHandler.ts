@@ -8,17 +8,31 @@ const consumerKey = getEnv('OAUTH_CONSUMER_KEY');
 
 const consumerSecret = getEnv('OAUTH_CONSUMER_SECRET');
 
-const webBaseUrl = getEnv('WEB_BASE_URL');
+const webBaseUrls = getEnv('WEB_BASE_URL').split(',');
 
 export function attachLoginHandler(router: Router) {
   router.post(
     '/login',
     // TODO validation
     async (ctx) => {
+      const webBaseUrlCandidate = ctx.body?.webBaseUrl;
+
+      let webBaseUrl: string;
+
+      if (webBaseUrlCandidate !== undefined) {
+        if (!webBaseUrls.includes(webBaseUrlCandidate)) {
+          ctx.throw(403, 'invalid webBaseUrl');
+        }
+
+        webBaseUrl = webBaseUrlCandidate;
+      } else {
+        webBaseUrl = webBaseUrls[0];
+      }
+
       const body = await rp.post({
         url: 'https://www.openstreetmap.org/oauth/request_token',
         oauth: {
-          callback: `${webBaseUrl}/authCallback.html`,
+          callback: `${webBaseUrl ?? defaultWebBaseUrl}/authCallback.html`,
           consumer_key: consumerKey,
           consumer_secret: consumerSecret,
         },
