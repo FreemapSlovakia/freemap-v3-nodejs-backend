@@ -15,7 +15,7 @@ export function attachLoginHandler(router: Router) {
     '/login',
     // TODO validation
     async (ctx) => {
-      const webBaseUrlCandidate = ctx.body?.webBaseUrl;
+      const webBaseUrlCandidate = ctx.request.body?.webBaseUrl;
 
       let webBaseUrl: string;
 
