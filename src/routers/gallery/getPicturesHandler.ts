@@ -112,9 +112,6 @@ export function attachGetPicturesHandler(router: Router) {
 
 async function byRadius(ctx: ParameterizedContext) {
   const {
-    lat,
-    lon,
-    distance,
     userId,
     tag,
     ratingFrom,
@@ -124,6 +121,10 @@ async function byRadius(ctx: ParameterizedContext) {
     createdAtFrom,
     createdAtTo,
   } = ctx.query;
+
+  const lat = Number(ctx.query.lat);
+  const lon = Number(ctx.query.lon);
+  const distance = Number(ctx.query.distance);
 
   // cca 1 degree
   const lat1 = lat - distance / 43;
@@ -186,8 +187,13 @@ async function byBbox(ctx: ParameterizedContext) {
   const flds = [
     'lat',
     'lon',
-    ...(fields ? fields.filter((f: any) => f !== 'rating') : []),
+    ...(fields
+      ? (Array.isArray(fields) ? fields : [fields]).filter(
+          (f) => f !== 'rating',
+        )
+      : []),
   ];
+
   if (ratingFrom || ratingTo) {
     flds.push(ratingSubquery);
   }
@@ -239,28 +245,37 @@ async function byOrder(ctx: ParameterizedContext) {
   } = ctx.query;
 
   const hv = [];
+
   const wh = [];
+
   if (ratingFrom !== null) {
     hv.push(`rating >= ${ratingFrom}`);
   }
+
   if (ratingTo !== null) {
     hv.push(`rating <= ${ratingTo}`);
   }
+
   if (takenAtFrom !== null) {
     wh.push(`takenAt >= '${toSqlDate(takenAtFrom)}'`);
   }
+
   if (takenAtTo !== null) {
     wh.push(`takenAt <= '${toSqlDate(takenAtTo)}'`);
   }
+
   if (createdAtFrom !== null) {
     wh.push(`createdAt >= '${toSqlDate(createdAtFrom)}'`);
   }
+
   if (createdAtTo !== null) {
     wh.push(`createdAt <= '${toSqlDate(createdAtTo)}'`);
   }
+
   if (userId !== null) {
     wh.push(`userId = ${userId}`);
   }
+
   if (tag === '') {
     wh.push('id NOT IN (SELECT pictureId FROM pictureTag)');
   }

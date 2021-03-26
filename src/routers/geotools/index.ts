@@ -25,8 +25,12 @@ router.get('/elevation', compute);
 router.post('/elevation', acceptValidator('application/json'), compute);
 
 async function compute(ctx: ParameterizedContext) {
-  const { coordinates }: { coordinates: string } = ctx.query;
+  const coordinates = Array.isArray(ctx.query.coordinates)
+    ? ctx.query.coordinates.join(',')
+    : ctx.query.coordinates;
+
   let cs;
+
   if (
     ctx.method === 'GET' &&
     coordinates &&

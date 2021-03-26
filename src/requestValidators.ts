@@ -88,9 +88,11 @@ export type AdapterRules = {
 
 export function queryAdapter(spec: AdapterRules): Middleware {
   return async (ctx, next) => {
-    Object.keys(spec).forEach((key) => {
-      ctx.query[key] = spec[key](ctx.query[key]);
-    });
+    for (const key of Object.keys(spec)) {
+      const value = ctx.query[key];
+
+      ctx.query[key] = spec[key](Array.isArray(value) ? value[0] : value);
+    }
 
     await next();
   };
