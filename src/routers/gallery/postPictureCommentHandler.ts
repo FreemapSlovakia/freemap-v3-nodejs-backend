@@ -88,6 +88,7 @@ export function attachPostPictureCommentHandler(router: Router) {
         const picTitle = picInfo.title ? `"${picInfo.title} "` : '';
 
         const picUrl = webBaseUrl + '/?image=' + ctx.params.id;
+        const unsubscribeUrl = webBaseUrl + '/?show=settings';
 
         return got.post(
           `https://api.mailgun.net/v3/${getEnv('MAILGIN_DOMAIN')}/messages`,
@@ -116,7 +117,12 @@ export function attachPostPictureCommentHandler(router: Router) {
                       own ? 'your' : 'a'
                     } photo ${picTitle}at ${picUrl}:`) +
                 '\n\n' +
-                comment,
+                comment +
+                '\n\n' +
+                // TODO translate for CS and HU
+                (lang === 'sk'
+                  ? `Ak si už neprajete dostávať upozornenia na komentáre k fotkám, nastavte si to na ${unsubscribeUrl} v záložke Účet.`
+                  : `If you no longer wish to be notified about photo comments, configure it at ${unsubscribeUrl} in the Account tab.`),
             },
           },
         );
