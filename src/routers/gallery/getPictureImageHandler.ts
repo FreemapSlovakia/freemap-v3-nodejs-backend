@@ -46,7 +46,10 @@ export function attachGetPictureImageHandler(router: Router) {
         ctx.throw(304);
       }
 
-      const w = parseInt(ctx.headers.width || ctx.query.width || 'NaN', 10);
+      const w = parseInt(
+        getFirst(ctx.headers.width) || getFirst(ctx.query.width) || 'NaN',
+        10,
+      );
 
       const resize = w ? sharp().resize(w).jpeg() : null;
 
@@ -55,4 +58,8 @@ export function attachGetPictureImageHandler(router: Router) {
       ctx.body = resize ? fileStream.pipe(resize) : fileStream;
     },
   );
+}
+
+function getFirst(x?: null | string[] | string): null | string {
+  return Array.isArray(x) ? x[0] : x;
 }
