@@ -18,14 +18,16 @@ export function attachLogin2Handler(router: Router) {
     '/login2',
     // TODO validation
     async (ctx) => {
+      const { token, verifier, language, preventTips } = ctx.request.body;
+
       const body = await rp.post({
         url: 'https://www.openstreetmap.org/oauth/access_token',
         oauth: {
           consumer_key: consumerKey,
           consumer_secret: consumerSecret,
-          token: ctx.request.body.token,
-          token_secret: requestTokenRegistry.get(ctx.request.body.token),
-          verifier: ctx.request.body.verifier,
+          token,
+          token_secret: requestTokenRegistry.get(token),
+          verifier,
         },
       });
 
@@ -63,6 +65,8 @@ export function attachLogin2Handler(router: Router) {
         null,
         lat,
         lon,
+        language,
+        preventTips,
       );
     },
   );

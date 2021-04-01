@@ -7,7 +7,7 @@ export function attachLoginWithFacebookHandler(router: Router) {
     '/login-fb',
     // TODO validation
     async (ctx) => {
-      const { accessToken }: { accessToken: string } = ctx.request.body;
+      const { accessToken, language, preventTips } = ctx.request.body;
 
       const { id, name, email } = await fb
         .withAccessToken(accessToken)
@@ -23,6 +23,8 @@ export function attachLoginWithFacebookHandler(router: Router) {
         email,
         undefined,
         undefined,
+        language,
+        preventTips,
       );
     },
   );

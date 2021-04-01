@@ -7,7 +7,7 @@ export function attachLoginWithGoogleHandler(router: Router) {
     '/login-google',
     // TODO validation
     async (ctx) => {
-      const { idToken } = ctx.request.body;
+      const { idToken, language, preventTips } = ctx.request.body;
 
       const { sub, name, email } = (
         await googleClient.verifyIdToken({
@@ -25,6 +25,8 @@ export function attachLoginWithGoogleHandler(router: Router) {
         email,
         undefined,
         undefined,
+        language,
+        preventTips,
       );
     },
   );

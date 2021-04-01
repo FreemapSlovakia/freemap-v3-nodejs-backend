@@ -13,6 +13,8 @@ export async function login(
   email0: string,
   lat0: number,
   lon0: number,
+  language0?: string | null,
+  preventTips0 = false,
 ) {
   const [user] = await pool.query(
     SQL`SELECT id, name, email, isAdmin, lat, lon, settings, sendGalleryEmails, preventTips, language FROM user WHERE `
@@ -48,9 +50,9 @@ export async function login(
     name = name0;
     email = email0;
     isAdmin = false;
-    preventTips = false;
+    preventTips = preventTips0;
     sendGalleryEmails = true;
-    language = null;
+    language = language0;
 
     userId = (
       await pool.query(
