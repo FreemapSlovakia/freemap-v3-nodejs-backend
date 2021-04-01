@@ -28,6 +28,7 @@ export async function initDatabase() {
       lon FLOAT(9, 6) NULL,
       settings VARCHAR(4096) CHARSET utf8 COLLATE utf8_bin NOT NULL DEFAULT '{}',
       preventTips BOOL NOT NULL DEFAULT 0
+      sendGalleryEmails BOOL NOT NULL DEFAULT 1
     ) ENGINE=InnoDB`,
 
     `CREATE TABLE IF NOT EXISTS auth (
@@ -137,7 +138,9 @@ export async function initDatabase() {
     ) ENGINE=InnoDB`,
   ];
 
-  const updates: string[] = [];
+  const updates: string[] = [
+    'ALTER TABLE user ADD COLUMN sendGalleryEmails BOOL NOT NULL DEFAULT 1',
+  ];
 
   const db = await pool.getConnection();
 

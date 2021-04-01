@@ -15,7 +15,7 @@ export async function login(
   lon0: number,
 ) {
   const [user] = await pool.query(
-    SQL`SELECT id, name, email, isAdmin, lat, lon, settings FROM user WHERE `
+    SQL`SELECT id, name, email, isAdmin, lat, lon, settings, sendGalleryEmails, preventTips FROM user WHERE `
       .append(dbField)
       .append(SQL` = ${dbValue}`),
   );
@@ -30,6 +30,7 @@ export async function login(
   let lon;
   let settings;
   let preventTips;
+  let sendGalleryEmails;
 
   if (user) {
     ({ name, email, lat, lon } = user);
@@ -37,6 +38,7 @@ export async function login(
     userId = user.id;
     isAdmin = !!user.isAdmin;
     preventTips = !!user.preventTips;
+    sendGalleryEmails = !!user.sendGalleryEmails;
   } else {
     settings = ctx.request.body.settings || {};
     lat = lat0 || settings.lat;
@@ -45,6 +47,7 @@ export async function login(
     email = email0;
     isAdmin = false;
     preventTips = false;
+    sendGalleryEmails = true;
 
     userId = (
       await pool.query(
@@ -54,7 +57,9 @@ export async function login(
           createdAt = ${now},
           lat = ${lat ?? null},
           lon = ${lon ?? null},
-          settings = ${JSON.stringify(settings)}`),
+          settings = ${JSON.stringify(settings)}
+          preventTips = ${preventTips},
+          sendGalleryEmails = ${sendGalleryEmails}`),
       )
     ).insertId;
   }
@@ -79,5 +84,6 @@ export async function login(
     lon,
     settings,
     preventTips,
+    sendGalleryEmails,
   };
 }

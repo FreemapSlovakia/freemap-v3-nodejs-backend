@@ -25,6 +25,9 @@ export function attachPatchUserHandler(router: Router) {
         {
           required: ['preventTips'],
         },
+        {
+          required: ['sendGalleryEmails'],
+        },
       ],
       properties: {
         name: {
@@ -44,6 +47,9 @@ export function attachPatchUserHandler(router: Router) {
           type: 'object',
         },
         preventTips: {
+          type: 'boolean',
+        },
+        sendGalleryEmails: {
           type: 'boolean',
         },
       },
