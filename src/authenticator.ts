@@ -38,7 +38,7 @@ export function authenticator(require?: boolean, deep?: boolean): Middleware {
     }
 
     const [auth] = await pool.query(SQL`
-      SELECT userId, osmAuthToken, osmAuthTokenSecret, facebookAccessToken, googleIdToken, name, email, isAdmin, lat, lon, settings, preventTips
+      SELECT userId, osmAuthToken, osmAuthTokenSecret, facebookAccessToken, googleIdToken, name, email, isAdmin, lat, lon, settings, preventTips, language, sendGalleryEmails
         FROM auth INNER JOIN user ON (userId = id) WHERE authToken = ${authToken}
     `);
 
@@ -57,6 +57,8 @@ export function authenticator(require?: boolean, deep?: boolean): Middleware {
       email: auth.email,
       settings: JSON.parse(auth.settings),
       preventTips: !!auth.preventTips,
+      language: auth.language,
+      sendGalleryEmails: auth.sendGalleryEmails,
     };
 
     if (!deep) {
