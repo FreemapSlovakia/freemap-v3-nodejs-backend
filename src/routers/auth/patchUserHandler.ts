@@ -28,6 +28,9 @@ export function attachPatchUserHandler(router: Router) {
         {
           required: ['sendGalleryEmails'],
         },
+        {
+          required: ['language'],
+        },
       ],
       properties: {
         name: {
@@ -50,7 +53,26 @@ export function attachPatchUserHandler(router: Router) {
           type: 'boolean',
         },
         sendGalleryEmails: {
-          type: 'boolean',
+          oneOf: [
+            {
+              type: 'boolean',
+            },
+            {
+              type: 'null',
+            },
+          ],
+        },
+        language: {
+          oneOf: [
+            {
+              type: 'string',
+              minLength: 2,
+              maxLength: 2,
+            },
+            {
+              type: 'null',
+            },
+          ],
         },
       },
       additionalProperties: false,

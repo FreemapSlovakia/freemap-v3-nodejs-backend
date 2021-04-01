@@ -6,6 +6,7 @@ import { authenticator } from '../../authenticator';
 import { PoolConnection } from 'mariadb';
 import { getEnv } from '../../env';
 import got from 'got';
+import { userInfo } from 'node:os';
 
 const webBaseUrls = getEnv('WEB_BASE_URL').split(',');
 
@@ -50,6 +51,8 @@ export function attachPostPictureCommentHandler(router: Router) {
         webBaseUrl = webBaseUrls[0];
       }
 
+      const webUrl = webBaseUrl.replace(/^https?:\/\//, '');
+
       const proms: Promise<any>[] = [
         conn.query(SQL`
           INSERT INTO pictureComment SET
@@ -63,14 +66,14 @@ export function attachPostPictureCommentHandler(router: Router) {
       if (getEnv('MAILGIN_ENABLE', '')) {
         proms.push(
           conn.query(SQL`
-            SELECT IF(sendGalleryEmails, email, NULL) AS email, title, userId
+            SELECT IF(sendGalleryEmails, email, NULL) AS email, language, title, userId
               FROM user
               JOIN picture ON userId = user.id
               WHERE picture.id = ${ctx.params.id}
           `),
 
           conn.query(SQL`
-            SELECT DISTINCT email, sendGalleryEmails
+            SELECT DISTINCT email, sendGalleryEmails, language
               FROM user
               JOIN pictureComment ON userId = user.id
               WHERE sendGalleryEmails AND pictureId = ${ctx.params.id} AND userId <> ${ctx.state.user.id} AND email IS NOT NULL
@@ -80,40 +83,64 @@ export function attachPostPictureCommentHandler(router: Router) {
 
       const [{ insertId }, picInfo, emails] = await Promise.all(proms);
 
-      const [{ email, title, userId }] = picInfo;
+      // TODO translate (use language)
+      const sendMail = (to: string, own: boolean, lang: string) => {
+        const picTitle = picInfo.title ? `"${picInfo.title} "` : '';
 
-      // TODO translate
-      const sendMail = (to: string, own: boolean) =>
-        got.post(
+        const picUrl = webBaseUrl + '/?image=' + ctx.params.id;
+
+        return got.post(
           `https://api.mailgun.net/v3/${getEnv('MAILGIN_DOMAIN')}/messages`,
           {
             username: 'api',
             password: getEnv('MAILGIN_API_KEY'),
             form: {
-              from: 'Freemap Fotky <noreply@freemap.sk>',
+              from:
+                // TODO translate for HU
+                (lang === 'sk' || lang === 'cs'
+                  ? 'Freemap Fotky'
+                  : 'Freemap Photos') + ' <noreply@freemap.sk>',
               to,
-              subject: `Komentár k fotke na ${webBaseUrl.replace(
-                /^https?:\/\//,
-                '',
-              )}`,
-              text: `Používateľ ${ctx.state.user.name} pridal komentár k ${
-                own ? 'vašej ' : ''
-              }fotke ${title ? `"${title} "` : ''}na ${webBaseUrl}/?image=${
-                ctx.params.id
-              }:\n\n${comment}`,
+              subject:
+                // TODO translate for CS and HU
+                lang === 'sk'
+                  ? `Komentár k fotke na ${webUrl}`
+                  : `Photo comment at ${webUrl}`,
+              text:
+                // TODO translate for CS and HU
+                (lang === 'sk'
+                  ? `Používateľ ${ctx.state.user.name} pridal komentár k ${
+                      own ? 'vašej ' : ''
+                    }fotke ${picTitle}na ${picUrl}:`
+                  : `User ${ctx.state.user.name} commented ${
+                      own ? 'your' : 'a'
+                    } photo ${picTitle}at ${picUrl}:`) +
+                '\n\n' +
+                comment,
             },
           },
         );
+      };
+
+      const acceptLang = ctx.acceptsLanguages(['en', 'sk', 'cs', 'hu']) || 'en';
 
       const promises = [];
 
-      if (email && userId !== ctx.state.user.id) {
-        promises.push(sendMail(email, true));
+      if (picInfo.email && picInfo.userId !== ctx.state.user.id) {
+        promises.push(
+          sendMail(picInfo.email, true, picInfo.language || acceptLang),
+        );
       }
 
       promises.push(
-        ...emails.map(({ email: to }: { email: string }) =>
-          sendMail(to, false),
+        ...emails.map(
+          ({
+            email: to,
+            language,
+          }: {
+            email: string;
+            language: string | null;
+          }) => sendMail(to, false, language || picInfo.language || acceptLang),
         ),
       );
 

@@ -27,8 +27,9 @@ export async function initDatabase() {
       lat FLOAT(8, 6) NULL,
       lon FLOAT(9, 6) NULL,
       settings VARCHAR(4096) CHARSET utf8 COLLATE utf8_bin NOT NULL DEFAULT '{}',
-      preventTips BOOL NOT NULL DEFAULT 0
-      sendGalleryEmails BOOL NOT NULL DEFAULT 1
+      preventTips BOOL NOT NULL DEFAULT 0,
+      sendGalleryEmails BOOL NOT NULL DEFAULT 1,
+      language CHAR(2) NULL
     ) ENGINE=InnoDB`,
 
     `CREATE TABLE IF NOT EXISTS auth (
@@ -140,6 +141,7 @@ export async function initDatabase() {
 
   const updates: string[] = [
     'ALTER TABLE user ADD COLUMN sendGalleryEmails BOOL NOT NULL DEFAULT 1',
+    'ALTER TABLE user ADD COLUMN language CHAR(2) NULL',
   ];
 
   const db = await pool.getConnection();
