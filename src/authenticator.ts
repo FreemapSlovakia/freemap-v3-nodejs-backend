@@ -58,7 +58,7 @@ export function authenticator(require?: boolean, deep?: boolean): Middleware {
       settings: JSON.parse(auth.settings),
       preventTips: !!auth.preventTips,
       language: auth.language,
-      sendGalleryEmails: auth.sendGalleryEmails,
+      sendGalleryEmails: !!auth.sendGalleryEmails,
     };
 
     if (!deep) {
