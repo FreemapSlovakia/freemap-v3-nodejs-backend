@@ -81,7 +81,9 @@ export function attachPostPictureCommentHandler(router: Router) {
         );
       }
 
-      const [{ insertId }, picInfo, emails] = await Promise.all(proms);
+      const [{ insertId }, [picInfo] = [], emails = []] = await Promise.all(
+        proms,
+      );
 
       const sendMail = (to: string, own: boolean, lang: string) => {
         ctx.log.info({ to, lang, own }, 'Sending picture comment mail.');
@@ -142,7 +144,7 @@ export function attachPostPictureCommentHandler(router: Router) {
 
       const promises = [];
 
-      if (picInfo.email && picInfo.userId !== ctx.state.user.id) {
+      if (picInfo && picInfo.email && picInfo.userId !== ctx.state.user.id) {
         promises.push(
           sendMail(picInfo.email, true, picInfo.language || acceptLang),
         );
