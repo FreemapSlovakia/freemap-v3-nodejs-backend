@@ -83,11 +83,13 @@ export function attachPostPictureCommentHandler(router: Router) {
 
       const [{ insertId }, picInfo, emails] = await Promise.all(proms);
 
-      // TODO translate (use language)
       const sendMail = (to: string, own: boolean, lang: string) => {
+        ctx.log.info({ to, lang, own }, 'Sending picture comment mail.');
+
         const picTitle = picInfo.title ? `"${picInfo.title} "` : '';
 
         const picUrl = webBaseUrl + '/?image=' + ctx.params.id;
+
         const unsubscribeUrl = webBaseUrl + '/?show=settings';
 
         return got.post(
