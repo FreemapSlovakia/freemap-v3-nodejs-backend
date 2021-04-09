@@ -24,16 +24,16 @@ export async function login(
 
   const now = new Date();
 
-  let userId;
-  let name;
-  let email;
-  let isAdmin;
-  let lat;
-  let lon;
+  let userId: number;
+  let name: string;
+  let email: string | null;
+  let isAdmin: boolean;
+  let lat: number;
+  let lon: number;
   let settings;
-  let preventTips;
-  let sendGalleryEmails;
-  let language;
+  let preventTips: boolean;
+  let sendGalleryEmails: boolean;
+  let language: string | null;
 
   if (user) {
     ({ name, email, lat, lon } = user);
