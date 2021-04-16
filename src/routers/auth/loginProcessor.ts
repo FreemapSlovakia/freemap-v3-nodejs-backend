@@ -62,7 +62,7 @@ export async function login(
           createdAt = ${now},
           lat = ${lat ?? null},
           lon = ${lon ?? null},
-          settings = ${JSON.stringify(settings)}
+          settings = ${JSON.stringify(settings)},
           language = ${language},
           preventTips = ${preventTips},
           sendGalleryEmails = ${sendGalleryEmails}`),
