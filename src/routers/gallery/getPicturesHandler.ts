@@ -79,22 +79,26 @@ export function attachGetPicturesHandler(router: Router) {
   router.get(
     '/pictures',
     acceptValidator('application/json'),
-    queryAdapter({
-      lat: parseFloat,
-      lon: parseFloat,
-      distance: parseFloat,
+    queryAdapter(
+      {
+        lat: parseFloat,
+        lon: parseFloat,
+        distance: parseFloat,
 
-      bbox: (x) => (x === undefined ? null : x.split(',').map(parseFloat)),
-      userId: (x) => (x ? parseInt(x, 10) : null),
+        bbox: (x) => (x === undefined ? null : x.split(',').map(parseFloat)),
+        userId: (x) => (x ? parseInt(x, 10) : null),
 
-      ratingFrom: (x) => (x ? parseFloat(x) : null),
-      ratingTo: (x) => (x ? parseFloat(x) : null),
-      takenAtFrom: (x) => (x ? new Date(x) : null),
-      takenAtTo: (x) => (x ? new Date(x) : null),
-      createdAtFrom: (x) => (x ? new Date(x) : null),
-      createdAtTo: (x) => (x ? new Date(x) : null),
-      fields: (x) => (typeof x === 'string' ? [x] : x),
-    }),
+        ratingFrom: (x) => (x ? parseFloat(x) : null),
+        ratingTo: (x) => (x ? parseFloat(x) : null),
+        takenAtFrom: (x) => (x ? new Date(x) : null),
+        takenAtTo: (x) => (x ? new Date(x) : null),
+        createdAtFrom: (x) => (x ? new Date(x) : null),
+        createdAtTo: (x) => (x ? new Date(x) : null),
+      },
+      {
+        fields: (x) => x,
+      },
+    ),
     queryValidator({
       by: (v) =>
         ['radius', 'bbox', 'order'].includes(v) ||

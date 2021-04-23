@@ -82,16 +82,38 @@ export function contentTypeValidator(...type: string[]): Middleware {
   };
 }
 
-export type AdapterRules = {
-  [name: string]: (v: string) => any;
-};
+export type AdapterRules<T> = Record<string, (v: T) => any>;
 
-export function queryAdapter(spec: AdapterRules): Middleware {
+export function queryAdapter(
+  spec: AdapterRules<string>,
+  arraySpec: AdapterRules<string[]> = {},
+): Middleware {
   return async (ctx, next) => {
     for (const key of Object.keys(spec)) {
-      const value = ctx.query[key];
+      let value = ctx.query[key];
 
-      ctx.query[key] = spec[key](Array.isArray(value) ? value[0] : value);
+      if (key in arraySpec) {
+        if (!Array.isArray(value)) {
+          value = [value];
+        }
+
+        ctx.query[key] = arraySpec[key](value);
+
+        return;
+      }
+
+      if (Array.isArray(value)) {
+        ctx.body = {
+          error: 'invalid_query_parameters',
+          detail: `parameter ${key} is specified multiple times`,
+        };
+
+        ctx.status = 400;
+
+        return;
+      }
+
+      ctx.query[key] = spec[key](value);
     }
 
     await next();
