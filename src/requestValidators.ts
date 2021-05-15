@@ -2,8 +2,9 @@ import { Middleware, ParameterizedContext } from 'koa';
 
 import Ajv from 'ajv';
 import { JSONSchema7 } from 'json-schema';
+import ajvFormats from 'ajv-formats';
 
-const ajv = new Ajv();
+const ajv = ajvFormats(new Ajv());
 
 export type ValidationRules = {
   [name: string]: (v: any, ctx?: ParameterizedContext) => true | string;
