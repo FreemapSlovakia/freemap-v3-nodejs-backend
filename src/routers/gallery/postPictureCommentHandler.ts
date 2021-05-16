@@ -6,7 +6,6 @@ import { authenticator } from '../../authenticator';
 import { PoolConnection } from 'mariadb';
 import { getEnv } from '../../env';
 import got from 'got';
-import { userInfo } from 'node:os';
 
 const webBaseUrls = getEnv('WEB_BASE_URL').split(',');
 
