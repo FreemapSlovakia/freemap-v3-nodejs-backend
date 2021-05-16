@@ -144,7 +144,7 @@ export async function initDatabase() {
     'ALTER TABLE user ADD COLUMN sendGalleryEmails BOOL NOT NULL DEFAULT 1',
     'ALTER TABLE user ADD COLUMN language CHAR(2) NULL',
     'ALTER TABLE map MODIFY COLUMN id CHAR(8)',
-    'ALTER TABLE map ADD COLUMN modifiedAt TIMESTAMP NOT NULL DEFAULT createdAt',
+    'ALTER TABLE map ADD COLUMN modifiedAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP',
   ];
 
   const db = await pool.getConnection();
