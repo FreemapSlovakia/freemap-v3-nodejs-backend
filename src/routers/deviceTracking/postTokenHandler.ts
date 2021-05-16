@@ -50,6 +50,7 @@ export function attachPostTokenHandler(router: Router) {
       }
 
       const token = randomize('Aa0', 8);
+
       const { timeFrom, timeTo, note, listingLabel } = ctx.request.body;
 
       const { insertId } = await pool.query(SQL`

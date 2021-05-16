@@ -13,7 +13,7 @@ export function attachGetMapHandler(router: Router) {
       const [item] = await pool.query(SQL`
         SELECT id, name, public, data, createdAt, userId
           FROM map
-          WHERE id = ${Number(ctx.params.id)}
+          WHERE id = ${ctx.params.id}
       `);
 
       if (!item) {

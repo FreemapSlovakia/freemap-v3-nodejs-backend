@@ -11,13 +11,15 @@ export function attachGetAllMapsHandler(router: Router) {
     authenticator(true),
     async (ctx) => {
       ctx.body = await pool.query(SQL`
-        SELECT id, name, public, createdAt, userId
+        SELECT id, name, public, createdAt, modifiedAt, userId
           FROM map
           WHERE userId = ${ctx.state.user.id}
       `);
 
       for (const item of ctx.body) {
         item.public = !!item.public;
+        item.createdAt = item.createdAt.toISOString();
+        item.modifiedAt = item.modifiedAt.toISOString();
       }
     },
   );

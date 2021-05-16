@@ -5,6 +5,7 @@ import { pool } from '../../database';
 import { acceptValidator } from '../../requestValidators';
 import { authenticator } from '../../authenticator';
 import { bodySchemaValidator } from '../../requestValidators';
+import randomize from 'randomatic';
 
 export function attachPostMapHandler(router: Router) {
   router.post(
@@ -34,15 +35,18 @@ export function attachPostMapHandler(router: Router) {
     async (ctx) => {
       const { name, public: pub, data } = ctx.request.body;
 
-      const { insertId } = await pool.query(SQL`
+      const id = randomize('Aa0', 8);
+
+      await pool.query(SQL`
         INSERT INTO map SET
+          id = ${id},
           name = ${name},
           public = ${pub},
           userId = ${ctx.state.user.id},
           data = ${JSON.stringify(data)}
       `);
 
-      ctx.body = { id: insertId };
+      ctx.body = { id };
     },
   );
 }

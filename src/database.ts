@@ -130,6 +130,7 @@ export async function initDatabase() {
     `CREATE TABLE IF NOT EXISTS map (
       id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
       createdAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      modifiedAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
       name VARCHAR(255) CHARSET utf8 COLLATE utf8_general_ci NULL,
       userId INT UNSIGNED NOT NULL,
       public BOOL NOT NULL DEFAULT 0,
@@ -142,6 +143,8 @@ export async function initDatabase() {
   const updates: string[] = [
     'ALTER TABLE user ADD COLUMN sendGalleryEmails BOOL NOT NULL DEFAULT 1',
     'ALTER TABLE user ADD COLUMN language CHAR(2) NULL',
+    'ALTER TABLE map MODIFY COLUMN id CHAR(8)',
+    'ALTER TABLE map ADD COLUMN modifiedAt TIMESTAMP NOT NULL DEFAULT createdAt',
   ];
 
   const db = await pool.getConnection();

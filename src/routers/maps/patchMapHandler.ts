@@ -34,7 +34,7 @@ export function attachPatchMapHandler(router: Router) {
     async (ctx) => {
       const conn = ctx.state.dbConn;
 
-      const id = Number(ctx.params.id);
+      const { id } = ctx.params;
 
       const [item] = await conn.query(
         SQL`SELECT userId FROM map WHERE id = ${id} FOR UPDATE`,
@@ -64,10 +64,10 @@ export function attachPatchMapHandler(router: Router) {
         parts.push(SQL`data = ${JSON.stringify(data)}`);
       }
 
-      const query = SQL`UPDATE map SET`;
+      const query = SQL`UPDATE map SET modifiedAt = ${new Date()}`;
 
       for (let i = 0; i < parts.length; i++) {
-        query.append(i ? ',' : ' ').append(parts[i]);
+        query.append(',').append(parts[i]);
       }
 
       await conn.query(query.append(SQL` WHERE id = ${id}`));
