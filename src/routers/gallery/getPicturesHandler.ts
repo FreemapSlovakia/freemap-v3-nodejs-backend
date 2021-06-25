@@ -37,10 +37,16 @@ const bboxQueryValidationRules: ValidationRules = {
     'invalid bbox',
   fields: (v) =>
     !v ||
-    v.every((f: any) =>
-      ['id', 'title', 'description', 'takenAt', 'createdAt', 'rating'].includes(
-        f,
-      ),
+    (Array.isArray(v) ? v : [v]).every((f: any) =>
+      [
+        'id',
+        'title',
+        'description',
+        'takenAt',
+        'createdAt',
+        'rating',
+        'userId',
+      ].includes(f),
     ) ||
     'invalid fields',
 };
@@ -188,17 +194,11 @@ async function byBbox(ctx: ParameterizedContext) {
     fields,
   } = ctx.query;
 
-  const flds = [
-    'lat',
-    'lon',
-    ...(fields
-      ? (Array.isArray(fields) ? fields : [fields]).filter(
-          (f) => f !== 'rating',
-        )
-      : []),
-  ];
+  const normFields = !fields ? [] : Array.isArray(fields) ? fields : [fields];
 
-  if (ratingFrom || ratingTo) {
+  const flds = ['lat', 'lon', ...normFields.filter((f) => f !== 'rating')];
+
+  if (ratingFrom || ratingTo || normFields.includes('rating')) {
     flds.push(ratingSubquery);
   }
 
@@ -228,10 +228,9 @@ async function byBbox(ctx: ParameterizedContext) {
 
   const rows = await pool.query(sql);
 
-  ctx.body =
-    fields && fields.includes('rating')
-      ? rows
-      : rows.map((row: any) => Object.assign({}, row, { rating: undefined }));
+  ctx.body = fields?.includes('rating')
+    ? rows
+    : rows.map((row: any) => Object.assign({}, row, { rating: undefined }));
 }
 
 async function byOrder(ctx: ParameterizedContext) {
