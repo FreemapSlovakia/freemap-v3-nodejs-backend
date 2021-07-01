@@ -58,7 +58,8 @@ const bboxQueryValidator = queryValidator({
 
 const orderQueryValidationRules: ValidationRules = {
   orderBy: (v) =>
-    ['createdAt', 'takenAt', 'rating'].includes(v) || 'invalid orderBy',
+    ['createdAt', 'takenAt', 'rating', 'lastCommentedAt'].includes(v) ||
+    'invalid orderBy',
   direction: (v) => ['desc', 'asc'].includes(v) || 'invalid direction',
 };
 
@@ -228,9 +229,19 @@ async function byBbox(ctx: ParameterizedContext) {
 
   const rows = await pool.query(sql);
 
-  ctx.body = fields?.includes('rating')
-    ? rows
-    : rows.map((row: any) => Object.assign({}, row, { rating: undefined }));
+  const getRating = fields?.includes('rating');
+
+  ctx.body = rows.map((row: any) =>
+    Object.assign({}, row, {
+      rating: getRating ? row.rating : undefined,
+      takenAt: r(row.takenAt?.getTime()),
+      createdAt: r(row.createdAt?.getTime()),
+    }),
+  );
+}
+
+function r(n: number | undefined | null) {
+  return n == null ? n : Math.round(n / 1000);
 }
 
 async function byOrder(ctx: ParameterizedContext) {
@@ -296,7 +307,11 @@ async function byOrder(ctx: ParameterizedContext) {
     }
     ${wh.length ? `WHERE ${wh.join(' AND ')}` : ''}
     ${hv.length ? `HAVING ${hv.join(' AND ')}` : ''}
-    ORDER BY ${orderBy} ${direction}, id ${direction}
+    ORDER BY ${
+      orderBy === 'lastCommentedAt'
+        ? `(SELECT MAX(createdAt) FROM pictureComment WHERE pictureId = picture.id)`
+        : orderBy
+    } ${direction}, id ${direction}
     LIMIT 1000
   `;
 
