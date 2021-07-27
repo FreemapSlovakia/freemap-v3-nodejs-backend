@@ -7,6 +7,8 @@ import { attachValidateHandler } from './validateHandler';
 import { attachLoginWithFacebookHandler } from './loginWithFacebookHandler';
 import { attachLoginWithGoogleHandler } from './loginWithGoogleHandler';
 import { attachPatchUserHandler } from './patchUserHandler';
+import { attachRovasTokenHandler } from './rovasTokenHandler';
+import { attachRovasValidateHandler } from './rovasValidateHandler';
 
 const router = new Router();
 
@@ -17,5 +19,7 @@ attachValidateHandler(router);
 attachLoginWithFacebookHandler(router);
 attachLoginWithGoogleHandler(router);
 attachPatchUserHandler(router);
+attachRovasTokenHandler(router);
+attachRovasValidateHandler(router);
 
 export const authRouter = router;

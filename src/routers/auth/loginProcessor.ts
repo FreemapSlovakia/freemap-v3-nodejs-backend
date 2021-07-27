@@ -17,7 +17,10 @@ export async function login(
   preventTips0 = false,
 ) {
   const [user] = await pool.query(
-    SQL`SELECT id, name, email, isAdmin, lat, lon, settings, sendGalleryEmails, preventTips, language FROM user WHERE `
+    SQL`SELECT id, name, email, isAdmin, lat, lon, settings, sendGalleryEmails, preventTips, language,
+      DATEDIFF(NOW(), lastPaymentAt) <= 365 AS isPremium
+      FROM user
+      WHERE `
       .append(dbField)
       .append(SQL` = ${dbValue}`),
   );
@@ -34,6 +37,7 @@ export async function login(
   let preventTips: boolean;
   let sendGalleryEmails: boolean;
   let language: string | null;
+  let isPremium: boolean;
 
   if (user) {
     ({ name, email, lat, lon } = user);
@@ -43,6 +47,7 @@ export async function login(
     preventTips = !!user.preventTips;
     sendGalleryEmails = !!user.sendGalleryEmails;
     language = user.language;
+    isPremium = !!user.isPremium;
   } else {
     settings = ctx.request.body.settings || {};
     lat = lat0 || settings.lat;
@@ -53,6 +58,7 @@ export async function login(
     preventTips = preventTips0;
     sendGalleryEmails = true;
     language = language0;
+    isPremium = false;
 
     userId = (
       await pool.query(
@@ -92,5 +98,6 @@ export async function login(
     preventTips,
     sendGalleryEmails,
     language,
+    isPremium,
   };
 }

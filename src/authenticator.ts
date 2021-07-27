@@ -38,8 +38,12 @@ export function authenticator(require?: boolean, deep?: boolean): Middleware {
     }
 
     const [auth] = await pool.query(SQL`
-      SELECT userId, osmAuthToken, osmAuthTokenSecret, facebookAccessToken, googleIdToken, name, email, isAdmin, lat, lon, settings, preventTips, language, sendGalleryEmails
-        FROM auth INNER JOIN user ON (userId = id) WHERE authToken = ${authToken}
+      SELECT
+        userId, osmAuthToken, osmAuthTokenSecret, facebookAccessToken, googleIdToken,name, email,
+        isAdmin, lat, lon,settings, preventTips, language, sendGalleryEmails, rovasToken,
+        DATEDIFF(NOW(), lastPaymentAt) <= 365 AS isPremium
+      FROM auth INNER JOIN user ON (userId = id)
+      WHERE authToken = ${authToken}
     `);
 
     if (!auth) {
@@ -59,6 +63,8 @@ export function authenticator(require?: boolean, deep?: boolean): Middleware {
       preventTips: !!auth.preventTips,
       language: auth.language,
       sendGalleryEmails: !!auth.sendGalleryEmails,
+      isPremium: !!auth.isPremium,
+      rovasToken: auth.rovasToken,
     };
 
     if (!deep) {

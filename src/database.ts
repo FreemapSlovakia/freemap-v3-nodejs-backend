@@ -29,11 +29,13 @@ export async function initDatabase() {
       settings VARCHAR(4096) CHARSET utf8 COLLATE utf8_bin NOT NULL DEFAULT '{}',
       preventTips BOOL NOT NULL DEFAULT 0,
       sendGalleryEmails BOOL NOT NULL DEFAULT 1,
-      language CHAR(2) NULL
+      language CHAR(2) NULL,
+      lastPaymentAt TIMESTAMP NULL,
+      rovasToken VARCHAR(255) CHARSET ascii NULL
     ) ENGINE=InnoDB`,
 
     `CREATE TABLE IF NOT EXISTS auth (
-      authToken VARCHAR(255) CHARSET utf8 COLLATE utf8_bin PRIMARY KEY,
+      authToken VARCHAR(255) CHARSET ascii PRIMARY KEY,
       userId INT UNSIGNED NOT NULL,
       createdAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
       osmAuthToken VARCHAR(255) CHARSET latin1 COLLATE latin1_bin NULL UNIQUE,
@@ -143,6 +145,8 @@ export async function initDatabase() {
   const updates: string[] = [
     'ALTER TABLE user ADD COLUMN sendGalleryEmails BOOL NOT NULL DEFAULT 1',
     'ALTER TABLE user ADD COLUMN language CHAR(2) NULL',
+    'ALTER TABLE user ADD lastPaymentAt TIMESTAMP NULL',
+    'ALTER TABLE user ADD rovasToken VARCHAR(255) CHARSET ascii NULL',
     'ALTER TABLE map MODIFY COLUMN id CHAR(8)',
     'ALTER TABLE map ADD COLUMN modifiedAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP',
   ];
