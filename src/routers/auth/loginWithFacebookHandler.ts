@@ -20,7 +20,7 @@ export function attachLoginWithFacebookHandler(router: Router) {
         'facebookAccessToken',
         [accessToken],
         name,
-        email,
+        email ?? null,
         undefined,
         undefined,
         language,

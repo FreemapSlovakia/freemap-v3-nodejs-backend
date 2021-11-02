@@ -10,7 +10,7 @@ export async function login(
   authFields: string,
   authValues: string[],
   name0: string,
-  email0: string,
+  email0: string | null,
   lat0: number,
   lon0: number,
   language0?: string | null,
