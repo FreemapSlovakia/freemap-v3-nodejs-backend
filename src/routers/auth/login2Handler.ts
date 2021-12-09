@@ -63,8 +63,8 @@ export function attachLogin2Handler(router: Router) {
         [permData.oauth_token, permData.oauth_token_secret],
         osmName,
         null,
-        lat,
-        lon,
+        lat ? Number(lat) : undefined,
+        lon ? Number(lon) : undefined,
         language,
         preventTips,
       );
