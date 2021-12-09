@@ -143,12 +143,12 @@ export async function initDatabase() {
   ];
 
   const updates: string[] = [
-    'ALTER TABLE user ADD COLUMN sendGalleryEmails BOOL NOT NULL DEFAULT 1',
-    'ALTER TABLE user ADD COLUMN language CHAR(2) NULL',
-    'ALTER TABLE user ADD lastPaymentAt TIMESTAMP NULL',
-    'ALTER TABLE user ADD rovasToken VARCHAR(255) CHARSET ascii NULL',
-    'ALTER TABLE map MODIFY COLUMN id CHAR(8)',
-    'ALTER TABLE map ADD COLUMN modifiedAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP',
+    // 'ALTER TABLE user ADD COLUMN sendGalleryEmails BOOL NOT NULL DEFAULT 1',
+    // 'ALTER TABLE user ADD COLUMN language CHAR(2) NULL',
+    // 'ALTER TABLE user ADD lastPaymentAt TIMESTAMP NULL',
+    // 'ALTER TABLE user ADD rovasToken VARCHAR(255) CHARSET ascii NULL',
+    // 'ALTER TABLE map MODIFY COLUMN id CHAR(8)',
+    // 'ALTER TABLE map ADD COLUMN modifiedAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP',
   ];
 
   const db = await pool.getConnection();
