@@ -53,7 +53,7 @@ export async function login(
     lat = lat0 || settings.lat;
     lon = lon0 || settings.lon;
     name = name0;
-    email = email0;
+    email = email0 || null;
     isAdmin = false;
     preventTips = preventTips0;
     sendGalleryEmails = true;
