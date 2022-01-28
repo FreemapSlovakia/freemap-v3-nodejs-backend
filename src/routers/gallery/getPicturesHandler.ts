@@ -234,14 +234,14 @@ async function byBbox(ctx: ParameterizedContext) {
   ctx.body = rows.map((row: any) =>
     Object.assign({}, row, {
       rating: getRating ? row.rating : undefined,
-      takenAt: r(row.takenAt?.getTime()),
-      createdAt: r(row.createdAt?.getTime()),
+      takenAt: toSec(row.takenAt),
+      createdAt: toSec(row.createdAt),
     }),
   );
 }
 
-function r(n: number | undefined | null) {
-  return n == null ? n : Math.round(n / 1000);
+function toSec(d: Date | null | undefined) {
+  return d == null ? d : Math.round(d.getTime() / 1000);
 }
 
 async function byOrder(ctx: ParameterizedContext) {
