@@ -46,6 +46,8 @@ const bboxQueryValidationRules: ValidationRules = {
         'createdAt',
         'rating',
         'userId',
+        'user',
+        'tags',
       ].includes(f),
     ) ||
     'invalid fields',
@@ -197,10 +199,24 @@ async function byBbox(ctx: ParameterizedContext) {
 
   const normFields = !fields ? [] : Array.isArray(fields) ? fields : [fields];
 
-  const flds = ['lat', 'lon', ...normFields.filter((f) => f !== 'rating')];
+  const flds = [
+    'lat',
+    'lon',
+    ...normFields.filter((f) => f !== 'rating' && f !== 'tags' && f !== 'user'),
+  ];
 
   if (ratingFrom || ratingTo || normFields.includes('rating')) {
     flds.push(ratingSubquery);
+  }
+
+  if (normFields.includes('tags')) {
+    flds.push(
+      "(SELECT GROUP_CONCAT(name SEPARATOR '\n') FROM pictureTag WHERE pictureId = picture.id) AS tags",
+    );
+  }
+
+  if (normFields.includes('user')) {
+    flds.push('(SELECT name FROM user WHERE picture.userId = user.id) AS user');
   }
 
   const sql = `SELECT ${flds.join(',')}
@@ -225,6 +241,7 @@ async function byBbox(ctx: ParameterizedContext) {
         ? ''
         : `${ratingTo ? 'AND' : 'HAVING'} rating <= ${ratingTo}`
     }
+    LIMIT 1000
   `;
 
   const rows = await pool.query(sql);
@@ -236,6 +253,7 @@ async function byBbox(ctx: ParameterizedContext) {
       rating: getRating ? row.rating : undefined,
       takenAt: toSec(row.takenAt),
       createdAt: toSec(row.createdAt),
+      tags: row.tags?.split('\n'),
     }),
   );
 }
