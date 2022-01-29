@@ -253,7 +253,9 @@ async function byBbox(ctx: ParameterizedContext) {
       rating: getRating ? row.rating : undefined,
       takenAt: toSec(row.takenAt),
       createdAt: toSec(row.createdAt),
-      tags: row.tags?.split('\n'),
+      tags: normFields.includes('tags')
+        ? row.tags?.split('\n') ?? []
+        : undefined,
     }),
   );
 }
