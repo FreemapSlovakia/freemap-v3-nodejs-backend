@@ -241,7 +241,6 @@ async function byBbox(ctx: ParameterizedContext) {
         ? ''
         : `${ratingTo ? 'AND' : 'HAVING'} rating <= ${ratingTo}`
     }
-    LIMIT 1000
   `;
 
   const rows = await pool.query(sql);
