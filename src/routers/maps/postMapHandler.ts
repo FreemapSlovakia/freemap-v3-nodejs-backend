@@ -27,13 +27,19 @@ export function attachPostMapHandler(router: Router) {
           public: {
             type: 'boolean',
           },
+          writers: {
+            type: 'array',
+            items: {
+              type: 'number',
+            },
+          },
         },
       },
       true,
     ),
     authenticator(true),
     async (ctx) => {
-      const { name, public: pub, data } = ctx.request.body;
+      const { name, public: pub, data, writers } = ctx.request.body;
 
       const id = randomize('Aa0', 8);
 
@@ -45,6 +51,24 @@ export function attachPostMapHandler(router: Router) {
           userId = ${ctx.state.user.id},
           data = ${JSON.stringify(data)}
       `);
+
+      if (writers?.length) {
+        const sql = SQL`INSERT INTO mapWriteAccess (mapId, userId) VALUES `;
+
+        let first = true;
+
+        for (const writer of writers) {
+          if (first) {
+            first = false;
+          } else {
+            sql.append(',');
+          }
+
+          sql.append(SQL`(${id}, ${writer})`);
+        }
+
+        await pool.query(sql);
+      }
 
       ctx.body = { id };
     },

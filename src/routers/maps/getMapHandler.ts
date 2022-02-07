@@ -11,9 +11,10 @@ export function attachGetMapHandler(router: Router) {
     authenticator(false),
     async (ctx) => {
       const [item] = await pool.query(SQL`
-        SELECT id, name, public, data, createdAt, userId
-          FROM map
+        SELECT id, name, public, data, createdAt, map.userId, GROUP_CONCAT(mapWriteAccess.userId) AS writers
+          FROM map LEFT JOIN mapWriteAccess ON (mapWriteAccess.mapId = id)
           WHERE id = ${ctx.params.id}
+          GROUP BY id, name, public, data, createdAt, map.userId
       `);
 
       if (!item) {
@@ -30,7 +31,17 @@ export function attachGetMapHandler(router: Router) {
 
       item.data = JSON.parse(item.data);
 
-      item.public = !!item.public;
+      if (ctx.state.user && item.userId === ctx.state.user.id) {
+        item.public = !!item.public;
+
+        item.writers =
+          item.writers?.split(',').map((s: any) => Number(s)) ?? [];
+      }
+
+      item.canWrite =
+        !!ctx.state.user &&
+        (item.userId === ctx.state.user.id ||
+          (item.writers ?? []).includes(ctx.state.user.id));
 
       ctx.body = item;
     },

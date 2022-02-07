@@ -25,6 +25,12 @@ export function attachPatchMapHandler(router: Router) {
           public: {
             type: 'boolean',
           },
+          writers: {
+            type: 'array',
+            items: {
+              type: 'number',
+            },
+          },
         },
       },
       true,
@@ -44,11 +50,24 @@ export function attachPatchMapHandler(router: Router) {
         ctx.throw(404, 'no such map');
       }
 
-      if (!ctx.state.user.isAdmin && item.userId !== ctx.state.user.id) {
+      const curWriters = (
+        await conn.query(
+          SQL`SELECT userId FROM mapWriteAccess WHERE mapId = ${id} FOR UPDATE`,
+        )
+      ).map(({ userId }: any) => userId);
+
+      const { name, public: pub, data, writers } = ctx.request.body;
+
+      if (
+        !ctx.state.user.isAdmin &&
+        item.userId !== ctx.state.user.id &&
+        (!curWriters.includes(ctx.state.user.id) ||
+          writers !== undefined ||
+          pub !== undefined ||
+          name !== undefined)
+      ) {
         ctx.throw(403);
       }
-
-      const { name, public: pub, data } = ctx.request.body;
 
       const parts = [];
 
@@ -71,6 +90,28 @@ export function attachPatchMapHandler(router: Router) {
       }
 
       await conn.query(query.append(SQL` WHERE id = ${id}`));
+
+      if (writers) {
+        conn.query(SQL`DELETE FROM mapWriteAccess WHERE mapId = ${id}`);
+
+        if (writers.length) {
+          const sql = SQL`INSERT INTO mapWriteAccess (mapId, userId) VALUES `;
+
+          let first = true;
+
+          for (const writer of writers) {
+            if (first) {
+              first = false;
+            } else {
+              sql.append(',');
+            }
+
+            sql.append(SQL`(${id}, ${writer})`);
+          }
+
+          await conn.query(sql);
+        }
+      }
 
       ctx.status = 204;
     },

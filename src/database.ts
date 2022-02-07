@@ -130,7 +130,7 @@ export async function initDatabase() {
     ) ENGINE=InnoDB`,
 
     `CREATE TABLE IF NOT EXISTS map (
-      id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+      id CHAR(8) PRIMARY KEY,
       createdAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
       modifiedAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
       name VARCHAR(255) CHARSET utf8 COLLATE utf8_general_ci NULL,
@@ -139,6 +139,14 @@ export async function initDatabase() {
       data MEDIUMTEXT CHARSET utf8 COLLATE utf8_bin NOT NULL DEFAULT '{}',
       CONSTRAINT umUserFk FOREIGN KEY (userId) REFERENCES user (id) ON DELETE CASCADE,
       INDEX umCreatedAtIdx (createdAt)
+    ) ENGINE=InnoDB`,
+
+    `CREATE TABLE IF NOT EXISTS mapWriteAccess (
+      mapId CHAR(8) NOT NULL,
+      userId INT UNSIGNED NOT NULL,
+      PRIMARY KEY (mapId, userId),
+      CONSTRAINT mwaUserFk FOREIGN KEY (userId) REFERENCES user (id) ON DELETE CASCADE,
+      CONSTRAINT mwaMapFk FOREIGN KEY (mapId) REFERENCES map (id) ON DELETE CASCADE
     ) ENGINE=InnoDB`,
   ];
 

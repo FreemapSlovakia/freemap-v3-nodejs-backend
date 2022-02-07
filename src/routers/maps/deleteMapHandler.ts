@@ -26,6 +26,7 @@ export function attachDeleteMapHandler(router: Router) {
       }
 
       await conn.query(SQL`DELETE FROM map WHERE id = ${ctx.params.id}`);
+
       ctx.status = 204;
     },
   );
