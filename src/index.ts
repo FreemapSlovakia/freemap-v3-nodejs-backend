@@ -18,6 +18,7 @@ import { trackingRouter } from './routers/deviceTracking';
 import { attachLoggerHandler } from './routers/loggerHandler';
 import { getEnv } from './env';
 import { startSocketDeviceTracking } from './socketDeviceTracking';
+import { attachGetUsers } from './routers/getUsersHandler';
 
 const logger = appLogger.child({ module: 'app' });
 
@@ -116,6 +117,8 @@ router.use(
 router.use('/maps', mapsRouter.routes(), mapsRouter.allowedMethods());
 
 attachLoggerHandler(router);
+
+attachGetUsers(router);
 
 app.use(router.routes()).use(router.allowedMethods());
 

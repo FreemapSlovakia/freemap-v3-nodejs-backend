@@ -11,7 +11,7 @@ export function attachGetMapHandler(router: Router) {
     authenticator(false),
     async (ctx) => {
       const [item] = await pool.query(SQL`
-        SELECT id, name, public, data, createdAt, map.userId, GROUP_CONCAT(mapWriteAccess.userId) AS writers
+        SELECT id, name, public, data, createdAt, modifiedAt, map.userId, GROUP_CONCAT(mapWriteAccess.userId) AS writers
           FROM map LEFT JOIN mapWriteAccess ON (mapWriteAccess.mapId = id)
           WHERE id = ${ctx.params.id}
           GROUP BY id, name, public, data, createdAt, map.userId
@@ -21,29 +21,33 @@ export function attachGetMapHandler(router: Router) {
         ctx.throw(404, 'no such map');
       }
 
+      const { user } = ctx.state;
+
       if (
         !item.public &&
-        (!ctx.state.user ||
-          (!ctx.state.user.isAdmin && ctx.state.user.id !== item.userId))
+        (!user || (!user.isAdmin && user.id !== item.userId))
       ) {
         ctx.throw(403);
       }
 
-      item.data = JSON.parse(item.data);
+      const writers = item.writers?.split(',').map((s: any) => Number(s)) ?? [];
 
-      if (ctx.state.user && item.userId === ctx.state.user.id) {
-        item.public = !!item.public;
-
-        item.writers =
-          item.writers?.split(',').map((s: any) => Number(s)) ?? [];
-      }
-
-      item.canWrite =
-        !!ctx.state.user &&
-        (item.userId === ctx.state.user.id ||
-          (item.writers ?? []).includes(ctx.state.user.id));
-
-      ctx.body = item;
+      ctx.body = {
+        meta: {
+          id: item.id,
+          createdAt: item.createdAt.toISOString(),
+          modifiedAt: item.modifiedAt.toISOString(),
+          name: item.name,
+          userId: item.userId,
+          public: !!item.public,
+          writers: item.userId === user?.id ? writers : undefined,
+          canWrite: !!(
+            user &&
+            (item.userId === user.id || writers.includes(user.id))
+          ),
+        },
+        data: JSON.parse(item.data),
+      };
     },
   );
 }
