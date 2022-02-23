@@ -45,15 +45,17 @@ export function attachPostMapHandler(router: Router) {
 
       const now = new Date();
 
+      const userId = ctx.state.user.id;
+
       await pool.query(SQL`
         INSERT INTO map SET
           id = ${id},
           name = ${name},
           public = ${pub},
-          userId = ${ctx.state.user.id},
-          data = ${JSON.stringify(data)}
+          userId = ${userId},
+          createdAt = ${now},
           modifiedAt = ${now},
-          modifiedAt = ${now}
+          data = ${JSON.stringify(data)}
       `);
 
       if (writers?.length) {
@@ -78,6 +80,11 @@ export function attachPostMapHandler(router: Router) {
         id,
         createdNow: now.toISOString(),
         modifiedAt: now.toISOString(),
+        public: !!pub,
+        writers,
+        name,
+        userId,
+        canWrite: true,
       };
     },
   );

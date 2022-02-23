@@ -43,7 +43,7 @@ export function attachPatchMapHandler(router: Router) {
       const { id } = ctx.params;
 
       const [item] = await conn.query(
-        SQL`SELECT userId, modifiedAt FROM map WHERE id = ${id} FOR UPDATE`,
+        SQL`SELECT userId, name, createdAt, modifiedAt, public FROM map WHERE id = ${id} FOR UPDATE`,
       );
 
       if (!item) {
@@ -125,7 +125,13 @@ export function attachPatchMapHandler(router: Router) {
 
       ctx.body = {
         id,
+        createdAt: item.createdAt.toISOString(),
         modifiedAt: now.toISOString(),
+        public: pub ?? item.public,
+        writers: writers ?? curWriters,
+        name: name ?? item.name,
+        userId: item.userId,
+        canWrite: true,
       };
     },
   );
