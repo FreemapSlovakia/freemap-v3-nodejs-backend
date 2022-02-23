@@ -43,7 +43,7 @@ export function attachPatchMapHandler(router: Router) {
       const { id } = ctx.params;
 
       const [item] = await conn.query(
-        SQL`SELECT userId FROM map WHERE id = ${id} FOR UPDATE`,
+        SQL`SELECT userId, modifiedAt FROM map WHERE id = ${id} FOR UPDATE`,
       );
 
       if (!item) {
@@ -69,6 +69,14 @@ export function attachPatchMapHandler(router: Router) {
         ctx.throw(403);
       }
 
+      if (
+        ctx.request.headers['if-unmodified-since'] &&
+        new Date(ctx.request.headers['if-unmodified-since']).getTime() <
+          item.modifiedAt.getTime()
+      ) {
+        ctx.throw(412);
+      }
+
       const parts = [];
 
       if (name !== undefined) {
@@ -83,7 +91,9 @@ export function attachPatchMapHandler(router: Router) {
         parts.push(SQL`data = ${JSON.stringify(data)}`);
       }
 
-      const query = SQL`UPDATE map SET modifiedAt = ${new Date()}`;
+      const now = new Date();
+
+      const query = SQL`UPDATE map SET modifiedAt = ${now}`;
 
       for (let i = 0; i < parts.length; i++) {
         query.append(',').append(parts[i]);
@@ -113,7 +123,10 @@ export function attachPatchMapHandler(router: Router) {
         }
       }
 
-      ctx.status = 204;
+      ctx.body = {
+        id,
+        modifiedAt: now.toISOString(),
+      };
     },
   );
 }

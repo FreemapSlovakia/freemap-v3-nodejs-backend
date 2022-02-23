@@ -43,6 +43,8 @@ export function attachPostMapHandler(router: Router) {
 
       const id = randomize('Aa0', 8);
 
+      const now = new Date();
+
       await pool.query(SQL`
         INSERT INTO map SET
           id = ${id},
@@ -50,6 +52,8 @@ export function attachPostMapHandler(router: Router) {
           public = ${pub},
           userId = ${ctx.state.user.id},
           data = ${JSON.stringify(data)}
+          modifiedAt = ${now},
+          modifiedAt = ${now}
       `);
 
       if (writers?.length) {
@@ -70,7 +74,11 @@ export function attachPostMapHandler(router: Router) {
         await pool.query(sql);
       }
 
-      ctx.body = { id };
+      ctx.body = {
+        id,
+        createdNow: now.toISOString(),
+        modifiedAt: now.toISOString(),
+      };
     },
   );
 }
