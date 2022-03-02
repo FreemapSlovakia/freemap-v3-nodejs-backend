@@ -78,7 +78,7 @@ export function attachPostMapHandler(router: Router) {
 
       ctx.body = {
         id,
-        createdNow: now.toISOString(),
+        createdAt: now.toISOString(),
         modifiedAt: now.toISOString(),
         public: !!pub,
         writers,
