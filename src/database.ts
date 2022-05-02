@@ -9,6 +9,9 @@ export const pool = createPool({
   database: getEnv('MARIADB_DATABASE'),
   user: getEnv('MARIADB_USER'),
   password: getEnv('MARIADB_PASSWORD'),
+  bigIntAsNumber: true,
+  insertIdAsNumber: true,
+  decimalAsNumber: true,
 });
 
 const logger = appLogger.child({ module: 'db' });
