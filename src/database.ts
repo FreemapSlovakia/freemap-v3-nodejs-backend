@@ -58,6 +58,7 @@ export async function initDatabase() {
       createdAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
       lat FLOAT(8, 6) NOT NULL,
       lon FLOAT(9, 6) NOT NULL,
+      pano BIT NOT NULL,
       FOREIGN KEY (userId) REFERENCES user (id) ON DELETE CASCADE,
       INDEX USING BTREE (lat),
       INDEX USING BTREE (lon)
@@ -160,6 +161,7 @@ export async function initDatabase() {
     // 'ALTER TABLE user ADD rovasToken VARCHAR(255) CHARSET ascii NULL',
     // 'ALTER TABLE map MODIFY COLUMN id CHAR(8)',
     // 'ALTER TABLE map ADD COLUMN modifiedAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP',
+    'ALTER TABLE picture ADD COLUMN pano BIT NOT NULL DEFAULT 0',
   ];
 
   const db = await pool.getConnection();

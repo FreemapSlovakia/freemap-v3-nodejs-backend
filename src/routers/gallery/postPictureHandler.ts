@@ -11,6 +11,7 @@ import { authenticator } from '../../authenticator';
 import { promisify } from 'util';
 import { execFile } from 'child_process';
 import { picturesDir } from '../../routers/gallery/constants';
+import ExifReader from 'exifreader';
 
 const execFileAsync = promisify(execFile);
 
@@ -109,12 +110,18 @@ export function attachPostPictureHandler(router: Router) {
 
       const name = uuidBase62.v4();
 
-      await execFileAsync('exiftran', [
-        '-a',
-        image.path,
-        '-o',
-        `${picturesDir}/${name}.jpeg`,
+      const [exif] = await Promise.all([
+        ExifReader.load(image.path),
+
+        await execFileAsync('exiftran', [
+          '-a',
+          image.path,
+          '-o',
+          `${picturesDir}/${name}.jpeg`,
+        ]),
       ]);
+
+      const pano = exif['UsePanoramaViewer']?.value === 'True';
 
       const { insertId } = await conn.query(SQL`
         INSERT INTO picture SET
@@ -125,7 +132,8 @@ export function attachPostPictureHandler(router: Router) {
           createdAt = ${new Date()},
           takenAt = ${takenAt ? new Date(takenAt) : null},
           lat = ${lat},
-          lon = ${lon}
+          lon = ${lon},
+          pano = ${pano}
       `);
 
       if (tags.length) {

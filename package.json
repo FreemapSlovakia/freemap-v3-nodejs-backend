@@ -21,6 +21,7 @@
     "bunyan": "1.8.15",
     "concurrently": "7.0.0",
     "etag": "1.8.1",
+    "exifreader": "4.5.0",
     "fb": "2.0.0",
     "fs-extra": "10.0.1",
     "google-auth-library": "7.14.0",
