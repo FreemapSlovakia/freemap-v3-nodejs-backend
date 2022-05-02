@@ -8,7 +8,7 @@ export function attachGetAllTagsHandler(router: Router) {
     acceptValidator('application/json'),
     async (ctx) => {
       ctx.body = await pool.query(
-        'SELECT name, count(*) AS count FROM pictureTag GROUP BY name ORDER BY name',
+        'SELECT name, COUNT(*) AS count FROM pictureTag GROUP BY name ORDER BY name',
       );
     },
   );

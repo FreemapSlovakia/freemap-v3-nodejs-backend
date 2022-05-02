@@ -5,7 +5,6 @@ import {
   fstat,
   read,
   createWriteStream,
-  rename,
   WriteStream,
 } from 'fs';
 import { ParameterizedContext } from 'koa';
@@ -19,9 +18,11 @@ const hgtDir = getEnv('ELEVATION_DATA_DIRECTORY');
 const router = new Router();
 
 const fstatAsync = promisify(fstat);
+
 const readAsync = promisify(read);
 
 router.get('/elevation', compute);
+
 router.post('/elevation', acceptValidator('application/json'), compute);
 
 async function compute(ctx: ParameterizedContext) {
@@ -60,12 +61,16 @@ async function compute(ctx: ParameterizedContext) {
   }
 
   const allocated = new Set<string>();
+
   const fdMap = new Map<string, [fs.FileHandle, number]>();
+
   try {
     const items = await Promise.all(
       cs.map(async ([lat, lon]) => {
         const alat = Math.abs(lat);
+
         const alon = Math.abs(lon);
+
         const key =
           `${lat >= 0 ? 'N' : 'E'}${Math.floor(alat + (lat < 0 ? 1 : 0))
             .toString()
@@ -76,20 +81,25 @@ async function compute(ctx: ParameterizedContext) {
 
         if (!allocated.has(key)) {
           allocated.add(key);
+
           const hgtPath = `${hgtDir}/${key}.HGT`;
 
           let fd;
+
           try {
             fd = await fs.open(hgtPath, 'r');
           } catch (e) {
             try {
               await fetchSafe(key);
+
               fd = await fs.open(hgtPath, 'r');
             } catch (e) {
               await (await fs.open(hgtPath, 'w')).close();
+
               fd = await fs.open(hgtPath, 'r');
             }
           }
+
           fdMap.set(key, [fd, (await fstatAsync(fd.fd)).size]);
         }
 
@@ -99,7 +109,9 @@ async function compute(ctx: ParameterizedContext) {
 
     items.forEach((item) => {
       const f = fdMap.get(item[2]);
+
       item[2] = f[0];
+
       item[3] = f[1];
     });
 
