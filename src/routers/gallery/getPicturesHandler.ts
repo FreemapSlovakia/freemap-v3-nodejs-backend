@@ -48,6 +48,7 @@ const bboxQueryValidationRules: ValidationRules = {
         'userId',
         'user',
         'tags',
+        'pano',
       ].includes(f),
     ) ||
     'invalid fields',
@@ -103,6 +104,7 @@ export function attachGetPicturesHandler(router: Router) {
         takenAtTo: (x) => (x ? new Date(x) : null),
         createdAtFrom: (x) => (x ? new Date(x) : null),
         createdAtTo: (x) => (x ? new Date(x) : null),
+        pano: (x) => (x ? x === 'true' : null),
       },
       {
         fields: (x) => x,
@@ -133,6 +135,7 @@ async function byRadius(ctx: ParameterizedContext) {
     takenAtTo,
     createdAtFrom,
     createdAtTo,
+    pano,
   } = ctx.query;
 
   const lat = Number(ctx.query.lat);
@@ -161,6 +164,7 @@ async function byRadius(ctx: ParameterizedContext) {
     ${takenAtTo ? `AND takenAt <= '${toSqlDate(takenAtTo)}'` : ''}
     ${createdAtFrom ? `AND createdAt >= '${toSqlDate(createdAtFrom)}'` : ''}
     ${createdAtTo ? `AND createdAt <= '${toSqlDate(createdAtTo)}'` : ''}
+    ${pano === null ? '' : ` AND pano = '${pano ? 1 : 0}'`}
     ${userId ? `AND userId = ${userId}` : ''}
     ${tag === '' ? 'AND id NOT IN (SELECT pictureId FROM pictureTag)' : ''}
     HAVING distance <= ${distance}
@@ -194,6 +198,7 @@ async function byBbox(ctx: ParameterizedContext) {
     takenAtTo,
     createdAtFrom,
     createdAtTo,
+    pano,
     fields,
   } = ctx.query;
 
@@ -233,6 +238,7 @@ async function byBbox(ctx: ParameterizedContext) {
     ${takenAtTo ? `AND takenAt <= '${toSqlDate(takenAtTo)}'` : ''}
     ${createdAtFrom ? `AND createdAt >= '${toSqlDate(createdAtFrom)}'` : ''}
     ${createdAtTo ? `AND createdAt <= '${toSqlDate(createdAtTo)}'` : ''}
+    ${pano === null ? '' : ` AND pano = '${pano ? 1 : 0}'`}
     ${userId ? `AND userId = ${userId}` : ''}
     ${tag === '' ? 'AND id NOT IN (SELECT pictureId FROM pictureTag)' : ''}
     ${ratingFrom === null ? '' : `HAVING rating >= ${ratingFrom}`}
@@ -252,6 +258,7 @@ async function byBbox(ctx: ParameterizedContext) {
       rating: getRating ? row.rating : undefined,
       takenAt: toSec(row.takenAt),
       createdAt: toSec(row.createdAt),
+      pano: row.pano ? 1 : undefined,
       tags: normFields.includes('tags')
         ? row.tags?.split('\n') ?? []
         : undefined,
@@ -275,6 +282,7 @@ async function byOrder(ctx: ParameterizedContext) {
     createdAtTo,
     orderBy,
     direction,
+    pano,
   } = ctx.query;
 
   const hv = [];
@@ -305,6 +313,10 @@ async function byOrder(ctx: ParameterizedContext) {
     wh.push(`createdAt <= '${toSqlDate(createdAtTo)}'`);
   }
 
+  if (pano !== null) {
+    wh.push(`pano = ${pano ? 1 : 0}`);
+  }
+
   if (userId !== null) {
     wh.push(`userId = ${userId}`);
   }
@@ -312,6 +324,8 @@ async function byOrder(ctx: ParameterizedContext) {
   if (tag === '') {
     wh.push('id NOT IN (SELECT pictureId FROM pictureTag)');
   }
+
+  console.log({ pano, wh });
 
   const sql = `SELECT id ${
     ratingFrom || ratingTo || orderBy === 'rating' ? `, ${ratingSubquery}` : ''

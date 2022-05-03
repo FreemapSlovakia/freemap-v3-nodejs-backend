@@ -84,7 +84,7 @@ export function attachGetPictureHandler(router: Router) {
         comments,
         rating,
         myStars,
-        pano: !!pano,
+        pano: pano ? 1 : undefined,
       };
     },
   );
