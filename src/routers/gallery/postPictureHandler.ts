@@ -31,7 +31,7 @@ export function attachPostPictureHandler(router: Router) {
         return;
       }
 
-      if (files.image.size > 20 * 1024 * 1024) {
+      if (files.image.size > 40 * 1024 * 1024) {
         ctx.throw(413);
       }
 
