@@ -85,7 +85,7 @@ export async function storeTrackPoint(
 
   const rows = await conn.query(SQL`
     SELECT token FROM trackingAccessToken
-      WHERE deviceId = ${id} AND (timeFrom IS NULL OR timeFrom > ${now}) AND (timeTo IS NULL OR timeTo < ${now})
+      WHERE deviceId = ${id} AND (timeFrom IS NULL OR timeFrom < ${now}) AND (timeTo IS NULL OR timeTo > ${now})
   `);
 
   const notify = (type: string, key: string | number) => {
