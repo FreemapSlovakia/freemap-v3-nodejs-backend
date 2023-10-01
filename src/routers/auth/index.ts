@@ -1,7 +1,6 @@
 import Router from '@koa/router';
 
-import { attachLoginHandler } from './loginHandler';
-import { attachLogin2Handler } from './login2Handler';
+import { attachLoginWithOsmHandler } from './loginWithOsmHandler';
 import { attachLogoutHandler } from './logoutHandler';
 import { attachValidateHandler } from './validateHandler';
 import { attachLoginWithFacebookHandler } from './loginWithFacebookHandler';
@@ -13,8 +12,7 @@ import { attachDeleteUserHandler } from './deleteUserHandler';
 
 const router = new Router();
 
-attachLoginHandler(router);
-attachLogin2Handler(router);
+attachLoginWithOsmHandler(router);
 attachLogoutHandler(router);
 attachValidateHandler(router);
 attachLoginWithFacebookHandler(router);

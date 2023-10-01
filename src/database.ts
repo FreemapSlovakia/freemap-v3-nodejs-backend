@@ -43,6 +43,7 @@ export async function initDatabase() {
       createdAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
       osmAuthToken VARCHAR(255) CHARSET latin1 COLLATE latin1_bin NULL UNIQUE,
       osmAuthTokenSecret VARCHAR(255) CHARSET latin1 COLLATE latin1_bin NULL,
+      osmAccessToken VARCHAR(255) CHARSET ascii NULL,
       facebookAccessToken VARCHAR(255) CHARSET latin1 COLLATE latin1_bin NULL,
       googleIdToken VARCHAR(4095) CHARSET latin1 COLLATE latin1_bin NULL,
       FOREIGN KEY (userId) REFERENCES user (id) ON DELETE CASCADE
@@ -155,13 +156,7 @@ export async function initDatabase() {
   ];
 
   const updates: string[] = [
-    // 'ALTER TABLE user ADD COLUMN sendGalleryEmails BOOL NOT NULL DEFAULT 1',
-    // 'ALTER TABLE user ADD COLUMN language CHAR(2) NULL',
-    // 'ALTER TABLE user ADD lastPaymentAt TIMESTAMP NULL',
-    // 'ALTER TABLE user ADD rovasToken VARCHAR(255) CHARSET ascii NULL',
-    // 'ALTER TABLE map MODIFY COLUMN id CHAR(8)',
-    // 'ALTER TABLE map ADD COLUMN modifiedAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP',
-    'ALTER TABLE picture ADD COLUMN pano BIT NOT NULL DEFAULT 0',
+    'ALTER TABLE auth ADD COLUMN osmAccessToken VARCHAR(255) CHARSET ascii NULL',
   ];
 
   const db = await pool.getConnection();

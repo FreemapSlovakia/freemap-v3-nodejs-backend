@@ -94,7 +94,26 @@ export function authenticator(require?: boolean, deep?: boolean): Middleware {
 
       ctx.state.user = user;
       await next();
+    } else if (auth.osmAccessToken) {
+      // oauth2
+      try {
+        await rp.get({
+          url: 'https://api.openstreetmap.org/api/0.6/user/details',
+          auth: {
+            bearer: auth.osmAccessToken,
+          },
+        });
+      } catch (e) {
+        if (e.name === 'StatusCodeError' && e.statusCode === 401) {
+          await bad('OSM');
+          return;
+        }
+      }
+
+      ctx.state.user = user;
+      await next();
     } else if (auth.osmAuthToken) {
+      // oauth1 (legacy)
       try {
         await rp.get({
           url: 'https://api.openstreetmap.org/api/0.6/user/details',
