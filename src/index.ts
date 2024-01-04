@@ -83,7 +83,7 @@ app.use(async (ctx, next) => {
       const files = ctx.request.files[field];
 
       for (const file of Array.isArray(files) ? files : [files]) {
-        proms.push(fs.unlink(file.path));
+        proms.push(fs.unlink(file.filepath));
       }
     }
     await Promise.all(proms);

@@ -31,7 +31,7 @@ export function attachPostPictureHandler(router: Router) {
         return;
       }
 
-      if (files.image.size > 40 * 1024 * 1024) {
+      if (Array.isArray(files.image) || files.image.size > 40 * 1024 * 1024) {
         ctx.throw(413);
       }
 
@@ -100,6 +100,11 @@ export function attachPostPictureHandler(router: Router) {
 
       const { image } = ctx.request.files;
 
+      if (Array.isArray(image)) {
+        ctx.status = 400;
+        return;
+      }
+
       const {
         title,
         description,
@@ -111,11 +116,11 @@ export function attachPostPictureHandler(router: Router) {
       const name = uuidBase62.v4();
 
       const [exif] = await Promise.all([
-        ExifReader.load(image.path),
+        ExifReader.load(image.filepath),
 
         await execFileAsync('exiftran', [
           '-a',
-          image.path,
+          image.filepath,
           '-o',
           `${picturesDir}/${name}.jpeg`,
         ]),
