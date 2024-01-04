@@ -68,24 +68,7 @@ export function startSocketDeviceTracking() {
           // args: 200313 (date) A (availability) 48 42.4669 N (lat) 021 14.1758 E (lon) 014.4 (speed) 174559 (time) 353.24 (orientation) , (comma) 00000000 (io_state) L (mile post) 00000000 (mile data)
 
           const indexes = [
-            2,
-            2,
-            2,
-            1,
-            2,
-            7,
-            1,
-            3,
-            7,
-            1,
-            5,
-            2,
-            2,
-            2,
-            6,
-            8,
-            1,
-            8,
+            2, 2, 2, 1, 2, 7, 1, 3, 7, 1, 5, 2, 2, 2, 6, 8, 1, 8,
           ];
 
           const slices = split(

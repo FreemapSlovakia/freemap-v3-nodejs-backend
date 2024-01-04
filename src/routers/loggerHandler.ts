@@ -13,7 +13,7 @@ const levelsAsConst = [
 
 const levels: string[] = levelsAsConst.map((level) => level);
 
-type LogLevelString = typeof levelsAsConst[number];
+type LogLevelString = (typeof levelsAsConst)[number];
 
 export function attachLoggerHandler(router: Router) {
   router.post(
