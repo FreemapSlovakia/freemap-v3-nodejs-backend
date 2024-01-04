@@ -23,8 +23,8 @@ export async function initDatabase() {
       osmId INT UNSIGNED NULL UNIQUE,
       facebookUserId VARCHAR(32) CHARSET latin1 COLLATE latin1_bin NULL UNIQUE,
       googleUserId VARCHAR(32) CHARSET latin1 COLLATE latin1_bin NULL UNIQUE,
-      name VARCHAR(255) CHARSET utf8 COLLATE utf8_general_ci NOT NULL,
-      email VARCHAR(255) CHARSET utf8 COLLATE utf8_general_ci NULL,
+      name VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+      email VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL,
       isAdmin BOOL NOT NULL DEFAULT 0,
       createdAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
       lat FLOAT(8, 6) NULL,
@@ -53,8 +53,8 @@ export async function initDatabase() {
       id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
       pathname VARCHAR(255) CHARSET utf8 COLLATE utf8_bin NOT NULL UNIQUE,
       userId INT UNSIGNED NOT NULL,
-      title VARCHAR(255) CHARSET utf8 COLLATE utf8_general_ci NULL,
-      description VARCHAR(4096) CHARSET utf8 COLLATE utf8_general_ci NULL,
+      title VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL,
+      description VARCHAR(4096) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL,
       takenAt TIMESTAMP NULL,
       createdAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
       lat FLOAT(8, 6) NOT NULL,
@@ -67,9 +67,10 @@ export async function initDatabase() {
 
     `CREATE TABLE IF NOT EXISTS pictureTag (
       pictureId INT UNSIGNED NOT NULL,
-      name VARCHAR(255) CHARSET utf8 COLLATE utf8_general_ci,
+      name VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
       PRIMARY KEY (pictureId, name),
-      FOREIGN KEY (pictureId) REFERENCES picture (id) ON DELETE CASCADE
+      FOREIGN KEY (pictureId) REFERENCES picture (id) ON DELETE CASCADE,
+      INDEX ptNameIdx (name)
     ) ENGINE=InnoDB`,
 
     `CREATE TABLE IF NOT EXISTS pictureComment (
@@ -77,7 +78,7 @@ export async function initDatabase() {
       pictureId INT UNSIGNED NOT NULL,
       userId INT UNSIGNED NOT NULL,
       createdAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      comment VARCHAR(4096) CHARSET utf8 COLLATE utf8_general_ci,
+      comment VARCHAR(4096) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
       FOREIGN KEY (pictureId) REFERENCES picture (id) ON DELETE CASCADE,
       FOREIGN KEY (userId) REFERENCES user (id) ON DELETE CASCADE
     ) ENGINE=InnoDB`,
@@ -95,7 +96,7 @@ export async function initDatabase() {
     `CREATE TABLE IF NOT EXISTS trackingDevice (
       id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
       userId INT UNSIGNED NOT NULL,
-      name VARCHAR(255) CHARSET utf8 COLLATE utf8_general_ci NOT NULL,
+      name VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
       token VARCHAR(255) CHARSET ascii NOT NULL UNIQUE,
       maxCount INT UNSIGNED NULL,
       maxAge INT UNSIGNED NULL,
@@ -116,7 +117,7 @@ export async function initDatabase() {
       bearing FLOAT NULL,
       battery FLOAT NULL,
       gsmSignal FLOAT NULL,
-      message VARCHAR(255) CHARSET utf8 COLLATE utf8_general_ci NULL,
+      message VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL,
       CONSTRAINT tpDeviceIdFk FOREIGN KEY (deviceId) REFERENCES trackingDevice (id) ON DELETE CASCADE,
       INDEX tpCreatedAtIdx (createdAt)
     ) ENGINE=InnoDB`,
@@ -128,8 +129,8 @@ export async function initDatabase() {
       createdAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
       timeFrom TIMESTAMP NULL,
       timeTo TIMESTAMP NULL,
-      listingLabel VARCHAR(255) CHARSET utf8 COLLATE utf8_general_ci NULL,
-      note VARCHAR(255) CHARSET utf8 COLLATE utf8_general_ci NULL,
+      listingLabel VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL,
+      note VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL,
       CONSTRAINT tatDeviceIdFk FOREIGN KEY (deviceId) REFERENCES trackingDevice (id) ON DELETE CASCADE,
       INDEX tatCreatedAtIdx (createdAt)
     ) ENGINE=InnoDB`,
@@ -138,7 +139,7 @@ export async function initDatabase() {
       id CHAR(8) PRIMARY KEY,
       createdAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
       modifiedAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      name VARCHAR(255) CHARSET utf8 COLLATE utf8_general_ci NULL,
+      name VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL,
       userId INT UNSIGNED NOT NULL,
       public BOOL NOT NULL DEFAULT 0,
       data MEDIUMTEXT CHARSET utf8 COLLATE utf8_bin NOT NULL DEFAULT '{}',
@@ -157,6 +158,7 @@ export async function initDatabase() {
 
   const updates: string[] = [
     'ALTER TABLE auth ADD COLUMN osmAccessToken VARCHAR(255) CHARSET ascii NULL',
+    'CREATE INDEX ptNameIdx ON pictureTag (name)',
   ];
 
   const db = await pool.getConnection();
