@@ -80,9 +80,8 @@ export function attachPostPictureCommentHandler(router: Router) {
         );
       }
 
-      const [{ insertId }, [picInfo] = [], emails = []] = await Promise.all(
-        proms,
-      );
+      const [{ insertId }, [picInfo] = [], emails = []] =
+        await Promise.all(proms);
 
       const sendMail = (to: string, own: boolean, lang: string) => {
         ctx.log.info({ to, lang, own }, 'Sending picture comment mail.');
@@ -110,8 +109,8 @@ export function attachPostPictureCommentHandler(router: Router) {
                 lang === 'sk'
                   ? `Komentár k fotke na ${webUrl}`
                   : lang === 'cs'
-                  ? `Komentář k fotce na ${webUrl}`
-                  : `Photo comment at ${webUrl}`,
+                    ? `Komentář k fotce na ${webUrl}`
+                    : `Photo comment at ${webUrl}`,
               text:
                 // TODO translate for HU
                 (lang === 'sk'
@@ -119,12 +118,12 @@ export function attachPostPictureCommentHandler(router: Router) {
                       own ? 'vašej ' : ''
                     }fotke ${picTitle}na ${picUrl}:`
                   : lang === 'cs'
-                  ? `Uživatel ${ctx.state.user.name} přidal komentář k ${
-                      own ? 'vaší ' : ''
-                    }fotce ${picTitle}na ${picUrl}:`
-                  : `User ${ctx.state.user.name} commented ${
-                      own ? 'your' : 'a'
-                    } photo ${picTitle}at ${picUrl}:`) +
+                    ? `Uživatel ${ctx.state.user.name} přidal komentář k ${
+                        own ? 'vaší ' : ''
+                      }fotce ${picTitle}na ${picUrl}:`
+                    : `User ${ctx.state.user.name} commented ${
+                        own ? 'your' : 'a'
+                      } photo ${picTitle}at ${picUrl}:`) +
                 '\n\n' +
                 comment +
                 '\n\n' +
@@ -132,8 +131,8 @@ export function attachPostPictureCommentHandler(router: Router) {
                 (lang === 'sk'
                   ? `Ak si už neprajete dostávať upozornenia na komentáre k fotkám, nastavte si to na ${unsubscribeUrl} v záložke Účet.`
                   : lang === 'cs'
-                  ? 'Pokud si již nepřejete dostávat upozornění na komentáře k fotkám, nastavte si to na ${unsubscribeUrl} v záložce Účet.'
-                  : `If you no longer wish to be notified about photo comments, configure it at ${unsubscribeUrl} in the Account tab.`),
+                    ? 'Pokud si již nepřejete dostávat upozornění na komentáře k fotkám, nastavte si to na ${unsubscribeUrl} v záložce Účet.'
+                    : `If you no longer wish to be notified about photo comments, configure it at ${unsubscribeUrl} in the Account tab.`),
             },
           },
         );

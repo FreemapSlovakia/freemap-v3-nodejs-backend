@@ -8,6 +8,7 @@ import {
 } from '../../requestValidators';
 import { ratingSubquery } from './ratingConstants';
 import { Middleware, ParameterizedContext } from 'koa';
+import { authenticator } from '../../authenticator';
 
 const globalValidationRules: ValidationRules = {
   userId: (v) => v === null || !Number.isNaN(v) || 'invalid userId',
@@ -89,6 +90,7 @@ export function attachGetPicturesHandler(router: Router) {
   router.get(
     '/pictures',
     acceptValidator('application/json'),
+    authenticator(false),
     queryAdapter(
       {
         lat: parseFloat,
@@ -126,6 +128,8 @@ export function attachGetPicturesHandler(router: Router) {
 }
 
 async function byRadius(ctx: ParameterizedContext) {
+  const myUserId = ctx.state.user?.id ?? -1;
+
   const {
     userId,
     tag,
@@ -166,6 +170,11 @@ async function byRadius(ctx: ParameterizedContext) {
     ${createdAtTo ? `AND createdAt <= '${toSqlDate(createdAtTo)}'` : ''}
     ${pano === null ? '' : ` AND pano = '${pano ? 1 : 0}'`}
     ${userId ? `AND userId = ${userId}` : ''}
+    ${
+      ctx.state.user?.isAdmin
+        ? ''
+        : `AND (id NOT IN (SELECT pictureId FROM pictureTag WHERE name = 'private') OR userId = ${myUserId})`
+    }
     ${tag === '' ? 'AND id NOT IN (SELECT pictureId FROM pictureTag)' : ''}
     HAVING distance <= ${distance}
     ${ratingFrom === null ? '' : `AND rating >= ${ratingFrom}`}
@@ -201,6 +210,8 @@ async function byBbox(ctx: ParameterizedContext) {
     pano,
     fields,
   } = ctx.query;
+
+  const myUserId = ctx.state.user?.id ?? -1;
 
   const normFields = !fields ? [] : Array.isArray(fields) ? fields : [fields];
 
@@ -240,6 +251,11 @@ async function byBbox(ctx: ParameterizedContext) {
     ${createdAtTo ? `AND createdAt <= '${toSqlDate(createdAtTo)}'` : ''}
     ${pano === null ? '' : ` AND pano = '${pano ? 1 : 0}'`}
     ${userId ? `AND userId = ${userId}` : ''}
+    ${
+      ctx.state.user?.isAdmin
+        ? ''
+        : `AND (id NOT IN (SELECT pictureId FROM pictureTag WHERE name = 'private') OR userId = ${myUserId})`
+    }
     ${tag === '' ? 'AND id NOT IN (SELECT pictureId FROM pictureTag)' : ''}
     ${ratingFrom === null ? '' : `HAVING rating >= ${ratingFrom}`}
     ${
@@ -285,9 +301,15 @@ async function byOrder(ctx: ParameterizedContext) {
     pano,
   } = ctx.query;
 
+  const myUserId = ctx.state.user?.id ?? -1;
+
   const hv = [];
 
-  const wh = [];
+  const wh = ctx.state.user?.isAdmin
+    ? []
+    : [
+        `(id NOT IN (SELECT pictureId FROM pictureTag WHERE name = 'private') OR userId = ${myUserId})`,
+      ];
 
   if (ratingFrom !== null) {
     hv.push(`rating >= ${ratingFrom}`);
