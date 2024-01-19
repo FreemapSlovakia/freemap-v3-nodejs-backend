@@ -57,11 +57,13 @@ export function attachWs(app: KoaWebsocket.App) {
       let msg;
 
       try {
-        if (typeof message !== 'string') {
+        if (message instanceof Buffer) {
+          msg = message.toJSON();
+        } else if (typeof message === 'string') {
+          msg = JSON.parse(message);
+        } else {
           throw new Error();
         }
-
-        msg = JSON.parse(message);
       } catch (err) {
         respondError(-32700, 'Parse error');
         return;
