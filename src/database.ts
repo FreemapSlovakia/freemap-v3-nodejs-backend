@@ -21,8 +21,9 @@ export async function initDatabase() {
     `CREATE TABLE IF NOT EXISTS user (
       id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
       osmId INT UNSIGNED NULL UNIQUE,
-      facebookUserId VARCHAR(32) CHARSET latin1 COLLATE latin1_bin NULL UNIQUE,
-      googleUserId VARCHAR(32) CHARSET latin1 COLLATE latin1_bin NULL UNIQUE,
+      facebookUserId VARCHAR(32) CHARSET ascii NULL UNIQUE,
+      googleUserId VARCHAR(32) CHARSET ascii NULL UNIQUE,
+      garminUserId VARCHAR(32) CHARSET ascii NULL UNIQUE,
       name VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
       email VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL,
       isAdmin BOOL NOT NULL DEFAULT 0,
@@ -41,11 +42,11 @@ export async function initDatabase() {
       authToken VARCHAR(255) CHARSET ascii PRIMARY KEY,
       userId INT UNSIGNED NOT NULL,
       createdAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      osmAuthToken VARCHAR(255) CHARSET latin1 COLLATE latin1_bin NULL UNIQUE,
-      osmAuthTokenSecret VARCHAR(255) CHARSET latin1 COLLATE latin1_bin NULL,
+      osmAuthToken VARCHAR(255) CHARSET ascii NULL UNIQUE,
+      osmAuthTokenSecret VARCHAR(255) CHARSET ascii NULL,
       osmAccessToken VARCHAR(255) CHARSET ascii NULL,
-      facebookAccessToken VARCHAR(255) CHARSET latin1 COLLATE latin1_bin NULL,
-      googleIdToken VARCHAR(4095) CHARSET latin1 COLLATE latin1_bin NULL,
+      facebookAccessToken VARCHAR(255) CHARSET ascii NULL,
+      googleIdToken VARCHAR(4095) CHARSET ascii NULL,
       FOREIGN KEY (userId) REFERENCES user (id) ON DELETE CASCADE
     ) ENGINE=InnoDB`,
 
@@ -158,6 +159,7 @@ export async function initDatabase() {
 
   const updates: string[] = [
     'ALTER TABLE auth ADD COLUMN osmAccessToken VARCHAR(255) CHARSET ascii NULL',
+    'ALTER TABLE user ADD COLUMN garminUserId VARCHAR(32) CHARSET ascii NULL UNIQUE',
     'CREATE INDEX ptNameIdx ON pictureTag (name)',
   ];
 

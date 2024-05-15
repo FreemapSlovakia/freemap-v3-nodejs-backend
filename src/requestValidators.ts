@@ -1,6 +1,6 @@
 import { Middleware, ParameterizedContext } from 'koa';
 
-import Ajv from 'ajv';
+import { Ajv } from 'ajv';
 import { JSONSchema7 } from 'json-schema';
 import ajvFormats from 'ajv-formats';
 
