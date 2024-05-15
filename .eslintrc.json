@@ -6,7 +6,7 @@
   },
   "extends": ["plugin:prettier/recommended", "eslint:recommended"],
   "parserOptions": {
-    "ecmaVersion": 2017
+    "ecmaVersion": 2019
   },
   "rules": {
     "require-atomic-updates": 0
