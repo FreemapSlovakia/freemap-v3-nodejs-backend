@@ -39,8 +39,9 @@ export function authenticator(require?: boolean, deep?: boolean): Middleware {
 
     const [auth] = await pool.query(SQL`
       SELECT
-        userId, osmAuthToken, osmAuthTokenSecret, facebookAccessToken, googleIdToken,name, email,
-        isAdmin, lat, lon,settings, preventTips, language, sendGalleryEmails, rovasToken,
+        userId, osmAuthToken, osmAuthTokenSecret, facebookAccessToken, googleIdToken,
+        garminUserId, garminAccessToken, garminAccessTokenSecret, name, email,
+        isAdmin, lat, lon,settings, language, sendGalleryEmails, rovasToken,
         DATEDIFF(NOW(), lastPaymentAt) <= 365 AS isPremium
       FROM auth INNER JOIN user ON (userId = id)
       WHERE authToken = ${authToken}
@@ -60,11 +61,11 @@ export function authenticator(require?: boolean, deep?: boolean): Middleware {
       lon: auth.lon,
       email: auth.email,
       settings: JSON.parse(auth.settings),
-      preventTips: !!auth.preventTips,
       language: auth.language,
       sendGalleryEmails: !!auth.sendGalleryEmails,
       isPremium: !!auth.isPremium,
       rovasToken: auth.rovasToken,
+      isGarminCapable: !!auth.garminUserId,
     };
 
     if (!deep) {

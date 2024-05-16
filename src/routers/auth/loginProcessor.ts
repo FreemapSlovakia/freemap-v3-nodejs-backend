@@ -14,10 +14,9 @@ export async function login(
   lat0: number,
   lon0: number,
   language0?: string | null,
-  preventTips0 = false,
 ) {
   const [user] = await pool.query(
-    SQL`SELECT id, name, email, isAdmin, lat, lon, settings, sendGalleryEmails, preventTips, language,
+    SQL`SELECT id, name, email, isAdmin, lat, lon, settings, sendGalleryEmails, language, garminUserId,
       DATEDIFF(NOW(), lastPaymentAt) <= 365 AS isPremium
       FROM user
       WHERE `
@@ -34,20 +33,20 @@ export async function login(
   let lat: number;
   let lon: number;
   let settings;
-  let preventTips: boolean;
   let sendGalleryEmails: boolean;
   let language: string | null;
   let isPremium: boolean;
+  let isGarminCapable: boolean;
 
   if (user) {
     ({ name, email, lat, lon } = user);
     settings = JSON.parse(user.settings);
     userId = user.id;
     isAdmin = !!user.isAdmin;
-    preventTips = !!user.preventTips;
     sendGalleryEmails = !!user.sendGalleryEmails;
     language = user.language;
     isPremium = !!user.isPremium;
+    isGarminCapable = !!user.garminUserId;
   } else {
     settings = ctx.request.body.settings || {};
     lat = lat0 || settings.lat;
@@ -55,10 +54,10 @@ export async function login(
     name = name0;
     email = email0 || null;
     isAdmin = false;
-    preventTips = preventTips0;
     sendGalleryEmails = true;
     language = language0;
     isPremium = false;
+    isGarminCapable = dbField === 'garminUserId';
 
     userId = (
       await pool.query(
@@ -70,7 +69,6 @@ export async function login(
           lon = ${lon ?? null},
           settings = ${JSON.stringify(settings)},
           language = ${language},
-          preventTips = ${preventTips},
           sendGalleryEmails = ${sendGalleryEmails}`),
       )
     ).insertId;
@@ -95,9 +93,9 @@ export async function login(
     lat,
     lon,
     settings,
-    preventTips,
     sendGalleryEmails,
     language,
     isPremium,
+    isGarminCapable,
   };
 }

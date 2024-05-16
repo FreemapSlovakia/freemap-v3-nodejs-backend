@@ -23,7 +23,7 @@ export async function initDatabase() {
       osmId INT UNSIGNED NULL UNIQUE,
       facebookUserId VARCHAR(32) CHARSET ascii NULL UNIQUE,
       googleUserId VARCHAR(32) CHARSET ascii NULL UNIQUE,
-      garminUserId VARCHAR(32) CHARSET ascii NULL UNIQUE,
+      garminUserId VARCHAR(36) CHARSET ascii NULL UNIQUE,
       name VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
       email VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL,
       isAdmin BOOL NOT NULL DEFAULT 0,
@@ -31,7 +31,6 @@ export async function initDatabase() {
       lat FLOAT(8, 6) NULL,
       lon FLOAT(9, 6) NULL,
       settings VARCHAR(4096) CHARSET utf8 COLLATE utf8_bin NOT NULL DEFAULT '{}',
-      preventTips BOOL NOT NULL DEFAULT 0,
       sendGalleryEmails BOOL NOT NULL DEFAULT 1,
       language CHAR(2) NULL,
       lastPaymentAt TIMESTAMP NULL,
@@ -45,6 +44,8 @@ export async function initDatabase() {
       osmAuthToken VARCHAR(255) CHARSET ascii NULL UNIQUE,
       osmAuthTokenSecret VARCHAR(255) CHARSET ascii NULL,
       osmAccessToken VARCHAR(255) CHARSET ascii NULL,
+      garminAccessToken VARCHAR(255) CHARSET ascii NULL,
+      garminAccessTokenSecret VARCHAR(255) CHARSET ascii NULL,
       facebookAccessToken VARCHAR(255) CHARSET ascii NULL,
       googleIdToken VARCHAR(4095) CHARSET ascii NULL,
       FOREIGN KEY (userId) REFERENCES user (id) ON DELETE CASCADE
@@ -159,6 +160,8 @@ export async function initDatabase() {
 
   const updates: string[] = [
     'ALTER TABLE auth ADD COLUMN osmAccessToken VARCHAR(255) CHARSET ascii NULL',
+    'ALTER TABLE auth ADD COLUMN garminAccessToken VARCHAR(255) CHARSET ascii NULL',
+    'ALTER TABLE auth ADD COLUMN garminAccessTokenSecret VARCHAR(255) CHARSET ascii NULL',
     'ALTER TABLE user ADD COLUMN garminUserId VARCHAR(32) CHARSET ascii NULL UNIQUE',
     'CREATE INDEX ptNameIdx ON pictureTag (name)',
   ];

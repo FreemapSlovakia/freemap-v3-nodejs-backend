@@ -22,7 +22,7 @@ export function attachLoginWithOsmHandler(router: Router) {
     '/login-osm',
     // TODO validation
     async (ctx) => {
-      const { code, language, preventTips } = ctx.request.body;
+      const { code, language } = ctx.request.body;
 
       const body = await rp.post({
         url:
@@ -67,7 +67,6 @@ export function attachLoginWithOsmHandler(router: Router) {
         lat ? Number(lat) : undefined,
         lon ? Number(lon) : undefined,
         language,
-        preventTips,
       );
     },
   );
