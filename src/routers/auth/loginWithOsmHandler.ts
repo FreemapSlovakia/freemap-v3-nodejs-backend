@@ -34,7 +34,9 @@ export function attachLoginWithOsmHandler(router: Router) {
             client_secret: clientSecret,
             grant_type: 'authorization_code',
             code,
-            redirect_uri: redirectUri,
+            redirect_uri:
+              redirectUri +
+              (connect === undefined ? '' : '?connect=' + connect),
           }).toString(),
         headers: {
           'content-type': 'application/x-www-form-urlencoded', // otherwise server returns 415

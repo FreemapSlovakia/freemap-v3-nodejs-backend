@@ -41,10 +41,6 @@ export async function login(
       sql`SELECT * FROM user WHERE ${raw(authProviderToColumn[authProvider])} = ${remoteUserId} FOR UPDATE`,
     );
 
-    if (currentUser && !userRow) {
-      ctx.throw(404, 'user_not_found');
-    }
-
     userId = (currentUser ?? userRow ?? {}).id;
 
     const now = new Date();
@@ -113,7 +109,7 @@ export async function login(
             'pictureRating', // TODO may conflict
             'trackingDevice',
             'map',
-            'mapWriteAccess',
+            'mapWriteAccess', // TODO may conflict
           ].map((table) =>
             conn.query(
               sql`UPDATE ${raw(table)} SET userId = ${currentUser.id} WHERE userId = ${id}`,

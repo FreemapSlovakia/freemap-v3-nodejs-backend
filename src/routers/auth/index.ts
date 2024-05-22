@@ -11,6 +11,7 @@ import { attachPatchUserHandler } from './patchUserHandler';
 import { attachRovasTokenHandler } from './rovasTokenHandler';
 import { attachRovasValidateHandler } from './rovasValidateHandler';
 import { attachDeleteUserHandler } from './deleteUserHandler';
+import { attachDisconnectHandler } from './disconnectHandler';
 
 const router = new Router();
 
@@ -25,5 +26,6 @@ attachPatchUserHandler(router);
 attachRovasTokenHandler(router);
 attachRovasValidateHandler(router);
 attachDeleteUserHandler(router);
+attachDisconnectHandler(router);
 
 export const authRouter = router;
