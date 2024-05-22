@@ -1,5 +1,5 @@
 import Router from '@koa/router';
-import { SQL } from 'sql-template-strings';
+import sql from 'sql-template-tag';
 import { pool } from '../../database';
 import { acceptValidator } from '../../requestValidators';
 import { authenticator } from '../../authenticator';
@@ -10,7 +10,7 @@ export function attachGetAllMapsHandler(router: Router) {
     acceptValidator('application/json'),
     authenticator(true),
     async (ctx) => {
-      const items = await pool.query(SQL`
+      const items = await pool.query(sql`
         SELECT id, name, public, createdAt, modifiedAt, map.userId, GROUP_CONCAT(mapWriteAccess.userId) AS writers
           FROM map LEFT JOIN mapWriteAccess ON (mapWriteAccess.mapId = id)
           WHERE map.userId = ${ctx.state.user.id}

@@ -1,16 +1,19 @@
 import { Middleware } from 'koa';
-import { SQL } from 'sql-template-strings';
-import rp from 'request-promise-native';
-import { fb } from './fb';
-import { googleClient } from './google';
+import sql from 'sql-template-tag';
 import { pool } from './database';
-import { getEnv } from './env';
 
-const consumerKey = getEnv('OAUTH_CONSUMER_KEY');
+export const authProviderToColumn = {
+  facebook: 'facebookUserId',
+  osm: 'osmId',
+  garmin: 'garminUserId',
+  google: 'googleUserId',
+};
 
-const consumerSecret = getEnv('OAUTH_CONSUMER_SECRET');
+export const columnToAuthProvider = Object.fromEntries(
+  Object.entries(authProviderToColumn).map(([k, v]) => [v, k]),
+);
 
-export function authenticator(require?: boolean, deep?: boolean): Middleware {
+export function authenticator(require?: boolean): Middleware {
   return async function authorize(ctx, next) {
     let { authToken } = ctx.query; // used in websockets
 
@@ -37,118 +40,67 @@ export function authenticator(require?: boolean, deep?: boolean): Middleware {
       authToken = m[1];
     }
 
-    const [auth] = await pool.query(SQL`
-      SELECT
-        userId, osmAuthToken, osmAuthTokenSecret, facebookAccessToken, googleIdToken,
-        garminUserId, garminAccessToken, garminAccessTokenSecret, name, email,
-        isAdmin, lat, lon,settings, language, sendGalleryEmails, rovasToken,
-        DATEDIFF(NOW(), lastPaymentAt) <= 365 AS isPremium
-      FROM auth INNER JOIN user ON (userId = id)
-      WHERE authToken = ${authToken}
+    const [userRow] = await pool.query(sql`
+      SELECT user.*, DATEDIFF(NOW(), lastPaymentAt) <= 365 AS isPremium
+      FROM user INNER JOIN auth ON (userId = id)
+      WHERE authToken = ${authToken as any}
     `);
 
-    if (!auth) {
-      await bad('');
-      return;
-    }
-
-    const user = {
-      id: auth.userId,
-      isAdmin: !!auth.isAdmin,
-      name: auth.name,
-      authToken,
-      lat: auth.lat,
-      lon: auth.lon,
-      email: auth.email,
-      settings: JSON.parse(auth.settings),
-      language: auth.language,
-      sendGalleryEmails: !!auth.sendGalleryEmails,
-      isPremium: !!auth.isPremium,
-      rovasToken: auth.rovasToken,
-      isGarminCapable: !!auth.garminUserId,
-    };
-
-    if (!deep) {
-      ctx.state.user = user;
-      await next();
-    } else if (auth.googleIdToken) {
-      try {
-        await googleClient.verifyIdToken({
-          idToken: auth.googleIdToken,
-        } as any);
-      } catch (e) {
-        await bad('Google');
-        return;
-      }
-
-      ctx.state.user = user;
-      await next();
-    } else if (auth.facebookAccessToken) {
-      try {
-        await fb
-          .withAccessToken(auth.facebookAccessToken)
-          .api('/me', { fields: 'id' });
-      } catch (e) {
-        await bad('Facebook');
-        return;
-      }
-
-      ctx.state.user = user;
-      await next();
-    } else if (auth.osmAccessToken) {
-      // oauth2
-      try {
-        await rp.get({
-          url: 'https://api.openstreetmap.org/api/0.6/user/details',
-          auth: {
-            bearer: auth.osmAccessToken,
-          },
-        });
-      } catch (e) {
-        if (e.name === 'StatusCodeError' && e.statusCode === 401) {
-          await bad('OSM');
-          return;
-        }
-      }
-
-      ctx.state.user = user;
-      await next();
-    } else if (auth.osmAuthToken) {
-      // oauth1 (legacy)
-      try {
-        await rp.get({
-          url: 'https://api.openstreetmap.org/api/0.6/user/details',
-          oauth: {
-            consumer_key: consumerKey,
-            consumer_secret: consumerSecret,
-            token: auth.osmAuthToken,
-            token_secret: auth.osmAuthTokenSecret,
-          },
-        });
-      } catch (e) {
-        if (e.name === 'StatusCodeError' && e.statusCode === 401) {
-          await bad('OSM');
-          return;
-        }
-      }
-
-      ctx.state.user = user;
-      await next();
-    }
-
-    async function bad(what: string) {
-      await pool.query(SQL`DELETE FROM auth WHERE authToken = ${authToken}`);
-
+    if (!userRow) {
       if (require) {
         ctx.set(
           'WWW-Authenticate',
-          `Bearer realm="freemap"; error="invalid ${what} authorization"`,
+          `Bearer realm="freemap"; error="invalid authorization"`,
         );
 
-        ctx.throw(401, `invalid ${what} authorization`);
+        ctx.throw(401, `invalid authorization`);
       }
 
       await next();
+
+      return;
     }
+
+    ctx.state.user = {
+      ...userRow,
+      ...userForResponse({ ...userRow, authToken }),
+    };
+
+    await next();
+  };
+}
+
+export function userForResponse(user: any) {
+  const {
+    id,
+    name,
+    email,
+    language,
+    lat,
+    lon,
+    sendGalleryEmails,
+    isAdmin,
+    settings,
+    isPremium,
+    authToken,
+  } = user;
+
+  return {
+    id,
+    name,
+    email,
+    isAdmin: Boolean(isAdmin),
+    lat,
+    lon,
+    settings: typeof settings === 'string' ? JSON.parse(settings) : settings,
+    sendGalleryEmails: Boolean(sendGalleryEmails),
+    language,
+    isPremium: Boolean(isPremium),
+    authToken,
+    authProviders:
+      user.authProviders ??
+      Object.entries(user)
+        .filter(([column, value]) => value && column in columnToAuthProvider)
+        .map(([column]) => columnToAuthProvider[column]),
   };
 }

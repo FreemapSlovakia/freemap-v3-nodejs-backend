@@ -1,5 +1,5 @@
 import Router from '@koa/router';
-import { SQL } from 'sql-template-strings';
+import sql, { empty, raw } from 'sql-template-tag';
 import { pool } from '../../database';
 import { acceptValidator } from '../../requestValidators';
 import { authenticator } from '../../authenticator';
@@ -12,25 +12,22 @@ export function attachGetPictureHandler(router: Router) {
     authenticator(false),
     async (ctx) => {
       const rows = await pool.query(
-        SQL`SELECT picture.id AS pictureId, picture.createdAt, pathname, title, description, takenAt, picture.lat, picture.lon, pano,
+        sql`SELECT picture.id AS pictureId, picture.createdAt, pathname, title, description, takenAt, picture.lat, picture.lon, pano,
           user.id as userId, user.name,
-          (SELECT GROUP_CONCAT(name SEPARATOR '\n') FROM pictureTag WHERE pictureId = picture.id) AS tags,`
-          .append(ratingSubquery)
-          .append(
+          (SELECT GROUP_CONCAT(name SEPARATOR '\n') FROM pictureTag WHERE pictureId = picture.id) AS tags, ${raw(ratingSubquery)}
+          ${
             ctx.state.user
-              ? `, (SELECT stars FROM pictureRating WHERE pictureId = picture.id AND userId = ${ctx.state.user.id}) AS myStars`
-              : '',
-          )
-          .append(
-            SQL` FROM picture LEFT JOIN user ON userId = user.id WHERE picture.id = ${ctx.params.id}`,
-          ),
+              ? sql`, (SELECT stars FROM pictureRating WHERE pictureId = picture.id AND userId = ${ctx.state.user.id}) AS myStars`
+              : empty
+          }
+          FROM picture LEFT JOIN user ON userId = user.id WHERE picture.id = ${ctx.params.id}`,
       );
 
       if (rows.length === 0) {
         ctx.throw(404, 'no such picture');
       }
 
-      const commentRows = await pool.query(SQL`
+      const commentRows = await pool.query(sql`
         SELECT pictureComment.id, pictureComment.createdAt, comment, user.name, userId
           FROM pictureComment JOIN user ON (userId = user.id)
           WHERE pictureId = ${ctx.params.id}

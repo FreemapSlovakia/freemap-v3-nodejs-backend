@@ -6,7 +6,7 @@ import { bodySchemaValidator } from '../../requestValidators';
 export function attachPatchUserHandler(router: Router) {
   router.patch(
     '/settings',
-    authenticator(true, false),
+    authenticator(true),
     bodySchemaValidator({
       type: 'object',
       anyOf: [

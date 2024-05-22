@@ -1,5 +1,5 @@
 import Router from '@koa/router';
-import { SQL } from 'sql-template-strings';
+import sql from 'sql-template-tag';
 import { runInTransaction } from '../../database';
 import { acceptValidator } from '../../requestValidators';
 import { authenticator } from '../../authenticator';
@@ -14,7 +14,7 @@ export function attachDeleteDeviceHandler(router: Router) {
       const conn = ctx.state.dbConn;
 
       const [item] = await conn.query(
-        SQL`SELECT userId FROM trackingDevice WHERE id = ${ctx.params.id} FOR UPDATE`,
+        sql`SELECT userId FROM trackingDevice WHERE id = ${ctx.params.id} FOR UPDATE`,
       );
 
       if (!item) {
@@ -26,7 +26,7 @@ export function attachDeleteDeviceHandler(router: Router) {
       }
 
       await conn.query(
-        SQL`DELETE FROM trackingDevice WHERE id = ${ctx.params.id}`,
+        sql`DELETE FROM trackingDevice WHERE id = ${ctx.params.id}`,
       );
 
       ctx.status = 204;

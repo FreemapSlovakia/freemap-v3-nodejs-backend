@@ -1,4 +1,4 @@
-import { SQL } from 'sql-template-strings';
+import sql from 'sql-template-tag';
 import { promises as fs } from 'fs';
 import Router from '@koa/router';
 import { runInTransaction } from '../../database';
@@ -14,7 +14,7 @@ export function attachDeletePictureHandler(router: Router) {
       const conn = ctx.state.dbConn;
 
       const rows = await conn.query(
-        SQL`SELECT pathname, userId FROM picture WHERE id = ${ctx.params.id} FOR UPDATE`,
+        sql`SELECT pathname, userId FROM picture WHERE id = ${ctx.params.id} FOR UPDATE`,
       );
 
       if (rows.length === 0) {
@@ -25,7 +25,7 @@ export function attachDeletePictureHandler(router: Router) {
         ctx.throw(403);
       }
 
-      await conn.query(SQL`DELETE FROM picture WHERE id = ${ctx.params.id}`);
+      await conn.query(sql`DELETE FROM picture WHERE id = ${ctx.params.id}`);
 
       await fs.unlink(`${picturesDir}/${rows[0].pathname}`);
 

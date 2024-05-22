@@ -1,13 +1,15 @@
 import Router from '@koa/router';
 import { fb } from '../../fb';
 import { login } from './loginProcessor';
+import { authenticator } from '../../authenticator';
 
 export function attachLoginWithFacebookHandler(router: Router) {
   router.post(
     '/login-fb',
+    authenticator(false),
     // TODO validation
     async (ctx) => {
-      const { accessToken, language } = ctx.request.body;
+      const { accessToken, language, connect } = ctx.request.body;
 
       const { id, name, email } = await fb
         .withAccessToken(accessToken)
@@ -15,15 +17,14 @@ export function attachLoginWithFacebookHandler(router: Router) {
 
       await login(
         ctx,
-        'facebookUserId',
+        'facebook',
         id,
-        'facebookAccessToken',
-        [accessToken],
         name,
         email ?? null,
         undefined,
         undefined,
         language,
+        connect,
       );
     },
   );

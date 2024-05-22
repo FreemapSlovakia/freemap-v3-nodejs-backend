@@ -1,6 +1,6 @@
 import Router from '@koa/router';
 
-import { SQL } from 'sql-template-strings';
+import sql from 'sql-template-tag';
 import randomize from 'randomatic';
 import { pool } from '../../database';
 import { acceptValidator } from '../../requestValidators';
@@ -38,7 +38,7 @@ export function attachPostTokenHandler(router: Router) {
     authenticator(true),
     async (ctx) => {
       const [device] = await pool.query(
-        SQL`SELECT userId FROM trackingDevice WHERE id = ${ctx.params.id}`,
+        sql`SELECT userId FROM trackingDevice WHERE id = ${ctx.params.id}`,
       );
 
       if (!device) {
@@ -53,7 +53,7 @@ export function attachPostTokenHandler(router: Router) {
 
       const { timeFrom, timeTo, note, listingLabel } = ctx.request.body;
 
-      const { insertId } = await pool.query(SQL`
+      const { insertId } = await pool.query(sql`
         INSERT INTO trackingAccessToken SET
           deviceId = ${ctx.params.id},
           token = ${token},

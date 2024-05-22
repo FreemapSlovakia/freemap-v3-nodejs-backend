@@ -1,5 +1,5 @@
 import Router from '@koa/router';
-import { SQL } from 'sql-template-strings';
+import sql from 'sql-template-tag';
 import { pool } from '../../database';
 import { bodySchemaValidator } from '../../requestValidators';
 import { authenticator } from '../../authenticator';
@@ -25,7 +25,7 @@ export function attachPostPictureRatingHandler(router: Router) {
     async (ctx) => {
       const { stars } = ctx.request.body;
 
-      await pool.query(SQL`
+      await pool.query(sql`
         INSERT INTO pictureRating SET
             pictureId = ${ctx.params.id},
             userId = ${ctx.state.user.id},

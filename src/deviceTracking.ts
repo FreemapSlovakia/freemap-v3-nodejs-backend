@@ -1,4 +1,4 @@
-import { SQL } from 'sql-template-strings';
+import sql from 'sql-template-tag';
 import { trackRegister } from './trackRegister';
 import { PoolConnection } from 'mariadb';
 
@@ -52,7 +52,7 @@ export async function storeTrackPoint(
 
   const speed = typeof speedKmh === 'number' ? speedKmh / 3.6 : speedMs;
 
-  const { insertId } = await conn.query(SQL`
+  const { insertId } = await conn.query(sql`
     INSERT INTO trackingPoint SET
       deviceId = ${id},
       lat = ${lat},
@@ -70,12 +70,12 @@ export async function storeTrackPoint(
 
   if (maxAge != null) {
     await conn.query(
-      SQL`DELETE FROM trackingPoint WHERE deviceId = ${id} AND TIMESTAMPDIFF(SECOND, createdAt, now()) > ${maxAge}`,
+      sql`DELETE FROM trackingPoint WHERE deviceId = ${id} AND TIMESTAMPDIFF(SECOND, createdAt, now()) > ${maxAge}`,
     );
   }
 
   if (maxCount != null) {
-    await conn.query(SQL`
+    await conn.query(sql`
       DELETE t FROM trackingPoint AS t JOIN (
         SELECT id FROM trackingPoint WHERE deviceId = ${id}
           ORDER BY id DESC LIMIT 18446744073709551615 OFFSET ${maxCount}
@@ -83,7 +83,7 @@ export async function storeTrackPoint(
     `);
   }
 
-  const rows = await conn.query(SQL`
+  const rows = await conn.query(sql`
     SELECT token FROM trackingAccessToken
       WHERE deviceId = ${id} AND (timeFrom IS NULL OR timeFrom < ${now}) AND (timeTo IS NULL OR timeTo > ${now})
   `);

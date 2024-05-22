@@ -1,13 +1,15 @@
 import Router from '@koa/router';
 import { googleClient } from '../../google';
 import { login } from './loginProcessor';
+import { authenticator } from '../../authenticator';
 
 export function attachLoginWithGoogleHandler(router: Router) {
   router.post(
     '/login-google',
+    authenticator(false),
     // TODO validation
     async (ctx) => {
-      const { idToken, language } = ctx.request.body;
+      const { idToken, language, connect } = ctx.request.body;
 
       const { sub, name, email } = (
         await googleClient.verifyIdToken({
@@ -17,15 +19,14 @@ export function attachLoginWithGoogleHandler(router: Router) {
 
       await login(
         ctx,
-        'googleUserId',
+        'google',
         sub,
-        'googleIdToken',
-        [idToken],
         name,
         email,
         undefined,
         undefined,
         language,
+        connect,
       );
     },
   );

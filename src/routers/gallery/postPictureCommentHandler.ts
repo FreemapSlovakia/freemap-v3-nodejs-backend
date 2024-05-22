@@ -1,5 +1,5 @@
 import Router from '@koa/router';
-import { SQL } from 'sql-template-strings';
+import sql from 'sql-template-tag';
 import { runInTransaction } from '../../database';
 import { acceptValidator, bodySchemaValidator } from '../../requestValidators';
 import { authenticator } from '../../authenticator';
@@ -53,7 +53,7 @@ export function attachPostPictureCommentHandler(router: Router) {
       const webUrl = webBaseUrl.replace(/^https?:\/\//, '');
 
       const proms: Promise<any>[] = [
-        conn.query(SQL`
+        conn.query(sql`
           INSERT INTO pictureComment SET
             pictureId = ${ctx.params.id},
             userId = ${ctx.state.user.id},
@@ -64,14 +64,14 @@ export function attachPostPictureCommentHandler(router: Router) {
 
       if (getEnv('MAILGIN_ENABLE', '')) {
         proms.push(
-          conn.query(SQL`
+          conn.query(sql`
             SELECT IF(sendGalleryEmails, email, NULL) AS email, language, title, userId
               FROM user
               JOIN picture ON userId = user.id
               WHERE picture.id = ${ctx.params.id}
           `),
 
-          conn.query(SQL`
+          conn.query(sql`
             SELECT DISTINCT email, sendGalleryEmails, language
               FROM user
               JOIN pictureComment ON userId = user.id

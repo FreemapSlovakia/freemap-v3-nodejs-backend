@@ -1,6 +1,6 @@
 import Router from '@koa/router';
 import { ParameterizedContext } from 'koa';
-import { SQL } from 'sql-template-strings';
+import sql from 'sql-template-tag';
 import { runInTransaction } from '../../database';
 import { storeTrackPoint } from '../../deviceTracking';
 
@@ -14,7 +14,7 @@ async function handler(ctx: ParameterizedContext) {
   const conn = ctx.state.dbConn;
 
   const [item] = await conn.query(
-    SQL`SELECT id, maxCount, maxAge FROM trackingDevice WHERE token = ${ctx.params.token}`,
+    sql`SELECT id, maxCount, maxAge FROM trackingDevice WHERE token = ${ctx.params.token}`,
   );
 
   if (!item) {

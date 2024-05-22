@@ -24,6 +24,8 @@ export async function initDatabase() {
       facebookUserId VARCHAR(32) CHARSET ascii NULL UNIQUE,
       googleUserId VARCHAR(32) CHARSET ascii NULL UNIQUE,
       garminUserId VARCHAR(36) CHARSET ascii NULL UNIQUE,
+      garminAccessToken VARCHAR(255) CHARSET ascii NULL,
+      garminAccessTokenSecret VARCHAR(255) CHARSET ascii NULL,
       name VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
       email VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL,
       isAdmin BOOL NOT NULL DEFAULT 0,
@@ -41,13 +43,6 @@ export async function initDatabase() {
       authToken VARCHAR(255) CHARSET ascii PRIMARY KEY,
       userId INT UNSIGNED NOT NULL,
       createdAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      osmAuthToken VARCHAR(255) CHARSET ascii NULL UNIQUE,
-      osmAuthTokenSecret VARCHAR(255) CHARSET ascii NULL,
-      osmAccessToken VARCHAR(255) CHARSET ascii NULL,
-      garminAccessToken VARCHAR(255) CHARSET ascii NULL,
-      garminAccessTokenSecret VARCHAR(255) CHARSET ascii NULL,
-      facebookAccessToken VARCHAR(255) CHARSET ascii NULL,
-      googleIdToken VARCHAR(4095) CHARSET ascii NULL,
       FOREIGN KEY (userId) REFERENCES user (id) ON DELETE CASCADE
     ) ENGINE=InnoDB`,
 
@@ -159,10 +154,16 @@ export async function initDatabase() {
   ];
 
   const updates: string[] = [
-    'ALTER TABLE auth ADD COLUMN osmAccessToken VARCHAR(255) CHARSET ascii NULL',
-    'ALTER TABLE auth ADD COLUMN garminAccessToken VARCHAR(255) CHARSET ascii NULL',
-    'ALTER TABLE auth ADD COLUMN garminAccessTokenSecret VARCHAR(255) CHARSET ascii NULL',
+    'ALTER TABLE user ADD COLUMN garminAccessToken VARCHAR(255) CHARSET ascii NULL',
+    'ALTER TABLE user ADD COLUMN garminAccessTokenSecret VARCHAR(255) CHARSET ascii NULL',
     'ALTER TABLE user ADD COLUMN garminUserId VARCHAR(32) CHARSET ascii NULL UNIQUE',
+    'ALTER TABLE auth DROP COLUMN osmAccessToken', // we don't use it so why bothering storing it
+    'ALTER TABLE auth DROP COLUMN osmAuthToken', // we don't use it so why bothering storing it
+    'ALTER TABLE auth DROP COLUMN osmAuthToken', // we don't use it so why bothering storing it
+    'ALTER TABLE auth DROP COLUMN osmAuthTokenSecret', // we don't use it so why bothering storing it
+    'ALTER TABLE auth DROP COLUMN garminAccessToken', // we don't use it so why bothering storing it
+    'ALTER TABLE auth DROP COLUMN garminAccessTokenSecret', // we don't use it so why bothering storing it
+    'ALTER TABLE auth DROP COLUMN googleIdToken', // we don't use it so why bothering storing it
     'CREATE INDEX ptNameIdx ON pictureTag (name)',
   ];
 

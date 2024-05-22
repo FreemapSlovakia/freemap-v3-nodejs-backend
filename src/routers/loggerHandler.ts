@@ -47,9 +47,9 @@ export function attachLoggerHandler(router: Router) {
 }
 
 function validateLevel(level: string): LogLevelString {
-  if (!levels.includes(level)) {
-    throw new Error('invalid loglevel');
+  if (levels.includes(level)) {
+    return level as LogLevelString;
   }
 
-  return level as LogLevelString;
+  throw new Error('invalid loglevel');
 }

@@ -1,6 +1,6 @@
 import Router from '@koa/router';
 
-import { SQL } from 'sql-template-strings';
+import sql, { empty } from 'sql-template-tag';
 import randomize from 'randomatic';
 import { runInTransaction } from '../../database';
 import { acceptValidator } from '../../requestValidators';
@@ -44,7 +44,7 @@ export function attachPutDeviceHandler(router: Router) {
       const conn = ctx.state.dbConn;
 
       const [item] = await conn.query(
-        SQL`SELECT userId FROM trackingDevice WHERE id = ${id} FOR UPDATE`,
+        sql`SELECT userId FROM trackingDevice WHERE id = ${id} FOR UPDATE`,
       );
 
       if (!item) {
@@ -63,19 +63,18 @@ export function attachPutDeviceHandler(router: Router) {
       }
 
       await conn.query(
-        SQL`UPDATE trackingDevice SET name = ${name}, maxCount = ${maxCount}, maxAge = ${maxAge}`
-          .append(regenerateToken ? SQL`, token = ${token}` : '')
-          .append(SQL` WHERE id = ${id}`),
+        sql`UPDATE trackingDevice SET name = ${name}, maxCount = ${maxCount}, maxAge = ${maxAge}
+          ${regenerateToken ? sql`, token = ${token}` : empty} WHERE id = ${id}`,
       );
 
       if (maxAge != null) {
-        await conn.query(SQL`
+        await conn.query(sql`
           DELETE FROM trackingPoint WHERE deviceId = ${id} AND TIMESTAMPDIFF(SECOND, createdAt, now()) > ${maxAge}
         `);
       }
 
       if (maxCount != null) {
-        await conn.query(SQL`
+        await conn.query(sql`
         DELETE t FROM trackingPoint AS t
           JOIN (
             SELECT id FROM trackingPoint WHERE deviceId = ${id}

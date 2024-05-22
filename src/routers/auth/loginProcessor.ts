@@ -1,101 +1,224 @@
 import { ParameterizedContext } from 'koa';
 import { pool } from '../../database';
-import { SQL } from 'sql-template-strings';
+import sql, { RawValue, join, raw } from 'sql-template-tag';
 import { randomBytes } from 'crypto';
+import {
+  authProviderToColumn,
+  columnToAuthProvider,
+  userForResponse,
+} from '../../authenticator';
 
 export async function login(
   ctx: ParameterizedContext,
-  dbField: string,
-  dbValue: string,
-  authFields: string,
-  authValues: string[],
-  name0: string,
-  email0: string | null,
-  lat0: number,
-  lon0: number,
-  language0?: string | null,
+  authProvider: keyof typeof authProviderToColumn,
+  remoteUserId: string,
+  remoteName: string,
+  remoteEmail: string | null,
+  remoteLat: number,
+  remoteLon: number,
+  remoteLanguage: string | null,
+  connect: boolean,
+  extraUserFields: Record<string, unknown> = {},
 ) {
-  const [user] = await pool.query(
-    SQL`SELECT id, name, email, isAdmin, lat, lon, settings, sendGalleryEmails, language, garminUserId,
-      DATEDIFF(NOW(), lastPaymentAt) <= 365 AS isPremium
-      FROM user
-      WHERE `
-      .append(dbField)
-      .append(SQL` = ${dbValue}`),
-  );
+  const currentUser = ctx.state.user;
 
-  const now = new Date();
-
-  let userId: number;
-  let name: string;
-  let email: string | null;
-  let isAdmin: boolean;
-  let lat: number;
-  let lon: number;
-  let settings;
-  let sendGalleryEmails: boolean;
-  let language: string | null;
-  let isPremium: boolean;
-  let isGarminCapable: boolean;
-
-  if (user) {
-    ({ name, email, lat, lon } = user);
-    settings = JSON.parse(user.settings);
-    userId = user.id;
-    isAdmin = !!user.isAdmin;
-    sendGalleryEmails = !!user.sendGalleryEmails;
-    language = user.language;
-    isPremium = !!user.isPremium;
-    isGarminCapable = !!user.garminUserId;
-  } else {
-    settings = ctx.request.body.settings || {};
-    lat = lat0 || settings.lat;
-    lon = lon0 || settings.lon;
-    name = name0;
-    email = email0 || null;
-    isAdmin = false;
-    sendGalleryEmails = true;
-    language = language0;
-    isPremium = false;
-    isGarminCapable = dbField === 'garminUserId';
-
-    userId = (
-      await pool.query(
-        SQL`INSERT INTO user SET `.append(dbField).append(SQL` = ${dbValue},
-          name = ${name},
-          email = ${email},
-          createdAt = ${now},
-          lat = ${lat ?? null},
-          lon = ${lon ?? null},
-          settings = ${JSON.stringify(settings)},
-          language = ${language},
-          sendGalleryEmails = ${sendGalleryEmails}`),
-      )
-    ).insertId;
+  if (!currentUser === connect) {
+    ctx.throw(403, currentUser ? 'already_authenticated' : 'unauthenticated');
   }
 
-  const authToken = randomBytes(32).toString('base64');
+  const conn = await pool.getConnection();
 
-  await pool.query(
-    `INSERT INTO auth (userId, createdAt, authToken, ${authFields}) VALUES (?, ?, ?,${authFields
-      .split(',')
-      .map(() => '?')
-      .join(',')})`,
-    [userId, now, authToken, ...authValues],
-  );
+  let userRow1: Record<string, any>;
 
-  ctx.body = {
-    id: userId,
-    authToken,
-    name,
-    email,
-    isAdmin,
-    lat,
-    lon,
-    settings,
-    sendGalleryEmails,
-    language,
-    isPremium,
-    isGarminCapable,
-  };
+  let userId: number;
+
+  let authToken: string;
+
+  try {
+    await conn.beginTransaction();
+
+    const [userRow] = await conn.query(
+      sql`SELECT * FROM user WHERE ${raw(authProviderToColumn[authProvider])} = ${remoteUserId} FOR UPDATE`,
+    );
+
+    if (currentUser && !userRow) {
+      ctx.throw(404, 'user_not_found');
+    }
+
+    userId = (currentUser ?? userRow ?? {}).id;
+
+    const now = new Date();
+
+    if (userRow) {
+      // found user in DB for this auth provider
+
+      const authData: Record<string, string> = {};
+
+      for (const col of [
+        'garminUserId',
+        'garminAccessToken',
+        'garminAccessTokenSecret',
+        'osmId',
+        'facebookUserId',
+        'googleUserId',
+      ]) {
+        authData[col] = userRow[col];
+      }
+
+      if (currentUser) {
+        if (currentUser[authProviderToColumn[authProvider]]) {
+          ctx.throw(400, 'provider_already_set');
+        }
+
+        for (const col of [
+          'garminUserId',
+          'osmId',
+          'facebookUserId',
+          'googleUserId',
+        ]) {
+          if (
+            currentUser[col] &&
+            userRow[col] &&
+            currentUser[col] !== userRow[col]
+          ) {
+            ctx.throw(400, 'conflicting_providers');
+          }
+        }
+
+        Object.assign(authData, {
+          [authProviderToColumn[authProvider]]: remoteUserId,
+          ...extraUserFields,
+        });
+
+        const {
+          id,
+          email,
+          lat,
+          lon,
+          language,
+          lastPaymentAt,
+          rovasToken,
+          createdAt,
+          isAdmin,
+          sendGalleryEmails,
+          settings,
+        } = userRow;
+
+        await conn.query(sql`DELETE FROM auth WHERE userId = ${id}`);
+
+        await Promise.all([
+          ...[
+            'picture',
+            'pictureComment',
+            'pictureRating', // TODO may conflict
+            'trackingDevice',
+            'map',
+            'mapWriteAccess',
+          ].map((table) =>
+            conn.query(
+              sql`UPDATE ${raw(table)} SET userId = ${currentUser.id} WHERE userId = ${id}`,
+            ),
+          ),
+        ]);
+
+        await conn.query(sql`DELETE FROM user WHERE id = ${id}`);
+
+        // TODO merge settings
+
+        await conn.query(sql`UPDATE user SET
+          email = COALESCE(email, ${email}),
+          lat = COALESCE(lat, ${lat}),
+          lon = COALESCE(lon, ${lon}),
+          language = COALESCE(language, ${language}),
+          rovasToken = COALESCE(rovasToken, ${rovasToken}),
+          createdAt = LEAST(createdAt, ${createdAt}),
+          lastPaymentAt = GREATEST(COALESCE(lastPaymentAt, ${lastPaymentAt}), COALESCE(${lastPaymentAt}, lastPaymentAt)),
+          isAdmin = isAdmin OR ${isAdmin},
+          sendGalleryEmails = sendGalleryEmails OR ${sendGalleryEmails},
+          settings = COALESCE(settings, ${settings}),
+          ${join(
+            Object.entries(authData).map(
+              ([column, value]) =>
+                sql`${raw(column)} = COALESCE(${raw(column)}, ${value as RawValue})`,
+            ),
+          )}
+          WHERE id = ${currentUser.id}
+        `);
+      }
+    } else {
+      // no such user in DB for this auth provider
+
+      const settings = ctx.request.body.settings || {};
+      const lat = remoteLat ?? settings.lat ?? null;
+      const lon = remoteLon ?? settings.lon ?? null;
+      const email = remoteEmail || null;
+
+      if (currentUser) {
+        await conn.query(sql`UPDATE user SET
+          email = COALESCE(email, ${email}),
+          language = COALESCE(language, ${remoteLanguage}),
+          lat = COALESCE(lat, ${lat}),
+          lon = COALESCE(lon, ${lon}),
+          ${join(
+            Object.entries({
+              [authProviderToColumn[authProvider]]: remoteUserId,
+              ...extraUserFields,
+            }).map(
+              ([column, value]) => sql`${raw(column)} = ${value as RawValue}`,
+            ),
+          )}
+
+          WHERE id = ${currentUser.id}
+      `);
+      } else {
+        userId = (
+          await conn.query(
+            sql`INSERT INTO user SET ${join(
+              Object.entries({
+                name: remoteName,
+                email,
+                language: remoteLanguage,
+                createdAt: now,
+                lat: lat ?? null,
+                lon: lon ?? null,
+                sendGalleryEmails: true,
+                isAdmin: false,
+                settings: JSON.stringify(settings),
+                [authProviderToColumn[authProvider]]: remoteUserId,
+                ...extraUserFields,
+              }).map(
+                ([column, value]) => sql`${raw(column)} = ${value as RawValue}`,
+              ),
+            )}`,
+          )
+        ).insertId;
+      }
+    }
+
+    if (currentUser) {
+      authToken = currentUser.authToken;
+    } else {
+      authToken = randomBytes(32).toString('base64');
+
+      await conn.query(
+        sql`INSERT INTO auth SET userId = ${userId}, createdAt = ${now as any}, authToken = ${authToken}`,
+      );
+    }
+
+    const rows = await conn.query(
+      sql`SELECT *, DATEDIFF(NOW(), lastPaymentAt) <= 365 AS isPremium FROM user WHERE id = ${userId}`,
+    );
+
+    userRow1 = rows[0];
+
+    await conn.commit();
+  } catch (e) {
+    await conn.rollback();
+
+    throw e;
+  } finally {
+    await conn.release();
+  }
+
+  ctx.body = userForResponse({ ...userRow1, authToken });
 }

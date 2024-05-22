@@ -1,5 +1,5 @@
 import Router from '@koa/router';
-import { SQL } from 'sql-template-strings';
+import sql from 'sql-template-tag';
 import sharp from 'sharp';
 import { promises as fs, createReadStream } from 'fs';
 import calculate from 'etag';
@@ -13,7 +13,7 @@ export function attachGetPictureImageHandler(router: Router) {
     acceptValidator('image/jpeg'),
     async (ctx) => {
       const rows = await pool.query(
-        SQL`SELECT pathname FROM picture WHERE picture.id = ${ctx.params.id}`,
+        sql`SELECT pathname FROM picture WHERE picture.id = ${ctx.params.id}`,
       );
 
       if (!rows.length) {

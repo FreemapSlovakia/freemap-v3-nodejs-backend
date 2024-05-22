@@ -1,5 +1,5 @@
 import Router from '@koa/router';
-import { SQL } from 'sql-template-strings';
+import sql from 'sql-template-tag';
 import { runInTransaction } from '../../database';
 import { acceptValidator } from '../../requestValidators';
 import { authenticator } from '../../authenticator';
@@ -13,7 +13,7 @@ export function attachDeleteTokenHandler(router: Router) {
     async (ctx) => {
       const conn = ctx.state.dbConn;
 
-      const [item] = await conn.query(SQL`
+      const [item] = await conn.query(sql`
         SELECT userId FROM trackingAccessToken
           JOIN trackingDevice ON (deviceId = trackingDevice.id)
           WHERE trackingAccessToken.id = ${ctx.params.id} FOR UPDATE
@@ -28,7 +28,7 @@ export function attachDeleteTokenHandler(router: Router) {
       }
 
       await conn.query(
-        SQL`DELETE FROM trackingAccessToken WHERE id = ${ctx.params.id}`,
+        sql`DELETE FROM trackingAccessToken WHERE id = ${ctx.params.id}`,
       );
 
       ctx.status = 204;

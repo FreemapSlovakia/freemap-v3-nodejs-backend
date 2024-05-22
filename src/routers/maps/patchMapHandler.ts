@@ -1,6 +1,6 @@
 import Router from '@koa/router';
 
-import { SQL } from 'sql-template-strings';
+import sql, { bulk, empty, join } from 'sql-template-tag';
 import { runInTransaction } from '../../database';
 import { acceptValidator } from '../../requestValidators';
 import { authenticator } from '../../authenticator';
@@ -43,7 +43,7 @@ export function attachPatchMapHandler(router: Router) {
       const { id } = ctx.params;
 
       const [item] = await conn.query(
-        SQL`SELECT userId, name, createdAt, modifiedAt, public FROM map WHERE id = ${id} FOR UPDATE`,
+        sql`SELECT userId, name, createdAt, modifiedAt, public FROM map WHERE id = ${id} FOR UPDATE`,
       );
 
       if (!item) {
@@ -52,7 +52,7 @@ export function attachPatchMapHandler(router: Router) {
 
       const curWriters = (
         await conn.query(
-          SQL`SELECT userId FROM mapWriteAccess WHERE mapId = ${id} FOR UPDATE`,
+          sql`SELECT userId FROM mapWriteAccess WHERE mapId = ${id} FOR UPDATE`,
         )
       ).map(({ userId }: any) => userId);
 
@@ -77,49 +77,22 @@ export function attachPatchMapHandler(router: Router) {
         ctx.throw(412);
       }
 
-      const parts = [];
-
-      if (name !== undefined) {
-        parts.push(SQL`name = ${name}`);
-      }
-
-      if (pub !== undefined) {
-        parts.push(SQL`public = ${pub}`);
-      }
-
-      if (data !== undefined) {
-        parts.push(SQL`data = ${JSON.stringify(data)}`);
-      }
-
       const now = new Date();
 
-      const query = SQL`UPDATE map SET modifiedAt = ${now}`;
-
-      for (let i = 0; i < parts.length; i++) {
-        query.append(',').append(parts[i]);
-      }
-
-      await conn.query(query.append(SQL` WHERE id = ${id}`));
+      await conn.query(sql`UPDATE map SET modifiedAt = ${now}
+        ${name === undefined ? empty : sql`name = ${name}`}
+        ${pub === undefined ? empty : sql`public = ${pub}`}
+        ${data === undefined ? empty : sql`data = ${JSON.stringify(data)}`}
+        WHERE id = ${id}
+      `);
 
       if (writers) {
-        conn.query(SQL`DELETE FROM mapWriteAccess WHERE mapId = ${id}`);
+        conn.query(sql`DELETE FROM mapWriteAccess WHERE mapId = ${id}`);
 
         if (writers.length) {
-          const sql = SQL`INSERT INTO mapWriteAccess (mapId, userId) VALUES `;
-
-          let first = true;
-
-          for (const writer of writers) {
-            if (first) {
-              first = false;
-            } else {
-              sql.append(',');
-            }
-
-            sql.append(SQL`(${id}, ${writer})`);
-          }
-
-          await conn.query(sql);
+          await conn.query(
+            sql`INSERT INTO mapWriteAccess (mapId, userId) VALUES ${bulk(writers.map((writer: number) => [id, writer]))}`,
+          );
         }
       }
 

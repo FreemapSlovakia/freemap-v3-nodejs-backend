@@ -3,13 +3,15 @@ import rp from 'request-promise-native';
 import { tokenSecrets } from './garminTokenSecrets';
 import { getEnv } from '../../env';
 import { login } from './loginProcessor';
+import { authenticator } from '../../authenticator';
 
 export function attachLoginWithGarmin2Handler(router: Router) {
   router.post(
     '/login-garmin-2',
+    authenticator(false),
     // TODO validation
     async (ctx) => {
-      const { token, verifier, language } = ctx.request.body;
+      const { token, verifier, language, connect } = ctx.request.body;
 
       const consumer_key = getEnv('GARMIN_OAUTH_CONSUMER_KEY');
 
@@ -45,15 +47,18 @@ export function attachLoginWithGarmin2Handler(router: Router) {
 
       await login(
         ctx,
-        'garminUserId',
+        'garmin',
         body2.userId,
-        'garminAccessToken, garminAccessTokenSecret',
-        [sp.get('oauth_token'), sp.get('oauth_token_secret')],
         body2.userId,
         null,
         undefined,
         undefined,
         language,
+        connect,
+        {
+          garminAccessToken: authToken,
+          garminAccessTokenSecret: authTokenSecret,
+        },
       );
     },
   );

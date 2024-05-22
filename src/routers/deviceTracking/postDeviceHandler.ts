@@ -1,5 +1,5 @@
 import Router from '@koa/router';
-import { SQL } from 'sql-template-strings';
+import sql from 'sql-template-tag';
 import randomize from 'randomatic';
 import { pool } from '../../database';
 import { acceptValidator } from '../../requestValidators';
@@ -41,7 +41,7 @@ export function attachPostDeviceHandler(router: Router) {
 
       const { name, maxCount, maxAge } = ctx.request.body;
 
-      const { insertId } = await pool.query(SQL`
+      const { insertId } = await pool.query(sql`
         INSERT INTO trackingDevice SET
           name = ${name},
           token = ${token1},

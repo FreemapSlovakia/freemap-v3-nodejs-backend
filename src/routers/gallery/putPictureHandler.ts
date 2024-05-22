@@ -1,6 +1,6 @@
 import Router from '@koa/router';
 
-import { SQL } from 'sql-template-strings';
+import sql from 'sql-template-tag';
 import { runInTransaction } from '../../database';
 import { bodySchemaValidator } from '../../requestValidators';
 import { authenticator } from '../../authenticator';
@@ -56,7 +56,7 @@ export function attachPutPictureHandler(router: Router) {
       } = ctx.request.body;
 
       const rows = await conn.query(
-        SQL`SELECT userId FROM picture WHERE id = ${ctx.params.id} FOR UPDATE`,
+        sql`SELECT userId FROM picture WHERE id = ${ctx.params.id} FOR UPDATE`,
       );
 
       if (rows.length === 0) {
@@ -68,7 +68,7 @@ export function attachPutPictureHandler(router: Router) {
       }
 
       const queries = [
-        conn.query(SQL`
+        conn.query(sql`
           UPDATE picture SET
             title = ${title},
             description = ${description},

@@ -1,6 +1,6 @@
 import net from 'net';
 import { getEnv } from './env';
-import { SQL } from 'sql-template-strings';
+import sql, { empty } from 'sql-template-tag';
 import { storeTrackPoint } from './deviceTracking';
 import { pool } from './database';
 import { PoolConnection } from 'mariadb';
@@ -53,9 +53,7 @@ export function startSocketDeviceTracking() {
         conn.beginTransaction();
 
         const [item] = await conn.query(
-          SQL`SELECT id, maxCount, maxAge FROM trackingDevice WHERE token IN (${`did:${deviceId}`}`
-            .append(imei ? SQL`, ${`imei:${imei}`}` : '')
-            .append(')'),
+          sql`SELECT id, maxCount, maxAge FROM trackingDevice WHERE token IN (${`did:${deviceId}`}${imei ? sql`, ${`imei:${imei}`}` : empty})`,
         );
 
         if (!item) {

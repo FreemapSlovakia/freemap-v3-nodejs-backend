@@ -1,5 +1,5 @@
 import Router from '@koa/router';
-import { SQL } from 'sql-template-strings';
+import sql from 'sql-template-tag';
 import { runInTransaction } from '../../database';
 import {
   acceptValidator,
@@ -23,12 +23,7 @@ export function attachPostPictureHandler(router: Router) {
     async (ctx, next) => {
       const { files } = ctx.request;
       if (!files || !files.image) {
-        ctx.body = {
-          error: 'missing_image_file',
-        };
-
-        ctx.status = 400;
-        return;
+        ctx.throw(400, 'missing_image_file');
       }
 
       if (Array.isArray(files.image) || files.image.size > 40 * 1024 * 1024) {
@@ -36,12 +31,7 @@ export function attachPostPictureHandler(router: Router) {
       }
 
       if (!ctx.request.body.meta) {
-        ctx.body = {
-          error: 'missing_meta_field',
-        };
-
-        ctx.status = 400;
-        return;
+        ctx.throw(400, 'missing_meta_field');
       }
 
       if (typeof ctx.request.body.meta === 'string') {
@@ -128,14 +118,14 @@ export function attachPostPictureHandler(router: Router) {
 
       const pano = exif['UsePanoramaViewer']?.value === 'True';
 
-      const { insertId } = await conn.query(SQL`
+      const { insertId } = await conn.query(sql`
         INSERT INTO picture SET
           pathname = ${`${name}.jpeg`},
           userId = ${ctx.state.user.id},
           title = ${title},
           description = ${description},
-          createdAt = ${new Date()},
-          takenAt = ${takenAt ? new Date(takenAt) : null},
+          createdAt = ${new Date() as any},
+          takenAt = ${takenAt ? (new Date(takenAt) as any) : null},
           lat = ${lat},
           lon = ${lon},
           pano = ${pano}

@@ -25,12 +25,13 @@ export function queryValidator(spec: ValidationRules): Middleware {
     });
 
     if (errors.length) {
+      ctx.status = 400;
+
       ctx.body = {
         error: 'invalid_query_parameters',
         detail: errors,
       };
 
-      ctx.status = 400;
       return;
     }
 
@@ -104,12 +105,12 @@ export function queryAdapter(
       }
 
       if (Array.isArray(value)) {
+        ctx.status = 400;
+
         ctx.body = {
           error: 'invalid_query_parameters',
           detail: `parameter ${key} is specified multiple times`,
         };
-
-        ctx.status = 400;
 
         return;
       }

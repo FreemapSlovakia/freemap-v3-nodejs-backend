@@ -1,5 +1,5 @@
 import Router from '@koa/router';
-import { SQL } from 'sql-template-strings';
+import sql from 'sql-template-tag';
 import { runInTransaction } from '../../database';
 import { acceptValidator } from '../../requestValidators';
 import { authenticator } from '../../authenticator';
@@ -14,7 +14,7 @@ export function attachDeleteMapHandler(router: Router) {
       const conn = ctx.state.dbConn;
 
       const [item] = await conn.query(
-        SQL`SELECT userId FROM map WHERE id = ${ctx.params.id} FOR UPDATE`,
+        sql`SELECT userId FROM map WHERE id = ${ctx.params.id} FOR UPDATE`,
       );
 
       if (!item) {
@@ -25,7 +25,7 @@ export function attachDeleteMapHandler(router: Router) {
         ctx.throw(403);
       }
 
-      await conn.query(SQL`DELETE FROM map WHERE id = ${ctx.params.id}`);
+      await conn.query(sql`DELETE FROM map WHERE id = ${ctx.params.id}`);
 
       ctx.status = 204;
     },

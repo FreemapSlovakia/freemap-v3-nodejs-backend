@@ -1,6 +1,6 @@
 import Router from '@koa/router';
 
-import { SQL } from 'sql-template-strings';
+import sql, { bulk } from 'sql-template-tag';
 import { pool } from '../../database';
 import { acceptValidator } from '../../requestValidators';
 import { authenticator } from '../../authenticator';
@@ -47,7 +47,7 @@ export function attachPostMapHandler(router: Router) {
 
       const userId = ctx.state.user.id;
 
-      await pool.query(SQL`
+      await pool.query(sql`
         INSERT INTO map SET
           id = ${id},
           name = ${name},
@@ -59,21 +59,9 @@ export function attachPostMapHandler(router: Router) {
       `);
 
       if (writers?.length) {
-        const sql = SQL`INSERT INTO mapWriteAccess (mapId, userId) VALUES `;
-
-        let first = true;
-
-        for (const writer of writers) {
-          if (first) {
-            first = false;
-          } else {
-            sql.append(',');
-          }
-
-          sql.append(SQL`(${id}, ${writer})`);
-        }
-
-        await pool.query(sql);
+        await pool.query(
+          sql`INSERT INTO mapWriteAccess (mapId, userId) VALUES ${bulk(writers.map((writer: number) => [id, writer]))}`,
+        );
       }
 
       ctx.body = {

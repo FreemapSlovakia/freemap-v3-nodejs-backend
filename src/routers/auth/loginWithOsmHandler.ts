@@ -4,6 +4,7 @@ import { parseString } from 'xml2js';
 import { promisify } from 'util';
 import { login } from './loginProcessor';
 import { getEnv } from '../../env';
+import { authenticator } from '../../authenticator';
 
 const parseStringAsync = promisify(parseString);
 
@@ -20,9 +21,10 @@ export function attachLoginWithOsmHandler(router: Router) {
 
   router.post(
     '/login-osm',
+    authenticator(false),
     // TODO validation
     async (ctx) => {
-      const { code, language } = ctx.request.body;
+      const { code, language, connect } = ctx.request.body;
 
       const body = await rp.post({
         url:
@@ -58,15 +60,14 @@ export function attachLoginWithOsmHandler(router: Router) {
 
       await login(
         ctx,
-        'osmId',
+        'osm',
         osmId,
-        'osmAccessToken',
-        [body.access_token],
         osmName,
         null,
         lat ? Number(lat) : undefined,
         lon ? Number(lon) : undefined,
         language,
+        connect,
       );
     },
   );

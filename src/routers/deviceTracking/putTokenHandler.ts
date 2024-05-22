@@ -1,5 +1,5 @@
 import Router from '@koa/router';
-import { SQL } from 'sql-template-strings';
+import sql from 'sql-template-tag';
 import { runInTransaction } from '../../database';
 import { acceptValidator } from '../../requestValidators';
 import { authenticator } from '../../authenticator';
@@ -38,7 +38,7 @@ export function attachPutTokenHandler(router: Router) {
     async (ctx) => {
       const conn = ctx.state.dbConn;
 
-      const [item] = await conn.query(SQL`
+      const [item] = await conn.query(sql`
           SELECT userId
             FROM trackingAccessToken
             JOIN trackingDevice ON (deviceId = trackingDevice.id)
@@ -56,7 +56,7 @@ export function attachPutTokenHandler(router: Router) {
 
       const { timeFrom, timeTo, note, listingLabel } = ctx.request.body;
 
-      await conn.query(SQL`
+      await conn.query(sql`
             UPDATE trackingAccessToken SET
               note = ${note},
               timeFrom = ${timeFrom && new Date(timeFrom)},
