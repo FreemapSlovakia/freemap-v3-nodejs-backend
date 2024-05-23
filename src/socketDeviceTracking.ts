@@ -1,10 +1,10 @@
 import net from 'net';
-import { getEnv } from './env';
+import { getEnv } from './env.js';
 import sql, { empty } from 'sql-template-tag';
-import { storeTrackPoint } from './deviceTracking';
-import { pool } from './database';
+import { storeTrackPoint } from './deviceTracking.js';
+import { pool } from './database.js';
 import { PoolConnection } from 'mariadb';
-import { appLogger } from './logger';
+import { appLogger } from './logger.js';
 
 const logger = appLogger.child({ module: 'socketDeviceTracking' });
 

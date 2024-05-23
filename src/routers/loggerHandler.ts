@@ -1,6 +1,6 @@
 import Router from '@koa/router';
 
-import { bodySchemaValidator } from '../requestValidators';
+import { bodySchemaValidator } from '../requestValidators.js';
 
 const levelsAsConst = [
   'trace',

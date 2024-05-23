@@ -1,9 +1,11 @@
 import Router from '@koa/router';
 import rp from 'request-promise-native';
-import { tokenSecrets } from './garminTokenSecrets';
-import { getEnv } from '../../env';
-import { login } from './loginProcessor';
-import { authenticator } from '../../authenticator';
+import { tokenSecrets } from './garminTokenSecrets.js';
+import { getEnv } from '../../env.js';
+import { login } from './loginProcessor.js';
+import { authenticator } from '../../authenticator.js';
+import { garminOauth } from './loginWithGarminHandler.js';
+import got from 'got';
 
 export function attachLoginWithGarmin2Handler(router: Router) {
   router.post(
@@ -13,37 +15,53 @@ export function attachLoginWithGarmin2Handler(router: Router) {
     async (ctx) => {
       const { token, verifier, language, connect } = ctx.request.body;
 
-      const consumer_key = getEnv('GARMIN_OAUTH_CONSUMER_KEY');
+      const url =
+        'https://connectapi.garmin.com/oauth-service/oauth/access_token';
 
-      const consumer_secret = getEnv('GARMIN_OAUTH_CONSUMER_SECRET');
-
-      const body = await rp.post({
-        url: 'https://connectapi.garmin.com/oauth-service/oauth/access_token',
-        oauth: {
-          consumer_key,
-          consumer_secret,
-          verifier,
-          token,
-          token_secret: tokenSecrets.get(ctx.request.body.token),
+      const response = await got.post(url, {
+        headers: {
+          ...garminOauth.toHeader(
+            garminOauth.authorize(
+              {
+                url,
+                method: 'POST',
+                data: { oauth_verifier: verifier },
+              },
+              {
+                key: token,
+                secret: tokenSecrets.get(ctx.request.body.token),
+              },
+            ),
+          ),
         },
       });
 
-      const sp = new URLSearchParams(String(body));
+      const sp = new URLSearchParams(String(response.body));
 
       const authToken = sp.get('oauth_token');
 
       const authTokenSecret = sp.get('oauth_token_secret');
 
-      const body2 = await rp.get({
-        url: 'https://apis.garmin.com/wellness-api/rest/user/id',
-        oauth: {
-          consumer_key,
-          consumer_secret,
-          token: authToken,
-          token_secret: authTokenSecret,
-        },
-        json: true,
-      });
+      const url2 = 'https://apis.garmin.com/wellness-api/rest/user/id';
+
+      const body2 = (await got
+        .get(url2, {
+          headers: {
+            ...garminOauth.toHeader(
+              garminOauth.authorize(
+                {
+                  url: url2,
+                  method: 'GET',
+                },
+                {
+                  key: authToken,
+                  secret: authTokenSecret,
+                },
+              ),
+            ),
+          },
+        })
+        .json()) as any;
 
       await login(
         ctx,

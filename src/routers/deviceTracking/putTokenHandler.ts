@@ -1,9 +1,9 @@
 import Router from '@koa/router';
 import sql from 'sql-template-tag';
-import { runInTransaction } from '../../database';
-import { acceptValidator } from '../../requestValidators';
-import { authenticator } from '../../authenticator';
-import { bodySchemaValidator } from '../../requestValidators';
+import { runInTransaction } from '../../database.js';
+import { acceptValidator } from '../../requestValidators.js';
+import { authenticator } from '../../authenticator.js';
+import { bodySchemaValidator } from '../../requestValidators.js';
 
 export function attachPutTokenHandler(router: Router) {
   router.put(

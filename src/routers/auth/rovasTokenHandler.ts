@@ -1,6 +1,6 @@
-import { pool } from '../../database';
+import { pool } from '../../database.js';
 import Router from '@koa/router';
-import { authenticator } from '../../authenticator';
+import { authenticator } from '../../authenticator.js';
 import sql from 'sql-template-tag';
 import { randomBytes } from 'crypto';
 

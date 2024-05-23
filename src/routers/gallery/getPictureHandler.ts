@@ -1,9 +1,9 @@
 import Router from '@koa/router';
 import sql, { empty, raw } from 'sql-template-tag';
-import { pool } from '../../database';
-import { acceptValidator } from '../../requestValidators';
-import { authenticator } from '../../authenticator';
-import { ratingSubquery } from './ratingConstants';
+import { pool } from '../../database.js';
+import { acceptValidator } from '../../requestValidators.js';
+import { authenticator } from '../../authenticator.js';
+import { ratingSubquery } from './ratingConstants.js';
 
 export function attachGetPictureHandler(router: Router) {
   router.get(

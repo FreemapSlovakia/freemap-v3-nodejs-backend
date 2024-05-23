@@ -1,5 +1,5 @@
 import sql from 'sql-template-tag';
-import { trackRegister } from './trackRegister';
+import { trackRegister } from './trackRegister.js';
 import { PoolConnection } from 'mariadb';
 
 export async function storeTrackPoint(

@@ -1,10 +1,10 @@
 import Router from '@koa/router';
-import rp from 'request-promise-native';
 import { parseString } from 'xml2js';
 import { promisify } from 'util';
-import { login } from './loginProcessor';
-import { getEnv } from '../../env';
-import { authenticator } from '../../authenticator';
+import { login } from './loginProcessor.js';
+import { getEnv } from '../../env.js';
+import { authenticator } from '../../authenticator.js';
+import got from 'got';
 
 const parseStringAsync = promisify(parseString);
 
@@ -26,30 +26,33 @@ export function attachLoginWithOsmHandler(router: Router) {
     async (ctx) => {
       const { code, language, connect } = ctx.request.body;
 
-      const body = await rp.post({
-        url:
+      const body = (await got
+        .post(
           'https://www.openstreetmap.org/oauth2/token?' +
-          new URLSearchParams({
-            client_id: clientId,
-            client_secret: clientSecret,
-            grant_type: 'authorization_code',
-            code,
-            redirect_uri:
-              redirectUri +
-              (connect === undefined ? '' : '?connect=' + connect),
-          }).toString(),
-        headers: {
-          'content-type': 'application/x-www-form-urlencoded', // otherwise server returns 415
-        },
-        json: true,
-      });
+            new URLSearchParams({
+              client_id: clientId,
+              client_secret: clientSecret,
+              grant_type: 'authorization_code',
+              code,
+              redirect_uri:
+                redirectUri +
+                (connect === undefined ? '' : '?connect=' + connect),
+            }).toString(),
+          {
+            headers: {
+              'content-type': 'application/x-www-form-urlencoded', // otherwise server returns 415
+            },
+          },
+        )
+        .json()) as any;
 
-      const userDetails = await rp.get({
-        url: 'https://api.openstreetmap.org/api/0.6/user/details',
-        auth: {
-          bearer: body.access_token,
-        },
-      });
+      const userDetails = await got
+        .get('https://api.openstreetmap.org/api/0.6/user/details', {
+          headers: {
+            authorization: 'Bearer ' + body.access_token,
+          },
+        })
+        .json();
 
       const result: any = await parseStringAsync(userDetails);
 

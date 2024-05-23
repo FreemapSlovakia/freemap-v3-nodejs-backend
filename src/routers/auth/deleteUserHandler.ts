@@ -1,9 +1,9 @@
 import Router from '@koa/router';
-import { runInTransaction } from '../../database';
-import { authenticator } from '../../authenticator';
-import sql from 'sql-template-tag';
+import { runInTransaction } from '../../database.js';
+import { authenticator } from '../../authenticator.js';
 import { promises as fs } from 'fs';
-import { picturesDir } from '../gallery/constants';
+import { picturesDir } from '../gallery/constants.js';
+import sql from 'sql-template-tag';
 
 export function attachDeleteUserHandler(router: Router) {
   router.delete(

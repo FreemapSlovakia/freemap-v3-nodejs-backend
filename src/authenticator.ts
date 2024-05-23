@@ -1,6 +1,6 @@
 import { Middleware } from 'koa';
 import sql from 'sql-template-tag';
-import { pool } from './database';
+import { pool } from './database.js';
 
 export const authProviderToColumn = {
   facebook: 'facebookUserId',

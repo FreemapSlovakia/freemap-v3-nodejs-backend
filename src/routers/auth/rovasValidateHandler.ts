@@ -1,8 +1,8 @@
-import { pool } from '../../database';
+import { pool } from '../../database.js';
 import Router from '@koa/router';
-import { authenticator } from '../../authenticator';
+import { authenticator } from '../../authenticator.js';
 import sql from 'sql-template-tag';
-import { getEnv } from './../../env';
+import { getEnv } from './../../env.js';
 
 export function attachRovasValidateHandler(router: Router) {
   router.post('/rovasValidate', authenticator(true), async (ctx) => {

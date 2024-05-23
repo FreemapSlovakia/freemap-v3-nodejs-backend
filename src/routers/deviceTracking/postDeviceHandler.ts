@@ -1,11 +1,10 @@
 import Router from '@koa/router';
-import sql from 'sql-template-tag';
 import randomize from 'randomatic';
-import { pool } from '../../database';
-import { acceptValidator } from '../../requestValidators';
-import { authenticator } from '../../authenticator';
-import { bodySchemaValidator } from '../../requestValidators';
-import { JSONSchema7 } from 'json-schema';
+import { pool } from '../../database.js';
+import { acceptValidator } from '../../requestValidators.js';
+import { authenticator } from '../../authenticator.js';
+import { bodySchemaValidator } from '../../requestValidators.js';
+import sql from 'sql-template-tag';
 
 export function attachPostDeviceHandler(router: Router) {
   router.post(

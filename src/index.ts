@@ -1,4 +1,4 @@
-import 'source-map-support/register';
+import 'source-map-support/register.js';
 import { promises as fs, readFileSync } from 'fs';
 import koaBody from 'koa-body';
 import Koa from 'koa';
@@ -6,19 +6,19 @@ import Router from '@koa/router';
 import cors from 'kcors';
 import koaBunyanLogger from 'koa-bunyan-logger';
 import websockify from 'koa-websocket';
-import { appLogger } from './logger';
-import { initDatabase } from './database';
-import { attachWs } from './ws';
-import { tracklogsRouter } from './routers/tracklogs';
-import { galleryRouter } from './routers/gallery';
-import { mapsRouter } from './routers/maps';
-import { authRouter } from './routers/auth';
-import { geotoolsRouter } from './routers/geotools';
-import { trackingRouter } from './routers/deviceTracking';
-import { attachLoggerHandler } from './routers/loggerHandler';
-import { getEnv } from './env';
-import { startSocketDeviceTracking } from './socketDeviceTracking';
-import { attachGetUsers } from './routers/getUsersHandler';
+import { appLogger } from './logger.js';
+import { initDatabase } from './database.js';
+import { attachWs } from './ws.js';
+import { tracklogsRouter } from './routers/tracklogs/index.js';
+import { galleryRouter } from './routers/gallery/index.js';
+import { mapsRouter } from './routers/maps/index.js';
+import { authRouter } from './routers/auth/index.js';
+import { geotoolsRouter } from './routers/geotools/index.js';
+import { trackingRouter } from './routers/deviceTracking/index.js';
+import { attachLoggerHandler } from './routers/loggerHandler.js';
+import { getEnv } from './env.js';
+import { startSocketDeviceTracking } from './socketDeviceTracking.js';
+import { attachGetUsers } from './routers/getUsersHandler.js';
 
 const logger = appLogger.child({ module: 'app' });
 
@@ -66,7 +66,7 @@ app.use(
 );
 
 app.use(
-  koaBody({
+  koaBody.default({
     jsonLimit: '16mb',
     multipart: true,
   }),

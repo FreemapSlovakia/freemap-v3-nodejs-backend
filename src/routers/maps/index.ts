@@ -1,9 +1,9 @@
 import Router from '@koa/router';
-import { attachDeleteMapHandler } from './deleteMapHandler';
-import { attachGetAllMapsHandler } from './getAllMapsHandler';
-import { attachGetMapHandler } from './getMapHandler';
-import { attachPostMapHandler } from './postMapHandler';
-import { attachPatchMapHandler } from './patchMapHandler';
+import { attachDeleteMapHandler } from './deleteMapHandler.js';
+import { attachGetAllMapsHandler } from './getAllMapsHandler.js';
+import { attachGetMapHandler } from './getMapHandler.js';
+import { attachPostMapHandler } from './postMapHandler.js';
+import { attachPatchMapHandler } from './patchMapHandler.js';
 
 const router = new Router();
 

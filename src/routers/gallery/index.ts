@@ -1,14 +1,14 @@
 import Router from '@koa/router';
-import { attachGetPicturesHandler } from './getPicturesHandler';
-import { attachGetPictureHandler } from './getPictureHandler';
-import { attachGetPictureImageHandler } from './getPictureImageHandler';
-import { attachPostPictureHandler } from './postPictureHandler';
-import { attachGetAllTagsHandler } from './getAllTagsHandler';
-import { attachDeletePictureHandler } from './deletePictureHandler';
-import { attachPutPictureHandler } from './putPictureHandler';
-import { attachPostPictureCommentHandler } from './postPictureCommentHandler';
-import { attachPostPictureRatingHandler } from './postPictureRatingHandler';
-import { attachGetAllPictureUsers } from './getAllUsersHandler';
+import { attachGetPicturesHandler } from './getPicturesHandler.js';
+import { attachGetPictureHandler } from './getPictureHandler.js';
+import { attachGetPictureImageHandler } from './getPictureImageHandler.js';
+import { attachPostPictureHandler } from './postPictureHandler.js';
+import { attachGetAllTagsHandler } from './getAllTagsHandler.js';
+import { attachDeletePictureHandler } from './deletePictureHandler.js';
+import { attachPutPictureHandler } from './putPictureHandler.js';
+import { attachPostPictureCommentHandler } from './postPictureCommentHandler.js';
+import { attachPostPictureRatingHandler } from './postPictureRatingHandler.js';
+import { attachGetAllPictureUsers } from './getAllUsersHandler.js';
 
 const router = new Router();
 

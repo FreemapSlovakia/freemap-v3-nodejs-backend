@@ -1,17 +1,14 @@
 {
   "compilerOptions": {
-    "module": "commonjs",
-    "esModuleInterop": true,
-    "allowSyntheticDefaultImports": true,
-    "target": "ES2019",
+    "module": "NodeNext",
+    "target": "ES2022",
+    "moduleResolution": "NodeNext",
     "noImplicitAny": true,
-    "moduleResolution": "node",
     "sourceMap": true,
     "outDir": "build",
     "baseUrl": ".",
-    "paths": {
-      "*": ["node_modules/*"]
-    }
+    "paths": {},
+    "lib": ["ES2022", "DOM"] // DOM is to prevent some TS errors but hopefully DOM fns are not actually used
   },
   "include": ["src/**/*", "types"]
 }

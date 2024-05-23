@@ -1,6 +1,6 @@
 import Router from '@koa/router';
-import { pool } from '../database';
-import { acceptValidator } from '../requestValidators';
+import { pool } from '../database.js';
+import { acceptValidator } from '../requestValidators.js';
 
 export function attachGetUsers(router: Router) {
   router.get('/users', acceptValidator('application/json'), async (ctx) => {

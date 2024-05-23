@@ -1,8 +1,8 @@
 import sql, { empty, join } from 'sql-template-tag';
-import * as ws from 'ws';
-import { trackRegister } from '../trackRegister';
-import { pool } from '../database';
-import { RpcContext } from '../rpcHandlerTypes';
+import ws from 'ws';
+import { trackRegister } from '../trackRegister.js';
+import { pool } from '../database.js';
+import { RpcContext } from '../rpcHandlerTypes.js';
 
 export function trackingSubscribeHandler(ctx: RpcContext) {
   // TODO validate ctx.params

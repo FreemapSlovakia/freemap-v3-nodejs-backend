@@ -8,8 +8,8 @@ import {
   WriteStream,
 } from 'fs';
 import { ParameterizedContext } from 'koa';
-import { acceptValidator } from '../../requestValidators';
-import { getEnv } from '../../env';
+import { acceptValidator } from '../../requestValidators.js';
+import { getEnv } from '../../env.js';
 import unzipper from 'unzipper';
 import got from 'got';
 
@@ -170,9 +170,11 @@ async function fetch(key: string) {
               beforeRedirect: [
                 (options, response) => {
                   if (
-                    options.url.href.startsWith(
-                      'https://urs.earthdata.nasa.gov/oauth/authorize',
-                    )
+                    typeof options.url === 'string'
+                      ? options.url
+                      : options.url.href.startsWith(
+                          'https://urs.earthdata.nasa.gov/oauth/authorize',
+                        )
                   ) {
                     options.headers.authorization = `Basic ${Buffer.from(
                       getEnv('URS_EARTHDATA_NASA_USERNAME') +

@@ -1,7 +1,7 @@
 import Router from '@koa/router';
 import sql from 'sql-template-tag';
-import { pool } from '../../database';
-import { authenticator } from '../../authenticator';
+import { pool } from '../../database.js';
+import { authenticator } from '../../authenticator.js';
 
 export function attachLogoutHandler(router: Router) {
   router.post('/logout', authenticator(true), async (ctx) => {

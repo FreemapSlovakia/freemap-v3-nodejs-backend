@@ -1,7 +1,7 @@
 import Router from '@koa/router';
-import { googleClient } from '../../google';
-import { login } from './loginProcessor';
-import { authenticator } from '../../authenticator';
+import { googleClient } from '../../google.js';
+import { login } from './loginProcessor.js';
+import { authenticator } from '../../authenticator.js';
 
 export function attachLoginWithGoogleHandler(router: Router) {
   router.post(

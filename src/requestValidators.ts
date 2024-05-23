@@ -4,7 +4,7 @@ import { Ajv } from 'ajv';
 import { JSONSchema7 } from 'json-schema';
 import ajvFormats from 'ajv-formats';
 
-const ajv = ajvFormats(new Ajv());
+const ajv = ajvFormats.default(new Ajv());
 
 export type ValidationRules = {
   [name: string]: (v: any, ctx?: ParameterizedContext) => true | string;

@@ -1,8 +1,8 @@
 import Router from '@koa/router';
 import uuidBase62 from 'uuid-base62';
 import { promises as fs } from 'fs';
-import { tracklogsDir } from '../../routers/tracklogs/constants';
-import { bodySchemaValidator } from '../../requestValidators';
+import { tracklogsDir } from '../../routers/tracklogs/constants.js';
+import { bodySchemaValidator } from '../../requestValidators.js';
 
 export function attachCreateTracklogHandler(router: Router) {
   router.post(

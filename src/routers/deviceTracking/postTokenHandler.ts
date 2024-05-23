@@ -2,10 +2,10 @@ import Router from '@koa/router';
 
 import sql from 'sql-template-tag';
 import randomize from 'randomatic';
-import { pool } from '../../database';
-import { acceptValidator } from '../../requestValidators';
-import { authenticator } from '../../authenticator';
-import { bodySchemaValidator } from '../../requestValidators';
+import { pool } from '../../database.js';
+import { acceptValidator } from '../../requestValidators.js';
+import { authenticator } from '../../authenticator.js';
+import { bodySchemaValidator } from '../../requestValidators.js';
 
 export function attachPostTokenHandler(router: Router) {
   router.post(

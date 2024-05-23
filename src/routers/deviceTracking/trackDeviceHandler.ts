@@ -1,8 +1,8 @@
 import Router from '@koa/router';
 import { ParameterizedContext } from 'koa';
 import sql from 'sql-template-tag';
-import { runInTransaction } from '../../database';
-import { storeTrackPoint } from '../../deviceTracking';
+import { runInTransaction } from '../../database.js';
+import { storeTrackPoint } from '../../deviceTracking.js';
 
 export function attachTrackDeviceHandler(router: Router) {
   for (const method of ['post', 'get'] as const) {

@@ -3,9 +3,9 @@ import sql from 'sql-template-tag';
 import sharp from 'sharp';
 import { promises as fs, createReadStream } from 'fs';
 import calculate from 'etag';
-import { pool } from '../../database';
-import { acceptValidator } from '../../requestValidators';
-import { picturesDir } from '../../routers/gallery/constants';
+import { pool } from '../../database.js';
+import { acceptValidator } from '../../requestValidators.js';
+import { picturesDir } from '../../routers/gallery/constants.js';
 
 export function attachGetPictureImageHandler(router: Router) {
   router.get(

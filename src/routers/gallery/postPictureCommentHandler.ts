@@ -1,10 +1,13 @@
 import Router from '@koa/router';
 import sql from 'sql-template-tag';
-import { runInTransaction } from '../../database';
-import { acceptValidator, bodySchemaValidator } from '../../requestValidators';
-import { authenticator } from '../../authenticator';
+import { runInTransaction } from '../../database.js';
+import {
+  acceptValidator,
+  bodySchemaValidator,
+} from '../../requestValidators.js';
+import { authenticator } from '../../authenticator.js';
 import { PoolConnection } from 'mariadb';
-import { getEnv } from '../../env';
+import { getEnv } from '../../env.js';
 import got from 'got';
 
 const webBaseUrls = getEnv('WEB_BASE_URL').split(',');

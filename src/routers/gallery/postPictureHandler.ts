@@ -1,16 +1,16 @@
 import Router from '@koa/router';
 import sql from 'sql-template-tag';
-import { runInTransaction } from '../../database';
+import { runInTransaction } from '../../database.js';
 import {
   acceptValidator,
   contentTypeValidator,
   bodySchemaValidator,
-} from '../../requestValidators';
+} from '../../requestValidators.js';
 import uuidBase62 from 'uuid-base62';
-import { authenticator } from '../../authenticator';
+import { authenticator } from '../../authenticator.js';
 import { promisify } from 'util';
 import { execFile } from 'child_process';
-import { picturesDir } from '../../routers/gallery/constants';
+import { picturesDir } from '../../routers/gallery/constants.js';
 import ExifReader from 'exifreader';
 
 const execFileAsync = promisify(execFile);

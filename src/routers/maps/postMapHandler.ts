@@ -1,10 +1,10 @@
 import Router from '@koa/router';
 
 import sql, { bulk } from 'sql-template-tag';
-import { pool } from '../../database';
-import { acceptValidator } from '../../requestValidators';
-import { authenticator } from '../../authenticator';
-import { bodySchemaValidator } from '../../requestValidators';
+import { pool } from '../../database.js';
+import { acceptValidator } from '../../requestValidators.js';
+import { authenticator } from '../../authenticator.js';
+import { bodySchemaValidator } from '../../requestValidators.js';
 import randomize from 'randomatic';
 
 export function attachPostMapHandler(router: Router) {
