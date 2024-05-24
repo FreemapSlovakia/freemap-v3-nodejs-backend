@@ -1,8 +1,8 @@
-import { pool } from '../../database.js';
 import Router from '@koa/router';
-import { authenticator } from '../../authenticator.js';
+import { randomBytes } from 'node:crypto';
 import sql from 'sql-template-tag';
-import { randomBytes } from 'crypto';
+import { authenticator } from '../../authenticator.js';
+import { pool } from '../../database.js';
 
 export function attachRovasTokenHandler(router: Router) {
   router.post('/rovasToken', authenticator(true), async (ctx) => {

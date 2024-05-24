@@ -1,5 +1,5 @@
 import Router from '@koa/router';
-import { promises as fs } from 'fs';
+import { readFile, stat } from 'node:fs/promises';
 import { tracklogsDir } from '../tracklogs/constants.js';
 
 export function attachGetTracklogHandler(router: Router) {
@@ -13,12 +13,12 @@ export function attachGetTracklogHandler(router: Router) {
     const filePath = `${tracklogsDir}/${fileUID}.b64.gpx`;
 
     try {
-      await fs.stat(filePath);
+      await stat(filePath);
     } catch {
       ctx.throw(404, 'gpx file not found');
     }
 
-    const b64gpx = await fs.readFile(filePath, 'utf8');
+    const b64gpx = await readFile(filePath, 'utf8');
 
     ctx.body = {
       uid: fileUID,

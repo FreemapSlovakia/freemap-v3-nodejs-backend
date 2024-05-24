@@ -1,24 +1,25 @@
-import 'source-map-support/register.js';
-import { promises as fs, readFileSync } from 'fs';
-import koaBody from 'koa-body';
-import Koa from 'koa';
 import Router from '@koa/router';
 import cors from 'kcors';
+import Koa from 'koa';
+import koaBody from 'koa-body';
 import koaBunyanLogger from 'koa-bunyan-logger';
 import websockify from 'koa-websocket';
-import { appLogger } from './logger.js';
+import { readFileSync } from 'node:fs';
+import { unlink } from 'node:fs/promises';
+import 'source-map-support/register.js';
 import { initDatabase } from './database.js';
-import { attachWs } from './ws.js';
-import { tracklogsRouter } from './routers/tracklogs/index.js';
-import { galleryRouter } from './routers/gallery/index.js';
-import { mapsRouter } from './routers/maps/index.js';
-import { authRouter } from './routers/auth/index.js';
-import { geotoolsRouter } from './routers/geotools/index.js';
-import { trackingRouter } from './routers/deviceTracking/index.js';
-import { attachLoggerHandler } from './routers/loggerHandler.js';
 import { getEnv } from './env.js';
-import { startSocketDeviceTracking } from './socketDeviceTracking.js';
+import { appLogger } from './logger.js';
+import { authRouter } from './routers/auth/index.js';
+import { trackingRouter } from './routers/deviceTracking/index.js';
+import { galleryRouter } from './routers/gallery/index.js';
+import { geotoolsRouter } from './routers/geotools/index.js';
 import { attachGetUsers } from './routers/getUsersHandler.js';
+import { attachLoggerHandler } from './routers/loggerHandler.js';
+import { mapsRouter } from './routers/maps/index.js';
+import { tracklogsRouter } from './routers/tracklogs/index.js';
+import { startSocketDeviceTracking } from './socketDeviceTracking.js';
+import { attachWs } from './ws.js';
 
 const logger = appLogger.child({ module: 'app' });
 
@@ -83,7 +84,7 @@ app.use(async (ctx, next) => {
       const files = ctx.request.files[field];
 
       for (const file of Array.isArray(files) ? files : [files]) {
-        proms.push(fs.unlink(file.filepath));
+        proms.push(unlink(file.filepath));
       }
     }
     await Promise.all(proms);

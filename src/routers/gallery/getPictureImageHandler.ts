@@ -1,8 +1,9 @@
 import Router from '@koa/router';
-import sql from 'sql-template-tag';
-import sharp from 'sharp';
-import { promises as fs, createReadStream } from 'fs';
 import calculate from 'etag';
+import { createReadStream } from 'node:fs';
+import { stat } from 'node:fs/promises';
+import sharp from 'sharp';
+import sql from 'sql-template-tag';
 import { pool } from '../../database.js';
 import { acceptValidator } from '../../requestValidators.js';
 import { picturesDir } from '../../routers/gallery/constants.js';
@@ -25,7 +26,7 @@ export function attachGetPictureImageHandler(router: Router) {
       let stats;
 
       try {
-        stats = await fs.stat(pathname);
+        stats = await stat(pathname);
       } catch {
         ctx.throw(404, 'missing picture file');
       }

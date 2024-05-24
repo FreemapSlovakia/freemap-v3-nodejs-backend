@@ -1,10 +1,10 @@
 import Router from '@koa/router';
-import { parseString } from 'xml2js';
-import { promisify } from 'util';
-import { login } from './loginProcessor.js';
-import { getEnv } from '../../env.js';
-import { authenticator } from '../../authenticator.js';
 import got from 'got';
+import { promisify } from 'node:util';
+import { parseString } from 'xml2js';
+import { authenticator } from '../../authenticator.js';
+import { getEnv } from '../../env.js';
+import { login } from './loginProcessor.js';
 
 const parseStringAsync = promisify(parseString);
 

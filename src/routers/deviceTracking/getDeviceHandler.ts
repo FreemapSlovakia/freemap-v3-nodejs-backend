@@ -1,8 +1,8 @@
 import Router from '@koa/router';
 import sql from 'sql-template-tag';
+import { authenticator } from '../../authenticator.js';
 import { pool } from '../../database.js';
 import { acceptValidator } from '../../requestValidators.js';
-import { authenticator } from '../../authenticator.js';
 
 export function attachGetDeviceHandler(router: Router) {
   router.get(

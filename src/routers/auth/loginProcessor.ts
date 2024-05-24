@@ -1,12 +1,8 @@
 import { ParameterizedContext } from 'koa';
-import { pool } from '../../database.js';
+import { randomBytes } from 'node:crypto';
 import sql, { RawValue, join, raw } from 'sql-template-tag';
-import { randomBytes } from 'crypto';
-import {
-  authProviderToColumn,
-  columnToAuthProvider,
-  userForResponse,
-} from '../../authenticator.js';
+import { authProviderToColumn, userForResponse } from '../../authenticator.js';
+import { pool } from '../../database.js';
 
 export async function login(
   ctx: ParameterizedContext,

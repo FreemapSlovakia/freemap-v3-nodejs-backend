@@ -1,9 +1,9 @@
 import Router from '@koa/router';
-import { runInTransaction } from '../../database.js';
-import { authenticator } from '../../authenticator.js';
-import { promises as fs } from 'fs';
-import { picturesDir } from '../gallery/constants.js';
+import { unlink } from 'node:fs/promises';
 import sql from 'sql-template-tag';
+import { authenticator } from '../../authenticator.js';
+import { runInTransaction } from '../../database.js';
+import { picturesDir } from '../gallery/constants.js';
 
 export function attachDeleteUserHandler(router: Router) {
   router.delete(
@@ -19,7 +19,7 @@ export function attachDeleteUserHandler(router: Router) {
 
       await Promise.all(
         rows.map((row: any) =>
-          fs.unlink(`${picturesDir}/${row.pathname}`).catch((err) => {
+          unlink(`${picturesDir}/${row.pathname}`).catch((err) => {
             ctx.log.error({ err }, 'Error deleting picture.');
           }),
         ),

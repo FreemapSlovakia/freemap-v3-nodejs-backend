@@ -1,7 +1,7 @@
 import Router from '@koa/router';
-import { login } from './loginProcessor.js';
-import { authenticator } from '../../authenticator.js';
 import got from 'got';
+import { authenticator } from '../../authenticator.js';
+import { login } from './loginProcessor.js';
 
 async function getUserData(accessToken: string) {
   return await got(

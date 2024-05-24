@@ -1,11 +1,9 @@
 import Router from '@koa/router';
-import rp from 'request-promise-native';
-import { tokenSecrets } from './garminTokenSecrets.js';
-import { getEnv } from '../../env.js';
-import { login } from './loginProcessor.js';
-import { authenticator } from '../../authenticator.js';
-import { garminOauth } from './loginWithGarminHandler.js';
 import got from 'got';
+import { authenticator } from '../../authenticator.js';
+import { tokenSecrets } from './garminTokenSecrets.js';
+import { login } from './loginProcessor.js';
+import { garminOauth } from './loginWithGarminHandler.js';
 
 export function attachLoginWithGarmin2Handler(router: Router) {
   router.post(

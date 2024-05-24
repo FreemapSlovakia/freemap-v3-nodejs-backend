@@ -1,8 +1,8 @@
 import Router from '@koa/router';
+import { writeFile } from 'node:fs/promises';
 import uuidBase62 from 'uuid-base62';
-import { promises as fs } from 'fs';
-import { tracklogsDir } from '../../routers/tracklogs/constants.js';
 import { bodySchemaValidator } from '../../requestValidators.js';
+import { tracklogsDir } from '../../routers/tracklogs/constants.js';
 
 export function attachCreateTracklogHandler(router: Router) {
   router.post(
@@ -22,7 +22,7 @@ export function attachCreateTracklogHandler(router: Router) {
       const fileUID = uuidBase62.v4();
       const filePath = `${tracklogsDir}/${fileUID}.b64.gpx`;
 
-      await fs.writeFile(filePath, b64gpx);
+      await writeFile(filePath, b64gpx);
 
       ctx.status = 201;
       ctx.body = { uid: fileUID };

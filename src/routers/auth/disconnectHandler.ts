@@ -1,8 +1,7 @@
-import { pool } from '../../database.js';
 import Router from '@koa/router';
-import { authenticator } from '../../authenticator.js';
 import sql, { join, raw } from 'sql-template-tag';
-import { randomBytes } from 'crypto';
+import { authenticator } from '../../authenticator.js';
+import { pool } from '../../database.js';
 
 export function attachDisconnectHandler(router: Router) {
   router.delete('/providers/:provider', authenticator(true), async (ctx) => {

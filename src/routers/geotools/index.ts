@@ -1,17 +1,12 @@
 import Router from '@koa/router';
-import { promisify } from 'util';
-import {
-  promises as fs,
-  fstat,
-  read,
-  createWriteStream,
-  WriteStream,
-} from 'fs';
-import { ParameterizedContext } from 'koa';
-import { acceptValidator } from '../../requestValidators.js';
-import { getEnv } from '../../env.js';
-import unzipper from 'unzipper';
 import got from 'got';
+import { ParameterizedContext } from 'koa';
+import { WriteStream, createWriteStream, fstat, read } from 'node:fs';
+import { FileHandle, open, rename, unlink } from 'node:fs/promises';
+import { promisify } from 'node:util';
+import unzipper from 'unzipper';
+import { getEnv } from '../../env.js';
+import { acceptValidator } from '../../requestValidators.js';
 
 const hgtDir = getEnv('ELEVATION_DATA_DIRECTORY');
 
@@ -62,7 +57,7 @@ async function compute(ctx: ParameterizedContext) {
 
   const allocated = new Set<string>();
 
-  const fdMap = new Map<string, [fs.FileHandle, number]>();
+  const fdMap = new Map<string, [FileHandle, number]>();
 
   try {
     const items = await Promise.all(
@@ -87,16 +82,16 @@ async function compute(ctx: ParameterizedContext) {
           let fd;
 
           try {
-            fd = await fs.open(hgtPath, 'r');
+            fd = await open(hgtPath, 'r');
           } catch (e) {
             try {
               await fetchSafe(key);
 
-              fd = await fs.open(hgtPath, 'r');
+              fd = await open(hgtPath, 'r');
             } catch (e) {
-              await (await fs.open(hgtPath, 'w')).close();
+              await (await open(hgtPath, 'w')).close();
 
-              fd = await fs.open(hgtPath, 'r');
+              fd = await open(hgtPath, 'r');
             }
           }
 
@@ -200,11 +195,11 @@ async function fetch(key: string) {
         .pipe(ws);
     });
 
-    await fs.rename(temp, fname);
+    await rename(temp, fname);
   } finally {
     if (ws) {
       ws.close();
-      await fs.unlink(temp).catch(() => {});
+      await unlink(temp).catch(() => {});
     }
   }
 }
@@ -212,7 +207,7 @@ async function fetch(key: string) {
 async function computeElevation([lat, lon, fd, size]: [
   number,
   number,
-  fs.FileHandle,
+  FileHandle,
   number,
 ]) {
   // gdal_translate supports: 1201x1201, 3601x3601 or 1801x3601

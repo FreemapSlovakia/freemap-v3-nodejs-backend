@@ -1,7 +1,7 @@
-import { createPool } from 'mariadb';
 import { Middleware } from 'koa';
-import { appLogger } from './logger.js';
+import { createPool } from 'mariadb';
 import { getEnv } from './env.js';
+import { appLogger } from './logger.js';
 
 export const pool = createPool({
   host: getEnv('MARIADB_HOST'),

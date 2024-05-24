@@ -1,14 +1,14 @@
 import Router from '@koa/router';
-import { pool } from '../../database.js';
-import {
-  acceptValidator,
-  queryValidator,
-  queryAdapter,
-  ValidationRules,
-} from '../../requestValidators.js';
-import { ratingSubquery } from './ratingConstants.js';
 import { Middleware, ParameterizedContext } from 'koa';
 import { authenticator } from '../../authenticator.js';
+import { pool } from '../../database.js';
+import {
+  ValidationRules,
+  acceptValidator,
+  queryAdapter,
+  queryValidator,
+} from '../../requestValidators.js';
+import { ratingSubquery } from './ratingConstants.js';
 
 const globalValidationRules: ValidationRules = {
   userId: (v) => v === null || !Number.isNaN(v) || 'invalid userId',

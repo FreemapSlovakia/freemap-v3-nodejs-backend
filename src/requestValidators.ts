@@ -1,8 +1,8 @@
 import { Middleware, ParameterizedContext } from 'koa';
 
 import { Ajv } from 'ajv';
-import { JSONSchema7 } from 'json-schema';
 import ajvFormats from 'ajv-formats';
+import { JSONSchema7 } from 'json-schema';
 
 const ajv = ajvFormats.default(new Ajv());
 

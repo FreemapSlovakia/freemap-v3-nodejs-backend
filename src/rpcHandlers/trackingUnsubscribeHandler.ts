@@ -1,5 +1,5 @@
-import { trackRegister } from '../trackRegister.js';
 import { RpcContext } from '../rpcHandlerTypes.js';
+import { trackRegister } from '../trackRegister.js';
 
 export function trackingUnsubscribeHandler(ctx: RpcContext) {
   // TODO validate ctx.params

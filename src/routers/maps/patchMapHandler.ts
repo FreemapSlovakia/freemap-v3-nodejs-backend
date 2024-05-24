@@ -1,10 +1,12 @@
 import Router from '@koa/router';
 
-import sql, { bulk, empty, join } from 'sql-template-tag';
-import { runInTransaction } from '../../database.js';
-import { acceptValidator } from '../../requestValidators.js';
+import sql, { bulk, empty } from 'sql-template-tag';
 import { authenticator } from '../../authenticator.js';
-import { bodySchemaValidator } from '../../requestValidators.js';
+import { runInTransaction } from '../../database.js';
+import {
+  acceptValidator,
+  bodySchemaValidator,
+} from '../../requestValidators.js';
 
 export function attachPatchMapHandler(router: Router) {
   router.patch(

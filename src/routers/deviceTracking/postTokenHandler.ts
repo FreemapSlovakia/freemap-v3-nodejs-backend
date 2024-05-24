@@ -1,11 +1,13 @@
 import Router from '@koa/router';
 
-import sql from 'sql-template-tag';
 import randomize from 'randomatic';
-import { pool } from '../../database.js';
-import { acceptValidator } from '../../requestValidators.js';
+import sql from 'sql-template-tag';
 import { authenticator } from '../../authenticator.js';
-import { bodySchemaValidator } from '../../requestValidators.js';
+import { pool } from '../../database.js';
+import {
+  acceptValidator,
+  bodySchemaValidator,
+} from '../../requestValidators.js';
 
 export function attachPostTokenHandler(router: Router) {
   router.post(

@@ -1,12 +1,12 @@
 import Router from '@koa/router';
-import { trackRegister } from './trackRegister.js';
-import { authenticator } from './authenticator.js';
-import { trackingSubscribeHandler } from './rpcHandlers/trackingSubscribeHandler.js';
-import { trackingUnsubscribeHandler } from './rpcHandlers/trackingUnsubscribeHandler.js';
-import { pingHandler } from './rpcHandlers/pingHandler.js';
 import KoaWebsocket from 'koa-websocket';
 import ws from 'ws';
+import { authenticator } from './authenticator.js';
 import { RpcContext } from './rpcHandlerTypes.js';
+import { pingHandler } from './rpcHandlers/pingHandler.js';
+import { trackingSubscribeHandler } from './rpcHandlers/trackingSubscribeHandler.js';
+import { trackingUnsubscribeHandler } from './rpcHandlers/trackingUnsubscribeHandler.js';
+import { trackRegister } from './trackRegister.js';
 
 export function attachWs(app: KoaWebsocket.App) {
   const wsRouter = new Router();

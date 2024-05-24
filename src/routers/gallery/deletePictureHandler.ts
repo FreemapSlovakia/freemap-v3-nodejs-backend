@@ -1,8 +1,8 @@
-import sql from 'sql-template-tag';
-import { promises as fs } from 'fs';
 import Router from '@koa/router';
-import { runInTransaction } from '../../database.js';
+import { unlink } from 'node:fs/promises';
+import sql from 'sql-template-tag';
 import { authenticator } from '../../authenticator.js';
+import { runInTransaction } from '../../database.js';
 import { picturesDir } from '../gallery/constants.js';
 
 export function attachDeletePictureHandler(router: Router) {
@@ -27,7 +27,7 @@ export function attachDeletePictureHandler(router: Router) {
 
       await conn.query(sql`DELETE FROM picture WHERE id = ${ctx.params.id}`);
 
-      await fs.unlink(`${picturesDir}/${rows[0].pathname}`);
+      await unlink(`${picturesDir}/${rows[0].pathname}`);
 
       ctx.status = 204;
     },
