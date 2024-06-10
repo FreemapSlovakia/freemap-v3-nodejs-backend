@@ -1,12 +1,8 @@
 import Router from '@koa/router';
 import got from 'got';
-import { promisify } from 'node:util';
-import { parseString } from 'xml2js';
 import { authenticator } from '../../authenticator.js';
 import { getEnv } from '../../env.js';
 import { login } from './loginProcessor.js';
-
-const parseStringAsync = promisify(parseString);
 
 const clientId = getEnv('OSM_OAUTH2_CLIENT_ID');
 
@@ -54,12 +50,9 @@ export function attachLoginWithOsmHandler(router: Router) {
         })
         .json();
 
-      const result: any = await parseStringAsync(userDetails);
-
       const {
-        $: { display_name: osmName, id: osmId },
-        home,
-      } = result.osm.user[0];
+        user: { display_name: osmName, id: osmId, home },
+      } = userDetails as any;
 
       const { lat, lon } = (home && home.length && home[0].$) || {};
 

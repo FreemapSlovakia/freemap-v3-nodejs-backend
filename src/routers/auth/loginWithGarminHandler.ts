@@ -1,20 +1,7 @@
 import Router from '@koa/router';
-import got from 'got';
-import crypto from 'node:crypto';
-import OAuth from 'oauth-1.0a';
 import { getEnv } from '../../env.js';
+import { garminOauth } from '../../garminOauth.js';
 import { tokenSecrets } from './garminTokenSecrets.js';
-
-export const garminOauth = new OAuth({
-  consumer: {
-    key: getEnv('GARMIN_OAUTH_CONSUMER_KEY'),
-    secret: getEnv('GARMIN_OAUTH_CONSUMER_SECRET'),
-  },
-  signature_method: 'HMAC-SHA1',
-  hash_function(base_string, key) {
-    return crypto.createHmac('sha1', key).update(base_string).digest('base64');
-  },
-});
 
 export function attachLoginWithGarminHandler(router: Router) {
   router.post(
@@ -24,7 +11,8 @@ export function attachLoginWithGarminHandler(router: Router) {
       const url =
         'https://connectapi.garmin.com/oauth-service/oauth/request_token';
 
-      const response = await got.post(url, {
+      const response = await fetch(url, {
+        method: 'POST',
         headers: {
           ...garminOauth.toHeader(
             garminOauth.authorize({
@@ -35,7 +23,12 @@ export function attachLoginWithGarminHandler(router: Router) {
         },
       });
 
-      const sp = new URLSearchParams(String(response.body));
+      if (!response.ok) {
+        ctx.log.error(await response.text());
+        ctx.throw(500);
+      }
+
+      const sp = new URLSearchParams(await response.text());
 
       const token = sp.get('oauth_token');
 

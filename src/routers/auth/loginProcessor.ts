@@ -136,6 +136,18 @@ export async function login(
           )}
           WHERE id = ${currentUser.id}
         `);
+      } else {
+        if (Object.keys(extraUserFields).length > 0) {
+          await conn.query(sql`UPDATE user SET
+            ${join(
+              Object.entries(extraUserFields).map(
+                ([column, value]) =>
+                  sql`${raw(column)} = COALESCE(${raw(column)}, ${value as RawValue})`,
+              ),
+            )}
+            WHERE id = ${userRow.id}
+          `);
+        }
       }
     } else {
       // no such user in DB for this auth provider

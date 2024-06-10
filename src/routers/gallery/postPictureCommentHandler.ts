@@ -102,20 +102,20 @@ export function attachPostPictureCommentHandler(router: Router) {
             password: getEnv('MAILGIN_API_KEY'),
             form: {
               from:
-                // TODO translate for HU
+                // TODO translate for HU and IT
                 (lang === 'sk' || lang === 'cs'
                   ? 'Freemap Fotky'
                   : 'Freemap Photos') + ' <noreply@freemap.sk>',
               to,
               subject:
-                // TODO translate for HU
+                // TODO translate for HU and IT
                 lang === 'sk'
                   ? `Komentár k fotke na ${webUrl}`
                   : lang === 'cs'
                     ? `Komentář k fotce na ${webUrl}`
                     : `Photo comment at ${webUrl}`,
               text:
-                // TODO translate for HU
+                // TODO translate for HU and IT
                 (lang === 'sk'
                   ? `Používateľ ${ctx.state.user.name} pridal komentár k ${
                       own ? 'vašej ' : ''
@@ -130,7 +130,7 @@ export function attachPostPictureCommentHandler(router: Router) {
                 '\n\n' +
                 comment +
                 '\n\n' +
-                // TODO translate for HU
+                // TODO translate for HU and IT
                 (lang === 'sk'
                   ? `Ak si už neprajete dostávať upozornenia na komentáre k fotkám, nastavte si to na ${unsubscribeUrl} v záložke Účet.`
                   : lang === 'cs'

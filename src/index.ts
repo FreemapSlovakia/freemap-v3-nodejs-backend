@@ -13,6 +13,7 @@ import { appLogger } from './logger.js';
 import { authRouter } from './routers/auth/index.js';
 import { trackingRouter } from './routers/deviceTracking/index.js';
 import { galleryRouter } from './routers/gallery/index.js';
+import { attachPostGarminCourses } from './routers/garminCoursesHandler.js';
 import { geotoolsRouter } from './routers/geotools/index.js';
 import { attachGetUsers } from './routers/getUsersHandler.js';
 import { attachLoggerHandler } from './routers/loggerHandler.js';
@@ -120,6 +121,8 @@ router.use('/maps', mapsRouter.routes(), mapsRouter.allowedMethods());
 attachLoggerHandler(router);
 
 attachGetUsers(router);
+
+attachPostGarminCourses(router);
 
 app.use(router.routes()).use(router.allowedMethods());
 
