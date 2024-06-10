@@ -2,6 +2,7 @@ import Router from '@koa/router';
 import got from 'got';
 import { authenticator } from '../../authenticator.js';
 import { garminOauth } from '../../garminOauth.js';
+import { acceptValidator } from '../../requestValidators.js';
 import { tokenSecrets } from './garminTokenSecrets.js';
 import { login } from './loginProcessor.js';
 
@@ -9,6 +10,7 @@ export function attachLoginWithGarmin2Handler(router: Router) {
   router.post(
     '/login-garmin-2',
     authenticator(false),
+    acceptValidator('application/json'),
     // TODO validation
     async (ctx) => {
       const { token, verifier, language, connect } = ctx.request.body;

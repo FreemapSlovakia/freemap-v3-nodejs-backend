@@ -2,6 +2,7 @@ import Router from '@koa/router';
 import got from 'got';
 import { authenticator } from '../../authenticator.js';
 import { getEnv } from '../../env.js';
+import { acceptValidator } from '../../requestValidators.js';
 import { login } from './loginProcessor.js';
 
 const clientId = getEnv('OSM_OAUTH2_CLIENT_ID');
@@ -18,6 +19,7 @@ export function attachLoginWithOsmHandler(router: Router) {
   router.post(
     '/login-osm',
     authenticator(false),
+    acceptValidator('application/json'),
     // TODO validation
     async (ctx) => {
       const { code, language, connect } = ctx.request.body;
