@@ -9,7 +9,15 @@ export function attachPostGarminCourses(router: Router) {
     acceptValidator('application/json'),
     authenticator(true),
     async (ctx) => {
-      const { name, description, activity, coordinates } = ctx.request.body;
+      const {
+        name,
+        description,
+        activity,
+        coordinates,
+        distance,
+        elevationGain,
+        elevationLoss,
+      } = ctx.request.body;
 
       const url = 'https://apis.garmin.com/training-api/courses/v1/course';
 
@@ -33,16 +41,16 @@ export function attachPostGarminCourses(router: Router) {
         body: JSON.stringify({
           courseName: name,
           description,
-          distance: 10000, // in meters
-          duration: 3600, // in seconds
+          distance, // in meters
           coordinateSystem: 'WGS84',
-          elevationGain: 200, // in meters
-          elevationLoss: 200, // in meters
+          elevationGain, // in meters
+          elevationLoss, // in meters
           activityType: activity,
           geoPoints: coordinates.map(
-            ([longitude, latitude]: [number, number]) => ({
+            ([longitude, latitude, elevation]: [number, number, number?]) => ({
               latitude,
               longitude,
+              elevation,
             }),
           ),
         }),
