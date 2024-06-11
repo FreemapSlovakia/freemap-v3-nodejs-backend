@@ -13,7 +13,7 @@ export async function login(
   remoteLat: number,
   remoteLon: number,
   remoteLanguage: string | null,
-  connect: boolean,
+  connect = false,
   extraUserFields: Record<string, unknown> = {},
   clientData?: unknown,
 ) {

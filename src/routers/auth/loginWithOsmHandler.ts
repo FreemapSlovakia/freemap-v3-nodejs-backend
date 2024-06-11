@@ -1,8 +1,8 @@
 import Router from '@koa/router';
 import got from 'got';
+import { acceptValidator } from 'src/requestValidators.js';
 import { authenticator } from '../../authenticator.js';
 import { getEnv } from '../../env.js';
-import { acceptValidator } from '../../requestValidators.js';
 import { login } from './loginProcessor.js';
 
 const clientId = getEnv('OSM_OAUTH2_CLIENT_ID');
