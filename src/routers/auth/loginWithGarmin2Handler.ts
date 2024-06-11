@@ -13,10 +13,16 @@ export function attachLoginWithGarmin2Handler(router: Router) {
     acceptValidator('application/json'),
     // TODO validation
     async (ctx) => {
-      const { token, verifier, language, connect } = ctx.request.body;
+      const { token, verifier, language } = ctx.request.body;
 
       const url =
         'https://connectapi.garmin.com/oauth-service/oauth/access_token';
+
+      const session = tokenSecrets.get(ctx.request.body.token);
+
+      if (!session) {
+        ctx.throw(403, 'session not found');
+      }
 
       const response = await fetch(url, {
         method: 'POST',
@@ -30,7 +36,7 @@ export function attachLoginWithGarmin2Handler(router: Router) {
               },
               {
                 key: token,
-                secret: tokenSecrets.get(ctx.request.body.token),
+                secret: session.tokenSecret,
               },
             ),
           ),
@@ -78,11 +84,12 @@ export function attachLoginWithGarmin2Handler(router: Router) {
         undefined,
         undefined,
         language,
-        connect,
+        session.connect,
         {
           garminAccessToken: authToken,
           garminAccessTokenSecret: authTokenSecret,
         },
+        session.clientData,
       );
     },
   );

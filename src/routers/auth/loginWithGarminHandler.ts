@@ -34,12 +34,17 @@ export function attachLoginWithGarminHandler(router: Router) {
 
       const token = sp.get('oauth_token');
 
-      tokenSecrets.set(token, sp.get('oauth_token_secret'));
+      tokenSecrets.set(token, {
+        tokenSecret: sp.get('oauth_token_secret'),
+        connect: Boolean(ctx.request.body.connect),
+        clientData: ctx.request.body.clientData,
+      });
 
       setTimeout(() => tokenSecrets.delete(token), 30 * 60_000); // max 30 minutes
 
       const callback = new URL(getEnv('GARMIN_OAUTH_CALLBACK'));
 
+      // extraQuery is unused now
       for (const [key, value] of Object.entries(
         ctx.request.body.extraQuery ?? {},
       )) {

@@ -15,6 +15,7 @@ export async function login(
   remoteLanguage: string | null,
   connect: boolean,
   extraUserFields: Record<string, unknown> = {},
+  clientData?: unknown,
 ) {
   const currentUser = ctx.state.user;
 
@@ -224,5 +225,9 @@ export async function login(
     await conn.release();
   }
 
-  ctx.body = userForResponse({ ...userRow1, authToken });
+  ctx.body = {
+    user: userForResponse({ ...userRow1, authToken }),
+    connect,
+    clientData,
+  };
 }
