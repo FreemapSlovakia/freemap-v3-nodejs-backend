@@ -23,7 +23,7 @@ export async function initDatabase() {
       osmId INT UNSIGNED NULL UNIQUE,
       facebookUserId VARCHAR(32) CHARSET ascii NULL UNIQUE,
       googleUserId VARCHAR(32) CHARSET ascii NULL UNIQUE,
-      garminUserId VARCHAR(36) CHARSET ascii NULL UNIQUE,
+      garminUserId VARCHAR(60) CHARSET ascii NULL UNIQUE,
       garminAccessToken VARCHAR(255) CHARSET ascii NULL,
       garminAccessTokenSecret VARCHAR(255) CHARSET ascii NULL,
       name VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
@@ -156,7 +156,7 @@ export async function initDatabase() {
   const updates: string[] = [
     'ALTER TABLE user ADD COLUMN garminAccessToken VARCHAR(255) CHARSET ascii NULL',
     'ALTER TABLE user ADD COLUMN garminAccessTokenSecret VARCHAR(255) CHARSET ascii NULL',
-    'ALTER TABLE user ADD COLUMN garminUserId VARCHAR(32) CHARSET ascii NULL UNIQUE',
+    'ALTER TABLE user ADD COLUMN garminUserId VARCHAR(60) CHARSET ascii NULL UNIQUE',
     'ALTER TABLE auth DROP COLUMN osmAccessToken', // we don't use it so why bothering storing it
     'ALTER TABLE auth DROP COLUMN osmAuthToken', // we don't use it so why bothering storing it
     'ALTER TABLE auth DROP COLUMN osmAuthToken', // we don't use it so why bothering storing it
