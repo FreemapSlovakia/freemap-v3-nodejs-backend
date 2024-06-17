@@ -58,7 +58,7 @@ export function attachWs(app: KoaWebsocket.App) {
 
       try {
         if (message instanceof Buffer) {
-          msg = message.toJSON();
+          msg = JSON.parse(message.toString('utf-8'));
         } else if (typeof message === 'string') {
           msg = JSON.parse(message);
         } else {
