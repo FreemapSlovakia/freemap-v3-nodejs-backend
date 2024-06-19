@@ -82,9 +82,9 @@ export function attachPatchMapHandler(router: Router) {
       const now = new Date();
 
       await conn.query(sql`UPDATE map SET modifiedAt = ${now}
-        ${name === undefined ? empty : sql`name = ${name}`}
-        ${pub === undefined ? empty : sql`public = ${pub}`}
-        ${data === undefined ? empty : sql`data = ${JSON.stringify(data)}`}
+        ${name === undefined ? empty : sql`, name = ${name}`}
+        ${pub === undefined ? empty : sql`, public = ${pub}`}
+        ${data === undefined ? empty : sql`, data = ${JSON.stringify(data)}`}
         WHERE id = ${id}
       `);
 
