@@ -57,7 +57,27 @@ export function attachPostGarminCourses(router: Router) {
       });
 
       if (!response.ok) {
-        ctx.log.error('Error sending course', await response.text());
+        const responseText = await response.text();
+
+        let responseJson;
+
+        try {
+          responseJson = JSON.parse(responseText);
+        } catch {}
+
+        if (responseJson?.error === 'PermissionsException') {
+          ctx.throw(403, 'missing permission');
+        }
+
+        if (
+          response.status === 401 &&
+          responseJson?.message === 'OAuthToken is invalid'
+        ) {
+          ctx.throw(401, 'invalid oauth token');
+        }
+
+        ctx.log.error('Error sending course', responseText);
+
         ctx.throw(500);
       }
 
