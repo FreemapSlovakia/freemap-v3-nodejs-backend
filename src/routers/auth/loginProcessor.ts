@@ -17,10 +17,10 @@ export async function login(
   extraUserFields: Record<string, unknown> = {},
   clientData?: unknown,
 ) {
-  const currentUser = ctx.state.user;
+  const currentUser = connect ? ctx.state.user : undefined;
 
-  if (!currentUser === connect) {
-    ctx.throw(403, currentUser ? 'already_authenticated' : 'unauthenticated');
+  if (connect && !currentUser) {
+    ctx.throw(403, 'unauthenticated');
   }
 
   const conn = await pool.getConnection();
@@ -60,7 +60,7 @@ export async function login(
 
       if (currentUser) {
         if (currentUser[authProviderToColumn[authProvider]]) {
-          ctx.throw(400, 'provider_already_set');
+          ctx.throw(400, 'provider already set');
         }
 
         for (const col of [
@@ -74,7 +74,7 @@ export async function login(
             userRow[col] &&
             currentUser[col] !== userRow[col]
           ) {
-            ctx.throw(400, 'conflicting_providers');
+            ctx.throw(400, 'conflicting providers');
           }
         }
 
@@ -142,8 +142,7 @@ export async function login(
           await conn.query(sql`UPDATE user SET
             ${join(
               Object.entries(extraUserFields).map(
-                ([column, value]) =>
-                  sql`${raw(column)} = COALESCE(${raw(column)}, ${value as RawValue})`,
+                ([column, value]) => sql`${raw(column)} = ${value as RawValue}`,
               ),
             )}
             WHERE id = ${userRow.id}
