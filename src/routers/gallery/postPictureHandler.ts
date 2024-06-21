@@ -23,7 +23,7 @@ export function attachPostPictureHandler(router: Router) {
     async (ctx, next) => {
       const { files } = ctx.request;
       if (!files || !files.image) {
-        ctx.throw(400, 'missing_image_file');
+        ctx.throw(400, 'missing image file');
       }
 
       if (Array.isArray(files.image) || files.image.size > 40 * 1024 * 1024) {
@@ -31,7 +31,7 @@ export function attachPostPictureHandler(router: Router) {
       }
 
       if (!ctx.request.body.meta) {
-        ctx.throw(400, 'missing_meta_field');
+        ctx.throw(400, 'missing meta field');
       }
 
       if (typeof ctx.request.body.meta === 'string') {
