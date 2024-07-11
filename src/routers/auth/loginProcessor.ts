@@ -20,7 +20,9 @@ export async function login(
   const currentUser = connect ? ctx.state.user : undefined;
 
   if (connect && !currentUser) {
-    ctx.throw(403, 'unauthenticated');
+    connect = false; // let just log in
+
+    // ctx.throw(403, 'unauthenticated');
   }
 
   const conn = await pool.getConnection();
