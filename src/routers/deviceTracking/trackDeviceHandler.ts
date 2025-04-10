@@ -89,6 +89,10 @@ async function handler(ctx: ParameterizedContext) {
 function guessTime(t: string) {
   const now = new Date();
 
+  if (!t) {
+    return now;
+  }
+
   const min = new Date();
 
   min.setDate(min.getDate() - 2);
@@ -96,10 +100,6 @@ function guessTime(t: string) {
   const max = new Date();
 
   max.setDate(max.getDate() + 1);
-
-  if (!t) {
-    return now;
-  }
 
   const d1 = new Date(t);
 
