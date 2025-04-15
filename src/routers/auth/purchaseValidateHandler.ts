@@ -31,7 +31,7 @@ export function attachPurchaseValidateHandler(router: Router) {
     }
 
     await pool.query(
-      sql`INSERT INTO purchase (userId, article, createdAt) VALUES (${row[0].userId}, 'rovas-default', now())`,
+      sql`INSERT INTO purchase (userId, article, createdAt) VALUES (${row.userId}, 'rovas-default', now())`,
     );
 
     await pool.query(sql`DELETE FROM purchase_token WHERE token = ${token}`);
