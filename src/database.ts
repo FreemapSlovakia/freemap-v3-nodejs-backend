@@ -35,13 +35,27 @@ export async function initDatabase() {
       settings VARCHAR(4096) CHARSET utf8 COLLATE utf8_bin NOT NULL DEFAULT '{}',
       sendGalleryEmails BOOL NOT NULL DEFAULT 1,
       language CHAR(2) NULL,
-      lastPaymentAt TIMESTAMP NULL,
+      lastpurchaseAt TIMESTAMP NULL,
       rovasToken VARCHAR(255) CHARSET ascii NULL
     ) ENGINE=InnoDB`,
 
     `CREATE TABLE IF NOT EXISTS auth (
       authToken VARCHAR(255) CHARSET ascii PRIMARY KEY,
       userId INT UNSIGNED NOT NULL,
+      createdAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (userId) REFERENCES user (id) ON DELETE CASCADE
+    ) ENGINE=InnoDB`,
+
+    `CREATE TABLE IF NOT EXISTS purchase_token (
+      token VARCHAR(255) CHARSET ascii NULL PRIMARY KEY,
+      userId INT UNSIGNED NOT NULL,
+      createdAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (userId) REFERENCES user (id) ON DELETE CASCADE
+    ) ENGINE=InnoDB`,
+
+    `CREATE TABLE IF NOT EXISTS purchase (
+      userId INT UNSIGNED NOT NULL,
+      article VARCHAR(255) NOT NULL,
       createdAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (userId) REFERENCES user (id) ON DELETE CASCADE
     ) ENGINE=InnoDB`,
@@ -184,6 +198,22 @@ export async function initDatabase() {
   } finally {
     db.release();
   }
+
+  setInterval(
+    async () => {
+      const db = await pool.getConnection();
+
+      try {
+        await db.query(
+          'DELETE FROM purchase_token WHERE TIMESTAMPDIFF(MINUTE, createdAt, now()) > 60',
+        );
+      } finally {
+        db.release();
+      }
+    },
+    // every 6 hours
+    60_000 * 60 * 6,
+  );
 }
 
 export function runInTransaction(): Middleware {

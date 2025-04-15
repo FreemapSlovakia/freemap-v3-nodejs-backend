@@ -41,7 +41,9 @@ export function authenticator(require?: boolean): Middleware {
     }
 
     const [userRow] = await pool.query(sql`
-      SELECT user.*, DATEDIFF(NOW(), lastPaymentAt) <= 365 AS isPremium
+      SELECT user.*, DATEDIFF(NOW(), lastPaymentAt) <= 365 OR EXISTS (
+        SELECT 1 FROM purchase WHERE DATEDIFF(NOW(), createdAt) <= 365 AND userId = id
+      ) AS isPremium
       FROM user INNER JOIN auth ON (userId = id)
       WHERE authToken = ${authToken as any}
     `);

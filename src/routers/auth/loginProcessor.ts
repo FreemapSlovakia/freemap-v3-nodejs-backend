@@ -211,11 +211,11 @@ export async function login(
       );
     }
 
-    const rows = await conn.query(
-      sql`SELECT *, DATEDIFF(NOW(), lastPaymentAt) <= 365 AS isPremium FROM user WHERE id = ${userId}`,
+    const [row] = await conn.query(
+      sql`SELECT *, DATEDIFF(NOW(), lastPaymentAt) <= 365 OR EXISTS (SELECT 1 FROM purchase WHERE DATEDIFF(NOW(), createdAt) <= 365 AND userId = id) AS isPremium FROM user WHERE id = ${userId}`,
     );
 
-    userRow1 = rows[0];
+    userRow1 = row;
 
     await conn.commit();
   } catch (e) {
