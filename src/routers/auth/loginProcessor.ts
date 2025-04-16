@@ -91,8 +91,6 @@ export async function login(
           lat,
           lon,
           language,
-          lastPaymentAt,
-          rovasToken,
           createdAt,
           isAdmin,
           sendGalleryEmails,
@@ -125,9 +123,7 @@ export async function login(
           lat = COALESCE(lat, ${lat}),
           lon = COALESCE(lon, ${lon}),
           language = COALESCE(language, ${language}),
-          rovasToken = COALESCE(rovasToken, ${rovasToken}),
           createdAt = LEAST(createdAt, ${createdAt}),
-          lastPaymentAt = GREATEST(COALESCE(lastPaymentAt, ${lastPaymentAt}), COALESCE(${lastPaymentAt}, lastPaymentAt)),
           isAdmin = isAdmin OR ${isAdmin},
           sendGalleryEmails = sendGalleryEmails OR ${sendGalleryEmails},
           settings = COALESCE(settings, ${settings}),
@@ -212,7 +208,13 @@ export async function login(
     }
 
     const [row] = await conn.query(
-      sql`SELECT *, DATEDIFF(NOW(), lastPaymentAt) <= 365 OR EXISTS (SELECT 1 FROM purchase WHERE DATEDIFF(NOW(), createdAt) <= 365 AND userId = id) AS isPremium FROM user WHERE id = ${userId}`,
+      sql`
+        SELECT
+          *,
+          EXISTS (SELECT 1 FROM purchase WHERE DATEDIFF(NOW(), createdAt) <= 365 AND userId = id) AS isPremium
+        FROM user
+        WHERE id = ${userId}
+      `,
     );
 
     userRow1 = row;

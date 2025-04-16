@@ -34,9 +34,7 @@ export async function initDatabase() {
       lon FLOAT(9, 6) NULL,
       settings VARCHAR(4096) CHARSET utf8 COLLATE utf8_bin NOT NULL DEFAULT '{}',
       sendGalleryEmails BOOL NOT NULL DEFAULT 1,
-      language CHAR(2) NULL,
-      lastpurchaseAt TIMESTAMP NULL,
-      rovasToken VARCHAR(255) CHARSET ascii NULL
+      language CHAR(2) NULL
     ) ENGINE=InnoDB`,
 
     `CREATE TABLE IF NOT EXISTS auth (
@@ -167,19 +165,7 @@ export async function initDatabase() {
     ) ENGINE=InnoDB`,
   ];
 
-  const updates: string[] = [
-    'ALTER TABLE user ADD COLUMN garminAccessToken VARCHAR(255) CHARSET ascii NULL',
-    'ALTER TABLE user ADD COLUMN garminAccessTokenSecret VARCHAR(255) CHARSET ascii NULL',
-    'ALTER TABLE user ADD COLUMN garminUserId VARCHAR(60) CHARSET ascii NULL UNIQUE',
-    'ALTER TABLE auth DROP COLUMN osmAccessToken', // we don't use it so why bothering storing it
-    'ALTER TABLE auth DROP COLUMN osmAuthToken', // we don't use it so why bothering storing it
-    'ALTER TABLE auth DROP COLUMN osmAuthToken', // we don't use it so why bothering storing it
-    'ALTER TABLE auth DROP COLUMN osmAuthTokenSecret', // we don't use it so why bothering storing it
-    'ALTER TABLE auth DROP COLUMN garminAccessToken', // we don't use it so why bothering storing it
-    'ALTER TABLE auth DROP COLUMN garminAccessTokenSecret', // we don't use it so why bothering storing it
-    'ALTER TABLE auth DROP COLUMN googleIdToken', // we don't use it so why bothering storing it
-    'CREATE INDEX ptNameIdx ON pictureTag (name)',
-  ];
+  const updates: string[] = [];
 
   const db = await pool.getConnection();
 

@@ -11,8 +11,6 @@ import { attachLogoutHandler } from './logoutHandler.js';
 import { attachPatchUserHandler } from './patchUserHandler.js';
 import { attachPurchaseTokenHandler } from './purchaseTokenHandler.js';
 import { attachPurchaseValidateHandler } from './purchaseValidateHandler.js';
-import { attachRovasTokenHandler } from './rovasTokenHandler.js';
-import { attachRovasValidateHandler } from './rovasValidateHandler.js';
 import { attachValidateHandler } from './validateHandler.js';
 
 const router = new Router();
@@ -25,8 +23,6 @@ attachLoginWithGoogleHandler(router);
 attachLoginWithGarminHandler(router);
 attachLoginWithGarmin2Handler(router);
 attachPatchUserHandler(router);
-attachRovasTokenHandler(router);
-attachRovasValidateHandler(router);
 attachPurchaseTokenHandler(router);
 attachPurchaseValidateHandler(router);
 attachDeleteUserHandler(router);
