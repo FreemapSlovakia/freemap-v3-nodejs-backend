@@ -25,7 +25,7 @@ export function attachLoginWithGoogleHandler(router: Router) {
         throw new Error('Failed to fetch user info from Google');
       }
 
-      const { sub, name, email } = await userinfoRes.json();
+      const { sub, name, email } = (await userinfoRes.json()) as any;
 
       await login(
         ctx,

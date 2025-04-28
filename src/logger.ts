@@ -1,6 +1,6 @@
-import bunyan from 'bunyan';
+import { pino } from 'pino';
 
-export const appLogger = bunyan.createLogger({
+export const appLogger = pino({
   name: 'freemap-api',
-  serializers: bunyan.stdSerializers,
+  serializers: pino.stdSerializers,
 });
