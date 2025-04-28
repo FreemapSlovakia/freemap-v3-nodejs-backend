@@ -1,6 +1,5 @@
 import Router from '@koa/router';
 import { authenticator } from '../../authenticator.js';
-import { googleClient } from '../../google.js';
 import { acceptValidator } from '../../requestValidators.js';
 import { login } from './loginProcessor.js';
 
@@ -11,13 +10,22 @@ export function attachLoginWithGoogleHandler(router: Router) {
     acceptValidator('application/json'),
     // TODO validation
     async (ctx) => {
-      const { idToken, language, connect } = ctx.request.body;
+      const { accessToken, language, connect } = ctx.request.body;
 
-      const { sub, name, email } = (
-        await googleClient.verifyIdToken({
-          idToken,
-        } as any)
-      ).getPayload(); // TODO catch error
+      const userinfoRes = await fetch(
+        'https://openidconnect.googleapis.com/v1/userinfo',
+        {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+          },
+        },
+      );
+
+      if (!userinfoRes.ok) {
+        throw new Error('Failed to fetch user info from Google');
+      }
+
+      const { sub, name, email } = await userinfoRes.json();
 
       await login(
         ctx,

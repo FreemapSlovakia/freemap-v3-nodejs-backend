@@ -24,7 +24,6 @@
     "etag": "^1.8.1",
     "exifreader": "^4.28.1",
     "fs-extra": "^11.3.0",
-    "google-auth-library": "^9.15.1",
     "got": "^14.4.7",
     "kcors": "^2.2.2",
     "koa": "^2.16.1",
