@@ -107,6 +107,8 @@ export async function login(
             'trackingDevice',
             'map',
             'mapWriteAccess', // TODO may conflict
+            'purchase',
+            'purchase_token',
           ].map((table) =>
             conn.query(
               sql`UPDATE ${raw(table)} SET userId = ${currentUser.id} WHERE userId = ${id}`,
