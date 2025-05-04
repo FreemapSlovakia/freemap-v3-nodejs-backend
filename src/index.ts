@@ -2,7 +2,7 @@ import Router from '@koa/router';
 import cors from 'kcors';
 import Koa from 'koa';
 import koaBody from 'koa-body';
-import koaBunyanLogger from 'koa-bunyan-logger';
+import koaPinoLogger from 'koa-pino-logger';
 import websockify from 'koa-websocket';
 import { readFileSync } from 'node:fs';
 import { unlink } from 'node:fs/promises';
@@ -35,25 +35,32 @@ const app = websockify(
     : undefined,
 );
 
-app.use(koaBunyanLogger(appLogger.child({ module: 'koa' })));
-
-app.use(koaBunyanLogger.requestIdContext());
-
 app.use(
-  koaBunyanLogger.requestLogger({
-    updateRequestLogFields(rd): any {
-      return {
-        method: rd.req.method,
-        url: rd.req.url,
-        userAgent: rd.req.headers['user-agent'],
-      };
-    },
-    updateResponseLogFields(rd: any): any {
-      return {
-        err: rd.err,
-        // status: (rd.res as any).statusCode,
-        duration: rd.duration,
-      };
+  koaPinoLogger({
+    base: { module: 'koa' },
+    serializers: {
+      req(req) {
+        return {
+          id: req.id,
+          method: req.method,
+          url: req.url,
+          userAgent: req.headers['user-agent'],
+        };
+      },
+      res(res) {
+        return {
+          id: res.id,
+          statusCode: res.statusCode,
+        };
+      },
+      err(err) {
+        return {
+          id: err.id,
+          type: err.type,
+          message: err.message,
+          stack: err.stack,
+        };
+      },
     },
   }),
 );

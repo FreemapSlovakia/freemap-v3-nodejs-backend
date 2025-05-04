@@ -15,7 +15,7 @@ Please provide settings in environment variables or put them to `.env` file in p
 
 ```bash
 npm i
-npm run watch | npx bunyan
+npm run watch | npx pino-pretty
 ```
 
 ## Running in production mode
@@ -25,7 +25,7 @@ Please provide settings in environment variables. Then:
 ```bash
 npm i
 npm run build
-npm start | npx bunyan
+npm start | npx pino-pretty
 ```
 
 We strongly recommend to use `forever` command (installed with `npm i -g forever`).
