@@ -13,6 +13,6 @@ export function attachPurchaseTokenHandler(router: Router) {
     );
 
     // TODO put expiration to DB record; same for `purchase` record
-    ctx.body = { token, expiration: Date.now() / 1000 };
+    ctx.body = { token, expiration: Math.floor(Date.now() / 1000) };
   });
 }
