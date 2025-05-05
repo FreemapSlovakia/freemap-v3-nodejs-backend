@@ -12,6 +12,7 @@ export function attachPurchaseTokenHandler(router: Router) {
       sql`INSERT INTO purchase_token (userId, createdAt, token) VALUES (${ctx.state.user.id}, now(), ${token})`,
     );
 
-    ctx.body = { token };
+    // TODO put expiration to DB record; same for `purchase` record
+    ctx.body = { token, expiration: Date.now() / 1000 };
   });
 }
