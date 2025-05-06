@@ -70,7 +70,7 @@ export async function storeTrackPoint(
 
   if (maxAge != null) {
     await conn.query(
-      sql`DELETE FROM trackingPoint WHERE deviceId = ${id} AND TIMESTAMPDIFF(SECOND, createdAt, now()) > ${maxAge}`,
+      sql`DELETE FROM trackingPoint WHERE deviceId = ${id} AND TIMESTAMPDIFF(SECOND, createdAt, NOW()) > ${maxAge}`,
     );
   }
 

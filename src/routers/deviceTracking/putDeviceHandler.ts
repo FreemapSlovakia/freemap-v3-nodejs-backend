@@ -71,13 +71,14 @@ export function attachPutDeviceHandler(router: Router) {
 
       if (maxAge != null) {
         await conn.query(sql`
-          DELETE FROM trackingPoint WHERE deviceId = ${id} AND TIMESTAMPDIFF(SECOND, createdAt, now()) > ${maxAge}
+          DELETE FROM trackingPoint WHERE deviceId = ${id} AND TIMESTAMPDIFF(SECOND, createdAt, NOW()) > ${maxAge}
         `);
       }
 
       if (maxCount != null) {
         await conn.query(sql`
-        DELETE t FROM trackingPoint AS t
+          DELETE t
+          FROM trackingPoint AS t
           JOIN (
             SELECT id FROM trackingPoint WHERE deviceId = ${id}
               ORDER BY id DESC LIMIT 18446744073709551615 OFFSET ${maxCount}

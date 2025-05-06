@@ -48,6 +48,7 @@ export async function initDatabase() {
       token VARCHAR(255) CHARSET ascii NULL PRIMARY KEY,
       userId INT UNSIGNED NOT NULL,
       createdAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      expireAt TIMESTAMP NOT NULL,
       FOREIGN KEY (userId) REFERENCES user (id) ON DELETE CASCADE
     ) ENGINE=InnoDB`,
 
@@ -55,6 +56,7 @@ export async function initDatabase() {
       userId INT UNSIGNED NOT NULL,
       article VARCHAR(255) NOT NULL,
       createdAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      expireAt TIMESTAMP NOT NULL,
       FOREIGN KEY (userId) REFERENCES user (id) ON DELETE CASCADE
     ) ENGINE=InnoDB`,
 
@@ -165,7 +167,18 @@ export async function initDatabase() {
     ) ENGINE=InnoDB`,
   ];
 
-  const updates: string[] = [];
+  const updates: string[] | string[][] = [
+    [
+      'ALTER TABLE purchase_token ADD COLUMN expireAt TIMESTAMP',
+      'UPDATE purchase_token SET expireAt = DATE_ADD(createdAt, INTERVAL 1 HOUR)',
+      'ALTER TABLE purchase_token MODIFY COLUMN expireAt TIMESTAMP NOT NULL',
+    ],
+    [
+      'ALTER TABLE purchase ADD COLUMN expireAt TIMESTAMP',
+      'UPDATE purchase SET expireAt = DATE_ADD(createdAt, INTERVAL 1 YEAR)',
+      'ALTER TABLE purchase MODIFY COLUMN expireAt TIMESTAMP NOT NULL',
+    ],
+  ];
 
   const db = await pool.getConnection();
 
@@ -174,32 +187,42 @@ export async function initDatabase() {
       await db.query(script);
     }
 
-    for (const script of updates) {
-      try {
-        await db.query(script);
-      } catch (err) {
-        logger.info(`Unsuccessful SQL ${script}: ${err.message}`);
-      }
-    }
+    await Promise.all(
+      updates.map((scripts) =>
+        (async () => {
+          for (const script of Array.isArray(scripts) ? scripts : [scripts]) {
+            try {
+              await db.query(script);
+            } catch (err) {
+              logger.info(`Unsuccessful SQL ${script}: ${err.message}`);
+
+              return;
+            }
+          }
+        })(),
+      ),
+    );
   } finally {
     db.release();
   }
 
-  setInterval(
-    async () => {
-      const db = await pool.getConnection();
+  async function cleanup() {
+    const db = await pool.getConnection();
 
-      try {
-        await db.query(
-          'DELETE FROM purchase_token WHERE TIMESTAMPDIFF(MINUTE, createdAt, now()) > 60',
-        );
-      } finally {
-        db.release();
-      }
-    },
-    // every 6 hours
-    60_000 * 60 * 6,
-  );
+    try {
+      await Promise.all([
+        db.query('DELETE FROM purchase_token WHERE expireAt < NOW()'),
+        db.query('DELETE FROM purchase WHERE expireAt < NOW()'),
+      ]);
+    } finally {
+      db.release();
+    }
+  }
+
+  cleanup();
+
+  // every 6 hours
+  setInterval(cleanup, 60_000 * 60 * 6);
 }
 
 export function runInTransaction(): Middleware {

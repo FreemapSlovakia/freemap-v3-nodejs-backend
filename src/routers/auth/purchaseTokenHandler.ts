@@ -8,11 +8,12 @@ export function attachPurchaseTokenHandler(router: Router) {
   router.post('/purchaseToken', authenticator(true), async (ctx) => {
     const token = randomBytes(32).toString('hex');
 
+    const expiration = new Date(Date.now() + 3_600_000); // 1 hour
+
     await pool.query(
-      sql`INSERT INTO purchase_token (userId, createdAt, token) VALUES (${ctx.state.user.id}, now(), ${token})`,
+      sql`INSERT INTO purchase_token (userId, createdAt, token, expireAt) VALUES (${ctx.state.user.id}, NOW(), ${token}, ${expiration})`,
     );
 
-    // TODO put expiration to DB record; same for `purchase` record
-    ctx.body = { token, expiration: Math.floor(Date.now() / 1000) };
+    ctx.body = { token, expiration: Math.floor(expiration.getTime() / 1000) };
   });
 }

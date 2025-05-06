@@ -44,7 +44,7 @@ export function authenticator(require?: boolean): Middleware {
       SELECT
         user.*,
         EXISTS (
-          SELECT 1 FROM purchase WHERE DATEDIFF(NOW(), createdAt) <= 365 AND userId = id
+          SELECT 1 FROM purchase WHERE userId = id AND expireAt > NOW()
         ) AS isPremium
       FROM user INNER JOIN auth ON (userId = id)
       WHERE authToken = ${authToken as any}

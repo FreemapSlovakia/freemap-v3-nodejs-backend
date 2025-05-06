@@ -20,7 +20,7 @@ export function attachPurchaseValidateHandler(router: Router) {
     }
 
     const [row] = await pool.query(
-      sql`SELECT userId FROM purchase_token WHERE token = ${token} AND TIMESTAMPDIFF(MINUTE, createdAt, now()) < 60 FOR UPDATE`,
+      sql`SELECT userId FROM purchase_token WHERE token = ${token} AND expireAt > NOW() FOR UPDATE`,
     );
 
     if (!row) {
@@ -31,7 +31,7 @@ export function attachPurchaseValidateHandler(router: Router) {
     }
 
     await pool.query(
-      sql`INSERT INTO purchase (userId, article, createdAt) VALUES (${row.userId}, 'rovas-default', now())`,
+      sql`INSERT INTO purchase (userId, article, createdAt, expireAt) VALUES (${row.userId}, 'rovas-default', NOW(), DATE_ADD(NOW(), INTERVAL 1 YEAR))`,
     );
 
     await pool.query(sql`DELETE FROM purchase_token WHERE token = ${token}`);

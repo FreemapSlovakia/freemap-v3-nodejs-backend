@@ -68,7 +68,7 @@ export function trackingSubscribeHandler(ctx: RpcContext) {
         }
         ${
           maxAge
-            ? sql` AND TIMESTAMPDIFF(SECOND, trackingPoint.createdAt, now()) < ${Number(
+            ? sql` AND TIMESTAMPDIFF(SECOND, trackingPoint.createdAt, NOW()) < ${Number(
                 maxAge,
               )}`
             : empty
