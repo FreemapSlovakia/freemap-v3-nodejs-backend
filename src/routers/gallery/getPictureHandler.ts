@@ -13,7 +13,7 @@ export function attachGetPictureHandler(router: Router) {
     async (ctx) => {
       const rows = await pool.query(
         sql`SELECT picture.id AS pictureId, picture.createdAt, pathname, title, description, takenAt, picture.lat, picture.lon, pano,
-          user.id as userId, user.name,
+          user.id as userId, user.name, premium,
           (SELECT GROUP_CONCAT(name SEPARATOR '\n') FROM pictureTag WHERE pictureId = picture.id) AS tags, ${raw(ratingSubquery)}
           ${
             ctx.state.user
@@ -60,6 +60,7 @@ export function attachGetPictureHandler(router: Router) {
         rating,
         myStars,
         pano,
+        premium,
       } = rows[0];
 
       ctx.body = {
@@ -82,6 +83,7 @@ export function attachGetPictureHandler(router: Router) {
         rating,
         myStars,
         pano: pano ? 1 : undefined,
+        premium: premium ? 1 : undefined,
       };
     },
   );

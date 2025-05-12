@@ -50,6 +50,7 @@ const bboxQueryValidationRules: ValidationRules = {
         'user',
         'tags',
         'pano',
+        'premium',
       ].includes(f),
     ) ||
     'invalid fields',
@@ -107,6 +108,7 @@ export function attachGetPicturesHandler(router: Router) {
         createdAtFrom: (x) => (x ? new Date(x) : null),
         createdAtTo: (x) => (x ? new Date(x) : null),
         pano: (x) => (x ? x === 'true' : null),
+        premium: (x) => (x ? x === 'true' : null),
       },
       {
         fields: (x) => x,
@@ -140,6 +142,7 @@ async function byRadius(ctx: ParameterizedContext) {
     createdAtFrom,
     createdAtTo,
     pano,
+    premium,
   } = ctx.query;
 
   const lat = Number(ctx.query.lat);
@@ -169,6 +172,7 @@ async function byRadius(ctx: ParameterizedContext) {
     ${createdAtFrom ? `AND createdAt >= '${toSqlDate(createdAtFrom)}'` : ''}
     ${createdAtTo ? `AND createdAt <= '${toSqlDate(createdAtTo)}'` : ''}
     ${pano === null ? '' : ` AND pano = '${pano ? 1 : 0}'`}
+    ${premium === null ? '' : ` AND premium = '${premium ? 1 : 0}'`}
     ${userId ? `AND userId = ${userId}` : ''}
     ${
       ctx.state.user?.isAdmin
@@ -208,6 +212,7 @@ async function byBbox(ctx: ParameterizedContext) {
     createdAtFrom,
     createdAtTo,
     pano,
+    premium,
     fields,
   } = ctx.query;
 
@@ -250,6 +255,7 @@ async function byBbox(ctx: ParameterizedContext) {
     ${createdAtFrom ? `AND createdAt >= '${toSqlDate(createdAtFrom)}'` : ''}
     ${createdAtTo ? `AND createdAt <= '${toSqlDate(createdAtTo)}'` : ''}
     ${pano === null ? '' : ` AND pano = '${pano ? 1 : 0}'`}
+    ${premium === null ? '' : ` AND premium = '${premium ? 1 : 0}'`}
     ${userId ? `AND userId = ${userId}` : ''}
     ${
       ctx.state.user?.isAdmin
@@ -275,8 +281,9 @@ async function byBbox(ctx: ParameterizedContext) {
       takenAt: toSec(row.takenAt),
       createdAt: toSec(row.createdAt),
       pano: row.pano ? 1 : undefined,
+      premium: row.premium ? 1 : undefined,
       tags: normFields.includes('tags')
-        ? row.tags?.split('\n') ?? []
+        ? (row.tags?.split('\n') ?? [])
         : undefined,
     }),
   );
@@ -299,6 +306,7 @@ async function byOrder(ctx: ParameterizedContext) {
     orderBy,
     direction,
     pano,
+    premium,
   } = ctx.query;
 
   const myUserId = ctx.state.user?.id ?? -1;
@@ -339,6 +347,10 @@ async function byOrder(ctx: ParameterizedContext) {
     wh.push(`pano = ${pano ? 1 : 0}`);
   }
 
+  if (premium !== null) {
+    wh.push(`premium = ${premium ? 1 : 0}`);
+  }
+
   if (userId !== null) {
     wh.push(`userId = ${userId}`);
   }
@@ -346,8 +358,6 @@ async function byOrder(ctx: ParameterizedContext) {
   if (tag === '') {
     wh.push('id NOT IN (SELECT pictureId FROM pictureTag)');
   }
-
-  console.log({ pano, wh });
 
   const sql = `SELECT id ${
     ratingFrom || ratingTo || orderBy === 'rating' ? `, ${ratingSubquery}` : ''

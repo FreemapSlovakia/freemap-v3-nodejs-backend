@@ -77,6 +77,9 @@ export function attachPostPictureHandler(router: Router) {
                   type: 'string',
                 },
               },
+              premium: {
+                type: 'boolean',
+              },
             },
           },
         },
@@ -101,6 +104,7 @@ export function attachPostPictureHandler(router: Router) {
         takenAt,
         position: { lat, lon },
         tags = [],
+        premium,
       } = ctx.request.body.meta;
 
       const name = uuidBase62.v4();
@@ -128,7 +132,8 @@ export function attachPostPictureHandler(router: Router) {
           takenAt = ${takenAt ? (new Date(takenAt) as any) : null},
           lat = ${lat},
           lon = ${lon},
-          pano = ${pano}
+          pano = ${pano},
+          premium = ${premium}
       `);
 
       if (tags.length) {

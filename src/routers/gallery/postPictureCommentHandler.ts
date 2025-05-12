@@ -39,6 +39,22 @@ export function attachPostPictureCommentHandler(router: Router) {
     async (ctx) => {
       const conn = ctx.state.dbConn as PoolConnection;
 
+      const [row] = await conn.query(
+        sql`SELECT premium FROM picture WHERE id = ${ctx.params.id} FOR UPDATE`,
+      );
+
+      if (!row) {
+        ctx.throw(404);
+      }
+
+      if (
+        row.premium &&
+        !ctx.state.user?.isPremium &&
+        ctx.state.user?.id !== row.userId
+      ) {
+        ctx.throw(402);
+      }
+
       const { comment, webBaseUrl: webBaseUrlCandidate } = ctx.request.body;
 
       let webBaseUrl: string;

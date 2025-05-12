@@ -1,7 +1,8 @@
 import Router from '@koa/router';
+import { PoolConnection } from 'mariadb';
 import sql from 'sql-template-tag';
 import { authenticator } from '../../authenticator.js';
-import { pool } from '../../database.js';
+import { runInTransaction } from '../../database.js';
 import { bodySchemaValidator } from '../../requestValidators.js';
 
 export function attachPostPictureRatingHandler(router: Router) {
@@ -22,10 +23,30 @@ export function attachPostPictureRatingHandler(router: Router) {
       },
       true,
     ),
+    runInTransaction(),
+
     async (ctx) => {
+      const conn = ctx.state.dbConn as PoolConnection;
+
+      const [row] = await conn.query(
+        sql`SELECT premium FROM picture WHERE id = ${ctx.params.id} FOR UPDATE`,
+      );
+
+      if (!row) {
+        ctx.throw(404);
+      }
+
+      if (
+        row.premium &&
+        !ctx.state.user?.isPremium &&
+        ctx.state.user?.id !== row.userId
+      ) {
+        ctx.throw(402);
+      }
+
       const { stars } = ctx.request.body;
 
-      await pool.query(sql`
+      await conn.query(sql`
         INSERT INTO pictureRating SET
             pictureId = ${ctx.params.id},
             userId = ${ctx.state.user.id},

@@ -4,6 +4,7 @@ import { createReadStream } from 'node:fs';
 import { stat } from 'node:fs/promises';
 import sharp from 'sharp';
 import sql from 'sql-template-tag';
+import { authenticator } from '../../authenticator.js';
 import { pool } from '../../database.js';
 import { acceptValidator } from '../../requestValidators.js';
 import { picturesDir } from '../../routers/gallery/constants.js';
@@ -12,16 +13,25 @@ export function attachGetPictureImageHandler(router: Router) {
   router.get(
     '/pictures/:id/image',
     acceptValidator('image/jpeg'),
+    authenticator(false),
     async (ctx) => {
-      const rows = await pool.query(
-        sql`SELECT pathname FROM picture WHERE picture.id = ${ctx.params.id}`,
+      const [row] = await pool.query(
+        sql`SELECT userId, pathname, premium FROM picture WHERE picture.id = ${ctx.params.id}`,
       );
 
-      if (!rows.length) {
+      if (!row) {
         ctx.throw(404, 'no such picture');
       }
 
-      const pathname = `${picturesDir}/${rows[0].pathname}`;
+      if (
+        row.premium &&
+        !ctx.state.user?.isPremium &&
+        ctx.state.user?.id !== row.userId
+      ) {
+        ctx.throw(402, 'only for premium users');
+      }
+
+      const pathname = `${picturesDir}/${row.pathname}`;
 
       let stats;
 
@@ -44,7 +54,9 @@ export function attachGetPictureImageHandler(router: Router) {
       ctx.type = 'image/jpeg';
 
       if (ctx.fresh) {
-        ctx.throw(304);
+        ctx.restatus = 304;
+
+        return;
       }
 
       const w = parseInt(

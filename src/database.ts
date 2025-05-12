@@ -71,6 +71,7 @@ export async function initDatabase() {
       lat FLOAT(8, 6) NOT NULL,
       lon FLOAT(9, 6) NOT NULL,
       pano BIT NOT NULL,
+      premium BIT NOT NULL DEFAULT FALSE,
       FOREIGN KEY (userId) REFERENCES user (id) ON DELETE CASCADE,
       INDEX USING BTREE (lat),
       INDEX USING BTREE (lon)
@@ -167,7 +168,7 @@ export async function initDatabase() {
     ) ENGINE=InnoDB`,
   ];
 
-  const updates: string[] | string[][] = [
+  const updates: (string | string[])[] = [
     [
       'ALTER TABLE purchase_token ADD COLUMN expireAt TIMESTAMP',
       'UPDATE purchase_token SET expireAt = DATE_ADD(createdAt, INTERVAL 1 HOUR)',
@@ -178,6 +179,7 @@ export async function initDatabase() {
       'UPDATE purchase SET expireAt = DATE_ADD(createdAt, INTERVAL 1 YEAR)',
       'ALTER TABLE purchase MODIFY COLUMN expireAt TIMESTAMP NOT NULL',
     ],
+    'ALTER TABLE picture ADD COLUMN premium BIT NOT NULL DEFAULT FALSE',
   ];
 
   const db = await pool.getConnection();

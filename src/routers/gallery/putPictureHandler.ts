@@ -41,6 +41,9 @@ export function attachPutPictureHandler(router: Router) {
             type: 'string',
           },
         },
+        premium: {
+          type: 'boolean',
+        },
       },
     }),
     runInTransaction(),
@@ -53,6 +56,7 @@ export function attachPutPictureHandler(router: Router) {
         takenAt,
         position: { lat, lon },
         tags = [],
+        premium,
       } = ctx.request.body;
 
       const rows = await conn.query(
@@ -74,7 +78,8 @@ export function attachPutPictureHandler(router: Router) {
             description = ${description},
             takenAt = ${takenAt ? new Date(takenAt) : null},
             lat = ${lat},
-            lon = ${lon}
+            lon = ${lon},
+            premium = ${premium}
             WHERE id = ${ctx.params.id}
         `),
 
