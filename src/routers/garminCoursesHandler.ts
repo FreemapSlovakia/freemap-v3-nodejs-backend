@@ -21,6 +21,12 @@ export function attachPostGarminCourses(router: Router) {
 
       const url = 'https://apis.garmin.com/training-api/courses/v1/course';
 
+      const { garminAccessToken, garminAccessTokenSecret } = ctx.state.user!;
+
+      if (!garminAccessToken || !garminAccessTokenSecret) {
+        return ctx.throw(403);
+      }
+
       const response = await fetch(url, {
         method: 'POST',
         headers: {
@@ -32,8 +38,8 @@ export function attachPostGarminCourses(router: Router) {
                 method: 'POST',
               },
               {
-                key: ctx.state.user.garminAccessToken,
-                secret: ctx.state.user.garminAccessTokenSecret,
+                key: garminAccessToken,
+                secret: garminAccessTokenSecret,
               },
             ),
           ),

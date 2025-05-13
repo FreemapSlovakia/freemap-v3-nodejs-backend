@@ -86,7 +86,7 @@ export function attachPatchUserHandler(router: Router) {
           ...keys.map((key) =>
             key === 'settings' ? JSON.stringify(body[key]) : body[key],
           ),
-          ctx.state.user.id,
+          ctx.state.user!.id,
         ],
       );
 

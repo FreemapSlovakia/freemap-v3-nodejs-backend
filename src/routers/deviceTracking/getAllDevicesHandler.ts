@@ -13,7 +13,7 @@ export function attachGetAllDevicesHandler(router: Router) {
       ctx.body = await pool.query(sql`
         SELECT id, name, token, createdAt, maxCount, maxAge, userId
           FROM trackingDevice
-          WHERE userId = ${ctx.state.user.id}
+          WHERE userId = ${ctx.state.user!.id}
       `);
     },
   );

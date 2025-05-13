@@ -10,10 +10,12 @@ export function attachGetAllMapsHandler(router: Router) {
     acceptValidator('application/json'),
     authenticator(true),
     async (ctx) => {
+      const user = ctx.state.user!;
+
       const items = await pool.query(sql`
         SELECT id, name, public, createdAt, modifiedAt, map.userId, GROUP_CONCAT(mapWriteAccess.userId) AS writers
           FROM map LEFT JOIN mapWriteAccess ON (mapWriteAccess.mapId = id)
-          WHERE map.userId = ${ctx.state.user.id}
+          WHERE map.userId = ${user.id}
           GROUP BY id, name, public, createdAt, modifiedAt, map.userId
       `);
 
@@ -28,12 +30,8 @@ export function attachGetAllMapsHandler(router: Router) {
           name: item.name,
           userId: item.userId,
           public: !!item.public,
-          writers: item.userId === ctx.state.user?.id ? writers : undefined,
-          canWrite: !!(
-            ctx.state.user &&
-            (item.userId === ctx.state.user.id ||
-              writers.includes(ctx.state.user.id))
-          ),
+          writers: item.userId === user.id ? writers : undefined,
+          canWrite: item.userId === user.id || writers.includes(user.id),
         };
       });
     },

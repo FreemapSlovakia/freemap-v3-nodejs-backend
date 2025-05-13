@@ -11,7 +11,7 @@ export function attachDeletePictureHandler(router: Router) {
     authenticator(true),
     runInTransaction(),
     async (ctx) => {
-      const conn = ctx.state.dbConn;
+      const conn = ctx.state.dbConn!;
 
       const rows = await conn.query(
         sql`SELECT pathname, userId FROM picture WHERE id = ${ctx.params.id} FOR UPDATE`,

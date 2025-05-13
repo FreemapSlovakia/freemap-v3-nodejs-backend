@@ -20,7 +20,7 @@ export function attachGetDeviceHandler(router: Router) {
         ctx.throw(404, 'no such tracking device');
       }
 
-      if (!ctx.state.user.isAdmin && ctx.state.user.id !== item.userId) {
+      if (!ctx.state.user?.isAdmin && ctx.state.user?.id !== item.userId) {
         ctx.throw(403);
       }
 

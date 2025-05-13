@@ -94,12 +94,12 @@ export function queryAdapter(
     for (const key of Object.keys(spec)) {
       let value = ctx.query[key];
 
-      if (key in arraySpec) {
-        if (!Array.isArray(value)) {
-          value = [value];
-        }
+      if (value === undefined) {
+        continue;
+      }
 
-        ctx.query[key] = arraySpec[key](value);
+      if (key in arraySpec) {
+        ctx.query[key] = arraySpec[key](Array.isArray(value) ? value : [value]);
 
         return;
       }

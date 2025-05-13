@@ -46,7 +46,7 @@ export function attachPostDeviceHandler(router: Router) {
         INSERT INTO trackingDevice SET
           name = ${name},
           token = ${token1},
-          userId = ${ctx.state.user.id},
+          userId = ${ctx.state.user!.id},
           maxCount = ${maxCount},
           maxAge = ${maxAge}
       `);

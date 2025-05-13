@@ -18,7 +18,7 @@ export function attachDisconnectHandler(router: Router) {
       sql`UPDATE user SET ${join(
         columns.map((col) => sql`${raw(col)} = NULL`),
         ',',
-      )} WHERE id = ${ctx.state.user.id}`,
+      )} WHERE id = ${ctx.state.user!.id}`,
     );
 
     ctx.status = 204;

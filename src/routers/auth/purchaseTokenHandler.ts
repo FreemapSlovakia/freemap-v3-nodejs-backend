@@ -11,7 +11,7 @@ export function attachPurchaseTokenHandler(router: Router) {
     const expiration = new Date(Date.now() + 3_600_000); // 1 hour
 
     await pool.query(
-      sql`INSERT INTO purchase_token (userId, createdAt, token, expireAt) VALUES (${ctx.state.user.id}, NOW(), ${token}, ${expiration})`,
+      sql`INSERT INTO purchase_token (userId, createdAt, token, expireAt) VALUES (${ctx.state.user!.id}, NOW(), ${token}, ${expiration})`,
     );
 
     ctx.body = { token, expiration: Math.floor(expiration.getTime() / 1000) };

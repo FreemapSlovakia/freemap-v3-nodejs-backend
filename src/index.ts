@@ -29,8 +29,8 @@ const app = websockify(
   {},
   getEnv('HTTP_SSL_ENABLE', '')
     ? {
-        key: readFileSync(getEnv('HTTP_SSL_KEY')),
-        cert: readFileSync(getEnv('HTTP_SSL_CERT')),
+        key: readFileSync(getEnv('HTTP_SSL_KEY')!),
+        cert: readFileSync(getEnv('HTTP_SSL_CERT')!),
       }
     : undefined,
 );
@@ -68,9 +68,11 @@ app.use(
 app.use(
   cors({
     origin: (ctx) =>
-      /\.freemap\.sk(:\d+)?$/.test(ctx.header.origin)
-        ? ctx.header.origin
-        : null,
+      !ctx.header.origin
+        ? ''
+        : /\.freemap\.sk(:\d+)?$/.test(ctx.header.origin)
+          ? ctx.header.origin!
+          : '',
   }),
 );
 

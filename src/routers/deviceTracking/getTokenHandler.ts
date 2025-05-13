@@ -21,7 +21,7 @@ export function attachGetTokenHandler(router: Router) {
         ctx.throw(404, 'no such tracking access token');
       }
 
-      if (!ctx.state.user.isAdmin && ctx.state.user.id !== item.userId) {
+      if (!ctx.state.user?.isAdmin && ctx.state.user?.id !== item.userId) {
         ctx.throw(403);
       }
 

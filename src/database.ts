@@ -196,7 +196,7 @@ export async function initDatabase() {
             try {
               await db.query(script);
             } catch (err) {
-              logger.info(`Unsuccessful SQL ${script}: ${err.message}`);
+              logger.info(`Unsuccessful SQL ${script}: ${err}`);
 
               return;
             }

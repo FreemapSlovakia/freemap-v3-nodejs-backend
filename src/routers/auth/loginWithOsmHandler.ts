@@ -5,9 +5,9 @@ import { getEnv } from '../../env.js';
 import { acceptValidator } from '../../requestValidators.js';
 import { login } from './loginProcessor.js';
 
-const clientId = getEnv('OSM_OAUTH2_CLIENT_ID');
+const clientId = getEnv('OSM_OAUTH2_CLIENT_ID')!;
 
-const clientSecret = getEnv('OSM_OAUTH2_CLIENT_SECRET');
+const clientSecret = getEnv('OSM_OAUTH2_CLIENT_SECRET')!;
 
 const redirectUri = getEnv('OSM_OAUTH2_REDIRECT_URI');
 
@@ -24,24 +24,21 @@ export function attachLoginWithOsmHandler(router: Router) {
     async (ctx) => {
       const { code, language, connect } = ctx.request.body;
 
+      const sp = new URLSearchParams({
+        client_id: clientId,
+        client_secret: clientSecret,
+        grant_type: 'authorization_code',
+        code,
+        redirect_uri:
+          redirectUri + (connect === undefined ? '' : '?connect=' + connect),
+      });
+
       const body = (await got
-        .post(
-          'https://www.openstreetmap.org/oauth2/token?' +
-            new URLSearchParams({
-              client_id: clientId,
-              client_secret: clientSecret,
-              grant_type: 'authorization_code',
-              code,
-              redirect_uri:
-                redirectUri +
-                (connect === undefined ? '' : '?connect=' + connect),
-            }).toString(),
-          {
-            headers: {
-              'content-type': 'application/x-www-form-urlencoded', // otherwise server returns 415
-            },
+        .post('https://www.openstreetmap.org/oauth2/token?' + sp.toString(), {
+          headers: {
+            'content-type': 'application/x-www-form-urlencoded', // otherwise server returns 415
           },
-        )
+        })
         .json()) as any;
 
       const userDetails = await got

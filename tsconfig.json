@@ -8,6 +8,7 @@
     "outDir": "build",
     "baseUrl": ".",
     "skipLibCheck": true,
+    "strict": true,
     "lib": ["ES2022"]
   }
 }

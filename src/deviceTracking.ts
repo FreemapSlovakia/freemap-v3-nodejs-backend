@@ -17,8 +17,8 @@ export async function storeTrackPoint(
   bearing: number | null,
   battery: number | null,
   gsmSignal: number | null,
-  message: string,
-  time: Date,
+  message: string | null,
+  time: Date | null,
 ) {
   if (
     time === null ||

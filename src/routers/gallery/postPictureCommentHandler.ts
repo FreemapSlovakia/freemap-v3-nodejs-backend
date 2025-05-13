@@ -10,7 +10,7 @@ import {
   bodySchemaValidator,
 } from '../../requestValidators.js';
 
-const webBaseUrls = getEnv('WEB_BASE_URL').split(',');
+const webBaseUrls = (getEnv('WEB_BASE_URL') ?? '').split(',').filter(Boolean);
 
 export function attachPostPictureCommentHandler(router: Router) {
   router.post(
@@ -47,11 +47,9 @@ export function attachPostPictureCommentHandler(router: Router) {
         ctx.throw(404);
       }
 
-      if (
-        row.premium &&
-        !ctx.state.user?.isPremium &&
-        ctx.state.user?.id !== row.userId
-      ) {
+      const user = ctx.state.user!;
+
+      if (row.premium && !user.isPremium && user.id !== row.userId) {
         ctx.throw(402);
       }
 
@@ -75,7 +73,7 @@ export function attachPostPictureCommentHandler(router: Router) {
         conn.query(sql`
           INSERT INTO pictureComment SET
             pictureId = ${ctx.params.id},
-            userId = ${ctx.state.user.id},
+            userId = ${user!.id},
             comment = ${comment},
             createdAt = ${new Date()}
         `),
@@ -94,7 +92,7 @@ export function attachPostPictureCommentHandler(router: Router) {
             SELECT DISTINCT email, sendGalleryEmails, language
               FROM user
               JOIN pictureComment ON userId = user.id
-              WHERE sendGalleryEmails AND pictureId = ${ctx.params.id} AND userId <> ${ctx.state.user.id} AND email IS NOT NULL
+              WHERE sendGalleryEmails AND pictureId = ${ctx.params.id} AND userId <> ${user!.id} AND email IS NOT NULL
           `),
         );
       }
@@ -133,14 +131,14 @@ export function attachPostPictureCommentHandler(router: Router) {
               text:
                 // TODO translate for HU and IT
                 (lang === 'sk'
-                  ? `Používateľ ${ctx.state.user.name} pridal komentár k ${
+                  ? `Používateľ ${user!.name} pridal komentár k ${
                       own ? 'vašej ' : ''
                     }fotke ${picTitle}na ${picUrl}:`
                   : lang === 'cs'
-                    ? `Uživatel ${ctx.state.user.name} přidal komentář k ${
+                    ? `Uživatel ${user!.name} přidal komentář k ${
                         own ? 'vaší ' : ''
                       }fotce ${picTitle}na ${picUrl}:`
-                    : `User ${ctx.state.user.name} commented ${
+                    : `User ${user!.name} commented ${
                         own ? 'your' : 'a'
                       } photo ${picTitle}at ${picUrl}:`) +
                 '\n\n' +
@@ -161,7 +159,7 @@ export function attachPostPictureCommentHandler(router: Router) {
 
       const promises = [];
 
-      if (picInfo && picInfo.email && picInfo.userId !== ctx.state.user.id) {
+      if (picInfo && picInfo.email && picInfo.userId !== user.id) {
         promises.push(
           sendMail(picInfo.email, true, picInfo.language || acceptLang),
         );

@@ -40,7 +40,7 @@ export function attachPatchMapHandler(router: Router) {
     authenticator(true),
     runInTransaction(),
     async (ctx) => {
-      const conn = ctx.state.dbConn;
+      const conn = ctx.state.dbConn!;
 
       const { id } = ctx.params;
 
@@ -60,10 +60,12 @@ export function attachPatchMapHandler(router: Router) {
 
       const { name, public: pub, data, writers } = ctx.request.body;
 
+      const user = ctx.state.user!;
+
       if (
-        !ctx.state.user.isAdmin &&
-        item.userId !== ctx.state.user.id &&
-        (!curWriters.includes(ctx.state.user.id) ||
+        !user.isAdmin &&
+        item.userId !== user.id &&
+        (!curWriters.includes(user.id) ||
           writers !== undefined ||
           pub !== undefined ||
           name !== undefined)

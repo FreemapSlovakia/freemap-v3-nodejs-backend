@@ -21,7 +21,7 @@ export function attachLoginWithGarmin2Handler(router: Router) {
       const session = tokenSecrets.get(ctx.request.body.token);
 
       if (!session) {
-        ctx.throw(403, 'session not found');
+        return ctx.throw(403, 'session not found');
       }
 
       const response = await fetch(url, {
@@ -52,7 +52,15 @@ export function attachLoginWithGarmin2Handler(router: Router) {
 
       const authToken = sp.get('oauth_token');
 
+      if (!authToken) {
+        return ctx.throw(400, 'missing oauth_token');
+      }
+
       const authTokenSecret = sp.get('oauth_token_secret');
+
+      if (!authTokenSecret) {
+        return ctx.throw(400, 'missing oauth_token_secret');
+      }
 
       const url2 = 'https://apis.garmin.com/wellness-api/rest/user/id';
 

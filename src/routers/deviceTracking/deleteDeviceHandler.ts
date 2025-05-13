@@ -11,7 +11,7 @@ export function attachDeleteDeviceHandler(router: Router) {
     authenticator(true),
     runInTransaction(),
     async (ctx) => {
-      const conn = ctx.state.dbConn;
+      const conn = ctx.state.dbConn!;
 
       const [item] = await conn.query(
         sql`SELECT userId FROM trackingDevice WHERE id = ${ctx.params.id} FOR UPDATE`,
@@ -21,7 +21,7 @@ export function attachDeleteDeviceHandler(router: Router) {
         ctx.throw(404, 'no such tracking device');
       }
 
-      if (!ctx.state.user.isAdmin && item.userId !== ctx.state.user.id) {
+      if (!ctx.state.user?.isAdmin && item.userId !== ctx.state.user?.id) {
         ctx.throw(403);
       }
 

@@ -9,7 +9,7 @@ export function attachPurchaseValidateHandler(router: Router) {
     const { token, signature } = ctx.request.body;
 
     if (
-      createHmac('sha256', getEnv('PURCHASE_SECRET'))
+      createHmac('sha256', getEnv('PURCHASE_SECRET')!)
         .update(token)
         .digest('hex') !== signature
     ) {

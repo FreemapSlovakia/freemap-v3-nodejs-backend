@@ -38,7 +38,7 @@ export function attachPutTokenHandler(router: Router) {
     authenticator(true),
     runInTransaction(),
     async (ctx) => {
-      const conn = ctx.state.dbConn;
+      const conn = ctx.state.dbConn!;
 
       const [item] = await conn.query(sql`
           SELECT userId
@@ -52,7 +52,7 @@ export function attachPutTokenHandler(router: Router) {
         ctx.throw(404, 'no such tracking access token');
       }
 
-      if (!ctx.state.user.isAdmin && item.userId !== ctx.state.user.id) {
+      if (!ctx.state.user!.isAdmin && item.userId !== ctx.state.user!.id) {
         ctx.throw(403);
       }
 

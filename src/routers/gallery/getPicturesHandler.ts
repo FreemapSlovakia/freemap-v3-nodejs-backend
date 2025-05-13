@@ -202,7 +202,7 @@ function toSqlDate(d: any) {
 
 async function byBbox(ctx: ParameterizedContext) {
   const {
-    bbox: [minLon, minLat, maxLon, maxLat],
+    bbox,
     userId,
     tag,
     ratingFrom,
@@ -215,6 +215,8 @@ async function byBbox(ctx: ParameterizedContext) {
     premium,
     fields,
   } = ctx.query;
+
+  const [minLon, minLat, maxLon, maxLat] = bbox as string[];
 
   const myUserId = ctx.state.user?.id ?? -1;
 

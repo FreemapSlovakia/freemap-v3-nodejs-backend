@@ -17,7 +17,7 @@ export function attachGetPictureHandler(router: Router) {
           (SELECT GROUP_CONCAT(name SEPARATOR '\n') FROM pictureTag WHERE pictureId = picture.id) AS tags, ${raw(ratingSubquery)}
           ${
             ctx.state.user
-              ? sql`, (SELECT stars FROM pictureRating WHERE pictureId = picture.id AND userId = ${ctx.state.user.id}) AS myStars`
+              ? sql`, (SELECT stars FROM pictureRating WHERE pictureId = picture.id AND userId = ${ctx.state.user!.id}) AS myStars`
               : empty
           }
           FROM picture LEFT JOIN user ON userId = user.id WHERE picture.id = ${ctx.params.id}`,

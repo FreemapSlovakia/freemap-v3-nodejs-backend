@@ -47,7 +47,7 @@ export function attachPostMapHandler(router: Router) {
 
       const now = new Date();
 
-      const userId = ctx.state.user.id;
+      const userId = ctx.state.user!.id;
 
       await pool.query(sql`
         INSERT INTO map SET

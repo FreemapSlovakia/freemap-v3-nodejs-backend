@@ -1,4 +1,3 @@
-import { PoolConnection } from 'mariadb';
 import net from 'net';
 import sql, { empty } from 'sql-template-tag';
 import { pool } from './database.js';
@@ -30,7 +29,7 @@ export function startSocketDeviceTracking() {
     );
 
     connection.on('data', async (data) => {
-      let conn: PoolConnection;
+      let conn;
 
       try {
         const msg = data.toString();

@@ -1,7 +1,7 @@
 import Router from '@koa/router';
 import got from 'got';
 import { ParameterizedContext } from 'koa';
-import { WriteStream, createWriteStream, fstat, read } from 'node:fs';
+import { createWriteStream, fstat, read, WriteStream } from 'node:fs';
 import { FileHandle, open, rename, unlink } from 'node:fs/promises';
 import { promisify } from 'node:util';
 import unzipper from 'unzipper';
@@ -25,7 +25,7 @@ async function compute(ctx: ParameterizedContext) {
     ? ctx.query.coordinates.join(',')
     : ctx.query.coordinates;
 
-  let cs;
+  let cs: number[][] | undefined;
 
   if (
     ctx.method === 'GET' &&
@@ -34,7 +34,7 @@ async function compute(ctx: ParameterizedContext) {
   ) {
     cs = coordinates
       .match(/[^,]+,[^,]+/g)
-      .map((pair) => pair.split(',').map((c) => Number.parseFloat(c)));
+      ?.map((pair) => pair.split(',').map((c) => Number.parseFloat(c)));
   } else if (ctx.method === 'POST' && Array.isArray(ctx.request.body)) {
     cs = ctx.request.body;
   } else {
@@ -42,7 +42,7 @@ async function compute(ctx: ParameterizedContext) {
   }
 
   if (
-    !cs.every(
+    !cs?.every(
       (x) =>
         Array.isArray(x) &&
         x.length === 2 &&
@@ -98,19 +98,21 @@ async function compute(ctx: ParameterizedContext) {
           fdMap.set(key, [fd, (await fstatAsync(fd.fd)).size]);
         }
 
-        return [lat, lon, key];
+        return [lat, lon, key] as const;
       }),
     );
 
-    items.forEach((item) => {
-      const f = fdMap.get(item[2]);
+    type Tuple = [number, number, FileHandle, number];
 
-      item[2] = f[0];
+    const mmm = items
+      .map((item) => {
+        const f = fdMap.get(item[2]);
 
-      item[3] = f[1];
-    });
+        return f && ([item[0], item[1], f[0], f[1]] as Tuple);
+      })
+      .filter((a): a is Tuple => Boolean(a));
 
-    ctx.response.body = await Promise.all(items.map(computeElevation));
+    ctx.response.body = await Promise.all(mmm.map(computeElevation));
   } finally {
     await Promise.all([...fdMap.values()].map(([fd]) => fd.close()));
   }
@@ -143,7 +145,7 @@ async function fetch(key: string) {
 
   const temp = `${fname}.tmp`;
 
-  let ws: WriteStream;
+  let ws;
 
   try {
     await new Promise<void>((resolve, reject) => {
@@ -167,7 +169,7 @@ async function fetch(key: string) {
                   if (
                     typeof options.url === 'string'
                       ? options.url
-                      : options.url.href.startsWith(
+                      : options.url?.href.startsWith(
                           'https://urs.earthdata.nasa.gov/oauth/authorize',
                         )
                   ) {
@@ -198,7 +200,7 @@ async function fetch(key: string) {
     await rename(temp, fname);
   } finally {
     if (ws) {
-      ws.close();
+      (ws as WriteStream).close();
       await unlink(temp).catch(() => {});
     }
   }

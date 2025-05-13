@@ -28,7 +28,7 @@ export function attachGetPictureImageHandler(router: Router) {
         !ctx.state.user?.isPremium &&
         ctx.state.user?.id !== row.userId
       ) {
-        ctx.throw(402, 'only for premium users');
+        return ctx.throw(402, 'only for premium users');
       }
 
       const pathname = `${picturesDir}/${row.pathname}`;
@@ -38,7 +38,7 @@ export function attachGetPictureImageHandler(router: Router) {
       try {
         stats = await stat(pathname);
       } catch {
-        ctx.throw(404, 'missing picture file');
+        return ctx.throw(404, 'missing picture file');
       }
 
       ctx.status = 200;
@@ -73,6 +73,6 @@ export function attachGetPictureImageHandler(router: Router) {
   );
 }
 
-function getFirst(x?: null | string[] | string): null | string {
+function getFirst(x?: undefined | string[] | string): undefined | string {
   return Array.isArray(x) ? x[0] : x;
 }

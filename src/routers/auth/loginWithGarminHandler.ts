@@ -34,15 +34,25 @@ export function attachLoginWithGarminHandler(router: Router) {
 
       const token = sp.get('oauth_token');
 
+      if (!token) {
+        return ctx.throw(400, 'missing oauth_token');
+      }
+
+      const tokenSecret = sp.get('oauth_token_secret');
+
+      if (!tokenSecret) {
+        return ctx.throw(400, 'missing oauth_token_secret');
+      }
+
       tokenSecrets.set(token, {
-        tokenSecret: sp.get('oauth_token_secret'),
+        tokenSecret,
         connect: Boolean(ctx.request.body.connect),
         clientData: ctx.request.body.clientData,
       });
 
       setTimeout(() => tokenSecrets.delete(token), 30 * 60_000); // max 30 minutes
 
-      const callback = new URL(getEnv('GARMIN_OAUTH_CALLBACK'));
+      const callback = new URL(getEnv('GARMIN_OAUTH_CALLBACK')!);
 
       // extraQuery is unused now
       for (const [key, value] of Object.entries(

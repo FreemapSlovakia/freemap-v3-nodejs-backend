@@ -11,7 +11,7 @@ export function attachTrackDeviceHandler(router: Router) {
 }
 
 async function handler(ctx: ParameterizedContext) {
-  const conn = ctx.state.dbConn;
+  const conn = ctx.state.dbConn!;
 
   const [item] = await conn.query(
     sql`SELECT id, maxCount, maxAge FROM trackingDevice WHERE token = ${ctx.params.token}`,
@@ -78,7 +78,7 @@ async function handler(ctx: ParameterizedContext) {
 
     ctx.body = { id };
   } catch (err) {
-    if (err.message === 'invalid param') {
+    if (err instanceof Error && err.message === 'invalid param') {
       ctx.throw(400, 'one or more values provided are not valid');
     }
 

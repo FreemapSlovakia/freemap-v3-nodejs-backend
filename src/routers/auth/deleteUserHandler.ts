@@ -11,10 +11,10 @@ export function attachDeleteUserHandler(router: Router) {
     authenticator(true),
     runInTransaction(),
     async (ctx) => {
-      const conn = ctx.state.dbConn;
+      const conn = ctx.state.dbConn!;
 
       const rows = await conn.query(
-        sql`SELECT pathname FROM picture WHERE userId = ${ctx.state.user.id} FOR UPDATE`,
+        sql`SELECT pathname FROM picture WHERE userId = ${ctx.state.user!.id} FOR UPDATE`,
       );
 
       await Promise.all(
@@ -25,7 +25,7 @@ export function attachDeleteUserHandler(router: Router) {
         ),
       );
 
-      await conn.query(sql`DELETE FROM user WHERE id = ${ctx.state.user.id}`);
+      await conn.query(sql`DELETE FROM user WHERE id = ${ctx.state.user!.id}`);
 
       ctx.status = 204;
     },

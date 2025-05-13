@@ -36,11 +36,9 @@ export function attachPostPictureRatingHandler(router: Router) {
         ctx.throw(404);
       }
 
-      if (
-        row.premium &&
-        !ctx.state.user?.isPremium &&
-        ctx.state.user?.id !== row.userId
-      ) {
+      const user = ctx.state.user!;
+
+      if (row.premium && !user.isPremium && user.id !== row.userId) {
         ctx.throw(402);
       }
 
@@ -49,7 +47,7 @@ export function attachPostPictureRatingHandler(router: Router) {
       await conn.query(sql`
         INSERT INTO pictureRating SET
             pictureId = ${ctx.params.id},
-            userId = ${ctx.state.user.id},
+            userId = ${user.id},
             stars = ${stars},
             ratedAt = ${new Date()}
           ON DUPLICATE KEY UPDATE stars = ${stars}, ratedAt = ${new Date()}
