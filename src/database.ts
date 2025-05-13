@@ -41,6 +41,7 @@ export async function initDatabase() {
       authToken VARCHAR(255) CHARSET ascii PRIMARY KEY,
       userId INT UNSIGNED NOT NULL,
       createdAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      INDEX authTokenIdx (authToken),
       FOREIGN KEY (userId) REFERENCES user (id) ON DELETE CASCADE
     ) ENGINE=InnoDB`,
 
@@ -57,6 +58,7 @@ export async function initDatabase() {
       article VARCHAR(255) NOT NULL,
       createdAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
       expireAt TIMESTAMP NOT NULL,
+      INDEX purExpIdx USING BTREE (expireAt),
       FOREIGN KEY (userId) REFERENCES user (id) ON DELETE CASCADE
     ) ENGINE=InnoDB`,
 
@@ -73,8 +75,12 @@ export async function initDatabase() {
       pano BIT NOT NULL,
       premium BIT NOT NULL DEFAULT FALSE,
       FOREIGN KEY (userId) REFERENCES user (id) ON DELETE CASCADE,
-      INDEX USING BTREE (lat),
-      INDEX USING BTREE (lon)
+      INDEX picPano (pano),
+      INDEX picPremium (premium),
+      INDEX picTakenAtIdx USING BTREE (takenAt),
+      INDEX picCreatedAtIdx USING BTREE (createdAt),
+      INDEX picLatIdx USING BTREE (lat),
+      INDEX picLonIdx USING BTREE (lon)
     ) ENGINE=InnoDB`,
 
     `CREATE TABLE IF NOT EXISTS pictureTag (
@@ -180,6 +186,12 @@ export async function initDatabase() {
       'ALTER TABLE purchase MODIFY COLUMN expireAt TIMESTAMP NOT NULL',
     ],
     'ALTER TABLE picture ADD COLUMN premium BIT NOT NULL DEFAULT FALSE',
+    'CREATE INDEX purExpIdx ON purchase (expireAt) USING BTREE',
+    'CREATE INDEX picPano ON picture (pano)',
+    'CREATE INDEX picPremium ON picture (premium)',
+    'CREATE INDEX picTakenAtIdx ON picture (takenAt) USING BTREE',
+    'CREATE INDEX picCreatedAtIdx ON picture (createdAt) USING BTREE',
+    'CREATE INDEX authTokenIdx ON auth (authToken)',
   ];
 
   const db = await pool.getConnection();
