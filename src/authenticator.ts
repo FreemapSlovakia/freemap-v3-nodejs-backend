@@ -7,7 +7,7 @@ export const authProviderToColumn = {
   osm: 'osmId',
   garmin: 'garminUserId',
   google: 'googleUserId',
-};
+} as const;
 
 export const columnToAuthProvider = Object.fromEntries(
   Object.entries(authProviderToColumn).map(([k, v]) => [v, k]),

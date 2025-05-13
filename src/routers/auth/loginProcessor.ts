@@ -70,7 +70,7 @@ export async function login(
           'osmId',
           'facebookUserId',
           'googleUserId',
-        ]) {
+        ] as const) {
           if (
             currentUser[col] &&
             userRow[col] &&
