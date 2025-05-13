@@ -54,7 +54,7 @@ export function attachGetPictureImageHandler(router: Router) {
       ctx.type = 'image/jpeg';
 
       if (ctx.fresh) {
-        ctx.restatus = 304;
+        ctx.status = 304;
 
         return;
       }
