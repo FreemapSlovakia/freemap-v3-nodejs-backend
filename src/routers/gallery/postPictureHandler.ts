@@ -3,9 +3,9 @@ import { execFile } from 'child_process';
 import ExifReader from 'exifreader';
 import { promisify } from 'node:util';
 import sql from 'sql-template-tag';
-import { contentTypeMiddleware } from 'src/contentTypeMiddleware.js';
 import uuidBase62 from 'uuid-base62';
 import { authenticator } from '../../authenticator.js';
+import { contentTypeMiddleware } from '../../contentTypeMiddleware.js';
 import { pool, runInTransaction } from '../../database.js';
 import {
   acceptValidator,
@@ -26,19 +26,22 @@ export function attachPostPictureHandler(router: Router) {
           properties: {
             type: {
               type: 'string',
-              enum: ['setAllPremium'],
+              const: ['setAllPremiumOrFree'],
             },
             payload: {
-              type: 'boolean',
+              type: 'string',
+              enum: ['premium', 'free'],
             },
           },
         }),
-        async (ctx, next) => {
-          const premium = ctx.request.body.payload;
+        async (ctx) => {
+          const premium = ctx.request.body.payload === 'premium';
 
           await pool.query(
-            sql`UPDATE picture SET premium = ${premium} WHERE useId = ${ctx.state.user!.id}`,
+            sql`UPDATE picture SET premium = ${premium} WHERE userId = ${ctx.state.user!.id}`,
           );
+
+          ctx.status = 204;
         },
       ],
       'multipart/form-data': [

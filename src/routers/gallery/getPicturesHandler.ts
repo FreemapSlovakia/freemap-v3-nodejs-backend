@@ -171,8 +171,8 @@ async function byRadius(ctx: ParameterizedContext) {
     ${takenAtTo ? `AND takenAt <= '${toSqlDate(takenAtTo)}'` : ''}
     ${createdAtFrom ? `AND createdAt >= '${toSqlDate(createdAtFrom)}'` : ''}
     ${createdAtTo ? `AND createdAt <= '${toSqlDate(createdAtTo)}'` : ''}
-    ${pano === null ? '' : ` AND pano = '${pano ? 1 : 0}'`}
-    ${premium === null ? '' : ` AND premium = '${premium ? 1 : 0}'`}
+    ${pano == null ? '' : ` AND pano = '${pano ? 1 : 0}'`}
+    ${premium == null ? '' : ` AND premium = '${premium ? 1 : 0}'`}
     ${userId ? `AND userId = ${userId}` : ''}
     ${
       ctx.state.user?.isAdmin
@@ -181,8 +181,8 @@ async function byRadius(ctx: ParameterizedContext) {
     }
     ${tag === '' ? 'AND id NOT IN (SELECT pictureId FROM pictureTag)' : ''}
     HAVING distance <= ${distance}
-    ${ratingFrom === null ? '' : `AND rating >= ${ratingFrom}`}
-    ${ratingTo === null ? '' : `AND rating <= ${ratingTo}`}
+    ${ratingFrom == null ? '' : `AND rating >= ${ratingFrom}`}
+    ${ratingTo == null ? '' : `AND rating <= ${ratingTo}`}
     ORDER BY distance
     LIMIT 1000`;
 
@@ -256,8 +256,8 @@ async function byBbox(ctx: ParameterizedContext) {
     ${takenAtTo ? `AND takenAt <= '${toSqlDate(takenAtTo)}'` : ''}
     ${createdAtFrom ? `AND createdAt >= '${toSqlDate(createdAtFrom)}'` : ''}
     ${createdAtTo ? `AND createdAt <= '${toSqlDate(createdAtTo)}'` : ''}
-    ${pano === null ? '' : ` AND pano = '${pano ? 1 : 0}'`}
-    ${premium === null ? '' : ` AND premium = '${premium ? 1 : 0}'`}
+    ${pano == null ? '' : ` AND pano = '${pano ? 1 : 0}'`}
+    ${premium == null ? '' : ` AND premium = '${premium ? 1 : 0}'`}
     ${userId ? `AND userId = ${userId}` : ''}
     ${
       ctx.state.user?.isAdmin
@@ -265,9 +265,9 @@ async function byBbox(ctx: ParameterizedContext) {
         : `AND (id NOT IN (SELECT pictureId FROM pictureTag WHERE name = 'private') OR userId = ${myUserId})`
     }
     ${tag === '' ? 'AND id NOT IN (SELECT pictureId FROM pictureTag)' : ''}
-    ${ratingFrom === null ? '' : `HAVING rating >= ${ratingFrom}`}
+    ${ratingFrom == null ? '' : `HAVING rating >= ${ratingFrom}`}
     ${
-      ratingTo === null
+      ratingTo == null
         ? ''
         : `${ratingTo ? 'AND' : 'HAVING'} rating <= ${ratingTo}`
     }
