@@ -87,16 +87,12 @@ export function contentTypeValidator(...type: string[]): Middleware {
 export type AdapterRules<T> = Record<string, (v: T) => any>;
 
 export function queryAdapter(
-  spec: AdapterRules<string>,
-  arraySpec: AdapterRules<string[]> = {},
+  spec: AdapterRules<string | undefined>,
+  arraySpec: AdapterRules<(string | undefined)[]> = {},
 ): Middleware {
   return async (ctx, next) => {
     for (const key of Object.keys(spec)) {
       let value = ctx.query[key];
-
-      if (value === undefined) {
-        continue;
-      }
 
       if (key in arraySpec) {
         ctx.query[key] = arraySpec[key](Array.isArray(value) ? value : [value]);

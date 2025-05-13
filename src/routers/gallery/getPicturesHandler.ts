@@ -94,9 +94,9 @@ export function attachGetPicturesHandler(router: Router) {
     authenticator(false),
     queryAdapter(
       {
-        lat: parseFloat,
-        lon: parseFloat,
-        distance: parseFloat,
+        lat: (x) => (x === undefined ? null : parseFloat(x)),
+        lon: (x) => (x === undefined ? null : parseFloat(x)),
+        distance: (x) => (x === undefined ? null : parseFloat(x)),
 
         bbox: (x) => (x === undefined ? null : x.split(',').map(parseFloat)),
         userId: (x) => (x ? parseInt(x, 10) : null),
