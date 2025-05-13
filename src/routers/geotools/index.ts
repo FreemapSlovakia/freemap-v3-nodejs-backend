@@ -104,7 +104,7 @@ async function compute(ctx: ParameterizedContext) {
 
     type Tuple = [number, number, FileHandle, number];
 
-    const mmm = items
+    const params = items
       .map((item) => {
         const f = fdMap.get(item[2]);
 
@@ -112,7 +112,7 @@ async function compute(ctx: ParameterizedContext) {
       })
       .filter((a): a is Tuple => Boolean(a));
 
-    ctx.response.body = await Promise.all(mmm.map(computeElevation));
+    ctx.response.body = await Promise.all(params.map(computeElevation));
   } finally {
     await Promise.all([...fdMap.values()].map(([fd]) => fd.close()));
   }
