@@ -2,6 +2,7 @@ import Router from '@koa/router';
 
 import { attachDeleteUserHandler } from './deleteUserHandler.js';
 import { attachDisconnectHandler } from './disconnectHandler.js';
+import { attachGetPurchasesHandler } from './getPurchasesHandler.js';
 import { attachLoginWithFacebookHandler } from './loginWithFacebookHandler.js';
 import { attachLoginWithGarmin2Handler } from './loginWithGarmin2Handler.js';
 import { attachLoginWithGarminHandler } from './loginWithGarminHandler.js';
@@ -25,6 +26,7 @@ attachLoginWithGarmin2Handler(router);
 attachPatchUserHandler(router);
 attachPurchaseTokenHandler(router);
 attachPurchaseValidateHandler(router);
+attachGetPurchasesHandler(router);
 attachDeleteUserHandler(router);
 attachDisconnectHandler(router);
 
