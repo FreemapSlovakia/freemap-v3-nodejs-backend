@@ -17,6 +17,8 @@
   },
   "dependencies": {
     "@koa/router": "^13.1.0",
+    "@mapbox/tilebelt": "^2.0.2",
+    "@turf/boolean-intersects": "^7.2.0",
     "ajv": "^8.17.1",
     "ajv-formats": "^3.0.1",
     "concurrently": "^9.1.2",
@@ -38,6 +40,7 @@
     "sharp": "^0.34.2",
     "source-map-support": "^0.5.21",
     "sql-template-tag": "^5.2.1",
+    "sqlite3": "^5.1.7",
     "unzipper": "^0.12.3",
     "uuid-base62": "^0.1.0"
   },
@@ -51,6 +54,7 @@
     "@types/koa-pino-logger": "^3.0.4",
     "@types/koa-websocket": "^5.0.10",
     "@types/mailgun-js": "^0.22.18",
+    "@types/mapbox__tilebelt": "^1.0.4",
     "@types/node": "^22.15.23",
     "@types/randomatic": "^3.1.5",
     "@types/request-promise-native": "^1.0.21",

@@ -13,6 +13,7 @@ export type User = {
   garminAccessToken: string | null;
   garminAccessTokenSecret: string | null;
   authToken: string;
+  email: string | null;
 };
 
 declare module 'koa' {

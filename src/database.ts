@@ -50,6 +50,7 @@ export async function initDatabase() {
       userId INT UNSIGNED NOT NULL,
       createdAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
       expireAt TIMESTAMP NOT NULL,
+      article VARCHAR(1024) NOT NULL,
       FOREIGN KEY (userId) REFERENCES user (id) ON DELETE CASCADE
     ) ENGINE=InnoDB`,
 
@@ -57,7 +58,8 @@ export async function initDatabase() {
       userId INT UNSIGNED NOT NULL,
       article VARCHAR(255) NOT NULL,
       createdAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      expireAt TIMESTAMP NOT NULL,
+      expireAt TIMESTAMP,
+      credits FLOAT',
       INDEX purExpIdx USING BTREE (expireAt),
       FOREIGN KEY (userId) REFERENCES user (id) ON DELETE CASCADE
     ) ENGINE=InnoDB`,
@@ -172,6 +174,15 @@ export async function initDatabase() {
       CONSTRAINT mwaUserFk FOREIGN KEY (userId) REFERENCES user (id) ON DELETE CASCADE,
       CONSTRAINT mwaMapFk FOREIGN KEY (mapId) REFERENCES map (id) ON DELETE CASCADE
     ) ENGINE=InnoDB`,
+
+    `CREATE TABLE IF NOT EXISTS spending (
+      id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+      userId INT UNSIGNED NOT NULL,
+      createdAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      amount FLOAT NOT NULL,
+      article VARCHAR(1025) NOT NULL,
+      CONSTRAINT spendUserFk FOREIGN KEY (userId) REFERENCES user (id) ON DELETE CASCADE,
+    ) ENGINE=InnoDB`,
   ];
 
   const updates: (string | string[])[] = [
@@ -192,6 +203,8 @@ export async function initDatabase() {
     'CREATE INDEX picTakenAtIdx ON picture (takenAt) USING BTREE',
     'CREATE INDEX picCreatedAtIdx ON picture (createdAt) USING BTREE',
     'CREATE INDEX authTokenIdx ON auth (authToken)',
+    'ALTER TABLE purchase ADD COLUMN credits FLOAT',
+    'ALTER TABLE purchase MODIFY COLUMN expireAt TIMESTAMP',
   ];
 
   const db = await pool.getConnection();
