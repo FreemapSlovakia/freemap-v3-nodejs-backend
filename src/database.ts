@@ -47,7 +47,7 @@ export async function initDatabase() {
       FOREIGN KEY (userId) REFERENCES user (id) ON DELETE CASCADE
     ) ENGINE=InnoDB`,
 
-    `CREATE TABLE IF NOT EXISTS purchase_token (
+    `CREATE TABLE IF NOT EXISTS purchaseToken (
       token VARCHAR(255) CHARSET ascii NULL PRIMARY KEY,
       userId INT UNSIGNED NOT NULL,
       createdAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -182,7 +182,8 @@ export async function initDatabase() {
       'ALTER TABLE purchase DROP COLUMN expireAt',
     ],
     'ALTER TABLE user ADD COLUMN credits FLOAT NOT NULL DEFAULT 0',
-    'ALTER TABLE purchase_token ADD COLUMN item JSON NOT NULL',
+    'RENAME TABLE purchase_token TO purchaseToken',
+    'ALTER TABLE purchaseToken ADD COLUMN item JSON NOT NULL',
   ];
 
   const db = await pool.getConnection();
@@ -216,7 +217,7 @@ export async function initDatabase() {
 
     try {
       await Promise.all([
-        db.query('DELETE FROM purchase_token WHERE expireAt < NOW()'),
+        db.query('DELETE FROM purchaseToken WHERE expireAt < NOW()'),
       ]);
     } finally {
       db.release();

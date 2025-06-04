@@ -42,7 +42,7 @@ export function attachPurchaseTokenHandler(router: Router) {
       const { item } = ctx.body;
 
       await pool.query(
-        sql`INSERT INTO purchase_token SET
+        sql`INSERT INTO purchaseToken SET
         userId = ${ctx.state.user!.id},
         createdAt = NOW(),
         token = ${token},

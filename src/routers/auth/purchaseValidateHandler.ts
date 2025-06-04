@@ -20,7 +20,7 @@ export function attachPurchaseValidateHandler(router: Router) {
     }
 
     const [row] = await pool.query(
-      sql`SELECT userId, item FROM purchase_token WHERE token = ${token} AND expireAt > NOW() FOR UPDATE`,
+      sql`SELECT userId, item FROM purchaseToken WHERE token = ${token} AND expireAt > NOW() FOR UPDATE`,
     );
 
     if (!row) {
@@ -55,7 +55,7 @@ export function attachPurchaseValidateHandler(router: Router) {
         );
     }
 
-    await pool.query(sql`DELETE FROM purchase_token WHERE token = ${token}`);
+    await pool.query(sql`DELETE FROM purchaseToken WHERE token = ${token}`);
 
     ctx.status = 204;
   });

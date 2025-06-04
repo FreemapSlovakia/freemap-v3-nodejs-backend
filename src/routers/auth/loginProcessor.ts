@@ -109,7 +109,7 @@ export async function login(
             'map',
             'mapWriteAccess', // TODO may conflict
             'purchase',
-            'purchase_token',
+            'purchaseToken',
           ].map((table) =>
             conn.query(
               sql`UPDATE ${raw(table)} SET userId = ${currentUser.id} WHERE userId = ${id}`,
