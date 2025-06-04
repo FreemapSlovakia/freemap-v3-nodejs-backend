@@ -217,8 +217,6 @@ export async function initDatabase() {
     try {
       await Promise.all([
         db.query('DELETE FROM purchase_token WHERE expireAt < NOW()'),
-        // Commented-out: Keep purchase records
-        // db.query('DELETE FROM purchase WHERE expireAt < NOW()'),
       ]);
     } finally {
       db.release();
