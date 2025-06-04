@@ -41,11 +41,7 @@ export function authenticator(require?: boolean): Middleware {
     }
 
     const [userRow] = await pool.query(sql`
-      SELECT
-        user.*,
-        EXISTS (
-          SELECT 1 FROM purchase WHERE userId = id AND expireAt > NOW()
-        ) AS isPremium
+      SELECT user.*
       FROM user INNER JOIN auth ON (userId = id)
       WHERE authToken = ${authToken as any}
     `);
@@ -85,7 +81,7 @@ export function userForResponse(user: any) {
     sendGalleryEmails,
     isAdmin,
     settings,
-    isPremium,
+    premiumExpiration,
     authToken,
   } = user;
 
@@ -99,7 +95,11 @@ export function userForResponse(user: any) {
     settings: typeof settings === 'string' ? JSON.parse(settings) : settings,
     sendGalleryEmails: Boolean(sendGalleryEmails),
     language,
-    isPremium: Boolean(isPremium),
+    premiumExpiration:
+      premiumExpiration instanceof Date &&
+      premiumExpiration.getTime() > Date.now()
+        ? premiumExpiration.toISOString()
+        : null,
     authToken,
     authProviders:
       user.authProviders ??

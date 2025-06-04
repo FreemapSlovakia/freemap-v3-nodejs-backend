@@ -34,7 +34,9 @@ export async function initDatabase() {
       lon FLOAT(9, 6) NULL,
       settings VARCHAR(4096) CHARSET utf8 COLLATE utf8_bin NOT NULL DEFAULT '{}',
       sendGalleryEmails BOOL NOT NULL DEFAULT 1,
-      language CHAR(2) NULL
+      premiumExpiration TIMESTAMP NULL,
+      credits FLOAT NOT NULL DEFAULT 0,
+      language CHAR(2) NULL,
     ) ENGINE=InnoDB`,
 
     `CREATE TABLE IF NOT EXISTS auth (
@@ -50,6 +52,7 @@ export async function initDatabase() {
       userId INT UNSIGNED NOT NULL,
       createdAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
       expireAt TIMESTAMP NOT NULL,
+      item JSON NOT NULL,
       FOREIGN KEY (userId) REFERENCES user (id) ON DELETE CASCADE
     ) ENGINE=InnoDB`,
 
@@ -57,8 +60,6 @@ export async function initDatabase() {
       userId INT UNSIGNED NOT NULL,
       article VARCHAR(255) NOT NULL,
       createdAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      expireAt TIMESTAMP NOT NULL,
-      INDEX purExpIdx USING BTREE (expireAt),
       FOREIGN KEY (userId) REFERENCES user (id) ON DELETE CASCADE
     ) ENGINE=InnoDB`,
 
@@ -176,22 +177,12 @@ export async function initDatabase() {
 
   const updates: (string | string[])[] = [
     [
-      'ALTER TABLE purchase_token ADD COLUMN expireAt TIMESTAMP',
-      'UPDATE purchase_token SET expireAt = DATE_ADD(createdAt, INTERVAL 1 HOUR)',
-      'ALTER TABLE purchase_token MODIFY COLUMN expireAt TIMESTAMP NOT NULL',
+      'ALTER TABLE user ADD COLUMN premiumExpiration TIMESTAMP NULL',
+      'UPDATE user SET premiumExpiration = SELECT MAX(expireAt) FROM purchase WHERE userId = user.id',
+      'ALTER TABLE purchase DROP COLUMN expireAt',
     ],
-    [
-      'ALTER TABLE purchase ADD COLUMN expireAt TIMESTAMP',
-      'UPDATE purchase SET expireAt = DATE_ADD(createdAt, INTERVAL 1 YEAR)',
-      'ALTER TABLE purchase MODIFY COLUMN expireAt TIMESTAMP NOT NULL',
-    ],
-    'ALTER TABLE picture ADD COLUMN premium BIT NOT NULL DEFAULT FALSE',
-    'CREATE INDEX purExpIdx ON purchase (expireAt) USING BTREE',
-    'CREATE INDEX picPano ON picture (pano)',
-    'CREATE INDEX picPremium ON picture (premium)',
-    'CREATE INDEX picTakenAtIdx ON picture (takenAt) USING BTREE',
-    'CREATE INDEX picCreatedAtIdx ON picture (createdAt) USING BTREE',
-    'CREATE INDEX authTokenIdx ON auth (authToken)',
+    'ALTER TABLE user ADD COLUMN credits FLOAT NOT NULL DEFAULT 0',
+    'ALTER TABLE purchase_token ADD COLUMN item JSON NOT NULL',
   ];
 
   const db = await pool.getConnection();

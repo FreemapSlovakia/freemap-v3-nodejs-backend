@@ -20,7 +20,7 @@ export function attachPurchaseValidateHandler(router: Router) {
     }
 
     const [row] = await pool.query(
-      sql`SELECT userId FROM purchase_token WHERE token = ${token} AND expireAt > NOW() FOR UPDATE`,
+      sql`SELECT userId, item FROM purchase_token WHERE token = ${token} AND expireAt > NOW() FOR UPDATE`,
     );
 
     if (!row) {
@@ -30,9 +30,30 @@ export function attachPurchaseValidateHandler(router: Router) {
       return;
     }
 
+    const { userId, item } = row;
+
     await pool.query(
-      sql`INSERT INTO purchase (userId, article, createdAt, expireAt) VALUES (${row.userId}, 'rovas-default', NOW(), DATE_ADD(NOW(), INTERVAL 1 YEAR))`,
+      sql`INSERT INTO purchase SET userId = ${userId}, item = ${item}, createdAt = NOW()`,
     );
+
+    switch (item.type) {
+      case 'premium':
+        await pool.query(
+          sql`UPDATE user SET premiumExpiration = COALESCE(premiumExpiration, NOW()) + INTERVAL 1 YEAR WHERE id = ${userId}`,
+        );
+        break;
+
+      case 'credits':
+        await pool.query(
+          sql`UPDATE user SET credits = credits + ${item.amount} WHERE id = ${userId}`,
+        );
+        break;
+
+      default:
+        ctx.throw(
+          new Error('invalid item type in purchase token: ' + item.type),
+        );
+    }
 
     await pool.query(sql`DELETE FROM purchase_token WHERE token = ${token}`);
 
