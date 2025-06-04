@@ -58,7 +58,7 @@ export async function initDatabase() {
 
     `CREATE TABLE IF NOT EXISTS purchase (
       userId INT UNSIGNED NOT NULL,
-      article VARCHAR(255) NOT NULL,
+      item JSON NOT NULL,
       createdAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (userId) REFERENCES user (id) ON DELETE CASCADE
     ) ENGINE=InnoDB`,
@@ -180,6 +180,9 @@ export async function initDatabase() {
       'ALTER TABLE user ADD COLUMN premiumExpiration TIMESTAMP NULL',
       'UPDATE user SET premiumExpiration = SELECT MAX(expireAt) FROM purchase WHERE userId = user.id',
       'ALTER TABLE purchase DROP COLUMN expireAt',
+      'ALTER TABLE purchase ADD COLUMN item JSON NOT NULL DEFAULT {}',
+      "UPDATE purchase SET item = JSON_OBJECT('type', 'legacy', 'value', article) WHERE item IS NULL",
+      'ALTER TABLE purchase DROP COLUMN article',
     ],
     'ALTER TABLE user ADD COLUMN credits FLOAT NOT NULL DEFAULT 0',
     'RENAME TABLE purchase_token TO purchaseToken',
