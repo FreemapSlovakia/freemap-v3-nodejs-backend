@@ -93,7 +93,9 @@ export function attachPurchaseTokenHandler(router: Router) {
         paymentUrl:
           paymentUrlString +
           '&signature=' +
-          createHmac('sha256').update(paymentUrlString).digest('hex'),
+          createHmac('sha256', getEnv('PURCHASE_SECRET'))
+            .update(paymentUrlString)
+            .digest('hex'),
       };
     },
   );
