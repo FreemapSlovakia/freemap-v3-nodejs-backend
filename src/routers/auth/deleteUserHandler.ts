@@ -18,7 +18,7 @@ export function attachDeleteUserHandler(router: Router) {
       );
 
       await Promise.all(
-        rows.map((row: any) =>
+        rows.map((row: { pathname: string }) =>
           unlink(`${picturesDir}/${row.pathname}`).catch((err) => {
             ctx.log.error({ err }, 'Error deleting picture.');
           }),

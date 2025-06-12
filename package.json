@@ -39,37 +39,40 @@
     "source-map-support": "^0.5.21",
     "sql-template-tag": "^5.2.1",
     "unzipper": "^0.12.3",
-    "uuid-base62": "^0.1.0"
+    "uuid-base62": "^0.1.0",
+    "ws": "^8.18.2"
   },
   "devDependencies": {
     "@dotenvx/dotenvx": "^1.44.2",
-    "@types/etag": "^1.8.3",
+    "@eslint/js": "^9.28.0",
+    "@types/etag": "^1.8.4",
     "@types/json-schema": "^7.0.15",
     "@types/kcors": "^2.2.8",
     "@types/koa": "^2.15.0",
-    "@types/koa__router": "^12.0.4",
     "@types/koa-bunyan-logger": "^2.1.7",
     "@types/koa-pino-logger": "^3.0.4",
     "@types/koa-websocket": "^5.0.10",
+    "@types/koa__router": "^12.0.4",
     "@types/mailgun-js": "^0.22.18",
-    "@types/node": "^22.15.23",
+    "@types/node": "^24.0.1",
     "@types/randomatic": "^3.1.5",
     "@types/request-promise-native": "^1.0.21",
     "@types/set-cookie-parser": "^2.4.10",
     "@types/unzipper": "^0.10.11",
-    "babel-eslint": "^10.1.0",
+    "@types/ws": "^8.18.1",
+    "@typescript-eslint/eslint-plugin": "^8.34.0",
+    "@typescript-eslint/parser": "^8.34.0",
     "chakram": "^1.5.0",
-    "eslint": "^9.27.0",
-    "eslint-config-prettier": "^10.1.5",
-    "eslint-import-resolver-babel-root-import": "^0.0.2",
-    "eslint-plugin-prettier": "^5.4.0",
+    "eslint": "^9.28.0",
+    "globals": "^16.2.0",
     "husky": "^9.1.7",
     "lint-staged": "^16.1.0",
     "nodemon": "^3.1.10",
     "pino-pretty": "^13.0.0",
     "prettier": "^3.5.3",
     "prettier-plugin-organize-imports": "^4.1.0",
-    "typescript": "^5.8.3"
+    "typescript": "^5.8.3",
+    "typescript-eslint": "^8.34.0"
   },
   "repository": {
     "type": "git",
@@ -86,6 +89,7 @@
   "lint-staged": {
     "*.js": [
       "prettier --write",
+      "eslint .",
       "git add"
     ]
   }

@@ -1,5 +1,5 @@
 import sql, { empty } from 'sql-template-tag';
-import ws from 'ws';
+import WebSocket from 'ws';
 import { pool } from '../database.js';
 import { RpcContext } from '../rpcHandlerTypes.js';
 import { trackRegister } from '../trackRegister.js';
@@ -40,7 +40,7 @@ export function trackingSubscribeHandler(ctx: RpcContext) {
     let websockets = trackRegister.get(deviceId || token);
 
     if (!websockets) {
-      websockets = new Set<ws>();
+      websockets = new Set<WebSocket>();
       trackRegister.set(deviceId || token, websockets);
     }
 

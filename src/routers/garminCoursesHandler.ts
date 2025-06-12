@@ -69,7 +69,9 @@ export function attachPostGarminCourses(router: Router) {
 
         try {
           responseJson = JSON.parse(responseText);
-        } catch {}
+        } catch {
+          responseJson = undefined;
+        }
 
         if (responseJson?.error === 'PermissionsException') {
           ctx.throw(403, 'missing permission');

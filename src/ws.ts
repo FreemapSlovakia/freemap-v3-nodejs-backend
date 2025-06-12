@@ -1,6 +1,6 @@
 import Router from '@koa/router';
 import KoaWebsocket from 'koa-websocket';
-import ws from 'ws';
+import type WebSocket from 'ws';
 import { authenticator } from './authenticator.js';
 import { RpcContext } from './rpcHandlerTypes.js';
 import { pingHandler } from './rpcHandlers/pingHandler.js';
@@ -16,7 +16,7 @@ export function attachWs(app: KoaWebsocket.App) {
 
     const { pingInterval } = ctx.query;
 
-    const ws = ctx.websocket as ws;
+    const ws = ctx.websocket as WebSocket;
 
     const pinger = !pingInterval
       ? null
@@ -66,7 +66,7 @@ export function attachWs(app: KoaWebsocket.App) {
         } else {
           throw new Error();
         }
-      } catch (err) {
+      } catch {
         respondError(-32700, 'Parse error');
         return;
       }

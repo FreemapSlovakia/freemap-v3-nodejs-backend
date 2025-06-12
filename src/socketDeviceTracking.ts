@@ -90,9 +90,9 @@ export function startSocketDeviceTracking() {
             nn,
             ss,
             orientation,
-            ioState,
-            milepost,
-            mileData,
+            // ioState,
+            // milepost,
+            // mileData,
           ] = slices;
 
           if (avail !== 'A') {
