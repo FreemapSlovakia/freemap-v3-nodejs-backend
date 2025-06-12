@@ -11,35 +11,32 @@ export function attachPurchaseTokenHandler(router: Router) {
     '/purchaseToken',
     authenticator(true),
     bodySchemaValidator({
-      type: 'object',
-      properties: {
-        item: {
+      oneOf: [
+        {
           type: 'object',
           required: ['type'],
-          oneOf: [
-            {
-              properties: {
-                type: { const: 'premium' },
-              },
-            },
-            {
-              properties: {
-                type: { const: 'credits' },
-                amount: { type: 'number' },
-              },
-            },
-          ],
+          additionalProperties: false,
+          properties: {
+            type: { const: 'premium' },
+          },
         },
-      },
-      required: ['item'],
-      additionalProperties: false,
+        {
+          type: 'object',
+          required: ['type'],
+          additionalProperties: false,
+          properties: {
+            type: { const: 'credits' },
+            amount: { type: 'number' },
+          },
+        },
+      ],
     }),
     async (ctx) => {
       const token = randomBytes(32).toString('hex');
 
       const expireAt = new Date(Date.now() + 3_600_000); // 1 hour
 
-      const { item } = ctx.body;
+      const item = ctx.request.body;
 
       await pool.query(
         sql`INSERT INTO purchaseToken SET
