@@ -49,7 +49,7 @@ export function attachPostPictureCommentHandler(router: Router) {
 
       const user = ctx.state.user!;
 
-      if (row.premium && !user.isPremium && user.id !== row.userId) {
+      if (row.premium && !user.premiumExpiration && user.id !== row.userId) {
         ctx.throw(402);
       }
 

@@ -4,7 +4,7 @@ import { Socket } from 'net';
 export type User = {
   id: number;
   isAdmin: boolean;
-  isPremium: boolean;
+  premiumExpiration: string | null;
   name: string;
   facebookUserId: string | null;
   osmId: string | null;
