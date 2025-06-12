@@ -4,7 +4,7 @@ API server for next freemap webapp.
 
 ## Requirements
 
-- Node 10+
+- Node 18+
 - MariaDB Database Server
 - exiftran (for uploaded images processing)
 - gdal_translate (for geotiff to HGT conversion)
@@ -15,7 +15,7 @@ Please provide settings in environment variables or put them to `.env` file in p
 
 ```sh
 npm i
-npm run watch | npx pino-pretty
+npm run watch
 ```
 
 ## Running in production mode

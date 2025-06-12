@@ -7,11 +7,30 @@
     "node": ">=18.0.0"
   },
   "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/FreemapSlovakia/ffreemap-v3-nodejs-backend.git"
+  },
+  "author": {
+    "name": "Freemap Slovakia",
+    "email": "freemap@freemap.sk"
+  },
+  "license": "Apache-2.0",
+  "bugs": {
+    "url": "https://github.com/FreemapSlovakia/ffreemap-v3-nodejs-backend/issues"
+  },
+  "lint-staged": {
+    "*.{js,ts}": [
+      "prettier --write",
+      "eslint .",
+      "git add"
+    ]
+  },
   "scripts": {
     "start": "dotenvx run -- node build/index.js",
     "build": "tsc",
     "watch": "concurrently -k -p \"[{name}]\" -n \"TypeScript,Node\" -c \"cyan.bold,green.bold\" \"npm run watch-ts\" \"npm run watch-node\"",
-    "watch-node": "env $(cat .env | grep -v \"#\" | xargs) nodemon build/index.js | pino-pretty -t -i hostname,pid",
+    "watch-node": "nodemon build/index.js | pino-pretty -t -i hostname,pid",
     "watch-ts": "tsc -w",
     "precommit": "lint-staged"
   },
@@ -73,24 +92,5 @@
     "prettier-plugin-organize-imports": "^4.1.0",
     "typescript": "^5.8.3",
     "typescript-eslint": "^8.34.0"
-  },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/FreemapSlovakia/ffreemap-v3-nodejs-backend.git"
-  },
-  "author": {
-    "name": "Freemap Slovakia",
-    "email": "freemap@freemap.sk"
-  },
-  "license": "Apache-2.0",
-  "bugs": {
-    "url": "https://github.com/FreemapSlovakia/ffreemap-v3-nodejs-backend/issues"
-  },
-  "lint-staged": {
-    "*.js": [
-      "prettier --write",
-      "eslint .",
-      "git add"
-    ]
   }
 }
