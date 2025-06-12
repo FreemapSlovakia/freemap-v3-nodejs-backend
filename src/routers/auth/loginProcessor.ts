@@ -1,7 +1,11 @@
 import { ParameterizedContext } from 'koa';
 import { randomBytes } from 'node:crypto';
 import sql, { RawValue, empty, join, raw } from 'sql-template-tag';
-import { authProviderToColumn, userForResponse } from '../../authenticator.js';
+import {
+  authProviderToColumn,
+  rowToUser,
+  userForResponse,
+} from '../../authenticator.js';
 import { pool } from '../../database.js';
 
 export async function login(
@@ -230,7 +234,7 @@ export async function login(
   }
 
   ctx.body = {
-    user: userForResponse({ ...userRow1, authToken }),
+    user: userForResponse(rowToUser(userRow1, authToken)),
     connect,
     clientData,
   };

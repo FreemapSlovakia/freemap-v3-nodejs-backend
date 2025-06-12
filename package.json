@@ -27,10 +27,10 @@
     ]
   },
   "scripts": {
-    "start": "dotenvx run -- node build/index.js",
+    "start": "node build/index.js",
     "build": "tsc",
     "watch": "concurrently -k -p \"[{name}]\" -n \"TypeScript,Node\" -c \"cyan.bold,green.bold\" \"npm run watch-ts\" \"npm run watch-node\"",
-    "watch-node": "nodemon build/index.js | pino-pretty -t -i hostname,pid",
+    "watch-node": "dotenvx run --overload -- nodemon build/index.js | pino-pretty -t -i hostname,pid",
     "watch-ts": "tsc -w",
     "precommit": "lint-staged"
   },

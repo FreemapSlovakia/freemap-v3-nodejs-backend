@@ -4,7 +4,7 @@ import { Socket } from 'net';
 export type User = {
   id: number;
   isAdmin: boolean;
-  premiumExpiration: string | null;
+  premiumExpiration: Date | null;
   name: string;
   facebookUserId: string | null;
   osmId: string | null;
@@ -13,6 +13,13 @@ export type User = {
   garminAccessToken: string | null;
   garminAccessTokenSecret: string | null;
   authToken: string;
+  email?: string;
+  authProviders: string[];
+  language: string | null;
+  lat: number | null;
+  lon: number | null;
+  sendGalleryEmails: boolean;
+  settings: Record<string, unknown> | null;
 };
 
 declare module 'koa' {

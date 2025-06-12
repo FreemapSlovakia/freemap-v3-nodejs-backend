@@ -39,6 +39,13 @@ export async function initDatabase() {
       language CHAR(2) NULL
     ) ENGINE=InnoDB`,
 
+    `CREATE TABLE IF NOT EXISTS blocked_credit (
+      id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+      amount FLOAT NOT NULL,
+      userId INT UNSIGNED NOT NULL,
+      FOREIGN KEY (userId) REFERENCES user (id) ON DELETE CASCADE
+    ) ENGINE=InnoDB`,
+
     `CREATE TABLE IF NOT EXISTS auth (
       authToken VARCHAR(255) CHARSET ascii PRIMARY KEY,
       userId INT UNSIGNED NOT NULL,

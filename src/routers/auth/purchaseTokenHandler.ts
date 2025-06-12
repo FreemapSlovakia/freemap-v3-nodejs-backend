@@ -63,7 +63,7 @@ export function attachPurchaseTokenHandler(router: Router) {
       // TODO translate texts by language
       switch (item.type) {
         case 'premium':
-          searchParams.set('price_eur', '5');
+          searchParams.set('price_eur', '500');
           searchParams.set('name', 'Freemap.sk premium access');
           searchParams.set(
             'description',
