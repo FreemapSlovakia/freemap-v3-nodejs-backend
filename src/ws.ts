@@ -12,6 +12,8 @@ export function attachWs(app: KoaWebsocket.App) {
   const wsRouter = new Router();
 
   wsRouter.all('/ws', authenticator(), async (ctx) => {
+    console.log('WebSocket connection established');
+
     const { pingInterval } = ctx.query;
 
     const ws = ctx.websocket as ws;
