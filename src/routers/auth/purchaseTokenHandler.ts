@@ -1,10 +1,10 @@
 import Router from '@koa/router';
 import { createHmac, randomBytes } from 'node:crypto';
 import sql from 'sql-template-tag';
-import { getEnv } from 'src/env.js';
-import { bodySchemaValidator } from 'src/requestValidators.js';
 import { authenticator } from '../../authenticator.js';
 import { pool } from '../../database.js';
+import { getEnv } from '../../env.js';
+import { bodySchemaValidator } from '../../requestValidators.js';
 
 export function attachPurchaseTokenHandler(router: Router) {
   router.post(
@@ -53,17 +53,13 @@ export function attachPurchaseTokenHandler(router: Router) {
       const expiration = Math.floor(expireAt.getTime() / 1000);
 
       // https://dev.rovas.app/rewpro?paytype=project&recipient=35384
-      const paymentUrl = new URL(getEnv('PURCHASE_URL_PREFIX')!);
+      const paymentUrl = new URL(getEnv('PURCHASE_URL_PREFIX'));
 
       const { searchParams } = paymentUrl;
 
       searchParams.set('token', token);
 
-      // TODO to env variable
-      searchParams.set(
-        'callbackurl',
-        'https://www.freemap.sk/purchaseCallback.html',
-      );
+      searchParams.set('callbackurl', getEnv('PURCHASE_CALLBACK_URL'));
 
       searchParams.set('expiration', String(expiration));
 
@@ -97,9 +93,7 @@ export function attachPurchaseTokenHandler(router: Router) {
         paymentUrl:
           paymentUrlString +
           '&signature=' +
-          createHmac('sha256', getEnv('PURCHASE_SECRET')!)
-            .update(paymentUrlString)
-            .digest('hex'),
+          createHmac('sha256').update(paymentUrlString).digest('hex'),
       };
     },
   );

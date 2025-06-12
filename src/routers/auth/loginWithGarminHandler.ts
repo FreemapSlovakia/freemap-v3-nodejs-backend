@@ -52,7 +52,7 @@ export function attachLoginWithGarminHandler(router: Router) {
 
       setTimeout(() => tokenSecrets.delete(token), 30 * 60_000); // max 30 minutes
 
-      const callback = new URL(getEnv('GARMIN_OAUTH_CALLBACK')!);
+      const callback = new URL(getEnv('GARMIN_OAUTH_CALLBACK'));
 
       // extraQuery is unused now
       for (const [key, value] of Object.entries(

@@ -4,13 +4,13 @@ import { PoolConnection } from 'mariadb';
 import sql from 'sql-template-tag';
 import { authenticator } from '../../authenticator.js';
 import { runInTransaction } from '../../database.js';
-import { getEnv } from '../../env.js';
+import { getEnv, getEnvBoolean } from '../../env.js';
 import {
   acceptValidator,
   bodySchemaValidator,
 } from '../../requestValidators.js';
 
-const webBaseUrls = (getEnv('WEB_BASE_URL') ?? '').split(',').filter(Boolean);
+const webBaseUrls = getEnv('WEB_BASE_URL').split(',').filter(Boolean);
 
 export function attachPostPictureCommentHandler(router: Router) {
   router.post(
@@ -79,7 +79,7 @@ export function attachPostPictureCommentHandler(router: Router) {
         `),
       ];
 
-      if (getEnv('MAILGIN_ENABLE', '')) {
+      if (getEnvBoolean('MAILGIN_ENABLE', false)) {
         proms.push(
           conn.query(sql`
             SELECT IF(sendGalleryEmails, email, NULL) AS email, language, title, userId

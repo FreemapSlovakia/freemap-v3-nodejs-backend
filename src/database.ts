@@ -1,11 +1,11 @@
 import { Middleware } from 'koa';
 import { createPool } from 'mariadb';
-import { getEnv } from './env.js';
+import { getEnv, getEnvInteger } from './env.js';
 import { appLogger } from './logger.js';
 
 export const pool = createPool({
   host: getEnv('MARIADB_HOST'),
-  port: Number(getEnv('MARIADB_PORT', '3306')),
+  port: getEnvInteger('MARIADB_PORT', 3306),
   database: getEnv('MARIADB_DATABASE'),
   user: getEnv('MARIADB_USER'),
   password: getEnv('MARIADB_PASSWORD'),
@@ -36,7 +36,7 @@ export async function initDatabase() {
       sendGalleryEmails BOOL NOT NULL DEFAULT 1,
       premiumExpiration TIMESTAMP NULL,
       credits FLOAT NOT NULL DEFAULT 0,
-      language CHAR(2) NULL,
+      language CHAR(2) NULL
     ) ENGINE=InnoDB`,
 
     `CREATE TABLE IF NOT EXISTS auth (

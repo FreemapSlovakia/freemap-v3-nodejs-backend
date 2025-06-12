@@ -8,7 +8,7 @@ import { readFileSync } from 'node:fs';
 import { unlink } from 'node:fs/promises';
 import 'source-map-support/register.js';
 import { initDatabase } from './database.js';
-import { getEnv } from './env.js';
+import { getEnv, getEnvBoolean } from './env.js';
 import { appLogger } from './logger.js';
 import { authRouter } from './routers/auth/index.js';
 import { trackingRouter } from './routers/deviceTracking/index.js';
@@ -27,10 +27,10 @@ const logger = appLogger.child({ module: 'app' });
 const app = websockify(
   new Koa(),
   {},
-  getEnv('HTTP_SSL_ENABLE', '')
+  getEnvBoolean('HTTP_SSL_ENABLE', false)
     ? {
-        key: readFileSync(getEnv('HTTP_SSL_KEY')!),
-        cert: readFileSync(getEnv('HTTP_SSL_CERT')!),
+        key: readFileSync(getEnv('HTTP_SSL_KEY')),
+        cert: readFileSync(getEnv('HTTP_SSL_CERT')),
       }
     : undefined,
 );
