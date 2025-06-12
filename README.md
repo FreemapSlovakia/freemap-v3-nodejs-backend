@@ -13,7 +13,7 @@ API server for next freemap webapp.
 
 Please provide settings in environment variables or put them to `.env` file in project root directory.
 
-```bash
+```sh
 npm i
 npm run watch | npx pino-pretty
 ```
@@ -22,7 +22,7 @@ npm run watch | npx pino-pretty
 
 Please provide settings in environment variables. Then:
 
-```bash
+```sh
 npm i
 npm run build
 npm start | npx pino-pretty
@@ -32,14 +32,14 @@ We strongly recommend to use `forever` command (installed with `npm i -g forever
 
 ## Running tests
 
-```bash
+```sh
 npm i
 npx mocha test/
 ```
 
 Running single test:
 
-```bash
+```sh
 ./node_modules/.bin/mochamocha test -g "POST /tracklogs should return uid"
 ```
 
@@ -78,3 +78,9 @@ Running single test:
 - `URS_EARTHDATA_NASA_PASSWORD` - TODO
 - `URS_EARTHDATA_NASA_USERNAME` - TODO
 - `WEB_BASE_URL` - TODO
+
+# Rovas callback tunneling
+
+```sh
+ssh -N -R 0.0.0.0:17744:localhost:3001 fm4
+```
