@@ -78,6 +78,7 @@ export function rowToUser(row: any, authToken: string): User {
       .filter(([column, value]) => value && column in columnToAuthProvider)
       .map(([column]) => columnToAuthProvider[column]),
     authToken,
+    settings: row.settings ? JSON.parse(row.settings) : row.settings,
   };
 }
 
@@ -108,7 +109,7 @@ export function userForResponse(user: User) {
     lon,
     name,
     premiumExpiration: premiumExpiration?.toISOString(),
-    sendGalleryEmails,
+    sendGalleryEmails: Boolean(sendGalleryEmails),
     settings,
   };
 }
