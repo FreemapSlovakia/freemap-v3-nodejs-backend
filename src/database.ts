@@ -185,9 +185,9 @@ export async function initDatabase() {
   const updates: (string | string[])[] = [
     [
       'ALTER TABLE user ADD COLUMN premiumExpiration TIMESTAMP NULL',
-      'UPDATE user SET premiumExpiration = SELECT MAX(expireAt) FROM purchase WHERE userId = user.id',
+      'UPDATE user SET premiumExpiration = (SELECT MAX(expireAt) FROM purchase WHERE userId = user.id)',
       'ALTER TABLE purchase DROP COLUMN expireAt',
-      'ALTER TABLE purchase ADD COLUMN item JSON NOT NULL DEFAULT {}',
+      "ALTER TABLE purchase ADD COLUMN item JSON NOT NULL DEFAULT '{}'",
       "UPDATE purchase SET item = JSON_OBJECT('type', 'legacy', 'value', article) WHERE item IS NULL",
       'ALTER TABLE purchase DROP COLUMN article',
     ],
