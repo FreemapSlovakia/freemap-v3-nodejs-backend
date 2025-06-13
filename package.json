@@ -4,7 +4,7 @@
   "description": "",
   "main": "index.js",
   "engines": {
-    "node": ">=18.0.0"
+    "node": ">=22.0.0"
   },
   "type": "module",
   "repository": {
@@ -36,6 +36,9 @@
   },
   "dependencies": {
     "@koa/router": "^13.1.0",
+    "@mapbox/tilebelt": "^2.0.2",
+    "@turf/bbox": "^7.2.0",
+    "@turf/boolean-intersects": "^7.2.0",
     "ajv": "^8.17.1",
     "ajv-formats": "^3.0.1",
     "concurrently": "^9.1.2",
@@ -65,6 +68,7 @@
     "@dotenvx/dotenvx": "^1.44.2",
     "@eslint/js": "^9.28.0",
     "@types/etag": "^1.8.4",
+    "@types/geojson": "^7946.0.16",
     "@types/json-schema": "^7.0.15",
     "@types/kcors": "^2.2.8",
     "@types/koa": "^2.15.0",

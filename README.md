@@ -4,7 +4,7 @@ API server for next freemap webapp.
 
 ## Requirements
 
-- Node 18+
+- Node 22+
 - MariaDB Database Server
 - exiftran (for uploaded images processing)
 - gdal_translate (for geotiff to HGT conversion)

@@ -1,4 +1,8 @@
 import Router from '@koa/router';
+import { pointToTile, Tile, tileToGeoJSON } from '@mapbox/tilebelt';
+import { bbox } from '@turf/bbox';
+import booleanIntersects from '@turf/boolean-intersects';
+import { Feature, MultiPolygon, Polygon } from 'geojson';
 import sql from 'sql-template-tag';
 import { blockedCreditIds } from 'src/blockedCredits.js';
 import { authenticator } from '../authenticator.js';
@@ -13,8 +17,17 @@ export function attachLoggerHandler(router: Router) {
       type: 'object',
       required: ['boundingMultipolygon', 'urlTemplate', 'maxZoom'],
       properties: {
-        urlTemplate: {
+        map: {
           type: 'string',
+          enum: [
+            'outdoor',
+            'hiking',
+            'cycling',
+            'skiing',
+            'car',
+            'hillshading',
+            // ...
+          ],
         },
         minZoom: {
           type: 'number',
@@ -81,8 +94,7 @@ export function attachLoggerHandler(router: Router) {
 
       blockedCreditIds.add(insertId);
 
-      const { urlTemplate, minZoom, maxZoom, boundingMultipolygon } =
-        ctx.request.body;
+      const { map, minZoom, maxZoom, boundingMultipolygon } = ctx.request.body;
 
       // download in background
 
@@ -91,4 +103,40 @@ export function attachLoggerHandler(router: Router) {
       ctx.status = 204;
     },
   );
+}
+
+/**
+ * Calculate which tiles intersect with the provided polygon
+ * @param polygon - GeoJSON polygon or feature
+ * @returns Array of tile objects [z, x, y]
+ */
+export function calculateTiles(
+  polygon: Feature<Polygon | MultiPolygon>,
+  minZoom: number,
+  maxZoom: number,
+): Tile[] {
+  const tiles: Tile[] = [];
+
+  // For each zoom level
+  for (let z = minZoom; z <= maxZoom; z++) {
+    // Get the tile extent at this zoom level
+    const bboxExtent = bbox(polygon);
+    const minTile = pointToTile(bboxExtent[0], bboxExtent[3], z);
+    const maxTile = pointToTile(bboxExtent[2], bboxExtent[1], z);
+
+    // Iterate through all tiles in the bounding box
+    for (let x = minTile[0]; x <= maxTile[0]; x++) {
+      for (let y = minTile[1]; y <= maxTile[1]; y++) {
+        // Convert tile to polygon
+        const tilePolygon = tileToGeoJSON([x, y, z]);
+
+        // Check if tile intersects with the input polygon
+        if (booleanIntersects(polygon, tilePolygon)) {
+          tiles.push([x, y, z]);
+        }
+      }
+    }
+  }
+
+  return tiles;
 }
