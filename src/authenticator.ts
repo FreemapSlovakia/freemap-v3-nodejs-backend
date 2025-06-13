@@ -108,7 +108,9 @@ export function userForResponse(user: User) {
     lat,
     lon,
     name,
-    premiumExpiration: premiumExpiration?.toISOString(),
+    premiumExpiration: premiumExpiration
+      ? premiumExpiration.toISOString()
+      : null,
     sendGalleryEmails: Boolean(sendGalleryEmails),
     settings,
   };
