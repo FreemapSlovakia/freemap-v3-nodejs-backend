@@ -86,6 +86,7 @@ export function userForResponse(user: User) {
   const {
     authProviders,
     authToken,
+    credits,
     email,
     id,
     isAdmin,
@@ -101,6 +102,7 @@ export function userForResponse(user: User) {
   return {
     authProviders,
     authToken,
+    credits,
     email,
     id,
     isAdmin,
@@ -108,9 +110,10 @@ export function userForResponse(user: User) {
     lat,
     lon,
     name,
-    premiumExpiration: premiumExpiration
-      ? premiumExpiration.toISOString()
-      : null,
+    premiumExpiration:
+      premiumExpiration && premiumExpiration.getTime() > Date.now()
+        ? premiumExpiration.toISOString()
+        : null,
     sendGalleryEmails: Boolean(sendGalleryEmails),
     settings,
   };
