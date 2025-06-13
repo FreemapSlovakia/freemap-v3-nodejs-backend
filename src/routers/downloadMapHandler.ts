@@ -1,7 +1,8 @@
 import Router from '@koa/router';
 import sql from 'sql-template-tag';
+import { blockedCreditIds } from 'src/blockedCredits.js';
 import { authenticator } from '../authenticator.js';
-import { pool } from '../database.js';
+import { pool, runInTransaction } from '../database.js';
 import { bodySchemaValidator } from '../requestValidators.js';
 
 export function attachLoggerHandler(router: Router) {
@@ -48,14 +49,15 @@ export function attachLoggerHandler(router: Router) {
         },
       },
     }),
+    runInTransaction(),
     async (ctx) => {
       if (!ctx.state.user?.email) {
         ctx.throw(409, 'absent email address');
         return;
       }
 
-      let [{ credits }] = pool.query(
-        sql`SELECT credits FROM user WHERE userId = ${ctx.state.user.id} FOR UPDATE`,
+      let [{ credits }] = await pool.query(
+        sql`SELECT credits FROM user WHERE id = ${ctx.state.user.id} FOR UPDATE`,
       );
 
       const price = 100; // TODO compute
@@ -70,12 +72,14 @@ export function attachLoggerHandler(router: Router) {
       }
 
       pool.query(
-        sql`UPDATE user SET credits = ${credits} WHERE userId = ${ctx.state.user.id}${ctx.state.user.id}`,
+        sql`UPDATE user SET credits = ${credits} WHERE id = ${ctx.state.user.id}${ctx.state.user.id}`,
       );
 
       const { insertId } = await pool.query(
         sql`INSERT INTO blocked_credit SET amount = ${price}, userId = ${ctx.state.user.id}`,
       );
+
+      blockedCreditIds.add(insertId);
 
       const { urlTemplate, minZoom, maxZoom, boundingMultipolygon } =
         ctx.request.body;
