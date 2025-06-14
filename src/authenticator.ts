@@ -110,10 +110,7 @@ export function userForResponse(user: User) {
     lat,
     lon,
     name,
-    premiumExpiration:
-      premiumExpiration && premiumExpiration.getTime() > Date.now()
-        ? premiumExpiration.toISOString()
-        : null,
+    premiumExpiration: premiumExpiration?.toISOString() ?? null,
     sendGalleryEmails: Boolean(sendGalleryEmails),
     settings,
   };

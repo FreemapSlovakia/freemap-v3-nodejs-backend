@@ -11,7 +11,7 @@ export function attachGetPictureHandler(router: Router) {
     acceptValidator('application/json'),
     authenticator(false),
     async (ctx) => {
-      const rows = await pool.query(
+      const [row] = await pool.query(
         sql`SELECT picture.id AS pictureId, picture.createdAt, pathname, title, description, takenAt, picture.lat, picture.lon, pano,
           user.id as userId, user.name, premium,
           (SELECT GROUP_CONCAT(name SEPARATOR '\n') FROM pictureTag WHERE pictureId = picture.id) AS tags, ${raw(ratingSubquery)}
@@ -23,8 +23,17 @@ export function attachGetPictureHandler(router: Router) {
           FROM picture LEFT JOIN user ON userId = user.id WHERE picture.id = ${ctx.params.id}`,
       );
 
-      if (rows.length === 0) {
+      if (!row) {
         ctx.throw(404, 'no such picture');
+      }
+
+      if (
+        row.premium &&
+        (!ctx.state.user?.premiumExpiration ||
+          ctx.state.user.premiumExpiration < new Date()) &&
+        ctx.state.user?.id !== row.userId
+      ) {
+        return ctx.throw(402, 'only for premium users');
       }
 
       const commentRows = await pool.query(sql`
@@ -61,7 +70,7 @@ export function attachGetPictureHandler(router: Router) {
         myStars,
         pano,
         premium,
-      } = rows[0];
+      } = row;
 
       ctx.body = {
         id: pictureId,

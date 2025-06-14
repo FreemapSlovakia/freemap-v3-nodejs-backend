@@ -39,7 +39,13 @@ export function attachPurchaseValidateHandler(router: Router) {
     switch (item.type) {
       case 'premium':
         await pool.query(
-          sql`UPDATE user SET premiumExpiration = COALESCE(premiumExpiration, NOW()) + INTERVAL 1 YEAR WHERE id = ${userId}`,
+          sql`UPDATE user
+            SET premiumExpiration =
+              CASE WHEN premiumExpiration IS NULL OR premiumExpiration < NOW()
+                THEN NOW()
+                ELSE premiumExpiration
+              END + INTERVAL 1 YEAR
+            WHERE id = ${userId}`,
         );
         break;
 
