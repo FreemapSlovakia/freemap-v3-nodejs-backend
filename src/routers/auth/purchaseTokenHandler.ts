@@ -6,6 +6,58 @@ import { pool } from '../../database.js';
 import { getEnv } from '../../env.js';
 import { bodySchemaValidator } from '../../requestValidators.js';
 
+type Combo = {
+  title: string;
+  description: string;
+};
+
+type Translation = {
+  premium: Combo;
+  credits: Combo;
+};
+
+const translations: Record<string, Translation> = {
+  en: {
+    premium: {
+      title: 'Freemap.sk premium access',
+      description: 'Premium access to Freemap.sk for 1 year',
+    },
+    credits: {
+      title: 'Freemap.sk credits',
+      description: 'Purchase of {} Freemap.sk credits',
+    },
+  },
+  sk: {
+    premium: {
+      title: 'Freemap.sk prémiový prístup',
+      description: 'Prémiový prístup na Freemap.sk na 1 rok',
+    },
+    credits: {
+      title: 'Freemap.sk kredity',
+      description: 'Nákup {} kreditov Freemap.sk',
+    },
+  },
+  cs: {
+    premium: {
+      title: 'Freemap.sk prémiový přístup',
+      description: 'Prémiový přístup na Freemap.sk na 1 rok',
+    },
+    credits: {
+      title: 'Freemap.sk kredity',
+      description: 'Nákup {} kreditů Freemap.sk',
+    },
+  },
+};
+
+type Body =
+  | {
+      type: 'premium';
+    }
+  | {
+      type: 'credits';
+      amount: number;
+    };
+
 export function attachPurchaseTokenHandler(router: Router) {
   router.post(
     '/purchaseToken',
@@ -36,11 +88,13 @@ export function attachPurchaseTokenHandler(router: Router) {
 
       const expireAt = new Date(Date.now() + 3_600_000); // 1 hour
 
-      const item = ctx.request.body;
+      const item = ctx.request.body as Body;
+
+      const user = ctx.state.user!;
 
       await pool.query(
         sql`INSERT INTO purchaseToken SET
-        userId = ${ctx.state.user!.id},
+        userId = ${user.id},
         createdAt = NOW(),
         token = ${token},
         expireAt = ${expireAt},
@@ -49,7 +103,6 @@ export function attachPurchaseTokenHandler(router: Router) {
 
       const expiration = Math.floor(expireAt.getTime() / 1000);
 
-      // https://dev.rovas.app/rewpro?paytype=project&recipient=35384
       const paymentUrl = new URL(getEnv('PURCHASE_URL_PREFIX'));
 
       const { searchParams } = paymentUrl;
@@ -60,28 +113,44 @@ export function attachPurchaseTokenHandler(router: Router) {
 
       searchParams.set('expiration', String(expiration));
 
-      // TODO translate texts by language
+      if (user.email) {
+        searchParams.set('email', user.email);
+      }
+
+      const lang =
+        user.language && user.language in translations
+          ? user.language
+          : ctx.acceptsLanguages(Object.keys(translations)) || 'en';
+
+      searchParams.set('lang', lang);
+
+      const translation = translations[lang]![item.type];
+
+      searchParams.set('name', translation.title);
+
+      searchParams.set('description', translation.description);
+
       switch (item.type) {
         case 'premium':
           searchParams.set('price_eur', '500');
-          searchParams.set('name', 'Freemap.sk premium access');
-          searchParams.set(
-            'description',
-            'Premium access to Freemap.sk for 1 year',
-          );
+
           break;
-        case 'credits':
+        case 'credits': {
           searchParams.set('price_eur', String(item.amount)); // let the exchange rate is 1
-          searchParams.set('name', 'Freemap.sk credits');
+
           searchParams.set(
             'description',
-            `Purchase of ${item.amount} Freemap.sk credits`,
+            translation.description.replace(
+              '{}',
+              Intl.NumberFormat(lang, {
+                minimumFractionDigits: 0,
+                maximumFractionDigits: 0,
+              }).format(item.amount),
+            ),
           );
+
           break;
-        default:
-          ctx.throw(
-            new Error('invalid item type in purchase token: ' + item.type),
-          );
+        }
       }
 
       const paymentUrlString = paymentUrl.toString();
