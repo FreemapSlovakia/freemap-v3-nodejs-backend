@@ -5,6 +5,7 @@ import booleanIntersects from '@turf/boolean-intersects';
 import { Feature, MultiPolygon, Polygon } from 'geojson';
 import sql from 'sql-template-tag';
 import { blockedCreditIds } from 'src/blockedCredits.js';
+import { getEnv } from 'src/env.js';
 import { authenticator } from '../authenticator.js';
 import { pool, runInTransaction } from '../database.js';
 import { bodySchemaValidator } from '../requestValidators.js';
@@ -15,31 +16,36 @@ export function attachLoggerHandler(router: Router) {
     authenticator(true),
     bodySchemaValidator({
       type: 'object',
-      required: ['boundingMultipolygon', 'urlTemplate', 'maxZoom'],
+      required: ['boundary', 'urlTemplate', 'maxZoom'],
       properties: {
-        map: {
+        type: {
           type: 'string',
           enum: [
-            'outdoor',
-            'hiking',
-            'cycling',
-            'skiing',
-            'car',
-            'hillshading',
+            'X',
             // ...
           ],
         },
         minZoom: {
           type: 'number',
           minimum: 0,
-          default: 0,
         },
         maxZoom: {
           type: 'number',
           minimum: 0,
           maximum: 20,
         },
-        boundingMultipolygon: {
+        boundary: {
+          type: 'object',
+          required: ['type', 'geometry'],
+          properties: {
+            type: { type: 'string', enum: ['Feature'] },
+            geometry: { $ref: '#/definitions/GeoJSONGeometry' },
+            properties: { type: 'object' },
+          },
+        },
+      },
+      definitions: {
+        PolygonCoords: {
           type: 'array',
           items: {
             type: 'array',
@@ -60,6 +66,29 @@ export function attachLoggerHandler(router: Router) {
             },
           },
         },
+        GeoJSONGeometry: {
+          oneOf: [
+            {
+              type: 'object',
+              required: ['type', 'coordinates'],
+              properties: {
+                type: { type: 'string', enum: ['Polygon'] },
+                coordinates: { $ref: '#/definitions/PolygonCoords' },
+              },
+            },
+            {
+              type: 'object',
+              required: ['type', 'coordinates'],
+              properties: {
+                type: { type: 'string', enum: ['MultiPolygon'] },
+                coordinates: {
+                  type: 'array',
+                  items: { $ref: '#/definitions/PolygonCoords' },
+                },
+              },
+            },
+          ],
+        },
       },
     }),
     runInTransaction(),
@@ -77,15 +106,13 @@ export function attachLoggerHandler(router: Router) {
 
       credits -= price;
 
-      // TODO add to reserved amount and subtract if resource is generated
-
       if (credits < 0) {
         ctx.throw(409, '');
         return;
       }
 
       pool.query(
-        sql`UPDATE user SET credits = ${credits} WHERE id = ${ctx.state.user.id}${ctx.state.user.id}`,
+        sql`UPDATE user SET credits = ${credits} WHERE id = ${ctx.state.user.id}`,
       );
 
       const { insertId } = await pool.query(
@@ -94,49 +121,55 @@ export function attachLoggerHandler(router: Router) {
 
       blockedCreditIds.add(insertId);
 
-      const { map, minZoom, maxZoom, boundingMultipolygon } = ctx.request.body;
+      download(ctx.request.body).catch((err) => {
+        ctx.log.error('Error during map download:', err);
 
-      // download in background
-
-      // send email
+        // TODO return blocked credit and notify user
+      });
 
       ctx.status = 204;
     },
   );
 }
 
-/**
- * Calculate which tiles intersect with the provided polygon
- * @param polygon - GeoJSON polygon or feature
- * @returns Array of tile objects [z, x, y]
- */
-export function calculateTiles(
-  polygon: Feature<Polygon | MultiPolygon>,
+async function download(body: any) {
+  const { type, minZoom, maxZoom, boundary, scale, name, email } = body;
+
+  calculateTiles(boundary, minZoom, maxZoom);
+
+  // send email
+  await got.post(
+    `https://api.mailgun.net/v3/${getEnv('MAILGIN_DOMAIN')}/messages`,
+    {
+      username: 'api',
+      password: getEnv('MAILGIN_API_KEY'),
+      form: {
+        from: 'Freemap <noreply@freemap.sk>',
+        to: email,
+        subject: 'Freemap Map Download',
+        text: `Map is readt at: ${url}`,
+      },
+    },
+  );
+}
+
+export function* calculateTiles(
+  boundary: Feature<Polygon | MultiPolygon>,
   minZoom: number,
   maxZoom: number,
-): Tile[] {
-  const tiles: Tile[] = [];
+): Generator<Tile> {
+  const bboxExtent = bbox(boundary);
 
-  // For each zoom level
   for (let z = minZoom; z <= maxZoom; z++) {
-    // Get the tile extent at this zoom level
-    const bboxExtent = bbox(polygon);
     const minTile = pointToTile(bboxExtent[0], bboxExtent[3], z);
     const maxTile = pointToTile(bboxExtent[2], bboxExtent[1], z);
 
-    // Iterate through all tiles in the bounding box
     for (let x = minTile[0]; x <= maxTile[0]; x++) {
       for (let y = minTile[1]; y <= maxTile[1]; y++) {
-        // Convert tile to polygon
-        const tilePolygon = tileToGeoJSON([x, y, z]);
-
-        // Check if tile intersects with the input polygon
-        if (booleanIntersects(polygon, tilePolygon)) {
-          tiles.push([x, y, z]);
+        if (booleanIntersects(boundary, tileToGeoJSON([x, y, z]))) {
+          yield [x, y, z];
         }
       }
     }
   }
-
-  return tiles;
 }
