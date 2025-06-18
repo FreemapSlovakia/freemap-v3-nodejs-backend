@@ -20,10 +20,6 @@ export function attachLoggerHandler(router: Router) {
       properties: {
         type: {
           type: 'string',
-          enum: [
-            'X',
-            // ...
-          ],
         },
         minZoom: {
           type: 'number',
