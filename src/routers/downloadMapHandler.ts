@@ -2,7 +2,7 @@ import Router from '@koa/router';
 import { pointToTile, Tile, tileToGeoJSON } from '@mapbox/tilebelt';
 import { bbox } from '@turf/bbox';
 import booleanIntersects from '@turf/boolean-intersects';
-import { Feature, MultiPolygon, Polygon } from 'geojson';
+import type { Feature, MultiPolygon, Polygon } from 'geojson';
 import got, { HTTPError } from 'got';
 import { DatabaseSync, SQLInputValue } from 'node:sqlite';
 import { Logger } from 'pino';
@@ -12,6 +12,8 @@ import { pool, runInTransaction } from '../database.js';
 import { DownloadableMap, downloadableMaps } from '../downloadableMaps.js';
 import { getEnv } from '../env.js';
 import { bodySchemaValidator } from '../requestValidators.js';
+
+const CONCURRENCY = 8;
 
 export function attachDownloadMapHandler(router: Router) {
   router.post(
@@ -104,10 +106,7 @@ export function attachDownloadMapHandler(router: Router) {
     }),
     runInTransaction(),
     async (ctx) => {
-      if (!ctx.state.user?.email) {
-        ctx.throw(409, 'absent email address');
-        return;
-      }
+      const user = ctx.state.user!;
 
       const map = downloadableMaps[ctx.request.body.type];
 
@@ -117,10 +116,21 @@ export function attachDownloadMapHandler(router: Router) {
       }
 
       let [{ credits }] = await pool.query(
-        sql`SELECT credits FROM user WHERE id = ${ctx.state.user.id} FOR UPDATE`,
+        sql`SELECT credits FROM user WHERE id = ${user.id} FOR UPDATE`,
       );
 
-      const price = 100; // TODO compute
+      const { minZoom, maxZoom, boundary, scale, name, email } =
+        ctx.request.body;
+
+      let totalTiles = 0;
+
+      const it = calculateTiles(boundary, minZoom, maxZoom);
+
+      while (!it.next().done) {
+        totalTiles++;
+      }
+
+      const price = (totalTiles / 1_000_000) * map.creditsPerMTile;
 
       credits -= price;
 
@@ -130,18 +140,28 @@ export function attachDownloadMapHandler(router: Router) {
       }
 
       pool.query(
-        sql`UPDATE user SET credits = ${credits} WHERE id = ${ctx.state.user.id}`,
+        sql`UPDATE user SET credits = ${credits} WHERE id = ${user.id}`,
       );
 
       const { insertId } = await pool.query(
-        sql`INSERT INTO blockedCredit SET amount = ${price}, userId = ${ctx.state.user.id}`,
+        sql`INSERT INTO blockedCredit SET amount = ${price}, userId = ${user.id}`,
       );
 
       (async () => {
         let refund = false;
 
         try {
-          await download(map, ctx.request.body, ctx.log);
+          await download(
+            map,
+            minZoom,
+            maxZoom,
+            boundary,
+            scale,
+            name,
+            email,
+            totalTiles,
+            ctx.log,
+          );
         } catch (err) {
           ctx.log.error({ err }, 'Error during map download.');
 
@@ -165,6 +185,8 @@ export function attachDownloadMapHandler(router: Router) {
         } finally {
           conn.release();
         }
+
+        ctx.log.error('Map download complete.');
       })().catch((err) => {
         ctx.log.error({ err }, 'Error during map download cleanup.');
       });
@@ -174,9 +196,17 @@ export function attachDownloadMapHandler(router: Router) {
   );
 }
 
-async function download(map: DownloadableMap, body: any, logger: Logger) {
-  const { minZoom, maxZoom, boundary, scale, name, email } = body;
-
+async function download(
+  map: DownloadableMap,
+  minZoom: number,
+  maxZoom: number,
+  boundary: Feature<Polygon | MultiPolygon>,
+  scale: number | undefined,
+  name: string,
+  email: string,
+  totalTiles: number,
+  logger: Logger,
+) {
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
   const dbName = name.trim() ? name.trim() + '-' + timestamp : timestamp;
   const db = new DatabaseSync(getEnv('MBTILES_DIR') + `/${dbName}.mbtiles`);
@@ -217,7 +247,12 @@ async function download(map: DownloadableMap, body: any, logger: Logger) {
     `INSERT OR IGNORE INTO tiles (zoom_level, tile_column, tile_row, tile_data) VALUES (?, ?, ?, ?)`,
   );
 
-  for (const tile of calculateTiles(boundary, minZoom, maxZoom)) {
+  const it = calculateTiles(boundary, minZoom, maxZoom);
+
+  let done = 0;
+  let logTs = 0;
+
+  async function downloadTile(tile: Tile) {
     const response = await got(
       map.url
         .replace('{x}', tile[0].toString())
@@ -230,6 +265,19 @@ async function download(map: DownloadableMap, body: any, logger: Logger) {
       },
     );
 
+    done++;
+
+    if (Date.now() - logTs > 1_000) {
+      logger.info(
+        { done, total: totalTiles },
+        'Downloaded tiles: %d/%d',
+        done,
+        totalTiles,
+      );
+
+      logTs = Date.now();
+    }
+
     if (response.statusCode === 200) {
       const [x, y, z] = tile;
 
@@ -239,7 +287,35 @@ async function download(map: DownloadableMap, body: any, logger: Logger) {
     }
   }
 
+  const active: Promise<void>[] = [];
+
+  for (let i = 0; i < CONCURRENCY; i++) {
+    const { done, value } = it.next();
+
+    if (done) {
+      break;
+    }
+
+    active.push(downloadTile(value));
+  }
+
+  while (active.length) {
+    const finishedIndex = await Promise.race(
+      active.map((p, idx) => p.then(() => idx)),
+    );
+
+    active.splice(finishedIndex, 1);
+
+    const { done, value } = it.next();
+
+    if (!done) {
+      active.push(downloadTile(value));
+    }
+  }
+
   db.close();
+
+  logger.info('Map download completed, sending email notification.');
 
   await got.post(
     `https://api.mailgun.net/v3/${getEnv('MAILGIN_DOMAIN')}/messages`,
@@ -250,7 +326,7 @@ async function download(map: DownloadableMap, body: any, logger: Logger) {
         from: 'Freemap <noreply@freemap.sk>',
         to: email,
         subject: 'Freemap Map Download',
-        text: `Map is ready at ${getEnv('MBTILES_URL_PREFIX')}/${dbName}.mbtiles for 24 hours.`,
+        text: `Your map is ready at ${getEnv('MBTILES_URL_PREFIX')}/${dbName}.mbtiles for 24 hours.`,
       },
     },
   );
@@ -260,7 +336,7 @@ export function* calculateTiles(
   boundary: Feature<Polygon | MultiPolygon>,
   minZoom: number,
   maxZoom: number,
-): Generator<Tile> {
+) {
   const bboxExtent = bbox(boundary);
 
   for (let z = minZoom; z <= maxZoom; z++) {
@@ -270,7 +346,7 @@ export function* calculateTiles(
     for (let x = minTile[0]; x <= maxTile[0]; x++) {
       for (let y = minTile[1]; y <= maxTile[1]; y++) {
         if (booleanIntersects(boundary, tileToGeoJSON([x, y, z]))) {
-          yield [x, y, z];
+          yield [x, y, z] as Tile;
         }
       }
     }
