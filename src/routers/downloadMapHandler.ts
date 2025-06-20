@@ -7,11 +7,11 @@ import got, { HTTPError } from 'got';
 import { DatabaseSync, SQLInputValue } from 'node:sqlite';
 import { Logger } from 'pino';
 import sql from 'sql-template-tag';
-import { appLogger } from 'src/logger.js';
 import { authenticator } from '../authenticator.js';
 import { pool, runInTransaction } from '../database.js';
 import { DownloadableMap, downloadableMaps } from '../downloadableMaps.js';
 import { getEnv } from '../env.js';
+import { appLogger } from '../logger.js';
 import { sendMail } from '../mailer.js';
 import { bodySchemaValidator } from '../requestValidators.js';
 

@@ -1,10 +1,10 @@
 import Router from '@koa/router';
 import { PoolConnection } from 'mariadb';
 import sql from 'sql-template-tag';
-import { appLogger } from 'src/logger.js';
 import { authenticator } from '../../authenticator.js';
 import { runInTransaction } from '../../database.js';
 import { getEnv, getEnvBoolean } from '../../env.js';
+import { appLogger } from '../../logger.js';
 import { sendMail } from '../../mailer.js';
 import {
   acceptValidator,

@@ -1,9 +1,9 @@
 import Router from '@koa/router';
 import { unlink } from 'node:fs/promises';
 import sql from 'sql-template-tag';
-import { appLogger } from 'src/logger.js';
 import { authenticator } from '../../authenticator.js';
 import { runInTransaction } from '../../database.js';
+import { appLogger } from '../../logger.js';
 import { picturesDir } from '../gallery/constants.js';
 
 export function attachDeleteUserHandler(router: Router) {
