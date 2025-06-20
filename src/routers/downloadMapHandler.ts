@@ -108,7 +108,9 @@ export function attachDownloadMapHandler(router: Router) {
     async (ctx) => {
       const user = ctx.state.user!;
 
-      const map = downloadableMaps[ctx.request.body.type];
+      const map = downloadableMaps.find(
+        ({ type }) => type === ctx.request.body.type,
+      );
 
       if (!map) {
         ctx.throw(400, 'invalid map type');
@@ -130,12 +132,12 @@ export function attachDownloadMapHandler(router: Router) {
         totalTiles++;
       }
 
-      const price = (totalTiles / 1_000_000) * map.creditsPerMTile;
+      const price = Math.ceil((totalTiles / 1_000_000) * map.creditsPerMTile);
 
       credits -= price;
 
       if (credits < 0) {
-        ctx.throw(409, '');
+        ctx.throw(409, 'not enough credit');
         return;
       }
 
