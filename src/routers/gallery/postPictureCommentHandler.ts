@@ -1,10 +1,10 @@
 import Router from '@koa/router';
-import got from 'got';
 import { PoolConnection } from 'mariadb';
 import sql from 'sql-template-tag';
 import { authenticator } from '../../authenticator.js';
 import { runInTransaction } from '../../database.js';
 import { getEnv, getEnvBoolean } from '../../env.js';
+import { sendMail } from '../../mailer.js';
 import {
   acceptValidator,
   bodySchemaValidator,
@@ -104,7 +104,7 @@ export function attachPostPictureCommentHandler(router: Router) {
       const [{ insertId }, [picInfo] = [], emails = []] =
         await Promise.all(proms);
 
-      const sendMail = (to: string, own: boolean, lang: string) => {
+      async function sendCommentMail(to: string, own: boolean, lang: string) {
         ctx.log.info({ to, lang, own }, 'Sending picture comment mail.');
 
         const picTitle = picInfo.title ? `"${picInfo.title} "` : '';
@@ -113,59 +113,44 @@ export function attachPostPictureCommentHandler(router: Router) {
 
         const unsubscribeUrl = webBaseUrl;
 
-        return got.post(
-          `https://api.mailgun.net/v3/${getEnv('MAILGIN_DOMAIN')}/messages`,
-          {
-            username: 'api',
-            password: getEnv('MAILGIN_API_KEY'),
-            form: {
-              from:
-                // TODO translate for HU and IT
-                (lang === 'sk' || lang === 'cs'
-                  ? 'Freemap Fotky'
-                  : 'Freemap Photos') + ' <noreply@freemap.sk>',
-              to,
-              subject:
-                // TODO translate for HU and IT
-                lang === 'sk'
-                  ? `Komentár k fotke na ${webUrl}`
-                  : lang === 'cs'
-                    ? `Komentář k fotce na ${webUrl}`
-                    : `Photo comment at ${webUrl}`,
-              text:
-                // TODO translate for HU and IT
-                (lang === 'sk'
-                  ? `Používateľ ${user!.name} pridal komentár k ${
-                      own ? 'vašej ' : ''
-                    }fotke ${picTitle}na ${picUrl}:`
-                  : lang === 'cs'
-                    ? `Uživatel ${user!.name} přidal komentář k ${
-                        own ? 'vaší ' : ''
-                      }fotce ${picTitle}na ${picUrl}:`
-                    : `User ${user!.name} commented ${
-                        own ? 'your' : 'a'
-                      } photo ${picTitle}at ${picUrl}:`) +
-                '\n\n' +
-                comment +
-                '\n\n' +
-                // TODO translate for HU and IT
-                (lang === 'sk'
-                  ? `Ak si už neprajete dostávať upozornenia na komentáre k fotkám, odškrtnite si to na ${unsubscribeUrl} v menu Fotografie.`
-                  : lang === 'cs'
-                    ? `Pokud si již nepřejete dostávat upozornění na komentáře k fotkám, odškrtnite si to na ${unsubscribeUrl} v menu Fotografie.`
-                    : `If you no longer wish to be notified about photo comments, uncheck it at ${unsubscribeUrl} in the Photos menu.`),
-            },
-          },
+        await sendMail(
+          to, // TODO translate for HU and IT
+          lang === 'sk'
+            ? `Komentár k fotke na ${webUrl}`
+            : lang === 'cs'
+              ? `Komentář k fotce na ${webUrl}`
+              : `Photo comment at ${webUrl}`,
+          // TODO translate for HU and IT
+          (lang === 'sk'
+            ? `Používateľ ${user!.name} pridal komentár k ${
+                own ? 'vašej ' : ''
+              }fotke ${picTitle}na ${picUrl}:`
+            : lang === 'cs'
+              ? `Uživatel ${user!.name} přidal komentář k ${
+                  own ? 'vaší ' : ''
+                }fotce ${picTitle}na ${picUrl}:`
+              : `User ${user!.name} commented ${
+                  own ? 'your' : 'a'
+                } photo ${picTitle}at ${picUrl}:`) +
+            '\n\n' +
+            comment +
+            '\n\n' +
+            // TODO translate for HU and IT
+            (lang === 'sk'
+              ? `Ak si už neprajete dostávať upozornenia na komentáre k fotkám, odškrtnite si to na ${unsubscribeUrl} v menu Fotografie.`
+              : lang === 'cs'
+                ? `Pokud si již nepřejete dostávat upozornění na komentáře k fotkám, odškrtnite si to na ${unsubscribeUrl} v menu Fotografie.`
+                : `If you no longer wish to be notified about photo comments, uncheck it at ${unsubscribeUrl} in the Photos menu.`),
         );
-      };
+      }
 
       const acceptLang = ctx.acceptsLanguages(['en', 'sk', 'cs', 'hu']) || 'en';
 
-      const promises = [];
+      const promises: Promise<void>[] = [];
 
       if (picInfo && picInfo.email && picInfo.userId !== user.id) {
         promises.push(
-          sendMail(picInfo.email, true, picInfo.language || acceptLang),
+          sendCommentMail(picInfo.email, true, picInfo.language || acceptLang),
         );
       }
 
@@ -177,7 +162,12 @@ export function attachPostPictureCommentHandler(router: Router) {
           }: {
             email: string;
             language: string | null;
-          }) => sendMail(to, false, language || picInfo.language || acceptLang),
+          }) =>
+            sendCommentMail(
+              to,
+              false,
+              language || picInfo.language || acceptLang,
+            ),
         ),
       );
 

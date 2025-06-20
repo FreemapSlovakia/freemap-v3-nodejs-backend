@@ -11,6 +11,7 @@ import { authenticator } from '../authenticator.js';
 import { pool, runInTransaction } from '../database.js';
 import { DownloadableMap, downloadableMaps } from '../downloadableMaps.js';
 import { getEnv } from '../env.js';
+import { sendMail } from '../mailer.js';
 import { bodySchemaValidator } from '../requestValidators.js';
 
 const CONCURRENCY = 8;
@@ -184,6 +185,14 @@ export function attachDownloadMapHandler(router: Router) {
           );
 
           await conn.commit();
+
+          await sendMail(
+            email,
+            'Freemap Map Download Error',
+            'An error occurred during your map download. ' +
+              'Your credits have been refunded. ' +
+              'Please try again later or contact support if the problem persists.',
+          );
         } finally {
           conn.release();
         }
@@ -319,18 +328,10 @@ async function download(
 
   logger.info('Map download completed, sending email notification.');
 
-  await got.post(
-    `https://api.mailgun.net/v3/${getEnv('MAILGIN_DOMAIN')}/messages`,
-    {
-      username: 'api',
-      password: getEnv('MAILGIN_API_KEY'),
-      form: {
-        from: 'Freemap <noreply@freemap.sk>',
-        to: email,
-        subject: 'Freemap Map Download',
-        text: `Your map is ready at ${getEnv('MBTILES_URL_PREFIX')}/${dbName}.mbtiles for 24 hours.`,
-      },
-    },
+  await sendMail(
+    email,
+    'Freemap Map Download',
+    `Your map is ready at ${getEnv('MBTILES_URL_PREFIX')}/${dbName}.mbtiles for 24 hours.`,
   );
 }
 
