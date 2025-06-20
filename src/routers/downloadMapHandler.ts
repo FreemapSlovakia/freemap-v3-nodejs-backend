@@ -235,7 +235,7 @@ async function download(
   const combo = sql`INSERT INTO metadata (name, value) VALUES
       ('name', ${name}),
       ('format', 'jpg'),
-      ('type', 'baselayer'),
+      ('type', ${map.overlay ? 'overlay' : 'baselayer'}),
       ('version', '1.0'),
       ('description', 'Downloaded map tiles from www.freemap.sk'),
       ('minzoom', ${minZoom}),
@@ -251,7 +251,7 @@ async function download(
 
   const it = calculateTiles(boundary, minZoom, maxZoom);
 
-  let done = 0;
+  let downloadedCount = 0;
   let logTs = 0;
 
   async function downloadTile(tile: Tile) {
@@ -260,20 +260,20 @@ async function download(
         .replace('{x}', tile[0].toString())
         .replace('{y}', tile[1].toString())
         .replace('{z}', tile[2].toString()) +
-        (scale && scale !== 1 ? `@${scale}x` : ''),
+        (scale && map.extraScales?.includes(scale) ? `@${scale}x` : ''),
       {
         responseType: 'buffer',
         throwHttpErrors: false,
       },
     );
 
-    done++;
+    downloadedCount++;
 
     if (Date.now() - logTs > 1_000) {
       logger.info(
-        { done, total: totalTiles },
+        { done: downloadedCount, total: totalTiles },
         'Downloaded tiles: %d/%d',
-        done,
+        downloadedCount,
         totalTiles,
       );
 

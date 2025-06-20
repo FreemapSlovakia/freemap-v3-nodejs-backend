@@ -5,7 +5,8 @@ export type DownloadableMap = {
   minZoom: number;
   maxNativeZoom: number;
   creditsPerMTile: number;
-  attributuion: string;
+  attribution: string;
+  overlay?: boolean;
 };
 
 export const downloadableMaps: DownloadableMap[] = [
@@ -16,39 +17,44 @@ export const downloadableMaps: DownloadableMap[] = [
     minZoom: 6,
     maxNativeZoom: 19,
     creditsPerMTile: 5000,
-    attributuion: 'TODO',
+    attribution:
+      'map: © Freemap Slovakia, data: © OpenStreetMap contributors, data: DTM providers…',
   },
   {
     type: 'A',
-    url: '//tile.freemap.sk/A/{z}/{x}/{y}.jpeg',
+    url: 'http://tile.freemap.sk/A/{z}/{x}/{y}.jpeg',
     minZoom: 8,
     maxNativeZoom: 16,
     creditsPerMTile: 1000,
-    attributuion: 'TODO',
+    attribution:
+      'map: © Freemap Slovakia, data: © OpenStreetMap contributors',
   },
   {
     type: 'T',
-    url: '//tile.freemap.sk/T/{z}/{x}/{y}.jpeg',
+    url: 'http://tile.freemap.sk/T/{z}/{x}/{y}.jpeg',
     minZoom: 8,
     maxNativeZoom: 16,
     creditsPerMTile: 1000,
-    attributuion: 'TODO',
+    attribution:
+      'map: © Freemap Slovakia, data: © OpenStreetMap contributors, data: © SRTM',
   },
   {
     type: 'C',
-    url: '//tile.freemap.sk/C/{z}/{x}/{y}.jpeg',
+    url: 'http://tile.freemap.sk/C/{z}/{x}/{y}.jpeg',
     minZoom: 8,
     maxNativeZoom: 16,
     creditsPerMTile: 1000,
-    attributuion: 'TODO',
+    attribution:
+      'map: © Freemap Slovakia, data: © OpenStreetMap contributors, data: © SRTM',
   },
   {
     type: 'K',
-    url: '//tile.freemap.sk/K/{z}/{x}/{y}.jpeg',
+    url: 'http://tile.freemap.sk/K/{z}/{x}/{y}.jpeg',
     minZoom: 8,
     maxNativeZoom: 16,
     creditsPerMTile: 1000,
-    attributuion: 'TODO',
+    attribution:
+      'map: © Freemap Slovakia, data: © OpenStreetMap contributors, data: © SRTM',
   },
   {
     type: 'Z',
@@ -56,7 +62,7 @@ export const downloadableMaps: DownloadableMap[] = [
     minZoom: 0,
     maxNativeZoom: 20,
     creditsPerMTile: 1000,
-    attributuion: 'TODO',
+    attribution: 'map: © GKÚ, NLC, map: © ČÚZK',
   },
   {
     type: 'J',
@@ -64,7 +70,7 @@ export const downloadableMaps: DownloadableMap[] = [
     minZoom: 0,
     maxNativeZoom: 19,
     creditsPerMTile: 1000,
-    attributuion: 'TODO',
+    attribution: 'map: © GKÚ, NLC',
   },
   {
     type: '4',
@@ -72,7 +78,7 @@ export const downloadableMaps: DownloadableMap[] = [
     minZoom: 0,
     maxNativeZoom: 18,
     creditsPerMTile: 1000,
-    attributuion: 'TODO',
+    attribution: 'map: © Freemap Slovakia, data: DMR 5.0: © ÚGKK SR',
   },
   {
     type: '7',
@@ -80,7 +86,7 @@ export const downloadableMaps: DownloadableMap[] = [
     minZoom: 0,
     maxNativeZoom: 20,
     creditsPerMTile: 1000,
-    attributuion: 'TODO',
+    attribution: 'map: © Freemap Slovakia, data: LLS DMR: © ÚGKK SR',
   },
   {
     type: '5',
@@ -88,7 +94,7 @@ export const downloadableMaps: DownloadableMap[] = [
     minZoom: 0,
     maxNativeZoom: 18,
     creditsPerMTile: 1000,
-    attributuion: 'TODO',
+    attribution: 'map: © Freemap Slovakia, data: DMR 5.0: © ÚGKK SR',
   },
   {
     type: '6',
@@ -96,7 +102,7 @@ export const downloadableMaps: DownloadableMap[] = [
     minZoom: 0,
     maxNativeZoom: 18,
     creditsPerMTile: 1000,
-    attributuion: 'TODO',
+    attribution: 'map: © Freemap Slovakia, data: DMP 1.0: © ÚGKK SR',
   },
   {
     type: 'l',
@@ -104,22 +110,24 @@ export const downloadableMaps: DownloadableMap[] = [
     minZoom: 11,
     maxNativeZoom: 15,
     creditsPerMTile: 1000,
-    attributuion: 'TODO',
+    attribution: 'map: © NLC Zvolen',
   },
   {
     type: 't',
-    url: '//tiles.freemap.sk/trails/{z}/{x}/{y}.png',
+    url: 'http://tiles.freemap.sk/trails/{z}/{x}/{y}.png',
     minZoom: 8,
     maxNativeZoom: 16,
     creditsPerMTile: 1000,
-    attributuion: 'TODO',
+    attribution:
+      'map: © Freemap Slovakia, data: © OpenStreetMap contributors',
   },
   {
     type: 'c',
-    url: '//tiles.freemap.sk/cycle/{z}/{x}/{y}.png',
+    url: 'http://tiles.freemap.sk/cycle/{z}/{x}/{y}.png',
     minZoom: 8,
     maxNativeZoom: 16,
     creditsPerMTile: 1000,
-    attributuion: 'TODO',
+    attribution:
+      'map: © Freemap Slovakia, data: © OpenStreetMap contributors',
   },
 ];
