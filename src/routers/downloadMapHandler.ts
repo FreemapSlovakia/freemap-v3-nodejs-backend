@@ -3,7 +3,7 @@ import { pointToTile, Tile, tileToGeoJSON } from '@mapbox/tilebelt';
 import { bbox } from '@turf/bbox';
 import booleanIntersects from '@turf/boolean-intersects';
 import type { Feature, MultiPolygon, Polygon } from 'geojson';
-import { connect } from 'node:http2';
+import { connect, constants } from 'node:http2';
 import { DatabaseSync, SQLInputValue } from 'node:sqlite';
 import { Logger } from 'pino';
 import sql from 'sql-template-tag';
@@ -281,35 +281,54 @@ async function download(
         (scale && map.extraScales?.includes(scale) ? `@${scale}x` : ''),
     );
 
-    const buffer = await new Promise<Buffer>((resolve, reject) => {
-      const req = client.request({
-        ':path': url.pathname + url.search,
-        ':method': 'GET',
-      });
+    let buffer: Buffer<ArrayBufferLike>;
 
-      req.on('response', (headers) => {
-        const statusCode = Number(headers[':status']);
+    for (let i = 0; ; i++) {
+      try {
+        buffer = await new Promise<Buffer>((resolve, reject) => {
+          const req = client.request({
+            ':path': url.pathname + url.search,
+            ':method': 'GET',
+          });
 
-        if (statusCode !== 200 && statusCode !== 404) {
-          reject(new Error(`Unexpected status code: ${statusCode}`));
-          req.close();
+          req.on('response', (headers) => {
+            const statusCode = Number(headers[':status']);
+
+            if (statusCode !== 200 && statusCode !== 404) {
+              reject(new Error(`Unexpected status code: ${statusCode}`));
+              req.close();
+            }
+          });
+
+          const chunks: Buffer[] = [];
+
+          req.on('data', (chunk) => chunks.push(chunk));
+
+          req.on('end', () => {
+            resolve(Buffer.concat(chunks));
+          });
+
+          req.on('error', (err) => {
+            reject(err);
+          });
+
+          req.end();
+        });
+
+        break;
+      } catch (err) {
+        if (
+          i < 5 &&
+          err instanceof Error &&
+          'code' in err &&
+          err.code === constants.NGHTTP2_REFUSED_STREAM
+        ) {
+          // retry
         }
-      });
 
-      const chunks: Buffer[] = [];
-
-      req.on('data', (chunk) => chunks.push(chunk));
-
-      req.on('end', () => {
-        resolve(Buffer.concat(chunks));
-      });
-
-      req.on('error', (err) => {
-        reject(err);
-      });
-
-      req.end();
-    });
+        throw err;
+      }
+    }
 
     downloadedCount++;
 
