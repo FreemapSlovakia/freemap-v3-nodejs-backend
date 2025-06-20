@@ -323,10 +323,10 @@ async function download(
           'code' in err &&
           err.code === constants.NGHTTP2_REFUSED_STREAM
         ) {
-          // retry
+          await new Promise((r) => setTimeout(r, 100 * (i + 1)));
+        } else {
+          throw err;
         }
-
-        throw err;
       }
     }
 
@@ -348,30 +348,34 @@ async function download(
     stmt.run(z, x, (1 << z) - 1 - y, buffer);
   }
 
-  const active: Promise<void>[] = [];
+  try {
+    const active: Promise<void>[] = [];
 
-  for (let i = 0; i < CONCURRENCY; i++) {
-    const { done, value } = it.next();
+    for (let i = 0; i < CONCURRENCY; i++) {
+      const { done, value } = it.next();
 
-    if (done) {
-      break;
-    }
+      if (done) {
+        break;
+      }
 
-    active.push(downloadTile(value));
-  }
-
-  while (active.length) {
-    const finishedIndex = await Promise.race(
-      active.map((p, idx) => p.then(() => idx)),
-    );
-
-    active.splice(finishedIndex, 1);
-
-    const { done, value } = it.next();
-
-    if (!done) {
       active.push(downloadTile(value));
     }
+
+    while (active.length) {
+      const finishedIndex = await Promise.race(
+        active.map((p, idx) => p.then(() => idx)),
+      );
+
+      active.splice(finishedIndex, 1);
+
+      const { done, value } = it.next();
+
+      if (!done) {
+        active.push(downloadTile(value));
+      }
+    }
+  } finally {
+    client.close();
   }
 
   db.close();
