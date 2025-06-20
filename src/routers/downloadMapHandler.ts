@@ -3,7 +3,7 @@ import { pointToTile, Tile, tileToGeoJSON } from '@mapbox/tilebelt';
 import { bbox } from '@turf/bbox';
 import booleanIntersects from '@turf/boolean-intersects';
 import type { Feature, MultiPolygon, Polygon } from 'geojson';
-import got, { HTTPError } from 'got';
+import { connect } from 'node:http2';
 import { DatabaseSync, SQLInputValue } from 'node:sqlite';
 import { Logger } from 'pino';
 import sql from 'sql-template-tag';
@@ -15,7 +15,7 @@ import { appLogger } from '../logger.js';
 import { sendMail } from '../mailer.js';
 import { bodySchemaValidator } from '../requestValidators.js';
 
-const CONCURRENCY = 8;
+const CONCURRENCY = 16;
 
 export function attachDownloadMapHandler(router: Router) {
   router.post(
@@ -257,7 +257,7 @@ async function download(
       ('minzoom', ${minZoom}),
       ('maxzoom', ${maxZoom}),
       ('bounds', ${bbox(boundary).join(',')}),
-      ('attribution', 'TODO')`;
+      ('attribution', ${map.attribution})`;
 
   db.prepare(combo.sql).run(...(combo.values as SQLInputValue[]));
 
@@ -270,19 +270,46 @@ async function download(
   let downloadedCount = 0;
   let logTs = 0;
 
+  const client = connect(new URL(map.url).origin);
+
   async function downloadTile(tile: Tile) {
-    const response = await got(
+    const url = new URL(
       map.url
         .replace('{x}', tile[0].toString())
         .replace('{y}', tile[1].toString())
         .replace('{z}', tile[2].toString()) +
         (scale && map.extraScales?.includes(scale) ? `@${scale}x` : ''),
-      {
-        responseType: 'buffer',
-        throwHttpErrors: false,
-        http2: true,
-      },
     );
+
+    const buffer = await new Promise<Buffer>((resolve, reject) => {
+      const req = client.request({
+        ':path': url.pathname + url.search,
+        ':method': 'GET',
+      });
+
+      req.on('response', (headers) => {
+        const statusCode = Number(headers[':status']);
+
+        if (statusCode !== 200 && statusCode !== 404) {
+          reject(new Error(`Unexpected status code: ${statusCode}`));
+          req.close();
+        }
+      });
+
+      const chunks: Buffer[] = [];
+
+      req.on('data', (chunk) => chunks.push(chunk));
+
+      req.on('end', () => {
+        resolve(Buffer.concat(chunks));
+      });
+
+      req.on('error', (err) => {
+        reject(err);
+      });
+
+      req.end();
+    });
 
     downloadedCount++;
 
@@ -297,13 +324,9 @@ async function download(
       logTs = Date.now();
     }
 
-    if (response.statusCode === 200) {
-      const [x, y, z] = tile;
+    const [x, y, z] = tile;
 
-      stmt.run(z, x, (1 << z) - 1 - y, response.body);
-    } else if (response.statusCode !== 404) {
-      throw new HTTPError(response);
-    }
+    stmt.run(z, x, (1 << z) - 1 - y, buffer);
   }
 
   const active: Promise<void>[] = [];
