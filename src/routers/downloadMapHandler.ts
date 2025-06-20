@@ -323,6 +323,14 @@ async function download(
           'code' in err &&
           err.code === constants.NGHTTP2_REFUSED_STREAM
         ) {
+          logger.warn(
+            { err, tile },
+            'HTTP/2 refused stream error, retrying download for tile %j (%d/%d)',
+            tile,
+            i + 1,
+            5,
+          );
+
           await new Promise((r) => setTimeout(r, 100 * (i + 1)));
         } else {
           throw err;
