@@ -1,4 +1,5 @@
 import Router from '@koa/router';
+import { createServer as createSecureServer } from 'https';
 import cors from 'kcors';
 import Koa from 'koa';
 import koaBody from 'koa-body';
@@ -6,12 +7,14 @@ import koaPinoLogger from 'koa-pino-logger';
 import websockify from 'koa-websocket';
 import { readFileSync } from 'node:fs';
 import { unlink } from 'node:fs/promises';
+import { createServer } from 'node:http';
 import 'source-map-support/register.js';
 import { initDatabase } from './database.js';
-import { getEnv } from './env.js';
+import { getEnv, getEnvInteger } from './env.js';
 import { appLogger } from './logger.js';
 import { authRouter } from './routers/auth/index.js';
 import { trackingRouter } from './routers/deviceTracking/index.js';
+import { attachDownloadMapHandler } from './routers/downloadMapHandler.js';
 import { galleryRouter } from './routers/gallery/index.js';
 import { attachPostGarminCourses } from './routers/garminCoursesHandler.js';
 import { geotoolsRouter } from './routers/geotools/index.js';
@@ -22,18 +25,42 @@ import { tracklogsRouter } from './routers/tracklogs/index.js';
 import { startSocketDeviceTracking } from './socketDeviceTracking.js';
 import { attachWs } from './ws.js';
 
+await initDatabase();
+
 const logger = appLogger.child({ module: 'app' });
 
-const app = websockify(
-  new Koa(),
-  {},
-  getEnv('HTTP_SSL_ENABLE', '')
-    ? {
-        key: readFileSync(getEnv('HTTP_SSL_KEY')!),
-        cert: readFileSync(getEnv('HTTP_SSL_CERT')!),
-      }
-    : undefined,
-);
+const app = new Koa();
+
+const wsApp = websockify(app);
+
+const httpPort = getEnvInteger('HTTP_PORT', 0);
+
+if (httpPort) {
+  const httpServer = createServer(wsApp.callback());
+
+  wsApp.ws.listen({ server: httpServer });
+
+  httpServer.listen(httpPort, () => {
+    logger.info(`Freemap v3 HTTP API listening on port ${httpPort}.`);
+  });
+}
+
+const httpsPort = getEnvInteger('HTTPS_PORT', 0);
+
+if (httpsPort) {
+  const httpsOptions = {
+    key: readFileSync(getEnv('HTTP_SSL_KEY')),
+    cert: readFileSync(getEnv('HTTP_SSL_CERT')),
+  };
+
+  const httpsServer = createSecureServer(httpsOptions, wsApp.callback());
+
+  wsApp.ws.listen({ server: httpsServer });
+
+  httpsServer.listen(httpsPort, () => {
+    logger.info(`Freemap v3 HTTPS API listening on port ${httpsPort}.`);
+  });
+}
 
 app.use(
   koaPinoLogger({
@@ -127,6 +154,8 @@ router.use(
 
 router.use('/maps', mapsRouter.routes(), mapsRouter.allowedMethods());
 
+attachDownloadMapHandler(router);
+
 attachLoggerHandler(router);
 
 attachGetUsers(router);
@@ -135,18 +164,6 @@ attachPostGarminCourses(router);
 
 app.use(router.routes()).use(router.allowedMethods());
 
-attachWs(app);
+attachWs(wsApp);
 
-initDatabase()
-  .then(() => {
-    const port = getEnv('HTTP_PORT');
-
-    app.listen(port, () => {
-      logger.info(`Freemap v3 API listening on port ${port}.`);
-    });
-
-    startSocketDeviceTracking();
-  })
-  .catch((err) => {
-    logger.fatal({ err }, 'Error initializing database.');
-  });
+startSocketDeviceTracking();

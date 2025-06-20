@@ -1,9 +1,9 @@
 import Router from '@koa/router';
 
-import randomize from 'randomatic';
 import sql, { bulk } from 'sql-template-tag';
 import { authenticator } from '../../authenticator.js';
 import { pool } from '../../database.js';
+import { nanoid } from '../../randomId.js';
 import {
   acceptValidator,
   bodySchemaValidator,
@@ -43,7 +43,7 @@ export function attachPostMapHandler(router: Router) {
     async (ctx) => {
       const { name, public: pub, data, writers } = ctx.request.body;
 
-      const id = randomize('Aa0', 8);
+      const id = nanoid();
 
       const now = new Date();
 

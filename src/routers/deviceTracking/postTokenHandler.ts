@@ -1,9 +1,9 @@
 import Router from '@koa/router';
 
-import randomize from 'randomatic';
 import sql from 'sql-template-tag';
 import { authenticator } from '../../authenticator.js';
 import { pool } from '../../database.js';
+import { nanoid } from '../../randomId.js';
 import {
   acceptValidator,
   bodySchemaValidator,
@@ -51,7 +51,7 @@ export function attachPostTokenHandler(router: Router) {
         ctx.throw(403);
       }
 
-      const token = randomize('Aa0', 8);
+      const token = nanoid();
 
       const { timeFrom, timeTo, note, listingLabel } = ctx.request.body;
 

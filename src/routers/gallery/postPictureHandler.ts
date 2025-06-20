@@ -2,8 +2,8 @@ import Router from '@koa/router';
 import { execFile } from 'child_process';
 import ExifReader from 'exifreader';
 import { promisify } from 'node:util';
+import shortUuid from 'short-uuid';
 import sql from 'sql-template-tag';
-import uuidBase62 from 'uuid-base62';
 import { authenticator } from '../../authenticator.js';
 import { contentTypeMiddleware } from '../../contentTypeMiddleware.js';
 import { pool, runInTransaction } from '../../database.js';
@@ -136,7 +136,7 @@ export function attachPostPictureHandler(router: Router) {
             premium,
           } = ctx.request.body.meta;
 
-          const name = uuidBase62.v4();
+          const name = shortUuid.generate();
 
           const [exif] = await Promise.all([
             ExifReader.load(image.filepath),

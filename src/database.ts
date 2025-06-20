@@ -1,11 +1,11 @@
 import { Middleware } from 'koa';
 import { createPool } from 'mariadb';
-import { getEnv } from './env.js';
+import { getEnv, getEnvInteger } from './env.js';
 import { appLogger } from './logger.js';
 
 export const pool = createPool({
   host: getEnv('MARIADB_HOST'),
-  port: Number(getEnv('MARIADB_PORT', '3306')),
+  port: getEnvInteger('MARIADB_PORT', 3306),
   database: getEnv('MARIADB_DATABASE'),
   user: getEnv('MARIADB_USER'),
   password: getEnv('MARIADB_PASSWORD'),
@@ -34,7 +34,17 @@ export async function initDatabase() {
       lon FLOAT(9, 6) NULL,
       settings VARCHAR(4096) CHARSET utf8 COLLATE utf8_bin NOT NULL DEFAULT '{}',
       sendGalleryEmails BOOL NOT NULL DEFAULT 1,
+      premiumExpiration TIMESTAMP NULL,
+      credits FLOAT NOT NULL DEFAULT 0,
       language CHAR(2) NULL
+    ) ENGINE=InnoDB`,
+
+    `CREATE TABLE IF NOT EXISTS blockedCredit (
+      id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+      amount FLOAT NOT NULL,
+      userId INT UNSIGNED NOT NULL,
+      createdAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (userId) REFERENCES user (id) ON DELETE CASCADE
     ) ENGINE=InnoDB`,
 
     `CREATE TABLE IF NOT EXISTS auth (
@@ -45,20 +55,19 @@ export async function initDatabase() {
       FOREIGN KEY (userId) REFERENCES user (id) ON DELETE CASCADE
     ) ENGINE=InnoDB`,
 
-    `CREATE TABLE IF NOT EXISTS purchase_token (
+    `CREATE TABLE IF NOT EXISTS purchaseToken (
       token VARCHAR(255) CHARSET ascii NULL PRIMARY KEY,
       userId INT UNSIGNED NOT NULL,
       createdAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
       expireAt TIMESTAMP NOT NULL,
+      item JSON NOT NULL,
       FOREIGN KEY (userId) REFERENCES user (id) ON DELETE CASCADE
     ) ENGINE=InnoDB`,
 
     `CREATE TABLE IF NOT EXISTS purchase (
       userId INT UNSIGNED NOT NULL,
-      article VARCHAR(255) NOT NULL,
+      item JSON NOT NULL,
       createdAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      expireAt TIMESTAMP NOT NULL,
-      INDEX purExpIdx USING BTREE (expireAt),
       FOREIGN KEY (userId) REFERENCES user (id) ON DELETE CASCADE
     ) ENGINE=InnoDB`,
 
@@ -176,22 +185,16 @@ export async function initDatabase() {
 
   const updates: (string | string[])[] = [
     [
-      'ALTER TABLE purchase_token ADD COLUMN expireAt TIMESTAMP',
-      'UPDATE purchase_token SET expireAt = DATE_ADD(createdAt, INTERVAL 1 HOUR)',
-      'ALTER TABLE purchase_token MODIFY COLUMN expireAt TIMESTAMP NOT NULL',
+      'ALTER TABLE user ADD COLUMN premiumExpiration TIMESTAMP NULL',
+      'UPDATE user SET premiumExpiration = (SELECT MAX(expireAt) FROM purchase WHERE userId = user.id)',
+      'ALTER TABLE purchase DROP COLUMN expireAt',
+      "ALTER TABLE purchase ADD COLUMN item JSON NOT NULL DEFAULT '{}'",
+      "UPDATE purchase SET item = JSON_OBJECT('type', 'legacy', 'value', article) WHERE item IS NULL",
+      'ALTER TABLE purchase DROP COLUMN article',
     ],
-    [
-      'ALTER TABLE purchase ADD COLUMN expireAt TIMESTAMP',
-      'UPDATE purchase SET expireAt = DATE_ADD(createdAt, INTERVAL 1 YEAR)',
-      'ALTER TABLE purchase MODIFY COLUMN expireAt TIMESTAMP NOT NULL',
-    ],
-    'ALTER TABLE picture ADD COLUMN premium BIT NOT NULL DEFAULT FALSE',
-    'CREATE INDEX purExpIdx ON purchase (expireAt) USING BTREE',
-    'CREATE INDEX picPano ON picture (pano)',
-    'CREATE INDEX picPremium ON picture (premium)',
-    'CREATE INDEX picTakenAtIdx ON picture (takenAt) USING BTREE',
-    'CREATE INDEX picCreatedAtIdx ON picture (createdAt) USING BTREE',
-    'CREATE INDEX authTokenIdx ON auth (authToken)',
+    'ALTER TABLE user ADD COLUMN credits FLOAT NOT NULL DEFAULT 0',
+    'RENAME TABLE purchase_token TO purchaseToken',
+    'ALTER TABLE purchaseToken ADD COLUMN item JSON NOT NULL',
   ];
 
   const db = await pool.getConnection();
@@ -225,9 +228,7 @@ export async function initDatabase() {
 
     try {
       await Promise.all([
-        db.query('DELETE FROM purchase_token WHERE expireAt < NOW()'),
-        // Commented-out: Keep purchase records
-        // db.query('DELETE FROM purchase WHERE expireAt < NOW()'),
+        db.query('DELETE FROM purchaseToken WHERE expireAt < NOW()'),
       ]);
     } finally {
       db.release();

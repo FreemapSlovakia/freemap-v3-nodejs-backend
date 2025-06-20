@@ -4,8 +4,8 @@ import { getEnv } from './env.js';
 
 export const garminOauth = new OAuth({
   consumer: {
-    key: getEnv('GARMIN_OAUTH_CONSUMER_KEY')!,
-    secret: getEnv('GARMIN_OAUTH_CONSUMER_SECRET')!,
+    key: getEnv('GARMIN_OAUTH_CONSUMER_KEY'),
+    secret: getEnv('GARMIN_OAUTH_CONSUMER_SECRET'),
   },
   signature_method: 'HMAC-SHA1',
   hash_function(base_string, key) {

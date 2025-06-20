@@ -1,8 +1,8 @@
 import Router from '@koa/router';
-import randomize from 'randomatic';
 import sql from 'sql-template-tag';
 import { authenticator } from '../../authenticator.js';
 import { pool } from '../../database.js';
+import { nanoid } from '../../randomId.js';
 import {
   acceptValidator,
   bodySchemaValidator,
@@ -38,7 +38,7 @@ export function attachPostDeviceHandler(router: Router) {
     async (ctx) => {
       const token1 = /^(imei|did:).*/.test(ctx.request.body.token ?? '')
         ? ctx.request.body.token
-        : randomize('Aa0', 8);
+        : nanoid();
 
       const { name, maxCount, maxAge } = ctx.request.body;
 

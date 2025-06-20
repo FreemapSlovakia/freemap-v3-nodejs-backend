@@ -25,7 +25,8 @@ export function attachGetPictureImageHandler(router: Router) {
 
       if (
         row.premium &&
-        !ctx.state.user?.isPremium &&
+        (!ctx.state.user?.premiumExpiration ||
+          ctx.state.user.premiumExpiration < new Date()) &&
         ctx.state.user?.id !== row.userId
       ) {
         return ctx.throw(402, 'only for premium users');

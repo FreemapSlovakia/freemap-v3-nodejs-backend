@@ -1,6 +1,7 @@
 import { Middleware } from 'koa';
 import sql from 'sql-template-tag';
 import { pool } from './database.js';
+import { User } from './koaTypes.js';
 
 export const authProviderToColumn = {
   facebook: 'facebookUserId',
@@ -15,7 +16,9 @@ export const columnToAuthProvider = Object.fromEntries(
 
 export function authenticator(require?: boolean): Middleware {
   return async function authorize(ctx, next) {
-    let { authToken } = ctx.query; // used in websockets
+    let authToken = Array.isArray(ctx.query.authToken)
+      ? ctx.query.authToken[0]
+      : ctx.query.authToken; // used in websockets
 
     if (!authToken) {
       const ah = ctx.get('Authorization');
@@ -41,13 +44,9 @@ export function authenticator(require?: boolean): Middleware {
     }
 
     const [userRow] = await pool.query(sql`
-      SELECT
-        user.*,
-        EXISTS (
-          SELECT 1 FROM purchase WHERE userId = id AND expireAt > NOW()
-        ) AS isPremium
+      SELECT user.*
       FROM user INNER JOIN auth ON (userId = id)
-      WHERE authToken = ${authToken as any}
+      WHERE authToken = ${authToken}
     `);
 
     if (!userRow) {
@@ -65,46 +64,54 @@ export function authenticator(require?: boolean): Middleware {
       return;
     }
 
-    ctx.state.user = {
-      ...userRow,
-      ...userForResponse({ ...userRow, authToken }),
-    };
+    ctx.state.user = rowToUser(userRow, authToken);
 
     await next();
   };
 }
 
-export function userForResponse(user: any) {
+export function rowToUser(row: any, authToken: string): User {
+  return {
+    ...row,
+    isAdmin: Boolean(row.isAdmin),
+    authProviders: Object.entries(row)
+      .filter(([column, value]) => value && column in columnToAuthProvider)
+      .map(([column]) => columnToAuthProvider[column]),
+    authToken,
+    settings: row.settings ? JSON.parse(row.settings) : row.settings,
+  };
+}
+
+export function userForResponse(user: User) {
   const {
-    id,
-    name,
+    authProviders,
+    authToken,
+    credits,
     email,
+    id,
+    isAdmin,
     language,
     lat,
     lon,
+    name,
+    premiumExpiration,
     sendGalleryEmails,
-    isAdmin,
     settings,
-    isPremium,
-    authToken,
   } = user;
 
   return {
-    id,
-    name,
+    authProviders,
+    authToken,
+    credits,
     email,
-    isAdmin: Boolean(isAdmin),
+    id,
+    isAdmin,
+    language,
     lat,
     lon,
-    settings: typeof settings === 'string' ? JSON.parse(settings) : settings,
+    name,
+    premiumExpiration: premiumExpiration?.toISOString() ?? null,
     sendGalleryEmails: Boolean(sendGalleryEmails),
-    language,
-    isPremium: Boolean(isPremium),
-    authToken,
-    authProviders:
-      user.authProviders ??
-      Object.entries(user)
-        .filter(([column, value]) => value && column in columnToAuthProvider)
-        .map(([column]) => columnToAuthProvider[column]),
+    settings,
   };
 }

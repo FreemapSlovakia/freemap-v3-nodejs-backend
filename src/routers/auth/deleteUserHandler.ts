@@ -1,6 +1,7 @@
 import Router from '@koa/router';
 import { unlink } from 'node:fs/promises';
 import sql from 'sql-template-tag';
+import { appLogger } from 'src/logger.js';
 import { authenticator } from '../../authenticator.js';
 import { runInTransaction } from '../../database.js';
 import { picturesDir } from '../gallery/constants.js';
@@ -17,10 +18,15 @@ export function attachDeleteUserHandler(router: Router) {
         sql`SELECT pathname FROM picture WHERE userId = ${ctx.state.user!.id} FOR UPDATE`,
       );
 
+      const logger = appLogger.child({
+        module: 'deleteUser',
+        reqId: ctx.reqId,
+      });
+
       await Promise.all(
-        rows.map((row: any) =>
+        rows.map((row: { pathname: string }) =>
           unlink(`${picturesDir}/${row.pathname}`).catch((err) => {
-            ctx.log.error({ err }, 'Error deleting picture.');
+            logger.error({ err }, 'Error deleting picture.');
           }),
         ),
       );

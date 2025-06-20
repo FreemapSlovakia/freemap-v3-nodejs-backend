@@ -5,9 +5,9 @@ import { getEnv } from '../../env.js';
 import { acceptValidator } from '../../requestValidators.js';
 import { login } from './loginProcessor.js';
 
-const clientId = getEnv('OSM_OAUTH2_CLIENT_ID')!;
+const clientId = getEnv('OSM_OAUTH2_CLIENT_ID');
 
-const clientSecret = getEnv('OSM_OAUTH2_CLIENT_SECRET')!;
+const clientSecret = getEnv('OSM_OAUTH2_CLIENT_SECRET');
 
 const redirectUri = getEnv('OSM_OAUTH2_REDIRECT_URI');
 

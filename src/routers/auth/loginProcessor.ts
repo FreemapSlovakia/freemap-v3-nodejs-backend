@@ -1,7 +1,11 @@
 import { ParameterizedContext } from 'koa';
 import { randomBytes } from 'node:crypto';
-import sql, { RawValue, join, raw } from 'sql-template-tag';
-import { authProviderToColumn, userForResponse } from '../../authenticator.js';
+import sql, { RawValue, empty, join, raw } from 'sql-template-tag';
+import {
+  authProviderToColumn,
+  rowToUser,
+  userForResponse,
+} from '../../authenticator.js';
 import { pool } from '../../database.js';
 
 export async function login(
@@ -95,6 +99,7 @@ export async function login(
           isAdmin,
           sendGalleryEmails,
           settings,
+          premiumExpiration,
         } = userRow;
 
         await conn.query(sql`DELETE FROM auth WHERE userId = ${id}`);
@@ -108,7 +113,7 @@ export async function login(
             'map',
             'mapWriteAccess', // TODO may conflict
             'purchase',
-            'purchase_token',
+            'purchaseToken',
           ].map((table) =>
             conn.query(
               sql`UPDATE ${raw(table)} SET userId = ${currentUser.id} WHERE userId = ${id}`,
@@ -119,14 +124,16 @@ export async function login(
         await conn.query(sql`DELETE FROM user WHERE id = ${id}`);
 
         // TODO merge settings
+        // TODO sum purchase expirations
 
-        await conn.query(sql`UPDATE user SET
+        const query = sql`UPDATE user SET
           email = COALESCE(email, ${email}),
           lat = COALESCE(lat, ${lat}),
           lon = COALESCE(lon, ${lon}),
           language = COALESCE(language, ${language}),
           createdAt = LEAST(createdAt, ${createdAt}),
           isAdmin = isAdmin OR ${isAdmin},
+          ${premiumExpiration ? sql`premiumExpiration = COALESCE(GREATEST(premiumExpiration, ${premiumExpiration}), ${premiumExpiration})` : empty},
           sendGalleryEmails = sendGalleryEmails OR ${sendGalleryEmails},
           settings = COALESCE(settings, ${settings}),
           ${join(
@@ -136,7 +143,9 @@ export async function login(
             ),
           )}
           WHERE id = ${currentUser.id}
-        `);
+        `;
+
+        await conn.query(query);
       } else {
         if (Object.keys(extraUserFields).length > 0) {
           await conn.query(sql`UPDATE user SET
@@ -210,13 +219,7 @@ export async function login(
     }
 
     const [row] = await conn.query(
-      sql`
-        SELECT
-          *,
-          EXISTS (SELECT 1 FROM purchase WHERE DATEDIFF(NOW(), createdAt) <= 365 AND userId = id) AS isPremium
-        FROM user
-        WHERE id = ${userId}
-      `,
+      sql`SELECT * FROM user WHERE id = ${userId}`,
     );
 
     userRow1 = row;
@@ -231,7 +234,7 @@ export async function login(
   }
 
   ctx.body = {
-    user: userForResponse({ ...userRow1, authToken }),
+    user: userForResponse(rowToUser(userRow1, authToken)),
     connect,
     clientData,
   };

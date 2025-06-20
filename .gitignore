@@ -1,7 +1,4 @@
 node_modules
-console.out
-nohup.out
-config/development.json
-hgt
 build
 .env
+data

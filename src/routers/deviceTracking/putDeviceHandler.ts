@@ -1,9 +1,9 @@
 import Router from '@koa/router';
 
-import randomize from 'randomatic';
 import sql, { empty } from 'sql-template-tag';
 import { authenticator } from '../../authenticator.js';
 import { runInTransaction } from '../../database.js';
+import { nanoid } from '../../randomId.js';
 import {
   acceptValidator,
   bodySchemaValidator,
@@ -61,7 +61,7 @@ export function attachPutDeviceHandler(router: Router) {
       let token;
 
       if (regenerateToken) {
-        token = randomize('Aa0', 8);
+        token = nanoid();
       }
 
       await conn.query(

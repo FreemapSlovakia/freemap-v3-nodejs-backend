@@ -2,7 +2,7 @@ import net from 'net';
 import sql, { empty } from 'sql-template-tag';
 import { pool } from './database.js';
 import { storeTrackPoint } from './deviceTracking.js';
-import { getEnv } from './env.js';
+import { getEnvInteger } from './env.js';
 import { appLogger } from './logger.js';
 
 const logger = appLogger.child({ module: 'socketDeviceTracking' });
@@ -10,7 +10,7 @@ const logger = appLogger.child({ module: 'socketDeviceTracking' });
 let id = 0;
 
 export function startSocketDeviceTracking() {
-  const port = getEnv('TRACKING_SOCKET_PORT', '');
+  const port = getEnvInteger('TRACKING_SOCKET_PORT', 0);
 
   if (!port) {
     return null;
@@ -90,9 +90,9 @@ export function startSocketDeviceTracking() {
             nn,
             ss,
             orientation,
-            ioState,
-            milepost,
-            mileData,
+            // ioState,
+            // milepost,
+            // mileData,
           ] = slices;
 
           if (avail !== 'A') {

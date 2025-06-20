@@ -26,8 +26,7 @@ export function attachLoginWithGarminHandler(router: Router) {
       });
 
       if (!response.ok) {
-        ctx.log.error(await response.text());
-        ctx.throw(500);
+        throw new Error('Authorization error: ' + (await response.text()));
       }
 
       const sp = new URLSearchParams(await response.text());
@@ -52,7 +51,7 @@ export function attachLoginWithGarminHandler(router: Router) {
 
       setTimeout(() => tokenSecrets.delete(token), 30 * 60_000); // max 30 minutes
 
-      const callback = new URL(getEnv('GARMIN_OAUTH_CALLBACK')!);
+      const callback = new URL(getEnv('GARMIN_OAUTH_CALLBACK'));
 
       // extraQuery is unused now
       for (const [key, value] of Object.entries(

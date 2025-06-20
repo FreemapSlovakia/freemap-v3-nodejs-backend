@@ -92,7 +92,7 @@ export function queryAdapter(
 ): Middleware {
   return async (ctx, next) => {
     for (const key of Object.keys(spec)) {
-      let value = ctx.query[key];
+      const value = ctx.query[key];
 
       if (key in arraySpec) {
         ctx.query[key] = arraySpec[key](Array.isArray(value) ? value : [value]);

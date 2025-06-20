@@ -83,12 +83,12 @@ async function compute(ctx: ParameterizedContext) {
 
           try {
             fd = await open(hgtPath, 'r');
-          } catch (e) {
+          } catch {
             try {
               await fetchSafe(key);
 
               fd = await open(hgtPath, 'r');
-            } catch (e) {
+            } catch {
               await (await open(hgtPath, 'w')).close();
 
               fd = await open(hgtPath, 'r');
