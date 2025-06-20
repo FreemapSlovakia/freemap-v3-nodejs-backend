@@ -331,7 +331,7 @@ async function download(
   await sendMail(
     email,
     'Freemap Map Download',
-    `Your map is ready at ${getEnv('MBTILES_URL_PREFIX')}/${dbName}.mbtiles for 24 hours.`,
+    `Your map is ready at ${getEnv('MBTILES_URL_PREFIX')}/${encodeURIComponent(dbName)}.mbtiles for 24 hours.`,
   );
 }
 
