@@ -39,10 +39,11 @@ export async function initDatabase() {
       language CHAR(2) NULL
     ) ENGINE=InnoDB`,
 
-    `CREATE TABLE IF NOT EXISTS blocked_credit (
+    `CREATE TABLE IF NOT EXISTS blockedCredit (
       id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
       amount FLOAT NOT NULL,
       userId INT UNSIGNED NOT NULL,
+      createdAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (userId) REFERENCES user (id) ON DELETE CASCADE
     ) ENGINE=InnoDB`,
 

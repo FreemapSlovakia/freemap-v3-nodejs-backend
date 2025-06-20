@@ -1,5 +1,6 @@
 import { PoolConnection } from 'mariadb';
 import { Socket } from 'net';
+import { Logger } from 'pino';
 
 export type User = {
   authProviders: string[];
@@ -36,5 +37,9 @@ declare module 'koa' {
     websocket: WebSocket & Socket;
     reqId: string;
     params: Record<string, string>;
+  }
+
+  interface ExtendableContext {
+    log: Logger;
   }
 }
