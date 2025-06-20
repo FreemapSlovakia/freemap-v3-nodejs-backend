@@ -84,9 +84,7 @@ export function attachPostGarminCourses(router: Router) {
           ctx.throw(401, 'invalid oauth token');
         }
 
-        ctx.log.error('Error sending course', responseText);
-
-        ctx.throw(500);
+        throw new Error('Error sending course: ' + responseText);
       }
 
       ctx.status = 204;

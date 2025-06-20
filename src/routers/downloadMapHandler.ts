@@ -7,6 +7,7 @@ import got, { HTTPError } from 'got';
 import { DatabaseSync, SQLInputValue } from 'node:sqlite';
 import { Logger } from 'pino';
 import sql from 'sql-template-tag';
+import { appLogger } from 'src/logger.js';
 import { authenticator } from '../authenticator.js';
 import { pool, runInTransaction } from '../database.js';
 import { DownloadableMap, downloadableMaps } from '../downloadableMaps.js';
@@ -150,6 +151,11 @@ export function attachDownloadMapHandler(router: Router) {
         sql`INSERT INTO blockedCredit SET amount = ${price}, userId = ${user.id}`,
       );
 
+      const logger = appLogger.child({
+        module: 'downloadMap',
+        reqId: ctx.reqId,
+      });
+
       (async () => {
         let refund = false;
 
@@ -163,10 +169,10 @@ export function attachDownloadMapHandler(router: Router) {
             name,
             email,
             totalTiles,
-            ctx.log,
+            logger,
           );
         } catch (err) {
-          ctx.log.error({ err }, 'Error during map download.');
+          logger.error({ err }, 'Error during map download.');
 
           await sendMail(
             email,
@@ -197,9 +203,9 @@ export function attachDownloadMapHandler(router: Router) {
           conn.release();
         }
 
-        ctx.log.error('Map download complete.');
+        logger.error('Map download complete.');
       })().catch((err) => {
-        ctx.log.error({ err }, 'Error during map download cleanup.');
+        logger.error({ err }, 'Error during map download cleanup.');
       });
 
       ctx.status = 204;

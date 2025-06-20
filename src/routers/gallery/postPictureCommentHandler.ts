@@ -1,6 +1,7 @@
 import Router from '@koa/router';
 import { PoolConnection } from 'mariadb';
 import sql from 'sql-template-tag';
+import { appLogger } from 'src/logger.js';
 import { authenticator } from '../../authenticator.js';
 import { runInTransaction } from '../../database.js';
 import { getEnv, getEnvBoolean } from '../../env.js';
@@ -104,8 +105,13 @@ export function attachPostPictureCommentHandler(router: Router) {
       const [{ insertId }, [picInfo] = [], emails = []] =
         await Promise.all(proms);
 
+      const logger = appLogger.child({
+        module: 'postPictureComment',
+        reqId: ctx.reqId,
+      });
+
       async function sendCommentMail(to: string, own: boolean, lang: string) {
-        ctx.log.info({ to, lang, own }, 'Sending picture comment mail.');
+        logger.info({ to, lang, own }, 'Sending picture comment mail.');
 
         const picTitle = picInfo.title ? `"${picInfo.title} "` : '';
 
