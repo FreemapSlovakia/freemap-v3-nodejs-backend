@@ -33,13 +33,10 @@ declare module 'koa' {
 
   type PropertyKey = never;
 
-  interface DefaultContext {
+  interface ExtendableContext {
+    log: Logger;
     websocket: WebSocket & Socket;
     reqId: string;
     params: Record<string, string>;
-  }
-
-  interface ExtendableContext {
-    log: Logger;
   }
 }
