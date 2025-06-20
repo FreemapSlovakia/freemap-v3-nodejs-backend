@@ -3,7 +3,8 @@ import { pointToTile, Tile, tileToGeoJSON } from '@mapbox/tilebelt';
 import { bbox } from '@turf/bbox';
 import booleanIntersects from '@turf/boolean-intersects';
 import type { Feature, MultiPolygon, Polygon } from 'geojson';
-import { connect } from 'node:http2';
+import { unlink } from 'node:fs/promises';
+import { ClientHttp2Session, connect } from 'node:http2';
 import { DatabaseSync, SQLInputValue } from 'node:sqlite';
 import { Logger } from 'pino';
 import sql from 'sql-template-tag';
@@ -15,7 +16,7 @@ import { appLogger } from '../logger.js';
 import { sendMail } from '../mailer.js';
 import { bodySchemaValidator } from '../requestValidators.js';
 
-const CONCURRENCY = 16;
+const CONCURRENCY = 8;
 
 export function attachDownloadMapHandler(router: Router) {
   router.post(
@@ -191,7 +192,9 @@ export function attachDownloadMapHandler(router: Router) {
           await conn.beginTransaction();
 
           if (refund) {
-            await conn.query(sql`UPDATE user SET credits = credits + ${price}`);
+            await conn.query(
+              sql`UPDATE user SET credits = credits + ${price} WHERE id = ${user.id}`,
+            );
           }
 
           await conn.query(
@@ -227,10 +230,12 @@ async function download(
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
   const safeName = name.trim().replace(/[^a-zA-Z0-9._-]+/g, '_');
   const dbName = safeName ? safeName + '-' + timestamp : timestamp;
-  const db = new DatabaseSync(getEnv('MBTILES_DIR') + `/${dbName}.mbtiles`);
+  const filename = getEnv('MBTILES_DIR') + `/${dbName}.mbtiles`;
+  const db = new DatabaseSync(filename);
 
   db.exec(`
     PRAGMA journal_mode = WAL;
+    PRAGMA synchronous = WAL;
 
     CREATE TABLE IF NOT EXISTS metadata (
       name TEXT,
@@ -269,8 +274,18 @@ async function download(
 
   let downloadedCount = 0;
   let logTs = 0;
+  let closing = false;
 
-  const client = connect(new URL(map.url).origin);
+  let client!: ClientHttp2Session;
+
+  const handleGoaway = () => {
+    if (!closing) {
+      client = connect(new URL(map.url).origin);
+      client.once('goaway', handleGoaway);
+    }
+  };
+
+  handleGoaway();
 
   async function downloadTile(tile: Tile) {
     const url = new URL(
@@ -321,17 +336,21 @@ async function download(
           i < 5 &&
           err instanceof Error &&
           'code' in err &&
-          err.code === 'ERR_HTTP2_STREAM_ERROR'
+          typeof err.code === 'string' &&
+          [
+            'ERR_HTTP2_STREAM_ERROR',
+            'ERR_HTTP2_INVALID_SESSION',
+            'ERR_HTTP2_GOAWAY_SESSION',
+          ].includes(err.code)
         ) {
           logger.warn(
-            { err, tile },
-            'HTTP/2 refused stream error, retrying download for tile %j (%d/%d)',
-            tile,
+            { code: err.code },
+            err.code + '; retrying download (%d/%d)',
             i + 1,
             5,
           );
 
-          await new Promise((r) => setTimeout(r, 100 * (i + 1)));
+          await new Promise((resolve) => setTimeout(resolve, i * 100));
         } else {
           throw err;
         }
@@ -382,11 +401,19 @@ async function download(
         active.push(downloadTile(value));
       }
     }
+
+    db.close();
+  } catch (err) {
+    db.close();
+
+    await unlink(filename);
+
+    throw err;
   } finally {
+    closing = true;
+
     client.close();
   }
-
-  db.close();
 
   logger.info('Map download completed, sending email notification.');
 
