@@ -274,6 +274,7 @@ async function download(
       {
         responseType: 'buffer',
         throwHttpErrors: false,
+        http2: true,
       },
     );
 
