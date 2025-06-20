@@ -133,7 +133,7 @@ export async function login(
           language = COALESCE(language, ${language}),
           createdAt = LEAST(createdAt, ${createdAt}),
           isAdmin = isAdmin OR ${isAdmin},
-          ${premiumExpiration ? sql`premiumExpiration = COALESCE(GREATEST(premiumExpiration, ${premiumExpiration}), ${premiumExpiration})` : empty},
+          ${premiumExpiration ? sql`premiumExpiration = COALESCE(GREATEST(premiumExpiration, ${premiumExpiration}), ${premiumExpiration}),` : empty}
           sendGalleryEmails = sendGalleryEmails OR ${sendGalleryEmails},
           settings = COALESCE(settings, ${settings}),
           ${join(
