@@ -3,7 +3,7 @@ import { pointToTile, Tile, tileToGeoJSON } from '@mapbox/tilebelt';
 import { bbox } from '@turf/bbox';
 import booleanIntersects from '@turf/boolean-intersects';
 import type { Feature, MultiPolygon, Polygon } from 'geojson';
-import { connect, constants } from 'node:http2';
+import { connect } from 'node:http2';
 import { DatabaseSync, SQLInputValue } from 'node:sqlite';
 import { Logger } from 'pino';
 import sql from 'sql-template-tag';
@@ -321,7 +321,7 @@ async function download(
           i < 5 &&
           err instanceof Error &&
           'code' in err &&
-          err.code === constants.NGHTTP2_REFUSED_STREAM
+          err.code === 'ERR_HTTP2_STREAM_ERROR'
         ) {
           logger.warn(
             { err, tile },
