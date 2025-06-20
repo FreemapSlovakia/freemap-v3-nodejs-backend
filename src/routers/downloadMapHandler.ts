@@ -168,6 +168,14 @@ export function attachDownloadMapHandler(router: Router) {
         } catch (err) {
           ctx.log.error({ err }, 'Error during map download.');
 
+          await sendMail(
+            email,
+            'Freemap Map Download Error',
+            'An error occurred during your map download. ' +
+              'Your credits have been refunded. ' +
+              'Please try again later or contact support if the problem persists.',
+          );
+
           refund = true;
         }
 
@@ -185,14 +193,6 @@ export function attachDownloadMapHandler(router: Router) {
           );
 
           await conn.commit();
-
-          await sendMail(
-            email,
-            'Freemap Map Download Error',
-            'An error occurred during your map download. ' +
-              'Your credits have been refunded. ' +
-              'Please try again later or contact support if the problem persists.',
-          );
         } finally {
           conn.release();
         }
