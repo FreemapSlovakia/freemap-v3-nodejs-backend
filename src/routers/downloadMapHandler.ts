@@ -3,20 +3,23 @@ import { pointToTile, Tile, tileToGeoJSON } from '@mapbox/tilebelt';
 import { bbox } from '@turf/bbox';
 import booleanIntersects from '@turf/boolean-intersects';
 import { Feature, MultiPolygon, Polygon } from 'geojson';
+import got, { HTTPError } from 'got';
+import { DatabaseSync, SQLInputValue } from 'node:sqlite';
+import { Logger } from 'pino';
 import sql from 'sql-template-tag';
-import { blockedCreditIds } from 'src/blockedCredits.js';
-import { getEnv } from 'src/env.js';
 import { authenticator } from '../authenticator.js';
 import { pool, runInTransaction } from '../database.js';
+import { DownloadableMap, downloadableMaps } from '../downloadableMaps.js';
+import { getEnv } from '../env.js';
 import { bodySchemaValidator } from '../requestValidators.js';
 
-export function attachLoggerHandler(router: Router) {
+export function attachDownloadMapHandler(router: Router) {
   router.post(
     '/downloadMap',
     authenticator(true),
     bodySchemaValidator({
       type: 'object',
-      required: ['boundary', 'urlTemplate', 'maxZoom'],
+      required: ['type', 'minZoom', 'maxZoom', 'boundary', 'name', 'email'],
       properties: {
         type: {
           type: 'string',
@@ -38,6 +41,18 @@ export function attachLoggerHandler(router: Router) {
             geometry: { $ref: '#/definitions/GeoJSONGeometry' },
             properties: { type: 'object' },
           },
+        },
+        name: {
+          type: 'string',
+        },
+        email: {
+          type: 'string',
+          format: 'email',
+        },
+        scale: {
+          type: 'number',
+          minimum: 1,
+          maximum: 3,
         },
       },
       definitions: {
@@ -94,6 +109,13 @@ export function attachLoggerHandler(router: Router) {
         return;
       }
 
+      const map = downloadableMaps[ctx.request.body.type];
+
+      if (!map) {
+        ctx.throw(400, 'invalid map type');
+        return;
+      }
+
       let [{ credits }] = await pool.query(
         sql`SELECT credits FROM user WHERE id = ${ctx.state.user.id} FOR UPDATE`,
       );
@@ -112,15 +134,39 @@ export function attachLoggerHandler(router: Router) {
       );
 
       const { insertId } = await pool.query(
-        sql`INSERT INTO blocked_credit SET amount = ${price}, userId = ${ctx.state.user.id}`,
+        sql`INSERT INTO blockedCredit SET amount = ${price}, userId = ${ctx.state.user.id}`,
       );
 
-      blockedCreditIds.add(insertId);
+      (async () => {
+        let refund = false;
 
-      download(ctx.request.body).catch((err) => {
-        ctx.log.error('Error during map download:', err);
+        try {
+          await download(map, ctx.request.body, ctx.log);
+        } catch (err) {
+          ctx.log.error({ err }, 'Error during map download.');
 
-        // TODO return blocked credit and notify user
+          refund = true;
+        }
+
+        const conn = await pool.getConnection();
+
+        try {
+          await conn.beginTransaction();
+
+          if (refund) {
+            await conn.query(sql`UPDATE user SET credits = credits + ${price}`);
+          }
+
+          await conn.query(
+            sql`DELETE FROM blockedCredit WHERE id = ${insertId}`,
+          );
+
+          await conn.commit();
+        } finally {
+          conn.release();
+        }
+      })().catch((err) => {
+        ctx.log.error({ err }, 'Error during map download cleanup.');
       });
 
       ctx.status = 204;
@@ -128,12 +174,73 @@ export function attachLoggerHandler(router: Router) {
   );
 }
 
-async function download(body: any) {
-  const { type, minZoom, maxZoom, boundary, scale, name, email } = body;
+async function download(map: DownloadableMap, body: any, logger: Logger) {
+  const { minZoom, maxZoom, boundary, scale, name, email } = body;
 
-  calculateTiles(boundary, minZoom, maxZoom);
+  const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+  const dbName = name.trim() ? name.trim() + '-' + timestamp : timestamp;
+  const db = new DatabaseSync(getEnv('MBTILES_DIR') + `/${dbName}.mbtiles`);
 
-  // send email
+  db.exec(`
+    PRAGMA journal_mode = WAL;
+
+    CREATE TABLE IF NOT EXISTS metadata (
+      name TEXT,
+      value TEXT
+    );
+
+    CREATE TABLE IF NOT EXISTS tiles (
+      zoom_level INTEGER,
+      tile_column INTEGER,
+      tile_row INTEGER,
+      tile_data BLOB,
+      PRIMARY KEY (zoom_level, tile_column, tile_row)
+    );
+
+    CREATE UNIQUE INDEX IF NOT EXISTS metadata_index ON metadata (name);
+  `);
+
+  const combo = sql`INSERT INTO metadata (name, value) VALUES
+      ('name', ${name}),
+      ('format', 'jpg'),
+      ('type', 'baselayer'),
+      ('version', '1.0'),
+      ('description', 'Downloaded map tiles from www.freemap.sk'),
+      ('minzoom', ${minZoom}),
+      ('maxzoom', ${maxZoom}),
+      ('bounds', ${bbox(boundary).join(',')}),
+      ('attribution', 'TODO')`;
+
+  db.prepare(combo.sql).run(...(combo.values as SQLInputValue[]));
+
+  const stmt = db.prepare(
+    `INSERT OR IGNORE INTO tiles (zoom_level, tile_column, tile_row, tile_data) VALUES (?, ?, ?, ?)`,
+  );
+
+  for (const tile of calculateTiles(boundary, minZoom, maxZoom)) {
+    const response = await got(
+      map.url
+        .replace('{x}', tile[0].toString())
+        .replace('{y}', tile[1].toString())
+        .replace('{z}', tile[2].toString()) +
+        (scale && scale !== 1 ? `@${scale}x` : ''),
+      {
+        responseType: 'buffer',
+        throwHttpErrors: false,
+      },
+    );
+
+    if (response.statusCode === 200) {
+      const [x, y, z] = tile;
+
+      stmt.run(z, x, (1 << z) - 1 - y, response.body);
+    } else if (response.statusCode !== 404) {
+      throw new HTTPError(response);
+    }
+  }
+
+  db.close();
+
   await got.post(
     `https://api.mailgun.net/v3/${getEnv('MAILGIN_DOMAIN')}/messages`,
     {
@@ -143,7 +250,7 @@ async function download(body: any) {
         from: 'Freemap <noreply@freemap.sk>',
         to: email,
         subject: 'Freemap Map Download',
-        text: `Map is readt at: ${url}`,
+        text: `Map is ready at ${getEnv('MBTILES_URL_PREFIX')}/${dbName}.mbtiles for 24 hours.`,
       },
     },
   );
