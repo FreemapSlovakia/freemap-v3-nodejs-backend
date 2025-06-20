@@ -132,11 +132,13 @@ export function attachPurchaseTokenHandler(router: Router) {
 
       switch (item.type) {
         case 'premium':
-          searchParams.set('price_eur', '500');
+          searchParams.set('price_eur', '800');
+          searchParams.set('price_chr', '80');
 
           break;
         case 'credits': {
           searchParams.set('price_eur', String(item.amount)); // let the exchange rate is 1
+          searchParams.set('price_chr', String(Math.ceil(item.amount / 10)));
 
           searchParams.set(
             'description',
