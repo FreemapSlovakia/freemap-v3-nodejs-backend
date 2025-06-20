@@ -219,7 +219,8 @@ async function download(
   logger: Logger,
 ) {
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-  const dbName = name.trim() ? name.trim() + '-' + timestamp : timestamp;
+  const safeName = name.trim().replace(/[^a-zA-Z0-9._-]+/g, '_');
+  const dbName = safeName ? safeName + '-' + timestamp : timestamp;
   const db = new DatabaseSync(getEnv('MBTILES_DIR') + `/${dbName}.mbtiles`);
 
   db.exec(`
