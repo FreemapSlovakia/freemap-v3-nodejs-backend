@@ -6,7 +6,15 @@ import { getEnv } from './../../env.js';
 
 export function attachPurchaseValidateHandler(router: Router) {
   router.post('/purchaseValidate', runInTransaction(), async (ctx) => {
-    const { token, signature } = ctx.request.body;
+    console.log(ctx.request.body);
+
+    const {
+      token,
+      email,
+      signature,
+      // amount_paid,
+      // currency,
+    } = ctx.request.body;
 
     if (
       createHmac('sha256', getEnv('PURCHASE_SECRET'))
@@ -44,14 +52,15 @@ export function attachPurchaseValidateHandler(router: Router) {
               CASE WHEN premiumExpiration IS NULL OR premiumExpiration < NOW()
                 THEN NOW()
                 ELSE premiumExpiration
-              END + INTERVAL 1 YEAR
+              END + INTERVAL 1 YEAR,
+              email = COALESCE(email, ${email})
             WHERE id = ${userId}`,
         );
         break;
 
       case 'credits':
         await pool.query(
-          sql`UPDATE user SET credits = credits + ${item.amount} WHERE id = ${userId}`,
+          sql`UPDATE user SET credits = credits + ${item.amount}, email = COALESCE(email, ${email}) WHERE id = ${userId}`,
         );
         break;
 
