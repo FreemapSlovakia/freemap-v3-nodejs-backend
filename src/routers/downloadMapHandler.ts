@@ -2,6 +2,7 @@ import Router from '@koa/router';
 import { pointToTile, Tile, tileToGeoJSON } from '@mapbox/tilebelt';
 import { bbox } from '@turf/bbox';
 import booleanIntersects from '@turf/boolean-intersects';
+import center from '@turf/center';
 import type { Feature, MultiPolygon, Polygon } from 'geojson';
 import { unlink } from 'node:fs/promises';
 import { ClientHttp2Session, connect } from 'node:http2';
@@ -24,10 +25,22 @@ export function attachDownloadMapHandler(router: Router) {
     authenticator(true),
     bodySchemaValidator({
       type: 'object',
-      required: ['type', 'minZoom', 'maxZoom', 'boundary', 'name', 'email'],
+      required: [
+        'map',
+        'minZoom',
+        'maxZoom',
+        'boundary',
+        'name',
+        'email',
+        'format',
+      ],
       properties: {
-        type: {
+        map: {
           type: 'string',
+        },
+        format: {
+          type: 'string',
+          enum: ['mbtiles', 'sqlitedb'],
         },
         minZoom: {
           type: 'number',
@@ -112,11 +125,11 @@ export function attachDownloadMapHandler(router: Router) {
       const user = ctx.state.user!;
 
       const map = downloadableMaps.find(
-        ({ type }) => type === ctx.request.body.type,
+        ({ type }) => type === ctx.request.body.map,
       );
 
       if (!map) {
-        ctx.throw(400, 'invalid map type');
+        ctx.throw(400, 'invalid map');
         return;
       }
 
@@ -124,7 +137,7 @@ export function attachDownloadMapHandler(router: Router) {
         sql`SELECT credits FROM user WHERE id = ${user.id} FOR UPDATE`,
       );
 
-      const { minZoom, maxZoom, boundary, scale, name, email } =
+      const { minZoom, maxZoom, boundary, scale, name, email, format } =
         ctx.request.body;
 
       let totalTiles = 0;
@@ -163,6 +176,7 @@ export function attachDownloadMapHandler(router: Router) {
         try {
           await download(
             map,
+            format,
             minZoom,
             maxZoom,
             boundary,
@@ -218,6 +232,7 @@ export function attachDownloadMapHandler(router: Router) {
 
 async function download(
   map: DownloadableMap,
+  format: 'mbtiles' | 'sqlitedb',
   minZoom: number,
   maxZoom: number,
   boundary: Feature<Polygon | MultiPolygon>,
@@ -230,13 +245,18 @@ async function download(
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
   const safeName = name.trim().replace(/[^a-zA-Z0-9._-]+/g, '_');
   const dbName = safeName ? safeName + '-' + timestamp : timestamp;
-  const filename = getEnv('MBTILES_DIR') + `/${dbName}.mbtiles`;
+  const filename = getEnv('MBTILES_DIR') + `/${dbName}.${format}`;
   const db = new DatabaseSync(filename);
 
   db.exec(`
     PRAGMA journal_mode = WAL;
     PRAGMA synchronous = WAL;
+  `);
 
+  const cntr = center(boundary);
+
+  if (format === 'mbtiles') {
+    db.exec(`
     CREATE TABLE IF NOT EXISTS metadata (
       name TEXT,
       value TEXT
@@ -253,7 +273,7 @@ async function download(
     CREATE UNIQUE INDEX IF NOT EXISTS metadata_index ON metadata (name);
   `);
 
-  const combo = sql`INSERT INTO metadata (name, value) VALUES
+    const combo = sql`INSERT INTO metadata (name, value) VALUES
       ('name', ${name}),
       ('format', 'jpg'),
       ('type', ${map.overlay ? 'overlay' : 'baselayer'}),
@@ -264,10 +284,36 @@ async function download(
       ('bounds', ${bbox(boundary).join(',')}),
       ('attribution', ${map.attribution})`;
 
-  db.prepare(combo.sql).run(...(combo.values as SQLInputValue[]));
+    db.prepare(combo.sql).run(...(combo.values as SQLInputValue[]));
+  } else if (format === 'sqlitedb') {
+    db.exec(
+      `
+        CREATE TABLE tiles (x INTEGER, y INTEGER, z INTEGER, s INTEGER, image BLOB, PRIMARY KEY (x, y, z, s));
+        CREATE TABLE info (minzoom INTEGER, maxzoom INTEGER, tilesize INTEGER, center_x DOUBLE, center_y DOUBLE, zooms TEXT, provider INTEGER);
+      `,
+    );
+
+    const min = 17 - maxZoom;
+    const max = 17 - minZoom;
+
+    const zooms = Array.from({ length: max - min + 1 }, (_, i) => max - i).join(
+      ',',
+    );
+
+    const combo = sql`
+      INSERT INTO info (minzoom, maxzoom, tilesize, center_x, center_y, zooms, provider)
+        VALUES (${min}, ${max}, ${256 * (scale ?? 1)}, ${cntr.geometry.coordinates[1]}, ${cntr.geometry.coordinates[0]}, ${zooms}, 0)
+    `;
+
+    db.prepare(combo.sql).run(...(combo.values as SQLInputValue[]));
+  } else {
+    throw new Error('Unsupported format: ' + format);
+  }
 
   const stmt = db.prepare(
-    `INSERT OR IGNORE INTO tiles (zoom_level, tile_column, tile_row, tile_data) VALUES (?, ?, ?, ?)`,
+    format === 'mbtiles'
+      ? `INSERT INTO tiles (zoom_level, tile_column, tile_row, tile_data) VALUES (?, ?, ?, ?)`
+      : `INSERT INTO tiles (z, x, y, image, s) VALUES (?, ?, ?, ?, 0)`,
   );
 
   const it = calculateTiles(boundary, minZoom, maxZoom);
@@ -288,11 +334,13 @@ async function download(
   handleGoaway();
 
   async function downloadTile(tile: Tile) {
+    const [x, y, z] = tile;
+
     const url = new URL(
       map.url
-        .replace('{x}', tile[0].toString())
-        .replace('{y}', tile[1].toString())
-        .replace('{z}', tile[2].toString()) +
+        .replace('{x}', x.toString())
+        .replace('{y}', y.toString())
+        .replace('{z}', z.toString()) +
         (scale && map.extraScales?.includes(scale) ? `@${scale}x` : ''),
     );
 
@@ -370,9 +418,11 @@ async function download(
       logTs = Date.now();
     }
 
-    const [x, y, z] = tile;
-
-    stmt.run(z, x, (1 << z) - 1 - y, buffer);
+    if (format === 'mbtiles') {
+      stmt.run(z, x, (1 << z) - 1 - y, buffer);
+    } else {
+      stmt.run(17 - z, x, y, buffer);
+    }
   }
 
   try {
@@ -420,7 +470,7 @@ async function download(
   await sendMail(
     email,
     'Freemap Map Download',
-    `Your map is ready at ${getEnv('MBTILES_URL_PREFIX')}/${encodeURIComponent(dbName)}.mbtiles for 24 hours.`,
+    `Your map is ready at ${getEnv('MBTILES_URL_PREFIX')}/${encodeURIComponent(dbName)}.${format} for 24 hours.`,
   );
 }
 

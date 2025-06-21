@@ -68,6 +68,7 @@ export async function initDatabase() {
       userId INT UNSIGNED NOT NULL,
       item JSON NOT NULL,
       createdAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      note VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL,
       FOREIGN KEY (userId) REFERENCES user (id) ON DELETE CASCADE
     ) ENGINE=InnoDB`,
 
@@ -195,6 +196,7 @@ export async function initDatabase() {
     'ALTER TABLE user ADD COLUMN credits FLOAT NOT NULL DEFAULT 0',
     'RENAME TABLE purchase_token TO purchaseToken',
     'ALTER TABLE purchaseToken ADD COLUMN item JSON NOT NULL',
+    'ALTER TABLE PURCHASE ADD COLUMN note VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL',
   ];
 
   const db = await pool.getConnection();
