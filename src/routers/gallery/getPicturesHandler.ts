@@ -171,8 +171,8 @@ async function byRadius(ctx: ParameterizedContext) {
     ${takenAtTo ? `AND takenAt <= '${toSqlDate(takenAtTo)}'` : ''}
     ${createdAtFrom ? `AND createdAt >= '${toSqlDate(createdAtFrom)}'` : ''}
     ${createdAtTo ? `AND createdAt <= '${toSqlDate(createdAtTo)}'` : ''}
-    ${pano == null ? '' : ` AND pano = '${pano ? 1 : 0}'`}
-    ${premium == null ? '' : ` AND premium = '${premium ? 1 : 0}'`}
+    ${pano == null ? '' : ` AND pano = ${pano ? 1 : 0}`}
+    ${premium == null ? '' : ` AND premium = ${premium ? 1 : 0}`}
     ${userId ? `AND userId = ${userId}` : ''}
     ${
       ctx.state.user?.isAdmin
@@ -256,8 +256,8 @@ async function byBbox(ctx: ParameterizedContext) {
     ${takenAtTo ? `AND takenAt <= '${toSqlDate(takenAtTo)}'` : ''}
     ${createdAtFrom ? `AND createdAt >= '${toSqlDate(createdAtFrom)}'` : ''}
     ${createdAtTo ? `AND createdAt <= '${toSqlDate(createdAtTo)}'` : ''}
-    ${pano == null ? '' : ` AND pano = '${pano ? 1 : 0}'`}
-    ${premium == null ? '' : ` AND premium = '${premium ? 1 : 0}'`}
+    ${pano == null ? '' : `AND pano = ${pano ? 1 : 0}`}
+    ${premium == null ? '' : `AND premium = ${premium ? 1 : 0}`}
     ${userId ? `AND userId = ${userId}` : ''}
     ${
       ctx.state.user?.isAdmin
