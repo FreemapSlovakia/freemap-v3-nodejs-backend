@@ -187,7 +187,10 @@ export function attachDownloadMapHandler(router: Router) {
             logger,
           );
         } catch (err) {
-          logger.error({ err }, 'Error during map download.');
+          logger.error(
+            { err },
+            'Error during map download, sending email notification.',
+          );
 
           await sendMail(
             email,
@@ -220,7 +223,7 @@ export function attachDownloadMapHandler(router: Router) {
           conn.release();
         }
 
-        logger.error('Map download complete.');
+        logger.info('Map download complete.');
       })().catch((err) => {
         logger.error({ err }, 'Error during map download cleanup.');
       });
@@ -408,12 +411,7 @@ async function download(
     downloadedCount++;
 
     if (Date.now() - logTs > 1_000) {
-      logger.info(
-        { done: downloadedCount, total: totalTiles },
-        'Downloaded tiles: %d/%d',
-        downloadedCount,
-        totalTiles,
-      );
+      logger.info('Downloaded tiles: %d/%d', downloadedCount, totalTiles);
 
       logTs = Date.now();
     }
@@ -465,7 +463,7 @@ async function download(
     client.close();
   }
 
-  logger.info('Map download completed, sending email notification.');
+  logger.info('Map download successful, sending email notification.');
 
   await sendMail(
     email,

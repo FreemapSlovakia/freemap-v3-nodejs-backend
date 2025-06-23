@@ -1,5 +1,6 @@
 import { Middleware } from 'koa';
 import { createPool } from 'mariadb';
+import sql from 'sql-template-tag';
 import { getEnv, getEnvInteger } from './env.js';
 import { appLogger } from './logger.js';
 
@@ -226,21 +227,44 @@ export async function initDatabase() {
   }
 
   async function cleanup() {
-    const db = await pool.getConnection();
+    const conn = await pool.getConnection();
 
     try {
-      await Promise.all([
-        db.query('DELETE FROM purchaseToken WHERE expireAt < NOW()'),
-      ]);
+      await conn.query('DELETE FROM purchaseToken WHERE expireAt < NOW()');
+
+      await conn.beginTransaction();
+
+      // TODO track pending downloads taking more than a day :-o
+
+      const yesterday = new Date();
+      yesterday.setDate(yesterday.getDate() - 1);
+
+      const rows = await conn.query(
+        sql`SELECT userId, amount FROM blockedCredit WHERE createdAt < ${yesterday} FOR UPDATE`,
+      );
+
+      await Promise.all(
+        rows.map((row: { userId: number; amount: number }) =>
+          conn.query(
+            sql`UPDATE user SET credits = credits + ${row.amount} WHERE id = ${row.userId}`,
+          ),
+        ),
+      );
+
+      await conn.query(
+        sql`DELETE FROM blockedCredit WHERE createdAt < ${yesterday}`,
+      );
+
+      await conn.commit();
     } finally {
-      db.release();
+      conn.release();
     }
   }
 
   cleanup();
 
-  // every 6 hours
-  setInterval(cleanup, 60_000 * 60 * 6);
+  // every 1 hour
+  setInterval(cleanup, 60_000 * 60 * 1);
 }
 
 export function runInTransaction(): Middleware {

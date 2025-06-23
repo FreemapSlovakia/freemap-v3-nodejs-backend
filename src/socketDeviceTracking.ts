@@ -49,7 +49,7 @@ export function startSocketDeviceTracking() {
 
         conn = await pool.getConnection();
 
-        conn.beginTransaction();
+        await conn.beginTransaction();
 
         const [item] = await conn.query(
           sql`SELECT id, maxCount, maxAge FROM trackingDevice WHERE token IN (${`did:${deviceId}`}${imei ? sql`, ${`imei:${imei}`}` : empty})`,
@@ -152,10 +152,10 @@ export function startSocketDeviceTracking() {
           connection.write(`${deviceId}AP01HSO${args.slice(19)}`);
         }
 
-        conn.commit();
+        await conn.commit();
       } finally {
         if (conn) {
-          conn.release();
+          await conn.release();
         }
       }
     });
