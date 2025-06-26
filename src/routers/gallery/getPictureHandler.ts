@@ -27,15 +27,6 @@ export function attachGetPictureHandler(router: Router) {
         ctx.throw(404, 'no such picture');
       }
 
-      if (
-        row.premium &&
-        (!ctx.state.user?.premiumExpiration ||
-          ctx.state.user.premiumExpiration < new Date()) &&
-        ctx.state.user?.id !== row.userId
-      ) {
-        return ctx.throw(402, 'only for premium users');
-      }
-
       const commentRows = await pool.query(sql`
         SELECT pictureComment.id, pictureComment.createdAt, comment, user.name, userId
           FROM pictureComment JOIN user ON (userId = user.id)
