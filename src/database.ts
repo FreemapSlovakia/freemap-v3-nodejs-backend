@@ -197,7 +197,8 @@ export async function initDatabase() {
     'ALTER TABLE user ADD COLUMN credits FLOAT NOT NULL DEFAULT 0',
     'RENAME TABLE purchase_token TO purchaseToken',
     'ALTER TABLE purchaseToken ADD COLUMN item JSON NOT NULL',
-    'ALTER TABLE PURCHASE ADD COLUMN note VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL',
+    'ALTER TABLE purchase ADD COLUMN note VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL',
+    'ALTER TABLE picture ADD COLUMN premium BIT NOT NULL DEFAULT FALSE',
   ];
 
   const db = await pool.getConnection();
