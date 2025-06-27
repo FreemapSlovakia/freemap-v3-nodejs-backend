@@ -12,7 +12,7 @@ export function attachGetPictureHandler(router: Router) {
     authenticator(false),
     async (ctx) => {
       const [row] = await pool.query(
-        sql`SELECT picture.id AS pictureId, picture.createdAt, pathname, title, description, takenAt, picture.lat, picture.lon, pano,
+        sql`SELECT picture.id AS pictureId, picture.createdAt, pathname, title, description, takenAt, picture.lat, picture.lon, azimuth, pano,
           user.id as userId, user.name, premium,
           (SELECT GROUP_CONCAT(name SEPARATOR '\n') FROM pictureTag WHERE pictureId = picture.id) AS tags, ${raw(ratingSubquery)}
           ${
@@ -54,6 +54,7 @@ export function attachGetPictureHandler(router: Router) {
         takenAt,
         lat,
         lon,
+        azimuth,
         userId,
         name,
         tags,
@@ -74,6 +75,7 @@ export function attachGetPictureHandler(router: Router) {
             : null,
         lat,
         lon,
+        azimuth,
         user: userId && {
           id: userId,
           name,

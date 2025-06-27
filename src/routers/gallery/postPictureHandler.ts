@@ -132,6 +132,7 @@ export function attachPostPictureHandler(router: Router) {
             description,
             takenAt,
             position: { lat, lon },
+            azimuth,
             tags = [],
             premium,
           } = ctx.request.body.meta;
@@ -152,18 +153,19 @@ export function attachPostPictureHandler(router: Router) {
           const pano = exif['UsePanoramaViewer']?.value === 'True';
 
           const { insertId } = await conn.query(sql`
-          INSERT INTO picture SET
-            pathname = ${`${name}.jpeg`},
-            userId = ${ctx.state.user!.id},
-            title = ${title},
-            description = ${description},
-            createdAt = ${new Date() as any},
-            takenAt = ${takenAt ? (new Date(takenAt) as any) : null},
-            lat = ${lat},
-            lon = ${lon},
-            pano = ${pano},
-            premium = ${premium}
-        `);
+            INSERT INTO picture SET
+              pathname = ${`${name}.jpeg`},
+              userId = ${ctx.state.user!.id},
+              title = ${title},
+              description = ${description},
+              createdAt = ${new Date()},
+              takenAt = ${takenAt ? new Date(takenAt) : null},
+              lat = ${lat},
+              lon = ${lon},
+              azimuth = ${azimuth},
+              pano = ${pano},
+              premium = ${premium}
+          `);
 
           if (tags.length) {
             await conn.query(

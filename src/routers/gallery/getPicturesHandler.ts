@@ -51,6 +51,7 @@ const bboxQueryValidationRules: ValidationRules = {
         'tags',
         'pano',
         'premium',
+        'azimuth',
       ].includes(f),
     ) ||
     'invalid fields',
@@ -284,6 +285,7 @@ async function byBbox(ctx: ParameterizedContext) {
       createdAt: toSec(row.createdAt),
       pano: row.pano ? 1 : undefined,
       premium: row.premium ? 1 : undefined,
+      azimuth: row.azimuth ?? undefined,
       tags: normFields.includes('tags')
         ? (row.tags?.split('\n') ?? [])
         : undefined,

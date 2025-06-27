@@ -25,6 +25,9 @@ export function attachPutPictureHandler(router: Router) {
             },
           },
         },
+        azimuth: {
+          type: ['number', 'null'],
+        },
         name: {
           type: ['string', 'null'],
         },
@@ -56,6 +59,7 @@ export function attachPutPictureHandler(router: Router) {
         takenAt,
         position: { lat, lon },
         tags = [],
+        azimuth,
         premium,
       } = ctx.request.body;
 
@@ -79,6 +83,7 @@ export function attachPutPictureHandler(router: Router) {
             takenAt = ${takenAt ? new Date(takenAt) : null},
             lat = ${lat},
             lon = ${lon},
+            azimuth = ${azimuth},
             premium = ${premium}
             WHERE id = ${ctx.params.id}
         `),
