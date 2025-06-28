@@ -100,6 +100,7 @@ export async function login(
           sendGalleryEmails,
           settings,
           premiumExpiration,
+          credits,
         } = userRow;
 
         await conn.query(sql`DELETE FROM auth WHERE userId = ${id}`);
@@ -136,6 +137,7 @@ export async function login(
           ${premiumExpiration ? sql`premiumExpiration = COALESCE(GREATEST(premiumExpiration, ${premiumExpiration}), ${premiumExpiration}),` : empty}
           sendGalleryEmails = sendGalleryEmails OR ${sendGalleryEmails},
           settings = COALESCE(settings, ${settings}),
+          credits = credits + ${credits},
           ${join(
             Object.entries(authData).map(
               ([column, value]) =>
