@@ -110,7 +110,13 @@ export function attachPostPictureCommentHandler(router: Router) {
         reqId: ctx.reqId,
       });
 
-      async function sendCommentMail(to: string, own: boolean, lang: string) {
+      type Lang = 'sk' | 'cs' | 'en' | 'hu' | 'it' | 'de';
+
+      async function sendCommentMail(
+        to: string,
+        own: boolean,
+        lang: Lang | string,
+      ) {
         logger.info({ to, lang, own }, 'Sending picture comment mail.');
 
         const picTitle = picInfo.title ? `"${picInfo.title} "` : '';
@@ -119,38 +125,42 @@ export function attachPostPictureCommentHandler(router: Router) {
 
         const unsubscribeUrl = webBaseUrl;
 
+        const subjects: Record<Lang, string> = {
+          sk: `Komentár k fotke na ${webUrl}`,
+          cs: `Komentář k fotce na ${webUrl}`,
+          en: `Photo comment at ${webUrl}`,
+          hu: `Hozzászólás a fotóhoz a következőn: ${webUrl}`,
+          it: `Commento alla foto su ${webUrl}`,
+          de: `Kommentar zu einem Foto auf ${webUrl}`,
+        };
+
+        const messages: Record<Lang, string> = {
+          sk: `Používateľ ${user!.name} pridal komentár k ${own ? 'vašej ' : ''}fotke ${picTitle}na ${picUrl}:`,
+          cs: `Uživatel ${user!.name} přidal komentář k ${own ? 'vaší ' : ''}fotce ${picTitle}na ${picUrl}:`,
+          en: `User ${user!.name} commented ${own ? 'your' : 'a'} photo ${picTitle}at ${picUrl}:`,
+          hu: `A felhasználó ${user!.name} hozzászólt ${own ? 'az ön' : 'egy'} fotójához: ${picTitle}${picUrl}:`,
+          it: `L'utente ${user!.name} ha commentato ${own ? 'la tua' : 'una'} foto ${picTitle}su ${picUrl}:`,
+          de: `Benutzer ${user!.name} hat ${own ? 'dein' : 'ein'} Foto kommentiert: ${picTitle}${picUrl}:`,
+        };
+
+        const footers: Record<Lang, string> = {
+          sk: `Ak si už neprajete dostávať upozornenia na komentáre k fotkám, odškrtnite si to na ${unsubscribeUrl} v menu Fotografie.`,
+          cs: `Pokud si již nepřejete dostávat upozornění na komentáře k fotkám, odškrtnite si to na ${unsubscribeUrl} v menu Fotografie.`,
+          en: `If you no longer wish to be notified about photo comments, uncheck it at ${unsubscribeUrl} in the Photos menu.`,
+          hu: `Ha nem szeretne több értesítést kapni a fotókhoz fűzött hozzászólásokról, kapcsolja ki a beállítást a Fotók menüben: ${unsubscribeUrl}.`,
+          it: `Se non desideri più ricevere notifiche sui commenti alle foto, disattiva l'opzione nel menu Foto: ${unsubscribeUrl}.`,
+          de: `Wenn du keine Benachrichtigungen über Fotokommentare mehr erhalten möchtest, deaktiviere dies im Menü „Fotos“ unter ${unsubscribeUrl}.`,
+        };
+
         await sendMail(
-          to, // TODO translate for HU and IT
-          lang === 'sk'
-            ? `Komentár k fotke na ${webUrl}`
-            : lang === 'cs'
-              ? `Komentář k fotce na ${webUrl}`
-              : `Photo comment at ${webUrl}`,
-          // TODO translate for HU and IT
-          (lang === 'sk'
-            ? `Používateľ ${user!.name} pridal komentár k ${
-                own ? 'vašej ' : ''
-              }fotke ${picTitle}na ${picUrl}:`
-            : lang === 'cs'
-              ? `Uživatel ${user!.name} přidal komentář k ${
-                  own ? 'vaší ' : ''
-                }fotce ${picTitle}na ${picUrl}:`
-              : `User ${user!.name} commented ${
-                  own ? 'your' : 'a'
-                } photo ${picTitle}at ${picUrl}:`) +
-            '\n\n' +
-            comment +
-            '\n\n' +
-            // TODO translate for HU and IT
-            (lang === 'sk'
-              ? `Ak si už neprajete dostávať upozornenia na komentáre k fotkám, odškrtnite si to na ${unsubscribeUrl} v menu Fotografie.`
-              : lang === 'cs'
-                ? `Pokud si již nepřejete dostávat upozornění na komentáře k fotkám, odškrtnite si to na ${unsubscribeUrl} v menu Fotografie.`
-                : `If you no longer wish to be notified about photo comments, uncheck it at ${unsubscribeUrl} in the Photos menu.`),
+          to,
+          subjects[lang as Lang] ?? subjects.en,
+          `${messages[lang as Lang] ?? messages.en}\n\n${comment}\n\n${footers[lang as Lang] ?? footers.en}`,
         );
       }
 
-      const acceptLang = ctx.acceptsLanguages(['en', 'sk', 'cs', 'hu']) || 'en';
+      const acceptLang =
+        ctx.acceptsLanguages(['en', 'sk', 'cs', 'hu', 'it', 'de']) || 'en';
 
       const promises: Promise<void>[] = [];
 

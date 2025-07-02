@@ -47,6 +47,36 @@ const translations: Record<string, Translation> = {
       description: 'Nákup {} kreditů Freemap.sk',
     },
   },
+  hu: {
+    premium: {
+      title: 'Freemap.sk prémium hozzáférés',
+      description: 'Prémium hozzáférés a Freemap.sk-hoz 1 évre',
+    },
+    credits: {
+      title: 'Freemap.sk kreditek',
+      description: '{} Freemap.sk kredit vásárlása',
+    },
+  },
+  de: {
+    premium: {
+      title: 'Freemap.sk Premium-Zugang',
+      description: 'Premium-Zugang zu Freemap.sk für 1 Jahr',
+    },
+    credits: {
+      title: 'Freemap.sk Guthaben',
+      description: 'Kauf von {} Freemap.sk Guthaben',
+    },
+  },
+  it: {
+    premium: {
+      title: 'Accesso premium a Freemap.sk',
+      description: 'Accesso premium a Freemap.sk per 1 anno',
+    },
+    credits: {
+      title: 'Crediti Freemap.sk',
+      description: 'Acquisto di {} crediti Freemap.sk',
+    },
+  },
 };
 
 type Body =
