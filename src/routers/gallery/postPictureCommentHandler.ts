@@ -110,7 +110,7 @@ export function attachPostPictureCommentHandler(router: Router) {
         reqId: ctx.reqId,
       });
 
-      type Lang = 'sk' | 'cs' | 'en' | 'hu' | 'it' | 'de';
+      type Lang = 'sk' | 'cs' | 'en' | 'hu' | 'it' | 'de' | 'pl';
 
       async function sendCommentMail(
         to: string,
@@ -132,6 +132,7 @@ export function attachPostPictureCommentHandler(router: Router) {
           hu: `Hozzászólás a fotóhoz a következőn: ${webUrl}`,
           it: `Commento alla foto su ${webUrl}`,
           de: `Kommentar zu einem Foto auf ${webUrl}`,
+          pl: `Komentarz do zdjęcia na ${webUrl}`,
         };
 
         const messages: Record<Lang, string> = {
@@ -141,6 +142,7 @@ export function attachPostPictureCommentHandler(router: Router) {
           hu: `A felhasználó ${user!.name} hozzászólt ${own ? 'az ön' : 'egy'} fotójához: ${picTitle}${picUrl}:`,
           it: `L'utente ${user!.name} ha commentato ${own ? 'la tua' : 'una'} foto ${picTitle}su ${picUrl}:`,
           de: `Benutzer ${user!.name} hat ${own ? 'dein' : 'ein'} Foto kommentiert: ${picTitle}${picUrl}:`,
+          pl: `Użytkownik ${user!.name} dodał komentarz do ${own ? 'twojego' : 'zdjęcia'} ${picTitle} na ${picUrl}:`,
         };
 
         const footers: Record<Lang, string> = {
@@ -150,6 +152,7 @@ export function attachPostPictureCommentHandler(router: Router) {
           hu: `Ha nem szeretne több értesítést kapni a fotókhoz fűzött hozzászólásokról, kapcsolja ki a beállítást a Fotók menüben: ${unsubscribeUrl}.`,
           it: `Se non desideri più ricevere notifiche sui commenti alle foto, disattiva l'opzione nel menu Foto: ${unsubscribeUrl}.`,
           de: `Wenn du keine Benachrichtigungen über Fotokommentare mehr erhalten möchtest, deaktiviere dies im Menü „Fotos“ unter ${unsubscribeUrl}.`,
+          pl: `Jeśli nie chcesz otrzymywać powiadomień o komentarzach do zdjęć, odznacz to w menu Zdjęcia pod adresem ${unsubscribeUrl}.`,
         };
 
         await sendMail(
@@ -160,7 +163,8 @@ export function attachPostPictureCommentHandler(router: Router) {
       }
 
       const acceptLang =
-        ctx.acceptsLanguages(['en', 'sk', 'cs', 'hu', 'it', 'de']) || 'en';
+        ctx.acceptsLanguages(['en', 'sk', 'cs', 'hu', 'it', 'de', 'pl']) ||
+        'en';
 
       const promises: Promise<void>[] = [];
 

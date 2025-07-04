@@ -19,6 +19,110 @@ import { bodySchemaValidator } from '../requestValidators.js';
 
 const CONCURRENCY = 8;
 
+type Combo = {
+  subject: string;
+  body: string;
+};
+
+type Translation = {
+  success: Combo;
+  error: Combo;
+};
+
+const translations: Record<string, Translation> = {
+  en: {
+    success: {
+      subject: 'Freemap Map Download',
+      body: 'Your map is ready at {URL} for 24 hours.',
+    },
+    error: {
+      subject: 'Freemap Map Download Error',
+      body:
+        'An error occurred during your map download. ' +
+        'Your credits have been refunded. ' +
+        'Please try again later or contact support if the problem persists.',
+    },
+  },
+  sk: {
+    success: {
+      subject: 'Stiahnutie mapy Freemap',
+      body: 'Vaša mapa je pripravená na stiahnutie na {URL} počas 24 hodín.',
+    },
+    error: {
+      subject: 'Chyba pri sťahovaní mapy Freemap',
+      body:
+        'Pri sťahovaní vašej mapy nastala chyba. ' +
+        'Vaše kredity boli vrátené. ' +
+        'Prosím skúste to znovu neskôr, alebo kontaktujte podporu, ak problém pretrváva.',
+    },
+  },
+  cs: {
+    success: {
+      subject: 'Stažení mapy Freemap',
+      body: 'Vaše mapa je připravena ke stažení na {URL} po dobu 24 hodin.',
+    },
+    error: {
+      subject: 'Chyba při stahování mapy Freemap',
+      body:
+        'Při stahování vaší mapy došlo k chybě. ' +
+        'Vaše kredity byly vráceny. ' +
+        'Zkuste to znovu prosím později, nebo kontaktujte podporu, pokud problém přetrvává.',
+    },
+  },
+  pl: {
+    success: {
+      subject: 'Pobranie mapy Freemap',
+      body: 'Twoja mapa jest gotowa do pobrania pod adresem {URL} przez 24 godziny.',
+    },
+    error: {
+      subject: 'Błąd pobierania mapy Freemap',
+      body:
+        'Wystąpił błąd podczas pobierania mapy. ' +
+        'Twoje kredyty zostały zwrócone. ' +
+        'Spróbuj ponownie później lub skontaktuj się z pomocą, jeśli problem będzie się powtarzał.',
+    },
+  },
+  hu: {
+    success: {
+      subject: 'Freemap térkép letöltése',
+      body: 'A térképed készen áll letöltésre a következő címen: {URL} 24 órán keresztül.',
+    },
+    error: {
+      subject: 'Hiba a Freemap térkép letöltésekor',
+      body:
+        'Hiba történt a térkép letöltése során. ' +
+        'A kreditjeid visszakerültek. ' +
+        'Kérjük, próbáld meg később újra, vagy vedd fel a kapcsolatot a támogatással, ha a probléma fennáll.',
+    },
+  },
+  it: {
+    success: {
+      subject: 'Download mappa Freemap',
+      body: 'La tua mappa è pronta per il download a {URL} per 24 ore.',
+    },
+    error: {
+      subject: 'Errore nel download della mappa Freemap',
+      body:
+        'Si è verificato un errore durante il download della tua mappa. ' +
+        'I tuoi crediti sono stati rimborsati. ' +
+        'Per favore riprova più tardi o contatta l’assistenza se il problema persiste.',
+    },
+  },
+  de: {
+    success: {
+      subject: 'Freemap Karten-Download',
+      body: 'Ihre Karte steht zum Download bereit unter {URL} für 24 Stunden.',
+    },
+    error: {
+      subject: 'Fehler beim Freemap Karten-Download',
+      body:
+        'Beim Download Ihrer Karte ist ein Fehler aufgetreten. ' +
+        'Ihre Guthaben wurden zurückerstattet. ' +
+        'Bitte versuchen Sie es später erneut oder wenden Sie sich an den Support, falls das Problem weiterhin besteht.',
+    },
+  },
+};
+
 export function attachDownloadMapHandler(router: Router) {
   router.post(
     '/downloadMap',
@@ -124,6 +228,13 @@ export function attachDownloadMapHandler(router: Router) {
     async (ctx) => {
       const user = ctx.state.user!;
 
+      const lang =
+        user.language && user.language in translations
+          ? user.language
+          : ctx.acceptsLanguages(Object.keys(translations)) || 'en';
+
+      const translation = translations[lang]!;
+
       const map = downloadableMaps.find(
         ({ type }) => type === ctx.request.body.map,
       );
@@ -185,6 +296,7 @@ export function attachDownloadMapHandler(router: Router) {
             email,
             totalTiles,
             logger,
+            translation.success,
           );
         } catch (err) {
           logger.error(
@@ -194,10 +306,8 @@ export function attachDownloadMapHandler(router: Router) {
 
           await sendMail(
             email,
-            'Freemap Map Download Error',
-            'An error occurred during your map download. ' +
-              'Your credits have been refunded. ' +
-              'Please try again later or contact support if the problem persists.',
+            translation.error.subject,
+            translation.error.body,
           );
 
           refund = true;
@@ -244,6 +354,7 @@ async function download(
   email: string,
   totalTiles: number,
   logger: Logger,
+  translation: Combo,
 ) {
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
   const safeName = name.trim().replace(/[^a-zA-Z0-9._-]+/g, '_');
@@ -467,8 +578,11 @@ async function download(
 
   await sendMail(
     email,
-    'Freemap Map Download',
-    `Your map is ready at ${getEnv('MBTILES_URL_PREFIX')}/${encodeURIComponent(dbName)}.${format} for 24 hours.`,
+    translation.subject,
+    translation.body.replace(
+      '{URL}',
+      `${getEnv('MBTILES_URL_PREFIX')}/${encodeURIComponent(dbName)}.${format}`,
+    ),
   );
 }
 
