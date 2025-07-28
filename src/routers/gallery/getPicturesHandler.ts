@@ -1,7 +1,9 @@
 import Router from '@koa/router';
 import { Middleware, ParameterizedContext } from 'koa';
+import { createHmac } from 'node:crypto';
 import { authenticator } from '../../authenticator.js';
 import { pool } from '../../database.js';
+import { getEnv } from '../../env.js';
 import {
   ValidationRules,
   acceptValidator,
@@ -9,6 +11,8 @@ import {
   queryValidator,
 } from '../../requestValidators.js';
 import { ratingSubquery } from './ratingConstants.js';
+
+const secret = getEnv('PREMIUM_PHOTO_SECRET', '');
 
 const globalValidationRules: ValidationRules = {
   userId: (v) => v === null || !Number.isNaN(v) || 'invalid userId',
@@ -52,6 +56,7 @@ const bboxQueryValidationRules: ValidationRules = {
         'pano',
         'premium',
         'azimuth',
+        'hmac',
       ].includes(f),
     ) ||
     'invalid fields',
@@ -226,8 +231,14 @@ async function byBbox(ctx: ParameterizedContext) {
   const flds = [
     'lat',
     'lon',
-    ...normFields.filter((f) => f !== 'rating' && f !== 'tags' && f !== 'user'),
+    ...normFields.filter(
+      (f) => f !== 'rating' && f !== 'tags' && f !== 'user' && f !== 'hmac',
+    ),
   ];
+
+  if (flds.includes('hmac') && !flds.includes('premium')) {
+    flds.push('premium');
+  }
 
   if (ratingFrom || ratingTo || normFields.includes('rating')) {
     flds.push(ratingSubquery);
@@ -278,6 +289,8 @@ async function byBbox(ctx: ParameterizedContext) {
 
   const getRating = fields?.includes('rating');
 
+  const getHmac = fields?.includes('hmac');
+
   ctx.body = rows.map((row: any) =>
     Object.assign({}, row, {
       rating: getRating ? row.rating : undefined,
@@ -289,6 +302,10 @@ async function byBbox(ctx: ParameterizedContext) {
       tags: normFields.includes('tags')
         ? (row.tags?.split('\n') ?? [])
         : undefined,
+      hmac:
+        getHmac && row.premium && secret
+          ? createHmac('sha256', secret).update(String(row.id)).digest('hex')
+          : undefined,
     }),
   );
 }
