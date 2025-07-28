@@ -1,13 +1,17 @@
 import Router from '@koa/router';
 import calculate from 'etag';
+import { createHmac } from 'node:crypto';
 import { createReadStream } from 'node:fs';
 import { stat } from 'node:fs/promises';
 import sharp from 'sharp';
 import sql from 'sql-template-tag';
 import { authenticator } from '../../authenticator.js';
 import { pool } from '../../database.js';
+import { getEnv } from '../../env.js';
 import { acceptValidator } from '../../requestValidators.js';
 import { picturesDir } from '../../routers/gallery/constants.js';
+
+const secret = getEnv('PREMIUM_PHOTO_SECRET', '');
 
 export function attachGetPictureImageHandler(router: Router) {
   router.get(
@@ -29,7 +33,16 @@ export function attachGetPictureImageHandler(router: Router) {
           ctx.state.user.premiumExpiration < new Date()) &&
         ctx.state.user?.id !== row.userId
       ) {
-        return ctx.throw(402, 'only for premium users');
+        if (secret && typeof ctx.request.query.hmac === 'string') {
+          if (
+            createHmac('sha256', secret).update(ctx.params.id).digest('hex') !==
+            ctx.request.query.hmac
+          ) {
+            return ctx.throw(403, 'invalid hmac');
+          }
+        } else {
+          return ctx.throw(402, 'only for premium users');
+        }
       }
 
       const pathname = `${picturesDir}/${row.pathname}`;

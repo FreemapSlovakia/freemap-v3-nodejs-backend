@@ -1,9 +1,13 @@
 import Router from '@koa/router';
+import { createHmac } from 'node:crypto';
 import sql, { empty, raw } from 'sql-template-tag';
 import { authenticator } from '../../authenticator.js';
 import { pool } from '../../database.js';
+import { getEnv } from '../../env.js';
 import { acceptValidator } from '../../requestValidators.js';
 import { ratingSubquery } from './ratingConstants.js';
+
+const secret = getEnv('PREMIUM_PHOTO_SECRET', '');
 
 export function attachGetPictureHandler(router: Router) {
   router.get(
@@ -64,6 +68,11 @@ export function attachGetPictureHandler(router: Router) {
         premium,
       } = row;
 
+      const hmac =
+        premium && secret
+          ? createHmac('sha256', secret).update(String(pictureId)).digest('hex')
+          : undefined;
+
       ctx.body = {
         id: pictureId,
         createdAt: createdAt.toISOString(),
@@ -86,6 +95,7 @@ export function attachGetPictureHandler(router: Router) {
         myStars,
         pano: pano ? 1 : undefined,
         premium: premium ? 1 : undefined,
+        hmac,
       };
     },
   );
