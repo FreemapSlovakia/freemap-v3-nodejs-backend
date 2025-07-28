@@ -7,6 +7,7 @@ import { promisify } from 'node:util';
 import unzipper from 'unzipper';
 import { getEnv } from '../../env.js';
 import { acceptValidator } from '../../requestValidators.js';
+import { inCountries } from './inCountries.js';
 
 const hgtDir = getEnv('ELEVATION_DATA_DIRECTORY');
 
@@ -15,6 +16,8 @@ const router = new Router();
 const fstatAsync = promisify(fstat);
 
 const readAsync = promisify(read);
+
+router.post('/in-count', inCountries);
 
 router.get('/elevation', compute);
 

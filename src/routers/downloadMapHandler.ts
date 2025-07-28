@@ -3,10 +3,10 @@ import { pointToTile, Tile, tileToGeoJSON } from '@mapbox/tilebelt';
 import { bbox } from '@turf/bbox';
 import booleanIntersects from '@turf/boolean-intersects';
 import center from '@turf/center';
+import Database from 'better-sqlite3';
 import type { Feature, MultiPolygon, Polygon } from 'geojson';
 import { unlink } from 'node:fs/promises';
 import { ClientHttp2Session, connect } from 'node:http2';
-import { DatabaseSync, SQLInputValue } from 'node:sqlite';
 import { Logger } from 'pino';
 import sql from 'sql-template-tag';
 import { authenticator } from '../authenticator.js';
@@ -360,7 +360,7 @@ async function download(
   const safeName = name.trim().replace(/[^a-zA-Z0-9._-]+/g, '_');
   const dbName = safeName ? safeName + '-' + timestamp : timestamp;
   const filename = getEnv('MBTILES_DIR') + `/${dbName}.${format}`;
-  const db = new DatabaseSync(filename);
+  const db = new Database(filename);
 
   db.exec(`
     PRAGMA journal_mode = WAL;
@@ -398,7 +398,7 @@ async function download(
       ('bounds', ${bbox(boundary).join(',')}),
       ('attribution', ${map.attribution})`;
 
-    db.prepare(combo.sql).run(...(combo.values as SQLInputValue[]));
+    db.prepare(combo.sql).run(...combo.values);
   } else if (format === 'sqlitedb') {
     db.exec(
       `
@@ -419,7 +419,7 @@ async function download(
         VALUES (${min}, ${max}, ${256 * (scale ?? 1)}, ${cntr.geometry.coordinates[1]}, ${cntr.geometry.coordinates[0]}, ${zooms}, 0)
     `;
 
-    db.prepare(combo.sql).run(...(combo.values as SQLInputValue[]));
+    db.prepare(combo.sql).run(...combo.values);
   } else {
     throw new Error('Unsupported format: ' + format);
   }
