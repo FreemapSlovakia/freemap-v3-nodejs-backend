@@ -4,6 +4,9 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
+overrides:
+  '@types/koa': 3.0.0
+
 importers:
 
   .:
@@ -121,7 +124,7 @@ importers:
         specifier: ^2.2.8
         version: 2.2.8
       '@types/koa':
-        specifier: ^3.0.0
+        specifier: 3.0.0
         version: 3.0.0
       '@types/koa-websocket':
         specifier: ^5.0.10
@@ -613,9 +616,6 @@ packages:
 
   '@types/koa-websocket@5.0.10':
     resolution: {integrity: sha512-yaqbFuyrw4eFchCHdOiyF1uhSe0nRv6xFAvVlxoG8Fq2/h+0IDjka3DyN2hJt29m6jr3+nlgsPTGh/Hd/tZmIg==}
-
-  '@types/koa@2.15.0':
-    resolution: {integrity: sha512-7QFsywoE5URbuVnG3loe03QXuGajrnotr3gQkXcEBShORai23MePfFYdhz90FEtBBpkyIYQbVD+evKtloCgX3g==}
 
   '@types/koa@3.0.0':
     resolution: {integrity: sha512-MOcVYdVYmkSutVHZZPh8j3+dAjLyR5Tl59CN0eKgpkE1h/LBSmPAsQQuWs+bKu7WtGNn+hKfJH9Gzml+PulmDg==}
@@ -2794,17 +2794,6 @@ snapshots:
       '@types/koa-compose': 3.2.8
       '@types/ws': 8.18.1
 
-  '@types/koa@2.15.0':
-    dependencies:
-      '@types/accepts': 1.3.7
-      '@types/content-disposition': 0.5.9
-      '@types/cookies': 0.9.1
-      '@types/http-assert': 1.5.6
-      '@types/http-errors': 2.0.5
-      '@types/keygrip': 1.0.6
-      '@types/koa-compose': 3.2.8
-      '@types/node': 24.1.0
-
   '@types/koa@3.0.0':
     dependencies:
       '@types/accepts': 1.3.7
@@ -3743,7 +3732,7 @@ snapshots:
     dependencies:
       '@types/co-body': 6.1.3
       '@types/formidable': 2.0.6
-      '@types/koa': 2.15.0
+      '@types/koa': 3.0.0
       co-body: 6.2.0
       formidable: 2.1.5
       zod: 3.25.76
