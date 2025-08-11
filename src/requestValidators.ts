@@ -7,7 +7,7 @@ import { JSONSchema7 } from 'json-schema';
 const ajv = ajvFormats.default(new Ajv());
 
 export type ValidationRules = {
-  [name: string]: (v: any, ctx?: ParameterizedContext) => true | string;
+  [name: string]: (v: unknown, ctx?: ParameterizedContext) => true | string;
 };
 
 export function queryValidator(spec: ValidationRules): Middleware {

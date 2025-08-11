@@ -3,10 +3,102 @@ import { ParameterizedContext } from 'koa';
 import sql from 'sql-template-tag';
 import { runInTransaction } from '../../database.js';
 import { storeTrackPoint } from '../../deviceTracking.js';
+import { bodySchemaValidator } from '../../requestValidators.js';
 
 export function attachTrackDeviceHandler(router: Router) {
   for (const method of ['post', 'get'] as const) {
     router[method]('/track/:token', runInTransaction(), handler);
+  }
+
+  router.post(
+    '/track',
+    bodySchemaValidator({
+      type: 'object',
+      required: ['location', 'device_id'],
+      properties: {
+        device_id: { type: 'string', pattern: '^[^\\s]+$' },
+        location: {
+          type: 'object',
+          required: ['coords'],
+          properties: {
+            coords: {
+              type: 'object',
+              required: ['latitude', 'longitude'],
+              properties: {
+                latitude: { type: 'number' },
+                longitude: { type: 'number' },
+                accuracy: { type: 'number', minimum: 0 },
+                speed: { type: 'number', minimum: 0 },
+                heading: { type: 'number', minimum: 0, exclusiveMaximum: 360 },
+                altitude: { type: 'number' },
+              },
+            },
+            is_moving: { type: 'boolean' },
+            odometer: { type: 'number', minimum: 0 },
+            event: { type: 'string' }, // eg: 'motionchange'
+            battery: {
+              type: 'object',
+              properties: {
+                level: { type: 'number', minimum: 0, maximum: 1 },
+                is_charging: { type: 'boolean' },
+              },
+            },
+            activity: {
+              type: 'object',
+              properties: {
+                type: { type: 'string' }, // 'still', 'walking', 'in_vehicle'
+              },
+            },
+            extras: { type: 'object', additionalProperties: true },
+          },
+        },
+      },
+    }),
+    runInTransaction(),
+    handler2,
+  );
+}
+
+async function handler2(ctx: ParameterizedContext) {
+  const conn = ctx.state.dbConn!;
+
+  const body = ctx.request.body as any;
+
+  const [item] = await conn.query(
+    sql`SELECT id, maxCount, maxAge FROM trackingDevice WHERE token = ${body.device_id}`,
+  );
+
+  if (!item) {
+    ctx.throw(404, 'no such tracking device');
+  }
+
+  try {
+    const id = await storeTrackPoint(
+      conn,
+      item.id,
+      item.maxAge,
+      item.maxCount,
+      undefined,
+      undefined,
+      body.location.coords.speed,
+      body.location.coords.latitude,
+      body.location.coords.longitude,
+      body.location.coords.altitude,
+      body.location.coords.accuracy,
+      body.location.coords.bearing,
+      body.location.battery,
+      undefined,
+      undefined,
+      new Date(body.location.timestamp),
+    );
+
+    ctx.body = { id };
+  } catch (err) {
+    if (err instanceof Error && err.message === 'invalid param') {
+      ctx.throw(400, 'one or more values provided are not valid');
+    }
+
+    throw err;
   }
 }
 
@@ -21,38 +113,59 @@ async function handler(ctx: ParameterizedContext) {
     ctx.throw(404, 'no such tracking device');
   }
 
-  const q =
-    ctx.query?.lat && ctx.query?.lon ? ctx.query : ctx.request.body || {};
+  const q: Record<string, string> = {};
 
-  const { message } = q;
+  for (const [k, v] of Object.entries(ctx.query)) {
+    if (v !== undefined) {
+      q[k] = Array.isArray(v) ? v[0] : v;
+    }
+  }
 
-  const lat = Number.parseFloat(q.lat);
+  if (
+    ctx.request.body &&
+    typeof ctx.request.body === 'object' &&
+    Object.values(ctx.request.body).every((v) => typeof v === 'string')
+  ) {
+    Object.assign(q, ctx.request.body);
+  }
 
-  const lon = Number.parseFloat(q.lon);
+  let lat;
 
-  const altitude =
-    (q.alt || q.altitude) === undefined
-      ? null
-      : Number.parseFloat(q.alt || q.altitude);
+  let lon;
 
-  const speedMs = q.speed === undefined ? null : Number.parseFloat(q.speed);
+  if (q.location) {
+    const loc = q.location.split(',');
 
-  const speedKmh =
-    q.speedKmh === undefined ? null : Number.parseFloat(q.speedKmh);
+    lat = Number.parseFloat(loc[0]);
 
-  const accuracy = q.acc === undefined ? null : Number.parseFloat(q.acc);
+    lon = Number.parseFloat(loc[1]);
+  } else if (q.lat && q.lon) {
+    lat = Number.parseFloat(q.lat);
 
-  const hdop = q.hdop === undefined ? null : Number.parseFloat(q.hdop);
+    lon = Number.parseFloat(q.lon);
+  } else {
+    ctx.throw(400, 'missing location');
+  }
 
-  const bearing = q.bearing === undefined ? null : Number.parseFloat(q.bearing);
+  function tryFloat(value: string | undefined) {
+    return value !== undefined ? Number.parseFloat(value) : undefined;
+  }
 
-  const battery =
-    (q.battery || q.batt) === undefined
-      ? null
-      : Number.parseFloat(q.battery || q.batt);
+  const altitude = tryFloat(q.altitude || q.alt);
 
-  const gsmSignal =
-    q.gsm_signal === undefined ? null : Number.parseFloat(q.gsm_signal);
+  const speedMs = tryFloat(q.speed);
+
+  const speedKmh = tryFloat(q.speedKmh);
+
+  const accuracy = tryFloat(q.acc || q.accuracy);
+
+  const hdop = tryFloat(q.hdop);
+
+  const bearing = tryFloat(q.bearing || q.heading);
+
+  const battery = tryFloat(q.battery || q.batt);
+
+  const gsmSignal = tryFloat(q.gsm_signal);
 
   const time = guessTime(q.time || q.timestamp);
 
@@ -72,7 +185,7 @@ async function handler(ctx: ParameterizedContext) {
       bearing,
       battery,
       gsmSignal,
-      message ?? null,
+      q.message ?? null,
       time,
     );
 
@@ -110,7 +223,7 @@ function guessTime(t: string) {
   const n = Number.parseInt(t, 10);
 
   if (Number.isNaN(n)) {
-    return null;
+    return undefined;
   }
 
   const d2 = new Date(n);
@@ -125,5 +238,5 @@ function guessTime(t: string) {
     return d3;
   }
 
-  return null;
+  return undefined;
 }
