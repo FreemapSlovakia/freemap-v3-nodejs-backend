@@ -507,9 +507,7 @@ async function download(
         ) {
           logger.warn(
             { code: err.code },
-            err.code + '; retrying download (%d/%d)',
-            i + 1,
-            5,
+            err.code + `; retrying download (${i + 1}/5)`,
           );
 
           await new Promise((resolve) => setTimeout(resolve, i * 100));

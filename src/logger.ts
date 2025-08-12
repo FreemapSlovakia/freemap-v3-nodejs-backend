@@ -1,6 +1,6 @@
-import { pino } from 'pino';
+import pino, { stdSerializers } from 'pino';
 
 export const appLogger = pino({
   name: 'freemap-api',
-  serializers: pino.stdSerializers,
+  serializers: stdSerializers,
 });
