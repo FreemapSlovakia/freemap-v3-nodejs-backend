@@ -1,96 +1,47 @@
 import Router from '@koa/router';
+import { assert, tags } from 'typia';
 import { authenticator } from '../../authenticator.js';
 import { pool } from '../../database.js';
-import { bodySchemaValidator } from '../../requestValidators.js';
+
+type AtLeastOne<T> = { [K in keyof T]: Required<Pick<T, K>> }[keyof T] &
+  Partial<T>;
+
+export type Body = AtLeastOne<{
+  name: string;
+  email: (string & tags.Format<'email'>) | null;
+  lat: number;
+  lon: number;
+  settings: Record<string, unknown>;
+  sendGalleryEmails: boolean | null;
+  language: (string & tags.MinLength<2> & tags.MaxLength<2>) | null;
+}>;
 
 export function attachPatchUserHandler(router: Router) {
-  router.patch(
-    '/settings',
-    authenticator(true),
-    bodySchemaValidator({
-      type: 'object',
-      anyOf: [
-        {
-          required: ['name'],
-        },
-        {
-          required: ['email'],
-        },
-        {
-          required: ['lat', 'lon'],
-        },
-        {
-          required: ['settings'],
-        },
-        {
-          required: ['sendGalleryEmails'],
-        },
-        {
-          required: ['language'],
-        },
+  router.patch('/settings', authenticator(true), async (ctx) => {
+    let body;
+
+    try {
+      body = assert<Body>(ctx.request.body);
+    } catch (err) {
+      return ctx.throw(400, err as Error);
+    }
+
+    const keys = Object.keys(body) as (keyof Body)[];
+
+    // TODO validate duplicates
+
+    await pool.query(
+      `UPDATE user SET ${keys
+        .map((key) => `${key} = ?`)
+        .join(', ')} WHERE id = ?`,
+      [
+        ...keys.map((key) =>
+          key === 'settings' ? JSON.stringify(body[key]) : body[key],
+        ),
+        ctx.state.user!.id,
       ],
-      properties: {
-        name: {
-          type: 'string',
-        },
-        email: {
-          type: ['string', 'null'],
-          format: 'email',
-        },
-        lat: {
-          type: 'number',
-        },
-        lon: {
-          type: 'number',
-        },
-        settings: {
-          type: 'object',
-        },
-        sendGalleryEmails: {
-          oneOf: [
-            {
-              type: 'boolean',
-            },
-            {
-              type: 'null',
-            },
-          ],
-        },
-        language: {
-          oneOf: [
-            {
-              type: 'string',
-              minLength: 2,
-              maxLength: 2,
-            },
-            {
-              type: 'null',
-            },
-          ],
-        },
-      },
-      additionalProperties: false,
-    }),
-    async (ctx) => {
-      const { body } = ctx.request;
+    );
 
-      const keys = Object.keys(body);
-
-      // TODO validate duplicates
-
-      await pool.query(
-        `UPDATE user SET ${keys
-          .map((key) => `${key} = ?`)
-          .join(', ')} WHERE id = ?`,
-        [
-          ...keys.map((key) =>
-            key === 'settings' ? JSON.stringify(body[key]) : body[key],
-          ),
-          ctx.state.user!.id,
-        ],
-      );
-
-      ctx.status = 204;
-    },
-  );
+    ctx.status = 204;
+  });
 }

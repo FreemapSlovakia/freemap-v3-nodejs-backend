@@ -1,31 +1,29 @@
 import Router from '@koa/router';
 import { PoolConnection } from 'mariadb';
 import sql from 'sql-template-tag';
+import { assert, tags } from 'typia';
 import { authenticator } from '../../authenticator.js';
 import { runInTransaction } from '../../database.js';
-import { bodySchemaValidator } from '../../requestValidators.js';
 
 export function attachPostPictureRatingHandler(router: Router) {
   router.post(
     '/pictures/:id/rating',
     authenticator(true),
-    bodySchemaValidator(
-      {
-        type: 'object',
-        required: ['stars'],
-        properties: {
-          stars: {
-            type: 'integer',
-            minimum: 1,
-            maximum: 5,
-          },
-        },
-      },
-      true,
-    ),
     runInTransaction(),
 
     async (ctx) => {
+      type Body = {
+        stars: number & tags.Type<'uint32'> & tags.Minimum<1> & tags.Maximum<5>;
+      };
+
+      let body;
+
+      try {
+        body = assert<Body>(ctx.request.body);
+      } catch (err) {
+        return ctx.throw(400, err as Error);
+      }
+
       const conn = ctx.state.dbConn as PoolConnection;
 
       const [row] = await conn.query(
@@ -46,7 +44,7 @@ export function attachPostPictureRatingHandler(router: Router) {
         ctx.throw(402);
       }
 
-      const { stars } = ctx.request.body;
+      const { stars } = body;
 
       await conn.query(sql`
         INSERT INTO pictureRating SET

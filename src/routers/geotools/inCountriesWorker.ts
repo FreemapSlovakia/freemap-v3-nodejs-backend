@@ -32,5 +32,5 @@ export default function getCountries(wktPoly: string) {
       AND ST_Intersects(countries.geom, bbox.geom)`,
     )
     .all(wktPoly)
-    .map((item) => (item as any).alpha2);
+    .map((item) => (item as { alpha2: string }).alpha2);
 }

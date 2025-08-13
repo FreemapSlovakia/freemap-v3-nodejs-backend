@@ -1,45 +1,33 @@
 import Router from '@koa/router';
 
 import sql, { bulk, empty } from 'sql-template-tag';
+import { assert, tags } from 'typia';
 import { authenticator } from '../../authenticator.js';
 import { runInTransaction } from '../../database.js';
-import {
-  acceptValidator,
-  bodySchemaValidator,
-} from '../../requestValidators.js';
+import { acceptValidator } from '../../requestValidators.js';
 
 export function attachPatchMapHandler(router: Router) {
   router.patch(
     '/:id',
     acceptValidator('application/json'),
-    bodySchemaValidator(
-      {
-        type: 'object',
-        properties: {
-          name: {
-            type: 'string',
-            minLength: 1,
-            maxLength: 255,
-          },
-          data: {
-            type: 'object',
-          },
-          public: {
-            type: 'boolean',
-          },
-          writers: {
-            type: 'array',
-            items: {
-              type: 'number',
-            },
-          },
-        },
-      },
-      true,
-    ),
     authenticator(true),
     runInTransaction(),
     async (ctx) => {
+      type Body = {
+        name?: string & tags.MinLength<1> & tags.MaxLength<255>;
+        data?: Record<string, unknown>;
+        public?: boolean;
+        writers?: number[];
+      };
+
+      let body;
+
+      try {
+        body = assert<Body>(ctx.request.body);
+      } catch (err) {
+        return ctx.throw(400, err as Error);
+      }
+
       const conn = ctx.state.dbConn!;
 
       const { id } = ctx.params;
@@ -56,9 +44,9 @@ export function attachPatchMapHandler(router: Router) {
         await conn.query(
           sql`SELECT userId FROM mapWriteAccess WHERE mapId = ${id} FOR UPDATE`,
         )
-      ).map(({ userId }: any) => userId);
+      ).map(({ userId }: { userId: number }) => userId);
 
-      const { name, public: pub, data, writers } = ctx.request.body;
+      const { name, public: pub, data, writers } = body;
 
       const user = ctx.state.user!;
 

@@ -1,10 +1,10 @@
 import Router from '@koa/router';
 import { createHmac, randomBytes } from 'node:crypto';
 import sql from 'sql-template-tag';
+import { assert } from 'typia';
 import { authenticator } from '../../authenticator.js';
 import { pool } from '../../database.js';
 import { getEnv } from '../../env.js';
-import { bodySchemaValidator } from '../../requestValidators.js';
 
 type Combo = {
   title: string;
@@ -99,112 +99,93 @@ type Body =
     };
 
 export function attachPurchaseTokenHandler(router: Router) {
-  router.post(
-    '/purchaseToken',
-    authenticator(true),
-    bodySchemaValidator({
-      oneOf: [
-        {
-          type: 'object',
-          required: ['type'],
-          additionalProperties: false,
-          properties: {
-            type: { const: 'premium' },
-          },
-        },
-        {
-          type: 'object',
-          required: ['type'],
-          additionalProperties: false,
-          properties: {
-            type: { const: 'credits' },
-            amount: { type: 'number' },
-          },
-        },
-      ],
-    }),
-    async (ctx) => {
-      const token = randomBytes(32).toString('hex');
+  router.post('/purchaseToken', authenticator(true), async (ctx) => {
+    let body;
 
-      const expireAt = new Date(Date.now() + 3_600_000); // 1 hour
+    try {
+      body = assert<Body>(ctx.request.body);
+    } catch (err) {
+      return ctx.throw(400, err as Error);
+    }
 
-      const item = ctx.request.body as Body;
+    const token = randomBytes(32).toString('hex');
 
-      const user = ctx.state.user!;
+    const expireAt = new Date(Date.now() + 3_600_000); // 1 hour
 
-      await pool.query(
-        sql`INSERT INTO purchaseToken SET
+    const user = ctx.state.user!;
+
+    await pool.query(
+      sql`INSERT INTO purchaseToken SET
         userId = ${user.id},
         createdAt = NOW(),
         token = ${token},
         expireAt = ${expireAt},
-        item = ${JSON.stringify(item)}`,
-      );
+        item = ${JSON.stringify(body)}`,
+    );
 
-      const expiration = Math.floor(expireAt.getTime() / 1000);
+    const expiration = Math.floor(expireAt.getTime() / 1000);
 
-      const paymentUrl = new URL(getEnv('PURCHASE_URL_PREFIX'));
+    const paymentUrl = new URL(getEnv('PURCHASE_URL_PREFIX'));
 
-      const { searchParams } = paymentUrl;
+    const { searchParams } = paymentUrl;
 
-      searchParams.set('token', token);
+    searchParams.set('token', token);
 
-      searchParams.set('callbackurl', getEnv('PURCHASE_CALLBACK_URL'));
+    searchParams.set('callbackurl', getEnv('PURCHASE_CALLBACK_URL'));
 
-      searchParams.set('expiration', String(expiration));
+    searchParams.set('expiration', String(expiration));
 
-      if (user.email) {
-        searchParams.set('email', user.email);
+    if (user.email) {
+      searchParams.set('email', user.email);
+    }
+
+    const lang =
+      user.language && user.language in translations
+        ? user.language
+        : ctx.acceptsLanguages(Object.keys(translations)) || 'en';
+
+    searchParams.set('lang', lang);
+
+    const translation = translations[lang]![body.type];
+
+    searchParams.set('name', translation.title);
+
+    searchParams.set('description', translation.description);
+
+    switch (body.type) {
+      case 'premium':
+        searchParams.set('price_eur', '800');
+        searchParams.set('price_chr', '80');
+
+        break;
+      case 'credits': {
+        searchParams.set('price_eur', String(body.amount)); // let the exchange rate is 1
+        searchParams.set('price_chr', String(Math.ceil(body.amount / 10)));
+
+        searchParams.set(
+          'description',
+          translation.description.replace(
+            '{}',
+            Intl.NumberFormat(lang, {
+              minimumFractionDigits: 0,
+              maximumFractionDigits: 0,
+            }).format(body.amount),
+          ),
+        );
+
+        break;
       }
+    }
 
-      const lang =
-        user.language && user.language in translations
-          ? user.language
-          : ctx.acceptsLanguages(Object.keys(translations)) || 'en';
+    const paymentUrlString = paymentUrl.toString();
 
-      searchParams.set('lang', lang);
-
-      const translation = translations[lang]![item.type];
-
-      searchParams.set('name', translation.title);
-
-      searchParams.set('description', translation.description);
-
-      switch (item.type) {
-        case 'premium':
-          searchParams.set('price_eur', '800');
-          searchParams.set('price_chr', '80');
-
-          break;
-        case 'credits': {
-          searchParams.set('price_eur', String(item.amount)); // let the exchange rate is 1
-          searchParams.set('price_chr', String(Math.ceil(item.amount / 10)));
-
-          searchParams.set(
-            'description',
-            translation.description.replace(
-              '{}',
-              Intl.NumberFormat(lang, {
-                minimumFractionDigits: 0,
-                maximumFractionDigits: 0,
-              }).format(item.amount),
-            ),
-          );
-
-          break;
-        }
-      }
-
-      const paymentUrlString = paymentUrl.toString();
-
-      ctx.body = {
-        paymentUrl:
-          paymentUrlString +
-          '&signature=' +
-          createHmac('sha256', getEnv('PURCHASE_SECRET'))
-            .update(paymentUrlString)
-            .digest('hex'),
-      };
-    },
-  );
+    ctx.body = {
+      paymentUrl:
+        paymentUrlString +
+        '&signature=' +
+        createHmac('sha256', getEnv('PURCHASE_SECRET'))
+          .update(paymentUrlString)
+          .digest('hex'),
+    };
+  });
 }

@@ -2,12 +2,15 @@ import Router from '@koa/router';
 import got from 'got';
 import { authenticator } from '../../authenticator.js';
 import { login } from './loginProcessor.js';
+import { assert } from 'typia';
 
 async function getUserData(accessToken: string) {
-  return await got(
-    'https://graph.facebook.com/v20.0/me?fields=id,name,email&access_token=' +
-      encodeURIComponent(accessToken),
-  ).json();
+  return assert<{ id: string; name: string; email?: string | null }>(
+    await got(
+      'https://graph.facebook.com/v20.0/me?fields=id,name,email&access_token=' +
+        encodeURIComponent(accessToken),
+    ).json(),
+  );
 }
 
 export function attachLoginWithFacebookHandler(router: Router) {
@@ -18,7 +21,7 @@ export function attachLoginWithFacebookHandler(router: Router) {
     async (ctx) => {
       const { accessToken, language, connect } = ctx.request.body;
 
-      const { id, name, email } = (await getUserData(accessToken)) as any;
+      const { id, name, email } = await getUserData(accessToken);
 
       await login(
         ctx,

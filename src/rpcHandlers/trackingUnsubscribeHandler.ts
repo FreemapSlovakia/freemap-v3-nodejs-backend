@@ -1,27 +1,25 @@
+import { tags } from 'typia';
 import { RpcContext } from '../rpcHandlerTypes.js';
 import { trackRegister } from '../trackRegister.js';
 
-export function trackingUnsubscribeHandler(ctx: RpcContext) {
-  // TODO validate ctx.params
-  const { token, deviceId } = ctx.params;
+export type UnsubscribeParams =
+  | { token: string }
+  | { deviceId: number & tags.Type<'uint32'> };
 
-  function rm(key: string) {
-    const websockets = trackRegister.get(key);
-    if (websockets) {
-      websockets.delete(ctx.ctx.websocket);
+export function trackingUnsubscribeHandler(
+  ctx: RpcContext,
+  params: UnsubscribeParams,
+) {
+  const key = 'token' in params ? params.token : params.deviceId;
 
-      if (websockets.size === 0) {
-        trackRegister.delete(key);
-      }
+  const websockets = trackRegister.get(key);
+
+  if (websockets) {
+    websockets.delete(ctx.ctx.websocket);
+
+    if (websockets.size === 0) {
+      trackRegister.delete(key);
     }
-  }
-
-  if (token) {
-    rm(token);
-  }
-
-  if (deviceId) {
-    rm(deviceId);
   }
 
   ctx.respondResult(null);

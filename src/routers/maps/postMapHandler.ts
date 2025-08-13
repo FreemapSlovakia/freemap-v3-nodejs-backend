@@ -1,47 +1,34 @@
 import Router from '@koa/router';
 
 import sql, { bulk } from 'sql-template-tag';
+import { assert, tags } from 'typia';
 import { authenticator } from '../../authenticator.js';
 import { pool } from '../../database.js';
 import { nanoid } from '../../randomId.js';
-import {
-  acceptValidator,
-  bodySchemaValidator,
-} from '../../requestValidators.js';
+import { acceptValidator } from '../../requestValidators.js';
 
 export function attachPostMapHandler(router: Router) {
   router.post(
     '/',
     acceptValidator('application/json'),
-    bodySchemaValidator(
-      {
-        type: 'object',
-        required: ['name'],
-        properties: {
-          name: {
-            type: 'string',
-            minLength: 1,
-            maxLength: 255,
-          },
-          data: {
-            type: 'object',
-          },
-          public: {
-            type: 'boolean',
-          },
-          writers: {
-            type: 'array',
-            items: {
-              type: 'number',
-            },
-          },
-        },
-      },
-      true,
-    ),
     authenticator(true),
     async (ctx) => {
-      const { name, public: pub, data, writers } = ctx.request.body;
+      type Body = {
+        name: string & tags.MinLength<1> & tags.MaxLength<255>;
+        data?: Record<string, unknown>;
+        public?: boolean;
+        writers?: (number & tags.Type<'uint32'>)[];
+      };
+
+      let body;
+
+      try {
+        body = assert<Body>(ctx.request.body);
+      } catch (err) {
+        return ctx.throw(400, err as Error);
+      }
+
+      const { name, public: pub, data, writers } = body;
 
       const id = nanoid();
 
@@ -62,7 +49,7 @@ export function attachPostMapHandler(router: Router) {
 
       if (writers?.length) {
         await pool.query(
-          sql`INSERT INTO mapWriteAccess (mapId, userId) VALUES ${bulk(writers.map((writer: number) => [id, writer]))}`,
+          sql`INSERT INTO mapWriteAccess (mapId, userId) VALUES ${bulk(writers.map((writer) => [id, writer]))}`,
         );
       }
 

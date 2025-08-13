@@ -32,7 +32,8 @@
     "watch": "concurrently -k -p \"[{name}]\" -n \"TypeScript,Node\" -c \"cyan.bold,green.bold\" \"npm run watch-ts\" \"npm run watch-node\"",
     "watch-node": "dotenvx run --overload -- nodemon --enable-source-maps build/index.js | pino-pretty -S -t -i hostname,pid",
     "watch-ts": "tsc -w",
-    "precommit": "lint-staged"
+    "precommit": "lint-staged",
+    "prepare": "ts-patch install"
   },
   "dependencies": {
     "@koa/router": "^14.0.0",
@@ -40,8 +41,6 @@
     "@turf/bbox": "^7.2.0",
     "@turf/boolean-intersects": "^7.2.0",
     "@turf/center": "^7.2.0",
-    "ajv": "^8.17.1",
-    "ajv-formats": "^3.0.1",
     "better-sqlite3": "^12.2.0",
     "concurrently": "^9.2.0",
     "etag": "^1.8.1",
@@ -63,6 +62,7 @@
     "short-uuid": "^5.2.0",
     "source-map-support": "^0.5.21",
     "sql-template-tag": "^5.2.1",
+    "typia": "^9.7.1",
     "unzipper": "^0.12.3",
     "ws": "^8.18.3"
   },
@@ -72,7 +72,6 @@
     "@types/better-sqlite3": "^7.6.13",
     "@types/etag": "^1.8.4",
     "@types/geojson": "^7946.0.16",
-    "@types/json-schema": "^7.0.15",
     "@types/kcors": "^2.2.8",
     "@types/koa": "^3.0.0",
     "@types/koa-websocket": "^5.0.10",
@@ -91,7 +90,8 @@
     "pino-pretty": "^13.1.1",
     "prettier": "^3.6.2",
     "prettier-plugin-organize-imports": "^4.2.0",
-    "typescript": "^5.9.2",
+    "ts-patch": "^3.3.0",
+    "typescript": "~5.9.2",
     "typescript-eslint": "^8.39.1"
   },
   "resolutions": {

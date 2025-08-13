@@ -9,6 +9,14 @@
     "baseUrl": ".",
     "skipLibCheck": true,
     "strict": true,
-    "lib": ["ES2022"]
+    "lib": [
+      "ES2022"
+    ],
+    "plugins": [
+      {
+        "transform": "typia/lib/transform"
+      }
+    ],
+    "strictNullChecks": true
   }
 }
