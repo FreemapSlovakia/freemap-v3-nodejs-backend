@@ -1,9 +1,9 @@
 import Router from '@koa/router';
 import { ParameterizedContext } from 'koa';
 import sql from 'sql-template-tag';
+import { assert, tags } from 'typia';
 import { runInTransaction } from '../../database.js';
 import { storeTrackPoint } from '../../deviceTracking.js';
-import { assert, tags } from 'typia';
 
 export function attachTrackDeviceHandler(router: Router) {
   for (const method of ['post', 'get'] as const) {
@@ -22,8 +22,8 @@ async function jsonHandler(ctx: ParameterizedContext) {
         latitude: number & tags.Minimum<-90> & tags.Maximum<90>;
         longitude: number & tags.Minimum<-180> & tags.Maximum<180>;
         accuracy?: number & tags.Minimum<0>;
-        speed?: number & tags.Minimum<0>;
-        heading?: number & tags.Minimum<0> & tags.ExclusiveMaximum<360>;
+        speed?: number; // seen -1
+        heading?: number; // seen -1
         altitude?: number;
       };
       is_moving?: boolean;
@@ -58,6 +58,9 @@ async function jsonHandler(ctx: ParameterizedContext) {
     ctx.throw(404, 'no such tracking device');
   }
 
+  const { speed, latitude, longitude, altitude, accuracy, heading } =
+    body.location.coords;
+
   try {
     const id = await storeTrackPoint(
       conn,
@@ -65,13 +68,13 @@ async function jsonHandler(ctx: ParameterizedContext) {
       item.maxAge,
       item.maxCount,
       undefined,
-      body.location.coords.speed,
-      body.location.coords.latitude,
-      body.location.coords.longitude,
-      body.location.coords.altitude,
-      body.location.coords.accuracy,
+      speed === -1 ? undefined : speed,
+      latitude,
+      longitude,
+      altitude,
+      accuracy,
       undefined,
-      body.location.coords.heading,
+      heading === -1 ? undefined : heading,
       body.location.battery?.level,
       undefined,
       undefined,
