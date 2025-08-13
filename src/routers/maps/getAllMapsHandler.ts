@@ -21,7 +21,7 @@ export function attachGetAllMapsHandler(router: Router) {
           GROUP BY id, name, public, createdAt, modifiedAt, map.userId
       `);
 
-      assertGuard<Map[]>(items);
+      assertGuard<Omit<Map, 'data'>[]>(items);
 
       ctx.body = items.map((item) => {
         const writers = item.writers?.split(',').map((s) => Number(s)) ?? [];

@@ -8,7 +8,7 @@ export type PictureRow = {
   createdAt: Date;
   lat: number;
   lon: number;
-  pano: 0 | 1;
-  premium: 0 | 1;
+  pano: boolean;
+  premium: boolean;
   azimuth: number | null;
 };
