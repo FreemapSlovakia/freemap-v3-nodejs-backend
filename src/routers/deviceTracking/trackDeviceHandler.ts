@@ -45,6 +45,8 @@ async function jsonHandler(ctx: ParameterizedContext) {
   try {
     body = assert<Body>(ctx.request.body);
   } catch (err) {
+    console.log(ctx.request.body);
+
     ctx.throw(400, err as Error);
   }
 
@@ -62,6 +64,8 @@ async function jsonHandler(ctx: ParameterizedContext) {
     battery,
     timestamp,
     coords: { speed, latitude, longitude, altitude, accuracy, heading },
+    event,
+    activity,
   } = body.location;
 
   try {
@@ -80,7 +84,7 @@ async function jsonHandler(ctx: ParameterizedContext) {
       heading === -1 ? undefined : heading,
       battery?.level === undefined ? undefined : battery?.level * 100,
       undefined,
-      undefined,
+      [event, activity?.type].filter((a) => a).join(', ') || undefined,
       new Date(timestamp),
     );
 
