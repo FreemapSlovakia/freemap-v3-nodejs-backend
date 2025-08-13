@@ -1,17 +1,18 @@
 import Router from '@koa/router';
 
-import sql, { empty } from 'sql-template-tag';
+import sql from 'sql-template-tag';
 import { assert, tags } from 'typia';
 import { authenticator } from '../../authenticator.js';
 import { runInTransaction } from '../../database.js';
 import { nanoid } from '../../randomId.js';
 import { acceptValidator } from '../../requestValidators.js';
+import { SqlError } from 'mariadb';
 
 export type Body = {
   name: string & tags.MinLength<1> & tags.MaxLength<255>;
   maxCount?: (number & tags.Type<'uint32'>) | null;
   maxAge?: (number & tags.Type<'uint32'>) | null;
-  regenerateToken?: boolean | null;
+  token?: string;
 };
 
 export function attachPutDeviceHandler(router: Router) {
@@ -45,18 +46,21 @@ export function attachPutDeviceHandler(router: Router) {
         ctx.throw(403);
       }
 
-      const { name, maxCount, maxAge, regenerateToken } = body;
+      const { name, maxCount, maxAge, token = '' } = body;
 
-      let token;
+      const okToken = token || nanoid();
 
-      if (regenerateToken) {
-        token = nanoid();
+      try {
+        await conn.query(
+          sql`UPDATE trackingDevice SET name = ${name}, maxCount = ${maxCount}, maxAge = ${maxAge}, token = ${okToken} WHERE id = ${id}`,
+        );
+      } catch (err) {
+        if (err instanceof SqlError && err.errno === 1062) {
+          ctx.throw(409);
+        }
+
+        throw err;
       }
-
-      await conn.query(
-        sql`UPDATE trackingDevice SET name = ${name}, maxCount = ${maxCount}, maxAge = ${maxAge}
-          ${regenerateToken ? sql`, token = ${token}` : empty} WHERE id = ${id}`,
-      );
 
       if (maxAge != null) {
         await conn.query(sql`
