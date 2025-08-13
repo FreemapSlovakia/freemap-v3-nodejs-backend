@@ -58,8 +58,11 @@ async function jsonHandler(ctx: ParameterizedContext) {
     ctx.throw(404, 'no such tracking device');
   }
 
-  const { speed, latitude, longitude, altitude, accuracy, heading } =
-    body.location.coords;
+  const {
+    battery,
+    timestamp,
+    coords: { speed, latitude, longitude, altitude, accuracy, heading },
+  } = body.location;
 
   try {
     const id = await storeTrackPoint(
@@ -75,10 +78,10 @@ async function jsonHandler(ctx: ParameterizedContext) {
       accuracy,
       undefined,
       heading === -1 ? undefined : heading,
-      body.location.battery?.level,
+      battery?.level === undefined ? undefined : battery?.level * 100,
       undefined,
       undefined,
-      new Date(body.location.timestamp),
+      new Date(timestamp),
     );
 
     ctx.body = { id };
