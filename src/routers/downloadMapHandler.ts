@@ -9,13 +9,13 @@ import { unlink } from 'node:fs/promises';
 import { ClientHttp2Session, connect } from 'node:http2';
 import { Logger } from 'pino';
 import sql from 'sql-template-tag';
+import { assert, tags } from 'typia';
 import { authenticator } from '../authenticator.js';
 import { pool, runInTransaction } from '../database.js';
 import { DownloadableMap, downloadableMaps } from '../downloadableMaps.js';
 import { getEnv } from '../env.js';
 import { appLogger } from '../logger.js';
 import { sendMail } from '../mailer.js';
-import { bodySchemaValidator } from '../requestValidators.js';
 
 const CONCURRENCY = 8;
 
@@ -123,109 +123,48 @@ const translations: Record<string, Translation> = {
   },
 };
 
+type Position = [
+  number & tags.Minimum<-180> & tags.Maximum<180>,
+  number & tags.Minimum<-90> & tags.Maximum<90>,
+];
+type LinearRing = Position[];
+type PolygonCoords = LinearRing[];
+
+type GeoJSONGeometry =
+  | { type: 'Polygon'; coordinates: PolygonCoords }
+  | { type: 'MultiPolygon'; coordinates: PolygonCoords[] };
+
+type GeoJSONFeature = {
+  type: 'Feature';
+  geometry: GeoJSONGeometry;
+  properties: Record<string, unknown>;
+};
+
 export function attachDownloadMapHandler(router: Router) {
   router.post(
     '/downloadMap',
     authenticator(true),
-    bodySchemaValidator({
-      type: 'object',
-      required: [
-        'map',
-        'minZoom',
-        'maxZoom',
-        'boundary',
-        'name',
-        'email',
-        'format',
-      ],
-      properties: {
-        map: {
-          type: 'string',
-        },
-        format: {
-          type: 'string',
-          enum: ['mbtiles', 'sqlitedb'],
-        },
-        minZoom: {
-          type: 'number',
-          minimum: 0,
-        },
-        maxZoom: {
-          type: 'number',
-          minimum: 0,
-          maximum: 20,
-        },
-        boundary: {
-          type: 'object',
-          required: ['type', 'geometry'],
-          properties: {
-            type: { type: 'string', enum: ['Feature'] },
-            geometry: { $ref: '#/definitions/GeoJSONGeometry' },
-            properties: { type: 'object' },
-          },
-        },
-        name: {
-          type: 'string',
-        },
-        email: {
-          type: 'string',
-          format: 'email',
-        },
-        scale: {
-          type: 'number',
-          minimum: 1,
-          maximum: 3,
-        },
-      },
-      definitions: {
-        PolygonCoords: {
-          type: 'array',
-          items: {
-            type: 'array',
-            items: {
-              type: 'array',
-              items: [
-                {
-                  type: 'number',
-                  minimum: -180,
-                  maximum: 180,
-                },
-                {
-                  type: 'number',
-                  minimum: -90,
-                  maximum: 90,
-                },
-              ],
-            },
-          },
-        },
-        GeoJSONGeometry: {
-          oneOf: [
-            {
-              type: 'object',
-              required: ['type', 'coordinates'],
-              properties: {
-                type: { type: 'string', enum: ['Polygon'] },
-                coordinates: { $ref: '#/definitions/PolygonCoords' },
-              },
-            },
-            {
-              type: 'object',
-              required: ['type', 'coordinates'],
-              properties: {
-                type: { type: 'string', enum: ['MultiPolygon'] },
-                coordinates: {
-                  type: 'array',
-                  items: { $ref: '#/definitions/PolygonCoords' },
-                },
-              },
-            },
-          ],
-        },
-      },
-    }),
     runInTransaction(),
     async (ctx) => {
+      type Body = {
+        map: string;
+        format: 'mbtiles' | 'sqlitedb';
+        minZoom: number & tags.Minimum<0>;
+        maxZoom: number & tags.Minimum<0> & tags.Maximum<20>;
+        boundary: GeoJSONFeature;
+        name: string;
+        email: string & tags.Format<'email'>;
+        scale?: number & tags.Minimum<1> & tags.Maximum<3>;
+      };
+
+      let body;
+
+      try {
+        body = assert<Body>(ctx.request.body);
+      } catch (err) {
+        return ctx.throw(400, err as Error);
+      }
+
       const user = ctx.state.user!;
 
       const lang =
@@ -235,9 +174,7 @@ export function attachDownloadMapHandler(router: Router) {
 
       const translation = translations[lang]!;
 
-      const map = downloadableMaps.find(
-        ({ type }) => type === ctx.request.body.map,
-      );
+      const map = downloadableMaps.find(({ type }) => type === body.map);
 
       if (!map) {
         ctx.throw(400, 'invalid map');
@@ -248,8 +185,7 @@ export function attachDownloadMapHandler(router: Router) {
         sql`SELECT credits FROM user WHERE id = ${user.id} FOR UPDATE`,
       );
 
-      const { minZoom, maxZoom, boundary, scale, name, email, format } =
-        ctx.request.body;
+      const { minZoom, maxZoom, boundary, scale, name, email, format } = body;
 
       let totalTiles = 0;
 

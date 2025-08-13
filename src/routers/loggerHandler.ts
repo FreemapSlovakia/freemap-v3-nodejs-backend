@@ -1,6 +1,6 @@
 import Router from '@koa/router';
 
-import { bodySchemaValidator } from '../requestValidators.js';
+import { assert } from 'typia';
 
 const levelsAsConst = [
   'trace',
@@ -15,35 +15,31 @@ const levels: string[] = levelsAsConst.map((level) => level);
 
 type LogLevelString = (typeof levelsAsConst)[number];
 
-export function attachLoggerHandler(router: Router) {
-  router.post(
-    '/logger',
-    bodySchemaValidator({
-      type: 'object',
-      required: ['level', 'message'],
-      properties: {
-        level: {
-          type: 'string',
-          enum: levels,
-        },
-        message: {
-          type: 'string',
-        },
-        details: {
-          type: 'object',
-        },
-      },
-    }),
-    async (ctx) => {
-      const { level, message, details = {} } = ctx.request.body;
-      ctx.log[validateLevel(level)](
-        Object.assign({ subModule: 'client' }, details),
-        message,
-      );
+export type Body = {
+  level: LogLevelString;
+  message: string;
+  details?: Record<string, unknown>;
+};
 
-      ctx.body = { id: ctx.reqId };
-    },
-  );
+export function attachLoggerHandler(router: Router) {
+  router.post('/logger', async (ctx) => {
+    let body;
+
+    try {
+      body = assert<Body>(ctx.request.body);
+    } catch (err) {
+      return ctx.throw(400, err as Error);
+    }
+
+    const { level, message, details = {} } = body;
+
+    ctx.log[validateLevel(level)](
+      Object.assign({ subModule: 'client' }, details),
+      message,
+    );
+
+    ctx.body = { id: ctx.reqId };
+  });
 }
 
 function validateLevel(level: string): LogLevelString {

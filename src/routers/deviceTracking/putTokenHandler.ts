@@ -1,43 +1,32 @@
 import Router from '@koa/router';
 import sql from 'sql-template-tag';
+import { assert, tags } from 'typia';
 import { authenticator } from '../../authenticator.js';
 import { runInTransaction } from '../../database.js';
-import {
-  acceptValidator,
-  bodySchemaValidator,
-} from '../../requestValidators.js';
+import { acceptValidator } from '../../requestValidators.js';
 
 export function attachPutTokenHandler(router: Router) {
   router.put(
     '/access-tokens/:id',
     acceptValidator('application/json'),
-    bodySchemaValidator(
-      {
-        type: 'object',
-        properties: {
-          timeFrom: {
-            type: ['string', 'null'],
-            format: 'date-time',
-          },
-          timeTo: {
-            type: ['string', 'null'],
-            format: 'date-time',
-          },
-          note: {
-            type: ['string', 'null'],
-            maxLength: 255,
-          },
-          listingLabel: {
-            type: ['string', 'null'],
-            maxLength: 255,
-          },
-        },
-      },
-      true,
-    ),
     authenticator(true),
     runInTransaction(),
     async (ctx) => {
+      type Body = {
+        timeFrom?: (string & tags.Format<'date-time'>) | null;
+        timeTo?: (string & tags.Format<'date-time'>) | null;
+        note?: (string & tags.MaxLength<255>) | null;
+        listingLabel?: (string & tags.MaxLength<255>) | null;
+      };
+
+      let body;
+
+      try {
+        body = assert<Body>(ctx.request.body);
+      } catch (err) {
+        return ctx.throw(400, err as Error);
+      }
+
       const conn = ctx.state.dbConn!;
 
       const [item] = await conn.query(sql`
@@ -56,7 +45,7 @@ export function attachPutTokenHandler(router: Router) {
         ctx.throw(403);
       }
 
-      const { timeFrom, timeTo, note, listingLabel } = ctx.request.body;
+      const { timeFrom, timeTo, note, listingLabel } = body;
 
       await conn.query(sql`
             UPDATE trackingAccessToken SET

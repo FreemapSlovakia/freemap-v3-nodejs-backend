@@ -1,88 +1,56 @@
 import Router from '@koa/router';
-import { Middleware, ParameterizedContext } from 'koa';
+import { ParameterizedContext } from 'koa';
 import { createHmac } from 'node:crypto';
+import { http, tags } from 'typia';
 import { authenticator } from '../../authenticator.js';
 import { pool } from '../../database.js';
 import { getEnv } from '../../env.js';
-import {
-  ValidationRules,
-  acceptValidator,
-  queryAdapter,
-  queryValidator,
-} from '../../requestValidators.js';
+import { acceptValidator } from '../../requestValidators.js';
 import { ratingSubquery } from './ratingConstants.js';
 
 const secret = getEnv('PREMIUM_PHOTO_SECRET', '');
 
-const globalValidationRules: ValidationRules = {
-  userId: (v) => v === null || !Number.isNaN(v) || 'invalid userId',
-  ratingFrom: (v) => v === null || !Number.isNaN(v) || 'invalid ratingFrom',
-  ratingTo: (v) => v === null || !Number.isNaN(v) || 'invalid ratingTo',
-  takenAtFrom: (v) => v === null || !Number.isNaN(v) || 'invalid takenAtFrom',
-  takenAtTo: (v) => v === null || !Number.isNaN(v) || 'invalid takenAtTo',
-  createdAtFrom: (v) =>
-    v === null || !Number.isNaN(v) || 'invalid createdAtFrom',
-  createdAtTo: (v) => v === null || !Number.isNaN(v) || 'invalid createdAtTo',
+type CommonQuery = {
+  userId?: number & tags.Type<'uint32'> & tags.Minimum<1>;
+  ratingFrom?: number & tags.Minimum<0> & tags.Maximum<5>;
+  ratingTo?: number & tags.Minimum<0> & tags.Maximum<5>;
+  takenAtFrom?: string & tags.Format<'date-time'>;
+  takenAtTo?: string & tags.Format<'date-time'>;
+  createdAtFrom?: string & tags.Format<'date-time'>;
+  createdAtTo?: string & tags.Format<'date-time'>;
+  tag?: string;
+  pano?: boolean;
+  premium?: boolean;
 };
 
-const radiusQueryValidationRules: ValidationRules = {
-  lat: (v) => (v >= -90 && v <= 90) || 'lat must be between -90 and 90',
-  lon: (v) => (v >= -180 && v <= 180) || 'lon must be between -180 and 180',
-  distance: (v) => v > 0 || 'distance must be positive',
+type RadiusQuery = CommonQuery & {
+  lat: number & tags.Minimum<-90> & tags.Maximum<90>;
+  lon: number & tags.Minimum<-180> & tags.Maximum<180>;
+  distance: number & tags.Minimum<0>;
 };
 
-const radiusQueryValidator = queryValidator({
-  ...radiusQueryValidationRules,
-  ...globalValidationRules,
-});
-
-const bboxQueryValidationRules: ValidationRules = {
-  bbox: (v) =>
-    (v && v.length === 4 && v.every((x: any) => !Number.isNaN(x))) ||
-    'invalid bbox',
-  fields: (v) =>
-    !v ||
-    (Array.isArray(v) ? v : [v]).every((f: any) =>
-      [
-        'id',
-        'title',
-        'description',
-        'takenAt',
-        'createdAt',
-        'rating',
-        'userId',
-        'user',
-        'tags',
-        'pano',
-        'premium',
-        'azimuth',
-        'hmac',
-      ].includes(f),
-    ) ||
-    'invalid fields',
+type BBoxQuery = CommonQuery & {
+  bbox: `${number & tags.Minimum<-180> & tags.Maximum<180>},${number & tags.Minimum<-90> & tags.Maximum<90>},${number & tags.Minimum<-180> & tags.Maximum<180>},${number & tags.Minimum<-90> & tags.Maximum<90>}`;
+  fields?: Array<
+    | 'id'
+    | 'title'
+    | 'description'
+    | 'takenAt'
+    | 'createdAt'
+    | 'rating'
+    | 'userId'
+    | 'user'
+    | 'tags'
+    | 'pano'
+    | 'premium'
+    | 'azimuth'
+    | 'hmac'
+  >;
 };
 
-const bboxQueryValidator = queryValidator({
-  ...globalValidationRules,
-  ...bboxQueryValidationRules,
-});
-
-const orderQueryValidationRules: ValidationRules = {
-  orderBy: (v) =>
-    ['createdAt', 'takenAt', 'rating', 'lastCommentedAt'].includes(v) ||
-    'invalid orderBy',
-  direction: (v) => ['desc', 'asc'].includes(v) || 'invalid direction',
-};
-
-const orderQueryValidator = queryValidator({
-  ...orderQueryValidationRules,
-  ...globalValidationRules,
-});
-
-const qvs: { [name: string]: Middleware } = {
-  radius: radiusQueryValidator,
-  bbox: bboxQueryValidator,
-  order: orderQueryValidator,
+type OrderByQuery = CommonQuery & {
+  orderBy: 'createdAt' | 'takenAt' | 'rating' | 'lastCommentedAt';
+  direction: 'desc' | 'asc';
 };
 
 const methods: {
@@ -98,45 +66,26 @@ export function attachGetPicturesHandler(router: Router) {
     '/pictures',
     acceptValidator('application/json'),
     authenticator(false),
-    queryAdapter(
-      {
-        lat: (x) => (x === undefined ? null : parseFloat(x)),
-        lon: (x) => (x === undefined ? null : parseFloat(x)),
-        distance: (x) => (x === undefined ? null : parseFloat(x)),
-
-        bbox: (x) => (x === undefined ? null : x.split(',').map(parseFloat)),
-        userId: (x) => (x ? parseInt(x, 10) : null),
-
-        ratingFrom: (x) => (x ? parseFloat(x) : null),
-        ratingTo: (x) => (x ? parseFloat(x) : null),
-        takenAtFrom: (x) => (x ? new Date(x) : null),
-        takenAtTo: (x) => (x ? new Date(x) : null),
-        createdAtFrom: (x) => (x ? new Date(x) : null),
-        createdAtTo: (x) => (x ? new Date(x) : null),
-        pano: (x) => (x ? x === 'true' : null),
-        premium: (x) => (x ? x === 'true' : null),
-      },
-      {
-        fields: (x) => x,
-      },
-    ),
-    queryValidator({
-      by: (v) =>
-        ['radius', 'bbox', 'order'].includes(v) ||
-        '"by" must be one of "radius", "bbox", "order"',
-      userId: (userId) => !userId || userId > 0 || 'invalid userId',
-    }),
-    async (ctx, next) => {
-      await qvs[ctx.query.by as string](ctx, next);
-    },
     async (ctx) => {
-      await methods[ctx.query.by as string](ctx);
+      const method = methods[ctx.query.by as string];
+
+      if (!method) {
+        ctx.throw(400, 'by must be one of ' + Object.keys(methods).join(', '));
+      }
+
+      await method(ctx);
     },
   );
 }
 
 async function byRadius(ctx: ParameterizedContext) {
-  const myUserId = ctx.state.user?.id ?? -1;
+  let radiusQuery;
+
+  try {
+    radiusQuery = http.assertQuery<RadiusQuery>('?' + ctx.querystring);
+  } catch (err) {
+    ctx.throw(400, err as Error);
+  }
 
   const {
     userId,
@@ -149,11 +98,12 @@ async function byRadius(ctx: ParameterizedContext) {
     createdAtTo,
     pano,
     premium,
-  } = ctx.query;
+    lat,
+    lon,
+    distance,
+  } = radiusQuery;
 
-  const lat = Number(ctx.query.lat);
-  const lon = Number(ctx.query.lon);
-  const distance = Number(ctx.query.distance);
+  const myUserId = ctx.state.user?.id ?? -1;
 
   // cca 1 degree
   const lat1 = lat - distance / 43;
@@ -194,19 +144,22 @@ async function byRadius(ctx: ParameterizedContext) {
 
   const rows = await pool.query(sql);
 
-  ctx.body = rows.map((row: any) => ({ id: row.id }));
+  ctx.body = rows.map((row: { id: number }) => ({ id: row.id }));
 }
 
-function toSqlDate(d: any) {
-  return Number.isNaN(d)
-    ? d
-    : d
-        .toISOString()
-        .replace('T', ' ')
-        .replace(/(\.\d*)?Z$/, '');
+function toSqlDate(d: string) {
+  return d.replace('T', ' ').replace(/(\.\d*)?Z$/, '');
 }
 
 async function byBbox(ctx: ParameterizedContext) {
+  let bboxQuery;
+
+  try {
+    bboxQuery = http.assertQuery<BBoxQuery>('?' + ctx.querystring);
+  } catch (err) {
+    ctx.throw(400, err as Error);
+  }
+
   const {
     bbox,
     userId,
@@ -220,13 +173,15 @@ async function byBbox(ctx: ParameterizedContext) {
     pano,
     premium,
     fields,
-  } = ctx.query;
+  } = bboxQuery;
 
-  const [minLon, minLat, maxLon, maxLat] = bbox as string[];
+  const [minLon, minLat, maxLon, maxLat] = bbox
+    .split(',')
+    .map((a) => Number(a));
 
   const myUserId = ctx.state.user?.id ?? -1;
 
-  const normFields = !fields ? [] : Array.isArray(fields) ? fields : [fields];
+  const normFields = fields ?? [];
 
   const flds = [
     'lat',
@@ -315,6 +270,14 @@ function toSec(d: Date | null | undefined) {
 }
 
 async function byOrder(ctx: ParameterizedContext) {
+  let orderByQuery;
+
+  try {
+    orderByQuery = http.assertQuery<OrderByQuery>('?' + ctx.querystring);
+  } catch (err) {
+    ctx.throw(400, err as Error);
+  }
+
   const {
     userId,
     tag,
@@ -328,7 +291,7 @@ async function byOrder(ctx: ParameterizedContext) {
     direction,
     pano,
     premium,
-  } = ctx.query;
+  } = orderByQuery;
 
   const myUserId = ctx.state.user?.id ?? -1;
 
@@ -340,39 +303,39 @@ async function byOrder(ctx: ParameterizedContext) {
         `(id NOT IN (SELECT pictureId FROM pictureTag WHERE name = 'private') OR userId = ${myUserId})`,
       ];
 
-  if (ratingFrom !== null) {
+  if (ratingFrom !== undefined) {
     hv.push(`rating >= ${ratingFrom}`);
   }
 
-  if (ratingTo !== null) {
+  if (ratingTo !== undefined) {
     hv.push(`rating <= ${ratingTo}`);
   }
 
-  if (takenAtFrom !== null) {
+  if (takenAtFrom) {
     wh.push(`takenAt >= '${toSqlDate(takenAtFrom)}'`);
   }
 
-  if (takenAtTo !== null) {
+  if (takenAtTo) {
     wh.push(`takenAt <= '${toSqlDate(takenAtTo)}'`);
   }
 
-  if (createdAtFrom !== null) {
+  if (createdAtFrom) {
     wh.push(`createdAt >= '${toSqlDate(createdAtFrom)}'`);
   }
 
-  if (createdAtTo !== null) {
+  if (createdAtTo) {
     wh.push(`createdAt <= '${toSqlDate(createdAtTo)}'`);
   }
 
-  if (pano !== null) {
+  if (pano !== undefined) {
     wh.push(`pano = ${pano ? 1 : 0}`);
   }
 
-  if (premium !== null) {
+  if (premium !== undefined) {
     wh.push(`premium = ${premium ? 1 : 0}`);
   }
 
-  if (userId !== null) {
+  if (userId !== undefined) {
     wh.push(`userId = ${userId}`);
   }
 
@@ -403,5 +366,5 @@ async function byOrder(ctx: ParameterizedContext) {
 
   const rows = await pool.query(sql);
 
-  ctx.body = rows.map((row: any) => ({ id: row.id }));
+  ctx.body = rows.map((row: { id: number }) => ({ id: row.id }));
 }

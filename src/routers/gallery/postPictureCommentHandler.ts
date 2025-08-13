@@ -1,15 +1,13 @@
 import Router from '@koa/router';
 import { PoolConnection } from 'mariadb';
 import sql from 'sql-template-tag';
+import { assert, tags } from 'typia';
 import { authenticator } from '../../authenticator.js';
 import { runInTransaction } from '../../database.js';
 import { getEnv, getEnvBoolean } from '../../env.js';
 import { appLogger } from '../../logger.js';
 import { sendMail } from '../../mailer.js';
-import {
-  acceptValidator,
-  bodySchemaValidator,
-} from '../../requestValidators.js';
+import { acceptValidator } from '../../requestValidators.js';
 
 const webBaseUrls = getEnv('WEB_BASE_URL').split(',').filter(Boolean);
 
@@ -17,27 +15,22 @@ export function attachPostPictureCommentHandler(router: Router) {
   router.post(
     '/pictures/:id/comments',
     authenticator(true),
-    bodySchemaValidator(
-      {
-        type: 'object',
-        required: ['comment'],
-        properties: {
-          webBaseUrl: {
-            type: 'string',
-            format: 'uri',
-          },
-          comment: {
-            type: 'string',
-            minLength: 1,
-            maxLength: 4096,
-          },
-        },
-      },
-      true,
-    ),
     acceptValidator('application/json'),
     runInTransaction(),
     async (ctx) => {
+      type Body = {
+        webBaseUrl?: string & tags.Format<'uri'>;
+        comment: string & tags.MinLength<1> & tags.MaxLength<4096>;
+      };
+
+      let body;
+
+      try {
+        body = assert<Body>(ctx.request.body);
+      } catch (err) {
+        return ctx.throw(400, err as Error);
+      }
+
       const conn = ctx.state.dbConn as PoolConnection;
 
       const [row] = await conn.query(
@@ -58,7 +51,7 @@ export function attachPostPictureCommentHandler(router: Router) {
         ctx.throw(402);
       }
 
-      const { comment, webBaseUrl: webBaseUrlCandidate } = ctx.request.body;
+      const { comment, webBaseUrl: webBaseUrlCandidate } = body;
 
       let webBaseUrl: string;
 

@@ -1,57 +1,46 @@
 import Router from '@koa/router';
 import sql from 'sql-template-tag';
+import { assert, tags } from 'typia';
 import { authenticator } from '../../authenticator.js';
 import { pool } from '../../database.js';
 import { nanoid } from '../../randomId.js';
-import {
-  acceptValidator,
-  bodySchemaValidator,
-} from '../../requestValidators.js';
+import { acceptValidator } from '../../requestValidators.js';
 
 export function attachPostDeviceHandler(router: Router) {
   router.post(
     '/devices',
     acceptValidator('application/json'),
-    bodySchemaValidator(
-      {
-        type: 'object',
-        required: ['name'],
-        properties: {
-          name: {
-            type: 'string',
-            minLength: 1,
-            maxLength: 255,
-          },
-          maxCount: {
-            type: ['number', 'null'],
-            minimum: 0,
-          },
-          maxAge: {
-            type: ['number', 'null'],
-            minimum: 0,
-          },
-        },
-      },
-      true,
-    ),
     authenticator(true),
     async (ctx) => {
-      const token1 = /^(imei|did:).*/.test(ctx.request.body.token ?? '')
-        ? ctx.request.body.token
-        : nanoid();
+      type Body = {
+        name: string & tags.MinLength<1> & tags.MaxLength<255>;
+        maxCount?: (number & tags.Type<'uint32'>) | null;
+        maxAge?: (number & tags.Type<'uint32'>) | null;
+        token?: string;
+      };
 
-      const { name, maxCount, maxAge } = ctx.request.body;
+      let body;
+
+      try {
+        body = assert<Body>(ctx.request.body);
+      } catch (err) {
+        return ctx.throw(400, err as Error);
+      }
+
+      const { name, maxCount, maxAge, token = '' } = body;
+
+      const okToken = /^(imei|did:).*/.test(token) ? token : nanoid();
 
       const { insertId } = await pool.query(sql`
         INSERT INTO trackingDevice SET
           name = ${name},
-          token = ${token1},
+          token = ${okToken},
           userId = ${ctx.state.user!.id},
           maxCount = ${maxCount},
           maxAge = ${maxAge}
       `);
 
-      ctx.body = { id: insertId, token: token1 };
+      ctx.body = { id: insertId, token: okToken };
     },
   );
 }
