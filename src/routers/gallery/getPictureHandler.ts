@@ -1,12 +1,12 @@
 import Router from '@koa/router';
 import { createHmac } from 'node:crypto';
 import sql, { empty, raw } from 'sql-template-tag';
+import { assertGuard } from 'typia';
 import { authenticator } from '../../authenticator.js';
 import { pool } from '../../database.js';
 import { getEnv } from '../../env.js';
 import { acceptValidator } from '../../requestValidators.js';
 import { ratingSubquery } from './ratingConstants.js';
-import { assertGuard } from 'typia';
 import { PictureRow } from './types.js';
 
 const secret = getEnv('PREMIUM_PHOTO_SECRET', '');
@@ -41,7 +41,7 @@ export function attachGetPictureHandler(router: Router) {
           pictureId: number;
           tags: string | null;
           rating: number;
-          myStars: number | null;
+          myStars?: number | null;
         }
       >(row);
 
