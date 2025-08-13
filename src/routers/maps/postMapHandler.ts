@@ -17,7 +17,7 @@ export function attachPostMapHandler(router: Router) {
         name: string & tags.MinLength<1> & tags.MaxLength<255>;
         data?: Record<string, unknown>;
         public?: boolean;
-        writers?: number & tags.Type<'uint32'>[];
+        writers?: (number & tags.Type<'uint32'>)[];
       };
 
       let body;

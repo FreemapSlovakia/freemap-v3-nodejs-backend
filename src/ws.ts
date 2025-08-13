@@ -4,9 +4,16 @@ import type WebSocket from 'ws';
 import { authenticator } from './authenticator.js';
 import { RpcContext } from './rpcHandlerTypes.js';
 import { pingHandler } from './rpcHandlers/pingHandler.js';
-import { trackingSubscribeHandler } from './rpcHandlers/trackingSubscribeHandler.js';
-import { trackingUnsubscribeHandler } from './rpcHandlers/trackingUnsubscribeHandler.js';
+import {
+  SubscribeParams,
+  trackingSubscribeHandler,
+} from './rpcHandlers/trackingSubscribeHandler.js';
+import {
+  trackingUnsubscribeHandler,
+  UnsubscribeParams,
+} from './rpcHandlers/trackingUnsubscribeHandler.js';
 import { trackRegister } from './trackRegister.js';
+import { is } from 'typia';
 
 export function attachWs(app: KoaWebsocket.App) {
   const wsRouter = new Router();
@@ -27,7 +34,7 @@ export function attachWs(app: KoaWebsocket.App) {
         }, 30000);
 
     ws.on('message', (message) => {
-      let id: number | string | null = null;
+      let id: number | string | null | undefined = undefined;
 
       function respondError(code: number, msg: string) {
         if (ws.readyState === 1) {
@@ -44,7 +51,7 @@ export function attachWs(app: KoaWebsocket.App) {
         }
       }
 
-      function respondResult(result: any) {
+      function respondResult(result: unknown) {
         if (ws.readyState === 1) {
           ws.send(
             JSON.stringify({
@@ -71,32 +78,59 @@ export function attachWs(app: KoaWebsocket.App) {
         return;
       }
 
-      if (
-        msg.jsonrpc !== '2.0' ||
-        typeof msg.method !== 'string' ||
-        ('id' in msg && !['string', 'number'].includes(typeof msg.id))
-      ) {
+      type Request = {
+        jsonrpc: '2.0';
+        method: string;
+        id?: string | number | null;
+        params?: unknown;
+      };
+
+      type KnownRequest =
+        | {
+            method: 'tracking.subscribe';
+            params: SubscribeParams;
+          }
+        | {
+            method: 'tracking.unsubscribe';
+            params: UnsubscribeParams;
+          }
+        | {
+            method: 'ping';
+          };
+
+      if (!is<Request>(msg)) {
         respondError(-32600, 'Invalid Request');
         return;
       }
 
       id = msg.id;
 
+      if (!is<Pick<KnownRequest, 'method'>>(msg)) {
+        respondError(-32601, 'Method not found');
+        return;
+      }
+
+      if (!is<KnownRequest>(msg)) {
+        respondError(-32602, 'Invalid params');
+        return;
+      }
+
       const rpcCtx: RpcContext = {
         respondResult,
         respondError,
-        params: msg.params,
         ctx,
       };
 
-      if (msg.method === 'tracking.subscribe') {
-        trackingSubscribeHandler(rpcCtx);
-      } else if (msg.method === 'tracking.unsubscribe') {
-        trackingUnsubscribeHandler(rpcCtx);
-      } else if (msg.method === 'ping') {
-        pingHandler(rpcCtx);
-      } else {
-        respondError(-32601, 'Method not found');
+      switch (msg.method) {
+        case 'tracking.subscribe':
+          trackingSubscribeHandler(rpcCtx, msg.params);
+          break;
+        case 'tracking.unsubscribe':
+          trackingUnsubscribeHandler(rpcCtx, msg.params);
+          break;
+        case 'ping':
+          pingHandler(rpcCtx);
+          break;
       }
     });
 
@@ -113,5 +147,6 @@ export function attachWs(app: KoaWebsocket.App) {
     ws.on('error', handleCloseOrError);
   });
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   app.ws.use(wsRouter.routes() as any).use(wsRouter.allowedMethods() as any);
 }

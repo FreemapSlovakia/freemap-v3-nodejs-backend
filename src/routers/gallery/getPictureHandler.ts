@@ -6,6 +6,8 @@ import { pool } from '../../database.js';
 import { getEnv } from '../../env.js';
 import { acceptValidator } from '../../requestValidators.js';
 import { ratingSubquery } from './ratingConstants.js';
+import { assertGuard } from 'typia';
+import { PictureRow } from './types.js';
 
 const secret = getEnv('PREMIUM_PHOTO_SECRET', '');
 
@@ -31,6 +33,16 @@ export function attachGetPictureHandler(router: Router) {
         ctx.throw(404, 'no such picture');
       }
 
+      assertGuard<
+        Omit<PictureRow, 'id'> & {
+          name: string;
+          pictureId: number;
+          tags: string | null;
+          rating: number;
+          myStars: number | null;
+        }
+      >(row);
+
       const commentRows = await pool.query(sql`
         SELECT pictureComment.id, pictureComment.createdAt, comment, user.name, userId
           FROM pictureComment JOIN user ON (userId = user.id)
@@ -38,8 +50,18 @@ export function attachGetPictureHandler(router: Router) {
           ORDER BY pictureComment.createdAt
       `);
 
+      assertGuard<
+        {
+          id: number;
+          createdAt: Date;
+          comment: string;
+          userId: number;
+          name: string;
+        }[]
+      >(commentRows);
+
       const comments = commentRows.map(
-        ({ id, createdAt, comment, userId, name }: any) => ({
+        ({ id, createdAt, comment, userId, name }) => ({
           id,
           createdAt: createdAt.toISOString(),
           comment,

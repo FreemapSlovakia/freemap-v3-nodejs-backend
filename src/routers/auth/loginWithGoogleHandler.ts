@@ -2,6 +2,7 @@ import Router from '@koa/router';
 import { authenticator } from '../../authenticator.js';
 import { acceptValidator } from '../../requestValidators.js';
 import { login } from './loginProcessor.js';
+import { assert } from 'typia';
 
 export function attachLoginWithGoogleHandler(router: Router) {
   router.post(
@@ -25,7 +26,11 @@ export function attachLoginWithGoogleHandler(router: Router) {
         throw new Error('Failed to fetch user info from Google');
       }
 
-      const { sub, name, email } = (await userinfoRes.json()) as any;
+      const { sub, name, email } = assert<{
+        sub: string;
+        name?: string;
+        email?: string;
+      }>(await userinfoRes.json());
 
       await login(
         ctx,

@@ -5,15 +5,17 @@ import {
   authProviderToColumn,
   rowToUser,
   userForResponse,
+  UserRow,
 } from '../../authenticator.js';
 import { pool } from '../../database.js';
+import { assert } from 'typia';
 
 export async function login(
   ctx: ParameterizedContext,
   authProvider: keyof typeof authProviderToColumn,
-  remoteUserId: string,
-  remoteName: string,
-  remoteEmail: string | null,
+  remoteUserId: string | number,
+  remoteName: string | undefined,
+  remoteEmail: string | null | undefined,
   remoteLat: number | undefined,
   remoteLon: number | undefined,
   remoteLanguage: string | null,
@@ -31,11 +33,11 @@ export async function login(
 
   const conn = await pool.getConnection();
 
-  let userRow1: Record<string, any>;
+  let userRow1;
 
-  let userId: number;
+  let userId;
 
-  let authToken: string;
+  let authToken;
 
   try {
     await conn.beginTransaction();
@@ -216,7 +218,7 @@ export async function login(
       authToken = randomBytes(32).toString('base64');
 
       await conn.query(
-        sql`INSERT INTO auth SET userId = ${userId}, createdAt = ${now as any}, authToken = ${authToken}`,
+        sql`INSERT INTO auth SET userId = ${userId}, createdAt = ${now}, authToken = ${authToken}`,
       );
     }
 
@@ -224,7 +226,7 @@ export async function login(
       sql`SELECT * FROM user WHERE id = ${userId}`,
     );
 
-    userRow1 = row;
+    userRow1 = assert<UserRow>(row);
 
     await conn.commit();
   } catch (e) {

@@ -1,12 +1,13 @@
 import Router from '@koa/router';
 import { ParameterizedContext } from 'koa';
 import { createHmac } from 'node:crypto';
-import { http, tags } from 'typia';
+import { assert, assertGuard, http, tags } from 'typia';
 import { authenticator } from '../../authenticator.js';
 import { pool } from '../../database.js';
 import { getEnv } from '../../env.js';
 import { acceptValidator } from '../../requestValidators.js';
 import { ratingSubquery } from './ratingConstants.js';
+import { PictureRow } from './types.js';
 
 const secret = getEnv('PREMIUM_PHOTO_SECRET', '');
 
@@ -142,9 +143,9 @@ async function byRadius(ctx: ParameterizedContext) {
     ORDER BY distance
     LIMIT 1000`;
 
-  const rows = await pool.query(sql);
+  const rows = assert<{ id: number }[]>(await pool.query(sql));
 
-  ctx.body = rows.map((row: { id: number }) => ({ id: row.id }));
+  ctx.body = rows.map((row) => ({ id: row.id }));
 }
 
 function toSqlDate(d: string) {
@@ -246,7 +247,16 @@ async function byBbox(ctx: ParameterizedContext) {
 
   const getHmac = fields?.includes('hmac');
 
-  ctx.body = rows.map((row: any) =>
+  assertGuard<
+    Partial<
+      PictureRow & {
+        rating: number | null;
+        tags: string | null;
+      }
+    >[]
+  >(rows);
+
+  ctx.body = rows.map((row) =>
     Object.assign({}, row, {
       rating: getRating ? row.rating : undefined,
       takenAt: toSec(row.takenAt),
@@ -364,7 +374,7 @@ async function byOrder(ctx: ParameterizedContext) {
     LIMIT 1000
   `;
 
-  const rows = await pool.query(sql);
+  const rows = assert<{ id: number }[]>(await pool.query(sql));
 
-  ctx.body = rows.map((row: { id: number }) => ({ id: row.id }));
+  ctx.body = rows.map((row) => ({ id: row.id }));
 }
