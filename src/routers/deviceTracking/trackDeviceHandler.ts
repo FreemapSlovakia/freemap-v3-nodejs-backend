@@ -14,31 +14,36 @@ export function attachTrackDeviceHandler(router: Router) {
 }
 
 async function jsonHandler(ctx: ParameterizedContext) {
-  type Body = {
-    device_id: string & tags.Pattern<'^[^\\s]+$'>;
-    location: {
-      timestamp: string & tags.Format<'date-time'>;
-      coords: {
-        latitude: number & tags.Minimum<-90> & tags.Maximum<90>;
-        longitude: number & tags.Minimum<-180> & tags.Maximum<180>;
-        accuracy?: number & tags.Minimum<0>;
-        speed?: number; // seen -1
-        heading?: number; // seen -1
-        altitude?: number;
+  type Body =
+    | {
+        id: string;
+        notificationToken: string;
+      }
+    | {
+        device_id: string;
+        location: {
+          timestamp: string & tags.Format<'date-time'>;
+          coords: {
+            latitude: number & tags.Minimum<-90> & tags.Maximum<90>;
+            longitude: number & tags.Minimum<-180> & tags.Maximum<180>;
+            accuracy?: number & tags.Minimum<0>;
+            speed?: number; // seen -1
+            heading?: number; // seen -1
+            altitude?: number;
+          };
+          is_moving?: boolean;
+          odometer?: number & tags.Minimum<0>;
+          event?: string;
+          battery?: {
+            level?: number & tags.Minimum<0> & tags.Maximum<1>;
+            is_charging?: boolean;
+          };
+          activity?: {
+            type?: string;
+          };
+          extras?: Record<string, unknown>;
+        };
       };
-      is_moving?: boolean;
-      odometer?: number & tags.Minimum<0>;
-      event?: string;
-      battery?: {
-        level?: number & tags.Minimum<0> & tags.Maximum<1>;
-        is_charging?: boolean;
-      };
-      activity?: {
-        type?: string;
-      };
-      extras?: Record<string, unknown>;
-    };
-  };
 
   let body;
 
@@ -48,6 +53,10 @@ async function jsonHandler(ctx: ParameterizedContext) {
     console.log(ctx.request.body);
 
     ctx.throw(400, err as Error);
+  }
+
+  if ('notificationToken' in body) {
+    ctx.throw(400, 'notifications are not supported');
   }
 
   const conn = ctx.state.dbConn!;
