@@ -3,17 +3,31 @@ import WebSocket from 'ws';
 import { pool } from '../database.js';
 import { RpcContext } from '../rpcHandlerTypes.js';
 import { trackRegister } from '../trackRegister.js';
+import { assertGuard, tags } from 'typia';
 
-export function trackingSubscribeHandler(ctx: RpcContext) {
-  // TODO validate ctx.params
-  const { token, deviceId, fromTime, maxCount, maxAge } = ctx.params;
+export type SubscribeParams = {
+  fromTime?: null | (string & tags.Format<'date-time'>);
+  maxCount?: null | (number & tags.Type<'uint32'>);
+  maxAge?: null | (number & tags.Type<'uint32'>);
+} & (
+  | {
+      token: string;
+    }
+  | {
+      deviceId: number & tags.Type<'uint32'>;
+    }
+);
 
+export function trackingSubscribeHandler(
+  ctx: RpcContext,
+  params: SubscribeParams,
+) {
   (async () => {
     const { user } = ctx.ctx.state || {};
 
-    if (deviceId) {
+    if ('deviceId' in params) {
       const [row] = await pool.query(
-        sql`SELECT userId FROM trackingDevice WHERE id = ${deviceId}`,
+        sql`SELECT userId FROM trackingDevice WHERE id = ${params.deviceId}`,
       );
 
       if (!row) {
@@ -25,9 +39,9 @@ export function trackingSubscribeHandler(ctx: RpcContext) {
         ctx.respondError(403, 'forbidden');
         return;
       }
-    } else if (token) {
+    } else {
       const [row] = await pool.query(
-        sql`SELECT 1 FROM trackingAccessToken WHERE token = ${token}`,
+        sql`SELECT 1 FROM trackingAccessToken WHERE token = ${params.token}`,
       );
 
       if (!row) {
@@ -35,18 +49,20 @@ export function trackingSubscribeHandler(ctx: RpcContext) {
       }
     }
 
-    // TODO check if token exists
+    const key = 'deviceId' in params ? params.deviceId : params.token;
 
-    let websockets = trackRegister.get(deviceId || token);
+    let websockets = trackRegister.get(key);
 
     if (!websockets) {
       websockets = new Set<WebSocket>();
-      trackRegister.set(deviceId || token, websockets);
+      trackRegister.set(key, websockets);
     }
 
     websockets.add(ctx.ctx.websocket);
 
-    let result: any[];
+    const { fromTime, maxCount, maxAge } = params;
+
+    let result;
 
     if (maxCount === 0 || maxAge === 0) {
       result = [];
@@ -55,11 +71,11 @@ export function trackingSubscribeHandler(ctx: RpcContext) {
         SELECT trackingPoint.id, lat, lon, message, trackingPoint.createdAt, altitude, speed, accuracy, hdop, bearing, battery, gsmSignal
         FROM trackingPoint
         ${
-          deviceId
-            ? sql` WHERE deviceId = ${deviceId}`
+          'deviceId' in params
+            ? sql` WHERE deviceId = ${params.deviceId}`
             : sql` JOIN trackingAccessToken
                      ON trackingPoint.deviceId = trackingAccessToken.deviceId
-                     WHERE trackingAccessToken.token = ${token}`
+                     WHERE trackingAccessToken.token = ${params.token}`
         }
         ${
           fromTime
@@ -74,11 +90,11 @@ export function trackingSubscribeHandler(ctx: RpcContext) {
             : empty
         }
         ${
-          token
+          'token' in params
             ? sql` AND (timeFrom IS NULL OR trackingPoint.createdAt >= timeFrom) AND (timeTo IS NULL OR trackingPoint.createdAt < timeTo)`
             : empty
         }
-        ORDER BY trackingPoint.id DESC
+        ORDER BY trackingPoint.createdAt DESC, trackingPoint.id DESC
         ${maxCount ? sql` LIMIT ${Number(maxCount)}` : empty}
       `;
 
@@ -87,10 +103,25 @@ export function trackingSubscribeHandler(ctx: RpcContext) {
       result.reverse();
     }
 
-    // TODO skip nulls
+    assertGuard<
+      {
+        id: number;
+        createdAt: Date;
+        lat: number;
+        lon: number;
+        message: string | null;
+        altitude: number | null;
+        speed: number | null;
+        accuracy: number | null;
+        hdop: number | null;
+        bearing: number | null;
+        battery: number | null;
+        gsmSignal: number | null;
+      }[]
+    >(result);
 
     ctx.respondResult(
-      result.map((item: any) => ({
+      result.map((item) => ({
         id: item.id,
         ts: item.createdAt,
         lat: item.lat,

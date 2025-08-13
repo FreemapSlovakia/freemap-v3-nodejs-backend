@@ -1,57 +1,37 @@
 import Router from '@koa/router';
-
-import sql from 'sql-template-tag';
+import sql, { bulk } from 'sql-template-tag';
+import { assert, tags } from 'typia';
 import { authenticator } from '../../authenticator.js';
 import { runInTransaction } from '../../database.js';
-import { bodySchemaValidator } from '../../requestValidators.js';
 
 export function attachPutPictureHandler(router: Router) {
   router.put(
     '/pictures/:id',
     authenticator(true),
-    bodySchemaValidator({
-      type: 'object',
-      required: ['position'],
-      properties: {
-        position: {
-          type: 'object',
-          required: ['lat', 'lon'],
-          properties: {
-            lat: {
-              type: 'number',
-            },
-            lon: {
-              type: 'number',
-            },
-          },
-        },
-        azimuth: {
-          type: ['number', 'null'],
-        },
-        name: {
-          type: ['string', 'null'],
-        },
-        description: {
-          type: ['string', 'null'],
-        },
-        takenAt: {
-          type: ['string', 'null'],
-          format: 'date-time',
-        },
-        tags: {
-          type: ['array', 'null'],
-          items: {
-            type: 'string',
-          },
-        },
-        premium: {
-          type: 'boolean',
-        },
-      },
-    }),
     runInTransaction(),
     async (ctx) => {
+      type Body = {
+        position: {
+          lat: number;
+          lon: number;
+        };
+        azimuth?: number | null;
+        title?: string | null;
+        description?: string | null;
+        takenAt?: (string & tags.Format<'date-time'>) | null;
+        tags?: string[] | null;
+        premium?: boolean;
+      };
+
       const conn = ctx.state.dbConn!;
+
+      let body;
+
+      try {
+        body = assert<Body>(ctx.request.body);
+      } catch (err) {
+        return ctx.throw(400, err as Error);
+      }
 
       const {
         title,
@@ -61,7 +41,7 @@ export function attachPutPictureHandler(router: Router) {
         tags = [],
         azimuth,
         premium,
-      } = ctx.request.body;
+      } = body;
 
       const rows = await conn.query(
         sql`SELECT userId FROM picture WHERE id = ${ctx.params.id} FOR UPDATE`,
@@ -92,21 +72,20 @@ export function attachPutPictureHandler(router: Router) {
         conn.query(
           `DELETE FROM pictureTag WHERE pictureId = ?
             ${
-              tags.length
+              tags?.length
                 ? ` AND name NOT IN (${tags.map(() => '?').join(', ')})`
                 : ''
             }`,
-          [ctx.params.id, ...tags],
+          [ctx.params.id, ...(tags ?? [])],
         ),
       ];
 
-      if (tags.length) {
+      if (tags?.length) {
         queries.push(
           conn.query(
-            `INSERT INTO pictureTag (name, pictureId)
-              VALUES ${tags.map(() => '(?, ?)').join(', ')}
+            sql`INSERT INTO pictureTag (name, pictureId)
+              VALUES ${bulk(tags.map((tag: string) => [tag, ctx.params.id]))}
               ON DUPLICATE KEY UPDATE name = name`,
-            [].concat(...tags.map((tag: string) => [tag, ctx.params.id])),
           ),
         );
       }

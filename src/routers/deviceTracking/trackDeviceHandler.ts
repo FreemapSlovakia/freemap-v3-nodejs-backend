@@ -3,66 +3,52 @@ import { ParameterizedContext } from 'koa';
 import sql from 'sql-template-tag';
 import { runInTransaction } from '../../database.js';
 import { storeTrackPoint } from '../../deviceTracking.js';
-import { bodySchemaValidator } from '../../requestValidators.js';
+import { assert, tags } from 'typia';
 
 export function attachTrackDeviceHandler(router: Router) {
   for (const method of ['post', 'get'] as const) {
-    router[method]('/track/:token', runInTransaction(), handler);
+    router[method]('/track/:token', runInTransaction(), urlEncodedHandler);
   }
 
-  router.post(
-    '/track',
-    bodySchemaValidator({
-      type: 'object',
-      required: ['location', 'device_id'],
-      properties: {
-        device_id: { type: 'string', pattern: '^[^\\s]+$' },
-        location: {
-          type: 'object',
-          required: ['coords'],
-          properties: {
-            coords: {
-              type: 'object',
-              required: ['latitude', 'longitude'],
-              properties: {
-                latitude: { type: 'number' },
-                longitude: { type: 'number' },
-                accuracy: { type: 'number', minimum: 0 },
-                speed: { type: 'number', minimum: 0 },
-                heading: { type: 'number', minimum: 0, exclusiveMaximum: 360 },
-                altitude: { type: 'number' },
-              },
-            },
-            is_moving: { type: 'boolean' },
-            odometer: { type: 'number', minimum: 0 },
-            event: { type: 'string' }, // eg: 'motionchange'
-            battery: {
-              type: 'object',
-              properties: {
-                level: { type: 'number', minimum: 0, maximum: 1 },
-                is_charging: { type: 'boolean' },
-              },
-            },
-            activity: {
-              type: 'object',
-              properties: {
-                type: { type: 'string' }, // 'still', 'walking', 'in_vehicle'
-              },
-            },
-            extras: { type: 'object', additionalProperties: true },
-          },
-        },
-      },
-    }),
-    runInTransaction(),
-    handler2,
-  );
+  router.post('/track', runInTransaction(), jsonHandler);
 }
 
-async function handler2(ctx: ParameterizedContext) {
-  const conn = ctx.state.dbConn!;
+async function jsonHandler(ctx: ParameterizedContext) {
+  type Body = {
+    device_id: string & tags.Pattern<'^[^\\s]+$'>;
+    location: {
+      timestamp: string & tags.Format<'date-time'>;
+      coords: {
+        latitude: number & tags.Minimum<-90> & tags.Maximum<90>;
+        longitude: number & tags.Minimum<-180> & tags.Maximum<180>;
+        accuracy?: number & tags.Minimum<0>;
+        speed?: number & tags.Minimum<0>;
+        heading?: number & tags.Minimum<0> & tags.ExclusiveMaximum<360>;
+        altitude?: number;
+      };
+      is_moving?: boolean;
+      odometer?: number & tags.Minimum<0>;
+      event?: string;
+      battery?: {
+        level?: number & tags.Minimum<0> & tags.Maximum<1>;
+        is_charging?: boolean;
+      };
+      activity?: {
+        type?: string;
+      };
+      extras?: Record<string, unknown>;
+    };
+  };
 
-  const body = ctx.request.body as any;
+  let body;
+
+  try {
+    body = assert<Body>(ctx.request.body);
+  } catch (err) {
+    ctx.throw(400, err as Error);
+  }
+
+  const conn = ctx.state.dbConn!;
 
   const [item] = await conn.query(
     sql`SELECT id, maxCount, maxAge FROM trackingDevice WHERE token = ${body.device_id}`,
@@ -79,14 +65,14 @@ async function handler2(ctx: ParameterizedContext) {
       item.maxAge,
       item.maxCount,
       undefined,
-      undefined,
       body.location.coords.speed,
       body.location.coords.latitude,
       body.location.coords.longitude,
       body.location.coords.altitude,
       body.location.coords.accuracy,
-      body.location.coords.bearing,
-      body.location.battery,
+      undefined,
+      body.location.coords.heading,
+      body.location.battery?.level,
       undefined,
       undefined,
       new Date(body.location.timestamp),
@@ -102,7 +88,7 @@ async function handler2(ctx: ParameterizedContext) {
   }
 }
 
-async function handler(ctx: ParameterizedContext) {
+async function urlEncodedHandler(ctx: ParameterizedContext) {
   const conn = ctx.state.dbConn!;
 
   const [item] = await conn.query(

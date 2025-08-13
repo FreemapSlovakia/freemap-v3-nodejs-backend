@@ -4,41 +4,31 @@ import sql from 'sql-template-tag';
 import { authenticator } from '../../authenticator.js';
 import { pool } from '../../database.js';
 import { nanoid } from '../../randomId.js';
-import {
-  acceptValidator,
-  bodySchemaValidator,
-} from '../../requestValidators.js';
+import { acceptValidator } from '../../requestValidators.js';
+
+import { assert, type tags } from 'typia';
 
 export function attachPostTokenHandler(router: Router) {
   router.post(
     '/devices/:id/access-tokens',
     acceptValidator('application/json'),
-    bodySchemaValidator(
-      {
-        type: 'object',
-        properties: {
-          timeFrom: {
-            type: ['string', 'null'],
-            format: 'date-time',
-          },
-          timeTo: {
-            type: ['string', 'null'],
-            format: 'date-time',
-          },
-          note: {
-            type: ['string', 'null'],
-            maxLength: 255,
-          },
-          listingLabel: {
-            type: ['string', 'null'],
-            maxLength: 255,
-          },
-        },
-      },
-      true,
-    ),
     authenticator(true),
     async (ctx) => {
+      type Body = {
+        timeFrom?: (string & tags.Format<'date-time'>) | null;
+        timeTo?: (string & tags.Format<'date-time'>) | null;
+        note?: (string & tags.MaxLength<255>) | null;
+        listingLabel?: (string & tags.MaxLength<255>) | null;
+      };
+
+      let body;
+
+      try {
+        body = assert<Body>(ctx.request.body);
+      } catch (err) {
+        return ctx.throw(400, err as Error);
+      }
+
       const [device] = await pool.query(
         sql`SELECT userId FROM trackingDevice WHERE id = ${ctx.params.id}`,
       );
@@ -53,7 +43,7 @@ export function attachPostTokenHandler(router: Router) {
 
       const token = nanoid();
 
-      const { timeFrom, timeTo, note, listingLabel } = ctx.request.body;
+      const { timeFrom, timeTo, note, listingLabel } = body;
 
       const { insertId } = await pool.query(sql`
         INSERT INTO trackingAccessToken SET

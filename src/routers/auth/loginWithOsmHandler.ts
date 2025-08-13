@@ -4,6 +4,7 @@ import { authenticator } from '../../authenticator.js';
 import { getEnv } from '../../env.js';
 import { acceptValidator } from '../../requestValidators.js';
 import { login } from './loginProcessor.js';
+import { assertGuard } from 'typia';
 
 const clientId = getEnv('OSM_OAUTH2_CLIENT_ID');
 
@@ -33,13 +34,15 @@ export function attachLoginWithOsmHandler(router: Router) {
           redirectUri + (connect === undefined ? '' : '?connect=' + connect),
       });
 
-      const body = (await got
+      const body = await got
         .post('https://www.openstreetmap.org/oauth2/token?' + sp.toString(), {
           headers: {
             'content-type': 'application/x-www-form-urlencoded', // otherwise server returns 415
           },
         })
-        .json()) as any;
+        .json();
+
+      assertGuard<{ access_token: string }>(body);
 
       const userDetails = await got
         .get('https://api.openstreetmap.org/api/0.6/user/details', {
@@ -49,20 +52,28 @@ export function attachLoginWithOsmHandler(router: Router) {
         })
         .json();
 
+      assertGuard<{
+        user: {
+          id: number;
+          display_name: string;
+          home?: { lat: number; lon: number };
+        };
+      }>(userDetails);
+
       const {
         user: { display_name: osmName, id: osmId, home },
-      } = userDetails as any;
+      } = userDetails;
 
-      const { lat, lon } = (home && home.length && home[0].$) || {};
+      const { lat, lon } = home ?? {};
 
       await login(
         ctx,
         'osm',
-        osmId,
+        Number(osmId),
         osmName,
         null,
-        lat ? Number(lat) : undefined,
-        lon ? Number(lon) : undefined,
+        lat === undefined ? undefined : Number(lat),
+        lon === undefined ? undefined : Number(lon),
         language,
         connect,
       );

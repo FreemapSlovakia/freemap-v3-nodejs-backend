@@ -5,6 +5,7 @@ import { garminOauth } from '../../garminOauth.js';
 import { acceptValidator } from '../../requestValidators.js';
 import { tokenSecrets } from './garminTokenSecrets.js';
 import { login } from './loginProcessor.js';
+import { assertGuard } from 'typia';
 
 export function attachLoginWithGarmin2Handler(router: Router) {
   router.post(
@@ -63,7 +64,7 @@ export function attachLoginWithGarmin2Handler(router: Router) {
 
       const url2 = 'https://apis.garmin.com/wellness-api/rest/user/id';
 
-      const body2 = (await got
+      const body2 = await got
         .get(url2, {
           headers: {
             ...garminOauth.toHeader(
@@ -80,7 +81,9 @@ export function attachLoginWithGarmin2Handler(router: Router) {
             ),
           },
         })
-        .json()) as any;
+        .json();
+
+      assertGuard<{ userId: string }>(body2);
 
       await login(
         ctx,

@@ -1,46 +1,34 @@
 import Router from '@koa/router';
 
 import sql, { empty } from 'sql-template-tag';
+import { assert, tags } from 'typia';
 import { authenticator } from '../../authenticator.js';
 import { runInTransaction } from '../../database.js';
 import { nanoid } from '../../randomId.js';
-import {
-  acceptValidator,
-  bodySchemaValidator,
-} from '../../requestValidators.js';
+import { acceptValidator } from '../../requestValidators.js';
+
+export type Body = {
+  name: string & tags.MinLength<1> & tags.MaxLength<255>;
+  maxCount?: (number & tags.Type<'uint32'>) | null;
+  maxAge?: (number & tags.Type<'uint32'>) | null;
+  regenerateToken?: boolean | null;
+};
 
 export function attachPutDeviceHandler(router: Router) {
   router.put(
     '/devices/:id',
     acceptValidator('application/json'),
-    bodySchemaValidator(
-      {
-        type: 'object',
-        required: ['name'],
-        properties: {
-          name: {
-            type: 'string',
-            minLength: 1,
-            maxLength: 255,
-          },
-          maxCount: {
-            type: ['number', 'null'],
-            minimum: 0,
-          },
-          maxAge: {
-            type: ['number', 'null'],
-            minimum: 0,
-          },
-          regenerateToken: {
-            type: ['boolean', 'null'],
-          },
-        },
-      },
-      true,
-    ),
     authenticator(true),
     runInTransaction(),
     async (ctx) => {
+      let body;
+
+      try {
+        body = assert<Body>(ctx.request.body);
+      } catch (err) {
+        return ctx.throw(400, err as Error);
+      }
+
       const { id } = ctx.params;
 
       const conn = ctx.state.dbConn!;
@@ -57,7 +45,8 @@ export function attachPutDeviceHandler(router: Router) {
         ctx.throw(403);
       }
 
-      const { name, maxCount, maxAge, regenerateToken } = ctx.request.body;
+      const { name, maxCount, maxAge, regenerateToken } = body;
+
       let token;
 
       if (regenerateToken) {

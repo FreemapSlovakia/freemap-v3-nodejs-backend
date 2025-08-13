@@ -85,6 +85,7 @@ export async function initDatabase() {
       lon FLOAT(9, 6) NOT NULL,
       pano BIT NOT NULL,
       premium BIT NOT NULL DEFAULT FALSE,
+      azimuth FLOAT DEFAULT NULL,
       FOREIGN KEY (userId) REFERENCES user (id) ON DELETE CASCADE,
       INDEX picPano (pano),
       INDEX picPremium (premium),

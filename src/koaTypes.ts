@@ -6,7 +6,7 @@ export type User = {
   authProviders: string[];
   authToken: string;
   credits: number;
-  email?: string;
+  email: string | null;
   facebookUserId: string | null;
   garminAccessToken: string | null;
   garminAccessTokenSecret: string | null;
@@ -18,7 +18,7 @@ export type User = {
   lat: number | null;
   lon: number | null;
   name: string;
-  osmId: string | null;
+  osmId: number | null;
   premiumExpiration: Date | null;
   sendGalleryEmails: boolean;
   settings: Record<string, unknown> | null;

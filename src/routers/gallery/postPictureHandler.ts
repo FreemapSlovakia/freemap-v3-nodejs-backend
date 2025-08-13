@@ -3,14 +3,12 @@ import { execFile } from 'child_process';
 import ExifReader from 'exifreader';
 import { promisify } from 'node:util';
 import shortUuid from 'short-uuid';
-import sql from 'sql-template-tag';
+import sql, { bulk } from 'sql-template-tag';
+import { assert, tags } from 'typia';
 import { authenticator } from '../../authenticator.js';
 import { contentTypeMiddleware } from '../../contentTypeMiddleware.js';
 import { pool, runInTransaction } from '../../database.js';
-import {
-  acceptValidator,
-  bodySchemaValidator,
-} from '../../requestValidators.js';
+import { acceptValidator } from '../../requestValidators.js';
 import { picturesDir } from '../../routers/gallery/constants.js';
 
 const execFileAsync = promisify(execFile);
@@ -21,21 +19,21 @@ export function attachPostPictureHandler(router: Router) {
     authenticator(true),
     contentTypeMiddleware({
       'application/json': [
-        bodySchemaValidator({
-          type: 'object',
-          properties: {
-            type: {
-              type: 'string',
-              const: ['setAllPremiumOrFree'],
-            },
-            payload: {
-              type: 'string',
-              enum: ['premium', 'free'],
-            },
-          },
-        }),
         async (ctx) => {
-          const premium = ctx.request.body.payload === 'premium';
+          type Body = {
+            type?: 'setAllPremiumOrFree';
+            payload?: 'premium' | 'free';
+          };
+
+          let body;
+
+          try {
+            body = assert<Body>(ctx.request.body);
+          } catch (err) {
+            return ctx.throw(400, err as Error);
+          }
+
+          const premium = body.payload === 'premium';
 
           await pool.query(
             sql`UPDATE picture SET premium = ${premium} WHERE userId = ${ctx.state.user!.id}`,
@@ -69,55 +67,34 @@ export function attachPostPictureHandler(router: Router) {
 
           await next();
         },
-        bodySchemaValidator(
-          {
-            type: 'object',
-            required: ['meta'],
-            properties: {
-              meta: {
-                type: 'object',
-                required: ['position'],
-                properties: {
-                  position: {
-                    type: 'object',
-                    required: ['lat', 'lon'],
-                    properties: {
-                      lat: {
-                        type: 'number',
-                      },
-                      lon: {
-                        type: 'number',
-                      },
-                    },
-                  },
-                  name: {
-                    type: ['string', 'null'],
-                  },
-                  description: {
-                    type: ['string', 'null'],
-                  },
-                  takenAt: {
-                    type: ['string', 'null'],
-                    format: 'date-time',
-                  },
-                  tags: {
-                    type: ['array', 'null'],
-                    items: {
-                      type: 'string',
-                    },
-                  },
-                  premium: {
-                    type: 'boolean',
-                  },
-                },
-              },
-            },
-          },
-          true,
-        ),
         acceptValidator('application/json'),
         runInTransaction(),
         async (ctx) => {
+          type Body = {
+            meta: {
+              position: {
+                lat: number & tags.Minimum<-90> & tags.Maximum<90>;
+                lon: number & tags.Minimum<-180> & tags.Maximum<180>;
+              };
+              title?: string | null;
+              description?: string | null;
+              takenAt?: (string & tags.Format<'date-time'>) | null;
+              tags?: string[] | null;
+              premium?: boolean;
+              azimuth?:
+                | (number & tags.Minimum<0> & tags.ExclusiveMaximum<360>)
+                | null;
+            };
+          };
+
+          let body;
+
+          try {
+            body = assert<Body>(ctx.request.body);
+          } catch (err) {
+            return ctx.throw(400, err as Error);
+          }
+
           const conn = ctx.state.dbConn!;
 
           const { image } = ctx.request.files!;
@@ -135,7 +112,7 @@ export function attachPostPictureHandler(router: Router) {
             azimuth,
             tags = [],
             premium,
-          } = ctx.request.body.meta;
+          } = body.meta;
 
           const name = shortUuid.generate();
 
@@ -167,12 +144,9 @@ export function attachPostPictureHandler(router: Router) {
               premium = ${premium}
           `);
 
-          if (tags.length) {
+          if (tags?.length) {
             await conn.query(
-              `INSERT INTO pictureTag (name, pictureId) VALUES ${tags
-                .map(() => '(?, ?)')
-                .join(', ')} ON DUPLICATE KEY UPDATE name = name`,
-              [].concat(...tags.map((tag: any) => [tag, insertId])),
+              sql`INSERT INTO pictureTag (name, pictureId) VALUES ${bulk(tags.flatMap((tag) => [tag, insertId]))} ON DUPLICATE KEY UPDATE name = name`,
             );
           }
 

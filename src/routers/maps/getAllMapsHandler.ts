@@ -3,6 +3,8 @@ import sql from 'sql-template-tag';
 import { authenticator } from '../../authenticator.js';
 import { pool } from '../../database.js';
 import { acceptValidator } from '../../requestValidators.js';
+import { assertGuard } from 'typia';
+import { Map } from './types.js';
 
 export function attachGetAllMapsHandler(router: Router) {
   router.get(
@@ -19,9 +21,10 @@ export function attachGetAllMapsHandler(router: Router) {
           GROUP BY id, name, public, createdAt, modifiedAt, map.userId
       `);
 
-      ctx.body = items.map((item: any) => {
-        const writers =
-          item.writers?.split(',').map((s: any) => Number(s)) ?? [];
+      assertGuard<Omit<Map, 'data'>[]>(items);
+
+      ctx.body = items.map((item) => {
+        const writers = item.writers?.split(',').map((s) => Number(s)) ?? [];
 
         return {
           id: item.id,
