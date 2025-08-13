@@ -33,8 +33,6 @@ export function attachGetPictureHandler(router: Router) {
         ctx.throw(404, 'no such picture');
       }
 
-      console.log(row);
-
       assertGuard<
         Omit<PictureRow, 'id'> & {
           name: string;
