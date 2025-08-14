@@ -1,16 +1,115 @@
 import Router from '@koa/router';
 import { ParameterizedContext } from 'koa';
 import sql from 'sql-template-tag';
+import { assert, tags } from 'typia';
 import { runInTransaction } from '../../database.js';
 import { storeTrackPoint } from '../../deviceTracking.js';
 
 export function attachTrackDeviceHandler(router: Router) {
   for (const method of ['post', 'get'] as const) {
-    router[method]('/track/:token', runInTransaction(), handler);
+    router[method]('/track/:token', runInTransaction(), urlEncodedHandler);
+  }
+
+  router.post('/track', runInTransaction(), jsonHandler);
+}
+
+async function jsonHandler(ctx: ParameterizedContext) {
+  type Body =
+    | {
+        id: string;
+        notificationToken: string;
+      }
+    | {
+        device_id: string;
+        location: {
+          timestamp: string & tags.Format<'date-time'>;
+          coords: {
+            latitude: number & tags.Minimum<-90> & tags.Maximum<90>;
+            longitude: number & tags.Minimum<-180> & tags.Maximum<180>;
+            accuracy?: number & tags.Minimum<0>;
+            speed?: number; // seen -1
+            heading?: number; // seen -1
+            altitude?: number;
+          };
+          is_moving?: boolean;
+          odometer?: number & tags.Minimum<0>;
+          event?: string;
+          battery?: {
+            level?: number & tags.Minimum<0> & tags.Maximum<1>;
+            is_charging?: boolean;
+          };
+          activity?: {
+            type?: string;
+          };
+          extras?: Record<string, unknown>;
+        };
+      };
+
+  let body;
+
+  try {
+    body = assert<Body>(ctx.request.body);
+  } catch (err) {
+    console.log(ctx.request.body);
+
+    ctx.throw(400, err as Error);
+  }
+
+  if ('notificationToken' in body) {
+    ctx.throw(400, 'notifications are not supported');
+  }
+
+  const conn = ctx.state.dbConn!;
+
+  const [item] = await conn.query(
+    sql`SELECT id, maxCount, maxAge FROM trackingDevice WHERE token = ${body.device_id}`,
+  );
+
+  if (!item) {
+    ctx.throw(404, 'no such tracking device');
+  }
+
+  const {
+    battery,
+    timestamp,
+    coords: { speed, latitude, longitude, altitude, accuracy, heading },
+    event,
+    activity,
+  } = body.location;
+
+  try {
+    const id = await storeTrackPoint(
+      conn,
+      item.id,
+      item.maxAge,
+      item.maxCount,
+      undefined,
+      speed === -1 ? undefined : speed,
+      latitude,
+      longitude,
+      altitude,
+      accuracy,
+      undefined,
+      heading === -1 ? undefined : heading,
+      battery?.level === undefined
+        ? undefined
+        : Math.floor(battery?.level * 100),
+      undefined,
+      [event, activity?.type].filter((a) => a).join(', ') || undefined,
+      new Date(timestamp),
+    );
+
+    ctx.body = { id };
+  } catch (err) {
+    if (err instanceof Error && err.message === 'invalid param') {
+      ctx.throw(400, 'one or more values provided are not valid');
+    }
+
+    throw err;
   }
 }
 
-async function handler(ctx: ParameterizedContext) {
+async function urlEncodedHandler(ctx: ParameterizedContext) {
   const conn = ctx.state.dbConn!;
 
   const [item] = await conn.query(
@@ -21,38 +120,59 @@ async function handler(ctx: ParameterizedContext) {
     ctx.throw(404, 'no such tracking device');
   }
 
-  const q =
-    ctx.query?.lat && ctx.query?.lon ? ctx.query : ctx.request.body || {};
+  const q: Record<string, string> = {};
 
-  const { message } = q;
+  for (const [k, v] of Object.entries(ctx.query)) {
+    if (v !== undefined) {
+      q[k] = Array.isArray(v) ? v[0] : v;
+    }
+  }
 
-  const lat = Number.parseFloat(q.lat);
+  if (
+    ctx.request.body &&
+    typeof ctx.request.body === 'object' &&
+    Object.values(ctx.request.body).every((v) => typeof v === 'string')
+  ) {
+    Object.assign(q, ctx.request.body);
+  }
 
-  const lon = Number.parseFloat(q.lon);
+  let lat;
 
-  const altitude =
-    (q.alt || q.altitude) === undefined
-      ? null
-      : Number.parseFloat(q.alt || q.altitude);
+  let lon;
 
-  const speedMs = q.speed === undefined ? null : Number.parseFloat(q.speed);
+  if (q.location) {
+    const loc = q.location.split(',');
 
-  const speedKmh =
-    q.speedKmh === undefined ? null : Number.parseFloat(q.speedKmh);
+    lat = Number.parseFloat(loc[0]);
 
-  const accuracy = q.acc === undefined ? null : Number.parseFloat(q.acc);
+    lon = Number.parseFloat(loc[1]);
+  } else if (q.lat && q.lon) {
+    lat = Number.parseFloat(q.lat);
 
-  const hdop = q.hdop === undefined ? null : Number.parseFloat(q.hdop);
+    lon = Number.parseFloat(q.lon);
+  } else {
+    ctx.throw(400, 'missing location');
+  }
 
-  const bearing = q.bearing === undefined ? null : Number.parseFloat(q.bearing);
+  function tryFloat(value: string | undefined) {
+    return value !== undefined ? Number.parseFloat(value) : undefined;
+  }
 
-  const battery =
-    (q.battery || q.batt) === undefined
-      ? null
-      : Number.parseFloat(q.battery || q.batt);
+  const altitude = tryFloat(q.altitude || q.alt);
 
-  const gsmSignal =
-    q.gsm_signal === undefined ? null : Number.parseFloat(q.gsm_signal);
+  const speedMs = tryFloat(q.speed);
+
+  const speedKmh = tryFloat(q.speedKmh);
+
+  const accuracy = tryFloat(q.acc || q.accuracy);
+
+  const hdop = tryFloat(q.hdop);
+
+  const bearing = tryFloat(q.bearing || q.heading);
+
+  const battery = tryFloat(q.battery || q.batt);
+
+  const gsmSignal = tryFloat(q.gsm_signal);
 
   const time = guessTime(q.time || q.timestamp);
 
@@ -72,7 +192,7 @@ async function handler(ctx: ParameterizedContext) {
       bearing,
       battery,
       gsmSignal,
-      message ?? null,
+      q.message ?? null,
       time,
     );
 
@@ -110,7 +230,7 @@ function guessTime(t: string) {
   const n = Number.parseInt(t, 10);
 
   if (Number.isNaN(n)) {
-    return null;
+    return undefined;
   }
 
   const d2 = new Date(n);
@@ -125,5 +245,5 @@ function guessTime(t: string) {
     return d3;
   }
 
-  return null;
+  return undefined;
 }

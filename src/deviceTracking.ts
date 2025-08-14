@@ -5,23 +5,23 @@ import { trackRegister } from './trackRegister.js';
 export async function storeTrackPoint(
   conn: PoolConnection,
   id: number,
-  maxAge: number | null,
-  maxCount: number | null,
-  speedKmh: number | null,
-  speedMs: number | null,
+  maxAge: number | undefined,
+  maxCount: number | undefined,
+  speedKmh: number | undefined,
+  speedMs: number | undefined,
   lat: number,
   lon: number,
-  altitude: number | null,
-  accuracy: number | null,
-  hdop: number | null,
-  bearing: number | null,
-  battery: number | null,
-  gsmSignal: number | null,
-  message: string | null,
-  time: Date | null,
+  altitude: number | undefined,
+  accuracy: number | undefined,
+  hdop: number | undefined,
+  bearing: number | undefined,
+  battery: number | undefined,
+  gsmSignal: number | undefined,
+  message: string | undefined,
+  time: Date | undefined,
 ) {
   if (
-    time === null ||
+    time === undefined ||
     Number.isNaN(lat) ||
     lat < -90 ||
     lat > 90 ||
@@ -29,19 +29,19 @@ export async function storeTrackPoint(
     lon < -180 ||
     lon > 180 ||
     Number.isNaN(battery) ||
-    (battery !== null && (battery < 0 || battery > 100)) ||
+    (battery !== undefined && (battery < 0 || battery > 100)) ||
     Number.isNaN(gsmSignal) ||
-    (gsmSignal !== null && (gsmSignal < 0 || gsmSignal > 100)) ||
+    (gsmSignal !== undefined && (gsmSignal < 0 || gsmSignal > 100)) ||
     Number.isNaN(bearing) ||
-    (bearing !== null && (bearing < 0 || bearing > 360)) ||
+    (bearing !== undefined && (bearing < 0 || bearing > 360)) ||
     Number.isNaN(accuracy) ||
-    (accuracy !== null && accuracy < 0) ||
+    (accuracy !== undefined && accuracy < 0) ||
     Number.isNaN(hdop) ||
-    (hdop !== null && hdop < 0) ||
+    (hdop !== undefined && hdop < 0) ||
     Number.isNaN(speedMs) ||
-    (speedMs !== null && speedMs < 0) ||
+    (speedMs !== undefined && speedMs < 0) ||
     Number.isNaN(speedKmh) ||
-    (speedKmh !== null && speedKmh < 0)
+    (speedKmh !== undefined && speedKmh < 0)
   ) {
     throw new Error('invalid param');
   }

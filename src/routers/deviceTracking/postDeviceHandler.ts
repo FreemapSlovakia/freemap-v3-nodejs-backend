@@ -1,4 +1,5 @@
 import Router from '@koa/router';
+import { SqlError } from 'mariadb';
 import sql from 'sql-template-tag';
 import { assert, tags } from 'typia';
 import { authenticator } from '../../authenticator.js';
@@ -29,18 +30,26 @@ export function attachPostDeviceHandler(router: Router) {
 
       const { name, maxCount, maxAge, token = '' } = body;
 
-      const okToken = /^(imei|did:).*/.test(token) ? token : nanoid();
+      const okToken = token || nanoid();
 
-      const { insertId } = await pool.query(sql`
-        INSERT INTO trackingDevice SET
-          name = ${name},
-          token = ${okToken},
-          userId = ${ctx.state.user!.id},
-          maxCount = ${maxCount},
-          maxAge = ${maxAge}
-      `);
+      try {
+        const { insertId } = await pool.query(sql`
+          INSERT INTO trackingDevice SET
+            name = ${name},
+            token = ${okToken},
+            userId = ${ctx.state.user!.id},
+            maxCount = ${maxCount},
+            maxAge = ${maxAge}
+        `);
 
-      ctx.body = { id: insertId, token: okToken };
+        ctx.body = { id: insertId, token: okToken };
+      } catch (err) {
+        if (err instanceof SqlError && err.errno === 1062) {
+          ctx.throw(409);
+        }
+
+        throw err;
+      }
     },
   );
 }
