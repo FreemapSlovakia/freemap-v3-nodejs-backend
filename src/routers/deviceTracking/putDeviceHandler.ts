@@ -1,12 +1,12 @@
 import Router from '@koa/router';
 
+import { SqlError } from 'mariadb';
 import sql from 'sql-template-tag';
 import { assert, tags } from 'typia';
 import { authenticator } from '../../authenticator.js';
 import { runInTransaction } from '../../database.js';
 import { nanoid } from '../../randomId.js';
 import { acceptValidator } from '../../requestValidators.js';
-import { SqlError } from 'mariadb';
 
 export type Body = {
   name: string & tags.MinLength<1> & tags.MaxLength<255>;
