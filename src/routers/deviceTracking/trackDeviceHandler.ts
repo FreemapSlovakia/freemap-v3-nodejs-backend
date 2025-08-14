@@ -91,7 +91,9 @@ async function jsonHandler(ctx: ParameterizedContext) {
       accuracy,
       undefined,
       heading === -1 ? undefined : heading,
-      battery?.level === undefined ? undefined : battery?.level * 100,
+      battery?.level === undefined
+        ? undefined
+        : Math.floor(battery?.level * 100),
       undefined,
       [event, activity?.type].filter((a) => a).join(', ') || undefined,
       new Date(timestamp),

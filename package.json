@@ -9,7 +9,7 @@
   "type": "module",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/FreemapSlovakia/ffreemap-v3-nodejs-backend.git"
+    "url": "git+https://github.com/FreemapSlovakia/freemap-v3-nodejs-backend.git"
   },
   "author": {
     "name": "Freemap Slovakia",
@@ -17,7 +17,7 @@
   },
   "license": "Apache-2.0",
   "bugs": {
-    "url": "https://github.com/FreemapSlovakia/ffreemap-v3-nodejs-backend/issues"
+    "url": "https://github.com/FreemapSlovakia/freemap-v3-nodejs-backend/issues"
   },
   "lint-staged": {
     "*.{js,ts}": [
@@ -54,7 +54,7 @@
     "mariadb": "^3.4.5",
     "nanoid": "^5.1.5",
     "oauth-1.0a": "^2.2.6",
-    "pino": "^9.8.0",
+    "pino": "^9.9.0",
     "pino-http": "^10.5.0",
     "piscina": "^5.1.3",
     "process-nextick-args": "^2.0.1",
@@ -81,7 +81,6 @@
     "@types/ws": "^8.18.1",
     "@typescript-eslint/eslint-plugin": "^8.39.1",
     "@typescript-eslint/parser": "^8.39.1",
-    "chakram": "^1.5.0",
     "eslint": "^9.33.0",
     "globals": "^16.3.0",
     "husky": "^9.1.7",
