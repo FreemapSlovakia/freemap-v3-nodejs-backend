@@ -1,11 +1,11 @@
 import Router from '@koa/router';
+import { SqlError } from 'mariadb';
 import sql from 'sql-template-tag';
 import { assert, tags } from 'typia';
 import { authenticator } from '../../authenticator.js';
 import { pool } from '../../database.js';
 import { nanoid } from '../../randomId.js';
 import { acceptValidator } from '../../requestValidators.js';
-import { SqlError } from 'mariadb';
 
 export function attachPostDeviceHandler(router: Router) {
   router.post(
