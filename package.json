@@ -29,7 +29,7 @@
   "scripts": {
     "start": "node --enable-source-maps build/index.js",
     "build": "tsc",
-    "dev": "tsc-watch --onSuccess \"dotenvx run --overload -- node --enable-source-maps build/index.js | pino-pretty -S -t -i hostname,pid\"",
+    "dev": "tsc-watch --onSuccess \"dotenvx run --overload -- sh -c 'node --enable-source-maps build/index.js | pino-pretty -S -t -i hostname,pid'\"",
     "precommit": "lint-staged",
     "prepare": "ts-patch install"
   },
