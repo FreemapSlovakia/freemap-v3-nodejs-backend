@@ -186,22 +186,7 @@ export async function initDatabase() {
     ) ENGINE=InnoDB`,
   ];
 
-  const updates: (string | string[])[] = [
-    [
-      'ALTER TABLE user ADD COLUMN premiumExpiration TIMESTAMP NULL',
-      'UPDATE user SET premiumExpiration = (SELECT MAX(expireAt) FROM purchase WHERE userId = user.id)',
-      'ALTER TABLE purchase DROP COLUMN expireAt',
-      "ALTER TABLE purchase ADD COLUMN item JSON NOT NULL DEFAULT '{}'",
-      "UPDATE purchase SET item = JSON_OBJECT('type', 'legacy', 'value', article) WHERE item IS NULL",
-      'ALTER TABLE purchase DROP COLUMN article',
-    ],
-    'ALTER TABLE user ADD COLUMN credits FLOAT NOT NULL DEFAULT 0',
-    'RENAME TABLE purchase_token TO purchaseToken',
-    'ALTER TABLE purchaseToken ADD COLUMN item JSON NOT NULL',
-    'ALTER TABLE purchase ADD COLUMN note VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL',
-    'ALTER TABLE picture ADD COLUMN premium BIT NOT NULL DEFAULT FALSE',
-    'ALTER TABLE picture ADD COLUMN azimuth FLOAT DEFAULT NULL',
-  ];
+  const updates: (string | string[])[] = [];
 
   const db = await pool.getConnection();
 
