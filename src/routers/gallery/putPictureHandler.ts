@@ -5,44 +5,39 @@ import { authenticator } from '../../authenticator.js';
 import { runInTransaction } from '../../database.js';
 
 export function attachPutPictureHandler(router: Router) {
-  router.put(
-    '/pictures/:id',
-    authenticator(true),
-    runInTransaction(),
-    async (ctx) => {
-      type Body = {
-        position: {
-          lat: number;
-          lon: number;
-        };
-        azimuth?: number | null;
-        title?: string | null;
-        description?: string | null;
-        takenAt?: (string & tags.Format<'date-time'>) | null;
-        tags?: string[] | null;
-        premium?: boolean;
+  router.put('/pictures/:id', authenticator(true), async (ctx) => {
+    type Body = {
+      position: {
+        lat: number;
+        lon: number;
       };
+      azimuth?: number | null;
+      title?: string | null;
+      description?: string | null;
+      takenAt?: (string & tags.Format<'date-time'>) | null;
+      tags?: string[] | null;
+      premium?: boolean;
+    };
 
-      const conn = ctx.state.dbConn!;
+    let body;
 
-      let body;
+    try {
+      body = assert<Body>(ctx.request.body);
+    } catch (err) {
+      return ctx.throw(400, err as Error);
+    }
 
-      try {
-        body = assert<Body>(ctx.request.body);
-      } catch (err) {
-        return ctx.throw(400, err as Error);
-      }
+    const {
+      title,
+      description,
+      takenAt,
+      position: { lat, lon },
+      tags = [],
+      azimuth,
+      premium,
+    } = body;
 
-      const {
-        title,
-        description,
-        takenAt,
-        position: { lat, lon },
-        tags = [],
-        azimuth,
-        premium,
-      } = body;
-
+    await runInTransaction(async (conn) => {
       const rows = await conn.query(
         sql`SELECT userId FROM picture WHERE id = ${ctx.params.id} FOR UPDATE`,
       );
@@ -71,11 +66,11 @@ export function attachPutPictureHandler(router: Router) {
         // delete missing tags
         conn.query(
           `DELETE FROM pictureTag WHERE pictureId = ?
-            ${
-              tags?.length
-                ? ` AND name NOT IN (${tags.map(() => '?').join(', ')})`
-                : ''
-            }`,
+                ${
+                  tags?.length
+                    ? ` AND name NOT IN (${tags.map(() => '?').join(', ')})`
+                    : ''
+                }`,
           [ctx.params.id, ...(tags ?? [])],
         ),
       ];
@@ -84,15 +79,15 @@ export function attachPutPictureHandler(router: Router) {
         queries.push(
           conn.query(
             sql`INSERT INTO pictureTag (name, pictureId)
-              VALUES ${bulk(tags.map((tag: string) => [tag, ctx.params.id]))}
-              ON DUPLICATE KEY UPDATE name = name`,
+                  VALUES ${bulk(tags.map((tag: string) => [tag, ctx.params.id]))}
+                  ON DUPLICATE KEY UPDATE name = name`,
           ),
         );
       }
 
       await Promise.all(queries);
+    });
 
-      ctx.status = 204;
-    },
-  );
+    ctx.status = 204;
+  });
 }

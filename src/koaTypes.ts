@@ -1,4 +1,3 @@
-import { PoolConnection } from 'mariadb';
 import { Socket } from 'net';
 import { Logger } from 'pino';
 
@@ -27,7 +26,6 @@ export type User = {
 declare module 'koa' {
   interface DefaultState {
     user?: User;
-    dbConn?: PoolConnection;
     [key: `${string}`]: never;
   }
 

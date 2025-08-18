@@ -11,7 +11,7 @@ import { Logger } from 'pino';
 import sql from 'sql-template-tag';
 import { assert, tags } from 'typia';
 import { authenticator } from '../authenticator.js';
-import { pool, runInTransaction } from '../database.js';
+import { runInTransaction } from '../database.js';
 import { DownloadableMap, downloadableMaps } from '../downloadableMaps.js';
 import { getEnv } from '../env.js';
 import { appLogger } from '../logger.js';
@@ -141,142 +141,130 @@ type GeoJSONFeature = {
 };
 
 export function attachDownloadMapHandler(router: Router) {
-  router.post(
-    '/downloadMap',
-    authenticator(true),
-    runInTransaction(),
-    async (ctx) => {
-      type Body = {
-        map: string;
-        format: 'mbtiles' | 'sqlitedb';
-        minZoom: number & tags.Minimum<0>;
-        maxZoom: number & tags.Minimum<0> & tags.Maximum<20>;
-        boundary: GeoJSONFeature;
-        name: string;
-        email: string & tags.Format<'email'>;
-        scale?: number & tags.Minimum<1> & tags.Maximum<3>;
-      };
+  router.post('/downloadMap', authenticator(true), async (ctx) => {
+    type Body = {
+      map: string;
+      format: 'mbtiles' | 'sqlitedb';
+      minZoom: number & tags.Minimum<0>;
+      maxZoom: number & tags.Minimum<0> & tags.Maximum<20>;
+      boundary: GeoJSONFeature;
+      name: string;
+      email: string & tags.Format<'email'>;
+      scale?: number & tags.Minimum<1> & tags.Maximum<3>;
+    };
 
-      let body;
+    let body;
 
-      try {
-        body = assert<Body>(ctx.request.body);
-      } catch (err) {
-        return ctx.throw(400, err as Error);
-      }
+    try {
+      body = assert<Body>(ctx.request.body);
+    } catch (err) {
+      return ctx.throw(400, err as Error);
+    }
 
-      const user = ctx.state.user!;
+    const user = ctx.state.user!;
 
-      const lang =
-        user.language && user.language in translations
-          ? user.language
-          : ctx.acceptsLanguages(Object.keys(translations)) || 'en';
+    const lang =
+      user.language && user.language in translations
+        ? user.language
+        : ctx.acceptsLanguages(Object.keys(translations)) || 'en';
 
-      const translation = translations[lang]!;
+    const translation = translations[lang]!;
 
-      const map = downloadableMaps.find(({ type }) => type === body.map);
+    const map = downloadableMaps.find(({ type }) => type === body.map);
 
-      if (!map) {
-        ctx.throw(400, 'invalid map');
-        return;
-      }
+    if (!map) {
+      ctx.throw(400, 'invalid map');
+      return;
+    }
 
-      let [{ credits }] = await pool.query(
+    const { minZoom, maxZoom, boundary, scale, name, email, format } = body;
+
+    let totalTiles = 0;
+
+    const it = calculateTiles(boundary, minZoom, maxZoom);
+
+    while (!it.next().done) {
+      totalTiles++;
+    }
+
+    const price = Math.ceil((totalTiles / 1_000_000) * map.creditsPerMTile);
+
+    const insertId = await runInTransaction(async (conn) => {
+      let [{ credits }] = await conn.query(
         sql`SELECT credits FROM user WHERE id = ${user.id} FOR UPDATE`,
       );
-
-      const { minZoom, maxZoom, boundary, scale, name, email, format } = body;
-
-      let totalTiles = 0;
-
-      const it = calculateTiles(boundary, minZoom, maxZoom);
-
-      while (!it.next().done) {
-        totalTiles++;
-      }
-
-      const price = Math.ceil((totalTiles / 1_000_000) * map.creditsPerMTile);
 
       credits -= price;
 
       if (credits < 0) {
         ctx.throw(409, 'not enough credit');
-        return;
       }
 
-      pool.query(
+      conn.query(
         sql`UPDATE user SET credits = ${credits} WHERE id = ${user.id}`,
       );
 
-      const { insertId } = await pool.query(
+      const { insertId } = await conn.query(
         sql`INSERT INTO blockedCredit SET amount = ${price}, userId = ${user.id}`,
       );
 
-      const logger = appLogger.child({
-        module: 'downloadMap',
-        reqId: ctx.reqId,
-      });
+      return insertId;
+    });
 
-      (async () => {
-        let refund = false;
+    const logger = appLogger.child({
+      module: 'downloadMap',
+      reqId: ctx.reqId,
+    });
 
-        try {
-          await download(
-            map,
-            format,
-            minZoom,
-            maxZoom,
-            boundary,
-            scale,
-            name,
-            email,
-            totalTiles,
-            logger,
-            translation.success,
-          );
-        } catch (err) {
-          logger.error(
-            { err },
-            'Error during map download, sending email notification.',
-          );
+    (async () => {
+      let refund = false;
 
-          await sendMail(
-            email,
-            translation.error.subject,
-            translation.error.body,
-          );
+      try {
+        await download(
+          map,
+          format,
+          minZoom,
+          maxZoom,
+          boundary,
+          scale,
+          name,
+          email,
+          totalTiles,
+          logger,
+          translation.success,
+        );
+      } catch (err) {
+        logger.error(
+          { err },
+          'Error during map download, sending email notification.',
+        );
 
-          refund = true;
-        }
+        await sendMail(
+          email,
+          translation.error.subject,
+          translation.error.body,
+        );
 
-        const conn = await pool.getConnection();
+        refund = true;
+      }
 
-        try {
-          await conn.beginTransaction();
-
-          if (refund) {
-            await conn.query(
-              sql`UPDATE user SET credits = credits + ${price} WHERE id = ${user.id}`,
-            );
-          }
-
+      await runInTransaction(async (conn) => {
+        if (refund) {
           await conn.query(
-            sql`DELETE FROM blockedCredit WHERE id = ${insertId}`,
+            sql`UPDATE user SET credits = credits + ${price} WHERE id = ${user.id}`,
           );
-
-          await conn.commit();
-        } finally {
-          conn.release();
         }
 
-        logger.info('Map download complete.');
-      })().catch((err) => {
-        logger.error({ err }, 'Error during map download cleanup.');
+        await conn.query(sql`DELETE FROM blockedCredit WHERE id = ${insertId}`);
       });
 
-      ctx.status = 204;
-    },
-  );
+      logger.info('Map download complete.');
+    })().catch((err) => {
+      logger.error({ err }, 'Error during map download cleanup.');
+    });
+
+    ctx.status = 204;
+  });
 }
 
 async function download(

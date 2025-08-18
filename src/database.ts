@@ -1,5 +1,4 @@
-import { Middleware } from 'koa';
-import { createPool } from 'mariadb';
+import { createPool, SqlError } from 'mariadb';
 import sql from 'sql-template-tag';
 import { getEnv, getEnvInteger } from './env.js';
 import { appLogger } from './logger.js';
@@ -215,13 +214,9 @@ export async function initDatabase() {
   }
 
   async function cleanup() {
-    const conn = await pool.getConnection();
+    await pool.query('DELETE FROM purchaseToken WHERE expireAt < NOW()');
 
-    try {
-      await conn.query('DELETE FROM purchaseToken WHERE expireAt < NOW()');
-
-      await conn.beginTransaction();
-
+    await runInTransaction(async (conn) => {
       // TODO track pending downloads taking more than a day :-o
 
       const yesterday = new Date();
@@ -242,11 +237,7 @@ export async function initDatabase() {
       await conn.query(
         sql`DELETE FROM blockedCredit WHERE createdAt < ${yesterday}`,
       );
-
-      await conn.commit();
-    } finally {
-      conn.release();
-    }
+    });
   }
 
   cleanup();
@@ -255,24 +246,73 @@ export async function initDatabase() {
   setInterval(cleanup, 60_000 * 60 * 1);
 }
 
-export function runInTransaction(): Middleware {
-  return async (ctx, next) => {
+import type { PoolConnection } from 'mariadb';
+
+const MAX_ATTEMPTS = 5;
+const BASE_DELAY_MS = 50;
+const MAX_DELAY_MS = 1500;
+
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function withJitter(ms: number) {
+  const jitter = Math.floor(Math.random() * ms);
+  return ms + jitter;
+}
+
+function isRetryableTxError(err: unknown): boolean {
+  return err instanceof SqlError && err.sqlState === '40001';
+}
+
+export async function runInTransaction<T>(
+  fn: (conn: PoolConnection) => Promise<T>,
+  opts: {
+    maxAttempts?: number;
+    baseDelay?: number;
+    maxDelay?: number;
+  } = {},
+): Promise<T> {
+  const {
+    maxAttempts = MAX_ATTEMPTS,
+    baseDelay = BASE_DELAY_MS,
+    maxDelay = MAX_DELAY_MS,
+  } = opts;
+
+  let attempt = 0;
+
+  while (true) {
     const conn = await pool.getConnection();
 
     try {
       await conn.beginTransaction();
 
-      const old = ctx.state.dbConn;
-
-      ctx.state.dbConn = conn;
-
-      await next();
-
-      ctx.state.dbConn = old;
+      const res = await fn(conn);
 
       await conn.commit();
+
+      return res;
+    } catch (err: unknown) {
+      try {
+        await conn.rollback();
+      } catch {
+        // ignore rollback errors
+      }
+
+      attempt++;
+
+      if (!isRetryableTxError(err) || attempt >= maxAttempts) {
+        throw err;
+      }
+
+      const delay = Math.min(
+        maxDelay,
+        withJitter(baseDelay * 2 ** (attempt - 1)),
+      );
+
+      await sleep(delay);
     } finally {
       conn.release();
     }
-  };
+  }
 }

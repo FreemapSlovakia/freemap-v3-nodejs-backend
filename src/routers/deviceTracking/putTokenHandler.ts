@@ -10,7 +10,6 @@ export function attachPutTokenHandler(router: Router) {
     '/access-tokens/:id',
     acceptValidator('application/json'),
     authenticator(true),
-    runInTransaction(),
     async (ctx) => {
       type Body = {
         timeFrom?: (string & tags.Format<'date-time'>) | null;
@@ -27,9 +26,8 @@ export function attachPutTokenHandler(router: Router) {
         return ctx.throw(400, err as Error);
       }
 
-      const conn = ctx.state.dbConn!;
-
-      const [item] = await conn.query(sql`
+      await runInTransaction(async (conn) => {
+        const [item] = await conn.query(sql`
           SELECT userId
             FROM trackingAccessToken
             JOIN trackingDevice ON (deviceId = trackingDevice.id)
@@ -37,17 +35,17 @@ export function attachPutTokenHandler(router: Router) {
             FOR UPDATE
         `);
 
-      if (!item) {
-        ctx.throw(404, 'no such tracking access token');
-      }
+        if (!item) {
+          ctx.throw(404, 'no such tracking access token');
+        }
 
-      if (!ctx.state.user!.isAdmin && item.userId !== ctx.state.user!.id) {
-        ctx.throw(403);
-      }
+        if (!ctx.state.user!.isAdmin && item.userId !== ctx.state.user!.id) {
+          ctx.throw(403);
+        }
 
-      const { timeFrom, timeTo, note, listingLabel } = body;
+        const { timeFrom, timeTo, note, listingLabel } = body;
 
-      await conn.query(sql`
+        await conn.query(sql`
             UPDATE trackingAccessToken SET
               note = ${note},
               timeFrom = ${timeFrom && new Date(timeFrom)},
@@ -55,6 +53,7 @@ export function attachPutTokenHandler(router: Router) {
               listingLabel = ${listingLabel}
               WHERE id = ${ctx.params.id}
           `);
+      });
 
       ctx.status = 204;
     },

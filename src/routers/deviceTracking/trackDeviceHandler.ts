@@ -7,10 +7,10 @@ import { storeTrackPoint } from '../../deviceTracking.js';
 
 export function attachTrackDeviceHandler(router: Router) {
   for (const method of ['post', 'get'] as const) {
-    router[method]('/track/:token', runInTransaction(), urlEncodedHandler);
+    router[method]('/track/:token', urlEncodedHandler);
   }
 
-  router.post('/track', runInTransaction(), jsonHandler);
+  router.post('/track', jsonHandler);
 }
 
 async function jsonHandler(ctx: ParameterizedContext) {
@@ -59,151 +59,151 @@ async function jsonHandler(ctx: ParameterizedContext) {
     ctx.throw(400, 'notifications are not supported');
   }
 
-  const conn = ctx.state.dbConn!;
-
-  const [item] = await conn.query(
-    sql`SELECT id, maxCount, maxAge FROM trackingDevice WHERE token = ${body.device_id}`,
-  );
-
-  if (!item) {
-    ctx.throw(404, 'no such tracking device');
-  }
-
-  const {
-    battery,
-    timestamp,
-    coords: { speed, latitude, longitude, altitude, accuracy, heading },
-    event,
-    activity,
-  } = body.location;
-
-  try {
-    const id = await storeTrackPoint(
-      conn,
-      item.id,
-      item.maxAge,
-      item.maxCount,
-      undefined,
-      speed === -1 ? undefined : speed,
-      latitude,
-      longitude,
-      altitude,
-      accuracy,
-      undefined,
-      heading === -1 ? undefined : heading,
-      battery?.level === undefined
-        ? undefined
-        : Math.floor(battery?.level * 100),
-      undefined,
-      [event, activity?.type].filter((a) => a).join(', ') || undefined,
-      new Date(timestamp),
+  await runInTransaction(async (conn) => {
+    const [item] = await conn.query(
+      sql`SELECT id, maxCount, maxAge FROM trackingDevice WHERE token = ${body.device_id}`,
     );
 
-    ctx.body = { id };
-  } catch (err) {
-    if (err instanceof Error && err.message === 'invalid param') {
-      ctx.throw(400, 'one or more values provided are not valid');
+    if (!item) {
+      ctx.throw(404, 'no such tracking device');
     }
 
-    throw err;
-  }
+    const {
+      battery,
+      timestamp,
+      coords: { speed, latitude, longitude, altitude, accuracy, heading },
+      event,
+      activity,
+    } = body.location;
+
+    try {
+      const id = await storeTrackPoint(
+        conn,
+        item.id,
+        item.maxAge,
+        item.maxCount,
+        undefined,
+        speed === -1 ? undefined : speed,
+        latitude,
+        longitude,
+        altitude,
+        accuracy,
+        undefined,
+        heading === -1 ? undefined : heading,
+        battery?.level === undefined
+          ? undefined
+          : Math.floor(battery?.level * 100),
+        undefined,
+        [event, activity?.type].filter((a) => a).join(', ') || undefined,
+        new Date(timestamp),
+      );
+
+      ctx.body = { id };
+    } catch (err) {
+      if (err instanceof Error && err.message === 'invalid param') {
+        ctx.throw(400, 'one or more values provided are not valid');
+      }
+
+      throw err;
+    }
+  });
 }
 
 async function urlEncodedHandler(ctx: ParameterizedContext) {
-  const conn = ctx.state.dbConn!;
-
-  const [item] = await conn.query(
-    sql`SELECT id, maxCount, maxAge FROM trackingDevice WHERE token = ${ctx.params.token}`,
-  );
-
-  if (!item) {
-    ctx.throw(404, 'no such tracking device');
-  }
-
-  const q: Record<string, string> = {};
-
-  for (const [k, v] of Object.entries(ctx.query)) {
-    if (v !== undefined) {
-      q[k] = Array.isArray(v) ? v[0] : v;
-    }
-  }
-
-  if (
-    ctx.request.body &&
-    typeof ctx.request.body === 'object' &&
-    Object.values(ctx.request.body).every((v) => typeof v === 'string')
-  ) {
-    Object.assign(q, ctx.request.body);
-  }
-
-  let lat;
-
-  let lon;
-
-  if (q.location) {
-    const loc = q.location.split(',');
-
-    lat = Number.parseFloat(loc[0]);
-
-    lon = Number.parseFloat(loc[1]);
-  } else if (q.lat && q.lon) {
-    lat = Number.parseFloat(q.lat);
-
-    lon = Number.parseFloat(q.lon);
-  } else {
-    ctx.throw(400, 'missing location');
-  }
-
-  function tryFloat(value: string | undefined) {
-    return value !== undefined ? Number.parseFloat(value) : undefined;
-  }
-
-  const altitude = tryFloat(q.altitude || q.alt);
-
-  const speedMs = tryFloat(q.speed);
-
-  const speedKmh = tryFloat(q.speedKmh);
-
-  const accuracy = tryFloat(q.acc || q.accuracy);
-
-  const hdop = tryFloat(q.hdop);
-
-  const bearing = tryFloat(q.bearing || q.heading);
-
-  const battery = tryFloat(q.battery || q.batt);
-
-  const gsmSignal = tryFloat(q.gsm_signal);
-
-  const time = guessTime(q.time || q.timestamp);
-
-  try {
-    const id = await storeTrackPoint(
-      conn,
-      item.id,
-      item.maxAge,
-      item.maxCount,
-      speedKmh,
-      speedMs,
-      lat,
-      lon,
-      altitude,
-      accuracy,
-      hdop,
-      bearing,
-      battery,
-      gsmSignal,
-      q.message ?? null,
-      time,
+  await runInTransaction(async (conn) => {
+    const [item] = await conn.query(
+      sql`SELECT id, maxCount, maxAge FROM trackingDevice WHERE token = ${ctx.params.token}`,
     );
 
-    ctx.body = { id };
-  } catch (err) {
-    if (err instanceof Error && err.message === 'invalid param') {
-      ctx.throw(400, 'one or more values provided are not valid');
+    if (!item) {
+      ctx.throw(404, 'no such tracking device');
     }
 
-    throw err;
-  }
+    const q: Record<string, string> = {};
+
+    for (const [k, v] of Object.entries(ctx.query)) {
+      if (v !== undefined) {
+        q[k] = Array.isArray(v) ? v[0] : v;
+      }
+    }
+
+    if (
+      ctx.request.body &&
+      typeof ctx.request.body === 'object' &&
+      Object.values(ctx.request.body).every((v) => typeof v === 'string')
+    ) {
+      Object.assign(q, ctx.request.body);
+    }
+
+    let lat;
+
+    let lon;
+
+    if (q.location) {
+      const loc = q.location.split(',');
+
+      lat = Number.parseFloat(loc[0]);
+
+      lon = Number.parseFloat(loc[1]);
+    } else if (q.lat && q.lon) {
+      lat = Number.parseFloat(q.lat);
+
+      lon = Number.parseFloat(q.lon);
+    } else {
+      ctx.throw(400, 'missing location');
+    }
+
+    function tryFloat(value: string | undefined) {
+      return value !== undefined ? Number.parseFloat(value) : undefined;
+    }
+
+    const altitude = tryFloat(q.altitude || q.alt);
+
+    const speedMs = tryFloat(q.speed);
+
+    const speedKmh = tryFloat(q.speedKmh);
+
+    const accuracy = tryFloat(q.acc || q.accuracy);
+
+    const hdop = tryFloat(q.hdop);
+
+    const bearing = tryFloat(q.bearing || q.heading);
+
+    const battery = tryFloat(q.battery || q.batt);
+
+    const gsmSignal = tryFloat(q.gsm_signal);
+
+    const time = guessTime(q.time || q.timestamp);
+
+    try {
+      const id = await storeTrackPoint(
+        conn,
+        item.id,
+        item.maxAge,
+        item.maxCount,
+        speedKmh,
+        speedMs,
+        lat,
+        lon,
+        altitude,
+        accuracy,
+        hdop,
+        bearing,
+        battery,
+        gsmSignal,
+        q.message ?? null,
+        time,
+      );
+
+      ctx.body = { id };
+    } catch (err) {
+      if (err instanceof Error && err.message === 'invalid param') {
+        ctx.throw(400, 'one or more values provided are not valid');
+      }
+
+      throw err;
+    }
+  });
 }
 
 function guessTime(t: string) {

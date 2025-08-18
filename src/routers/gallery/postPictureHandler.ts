@@ -68,7 +68,6 @@ export function attachPostPictureHandler(router: Router) {
           await next();
         },
         acceptValidator('application/json'),
-        runInTransaction(),
         async (ctx) => {
           type Body = {
             meta: {
@@ -94,8 +93,6 @@ export function attachPostPictureHandler(router: Router) {
           } catch (err) {
             return ctx.throw(400, err as Error);
           }
-
-          const conn = ctx.state.dbConn!;
 
           const { image } = ctx.request.files!;
 
@@ -129,28 +126,32 @@ export function attachPostPictureHandler(router: Router) {
 
           const pano = exif['UsePanoramaViewer']?.value === 'True';
 
-          const { insertId } = await conn.query(sql`
-            INSERT INTO picture SET
-              pathname = ${`${name}.jpeg`},
-              userId = ${ctx.state.user!.id},
-              title = ${title},
-              description = ${description},
-              createdAt = ${new Date()},
-              takenAt = ${takenAt ? new Date(takenAt) : null},
-              lat = ${lat},
-              lon = ${lon},
-              azimuth = ${azimuth},
-              pano = ${pano},
-              premium = ${premium}
-          `);
+          const id = await runInTransaction(async (conn) => {
+            const { insertId } = await conn.query(sql`
+              INSERT INTO picture SET
+                pathname = ${`${name}.jpeg`},
+                userId = ${ctx.state.user!.id},
+                title = ${title},
+                description = ${description},
+                createdAt = ${new Date()},
+                takenAt = ${takenAt ? new Date(takenAt) : null},
+                lat = ${lat},
+                lon = ${lon},
+                azimuth = ${azimuth},
+                pano = ${pano},
+                premium = ${premium}
+            `);
 
-          if (tags?.length) {
-            await conn.query(
-              sql`INSERT INTO pictureTag (name, pictureId) VALUES ${bulk(tags.map((tag) => [tag, insertId]))} ON DUPLICATE KEY UPDATE name = name`,
-            );
-          }
+            if (tags?.length) {
+              await conn.query(
+                sql`INSERT INTO pictureTag (name, pictureId) VALUES ${bulk(tags.map((tag) => [tag, insertId]))} ON DUPLICATE KEY UPDATE name = name`,
+              );
+            }
 
-          ctx.body = { id: insertId };
+            return insertId;
+          });
+
+          ctx.body = { id };
         },
       ],
     }),

@@ -20,7 +20,6 @@ export function attachPutDeviceHandler(router: Router) {
     '/devices/:id',
     acceptValidator('application/json'),
     authenticator(true),
-    runInTransaction(),
     async (ctx) => {
       let body;
 
@@ -32,52 +31,52 @@ export function attachPutDeviceHandler(router: Router) {
 
       const { id } = ctx.params;
 
-      const conn = ctx.state.dbConn!;
-
-      const [item] = await conn.query(
-        sql`SELECT userId FROM trackingDevice WHERE id = ${id} FOR UPDATE`,
-      );
-
-      if (!item) {
-        ctx.throw(404, 'no such tracking device');
-      }
-
-      if (!ctx.state.user!.isAdmin && item.userId !== ctx.state.user!.id) {
-        ctx.throw(403);
-      }
-
       const { name, maxCount, maxAge, token = '' } = body;
 
-      const okToken = token || nanoid();
-
-      try {
-        await conn.query(
-          sql`UPDATE trackingDevice SET name = ${name}, maxCount = ${maxCount}, maxAge = ${maxAge}, token = ${okToken} WHERE id = ${id}`,
+      await runInTransaction(async (conn) => {
+        const [item] = await conn.query(
+          sql`SELECT userId FROM trackingDevice WHERE id = ${id} FOR UPDATE`,
         );
-      } catch (err) {
-        if (err instanceof SqlError && err.errno === 1062) {
-          ctx.throw(409);
+
+        if (!item) {
+          ctx.throw(404, 'no such tracking device');
         }
 
-        throw err;
-      }
+        if (!ctx.state.user!.isAdmin && item.userId !== ctx.state.user!.id) {
+          ctx.throw(403);
+        }
 
-      if (maxAge != null) {
-        await conn.query(sql`
-          DELETE FROM trackingPoint WHERE deviceId = ${id} AND TIMESTAMPDIFF(SECOND, createdAt, NOW()) > ${maxAge}
+        const okToken = token || nanoid();
+
+        try {
+          await conn.query(
+            sql`UPDATE trackingDevice SET name = ${name}, maxCount = ${maxCount}, maxAge = ${maxAge}, token = ${okToken} WHERE id = ${id}`,
+          );
+        } catch (err) {
+          if (err instanceof SqlError && err.errno === 1062) {
+            ctx.throw(409);
+          }
+
+          throw err;
+        }
+
+        if (maxAge != null) {
+          await conn.query(sql`
+            DELETE FROM trackingPoint WHERE deviceId = ${id} AND TIMESTAMPDIFF(SECOND, createdAt, NOW()) > ${maxAge}
+          `);
+        }
+
+        if (maxCount != null) {
+          await conn.query(sql`
+            DELETE t
+            FROM trackingPoint AS t
+            JOIN (
+              SELECT id FROM trackingPoint WHERE deviceId = ${id}
+                ORDER BY id DESC LIMIT 18446744073709551615 OFFSET ${maxCount}
+            ) tlimit ON t.id = tlimit.id
         `);
-      }
-
-      if (maxCount != null) {
-        await conn.query(sql`
-          DELETE t
-          FROM trackingPoint AS t
-          JOIN (
-            SELECT id FROM trackingPoint WHERE deviceId = ${id}
-              ORDER BY id DESC LIMIT 18446744073709551615 OFFSET ${maxCount}
-          ) tlimit ON t.id = tlimit.id
-      `);
-      }
+        }
+      });
 
       ctx.body = { token };
     },

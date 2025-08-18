@@ -11,7 +11,6 @@ export function attachPatchMapHandler(router: Router) {
     '/:id',
     acceptValidator('application/json'),
     authenticator(true),
-    runInTransaction(),
     async (ctx) => {
       type Body = {
         name?: string & tags.MinLength<1> & tags.MaxLength<255>;
@@ -28,76 +27,76 @@ export function attachPatchMapHandler(router: Router) {
         return ctx.throw(400, err as Error);
       }
 
-      const conn = ctx.state.dbConn!;
-
       const { id } = ctx.params;
 
-      const [item] = await conn.query(
-        sql`SELECT userId, name, createdAt, modifiedAt, public FROM map WHERE id = ${id} FOR UPDATE`,
-      );
+      await runInTransaction(async (conn) => {
+        const [item] = await conn.query(
+          sql`SELECT userId, name, createdAt, modifiedAt, public FROM map WHERE id = ${id} FOR UPDATE`,
+        );
 
-      if (!item) {
-        ctx.throw(404, 'no such map');
-      }
-
-      const curWriters = (
-        await conn.query(
-          sql`SELECT userId FROM mapWriteAccess WHERE mapId = ${id} FOR UPDATE`,
-        )
-      ).map(({ userId }: { userId: number }) => userId);
-
-      const { name, public: pub, data, writers } = body;
-
-      const user = ctx.state.user!;
-
-      if (
-        !user.isAdmin &&
-        item.userId !== user.id &&
-        (!curWriters.includes(user.id) ||
-          writers !== undefined ||
-          pub !== undefined ||
-          name !== undefined)
-      ) {
-        ctx.throw(403);
-      }
-
-      if (
-        ctx.request.headers['if-unmodified-since'] &&
-        new Date(ctx.request.headers['if-unmodified-since']).getTime() <
-          item.modifiedAt.getTime()
-      ) {
-        ctx.throw(412);
-      }
-
-      const now = new Date();
-
-      await conn.query(sql`UPDATE map SET modifiedAt = ${now}
-        ${name === undefined ? empty : sql`, name = ${name}`}
-        ${pub === undefined ? empty : sql`, public = ${pub}`}
-        ${data === undefined ? empty : sql`, data = ${JSON.stringify(data)}`}
-        WHERE id = ${id}
-      `);
-
-      if (writers) {
-        conn.query(sql`DELETE FROM mapWriteAccess WHERE mapId = ${id}`);
-
-        if (writers.length) {
-          await conn.query(
-            sql`INSERT INTO mapWriteAccess (mapId, userId) VALUES ${bulk(writers.map((writer: number) => [id, writer]))}`,
-          );
+        if (!item) {
+          ctx.throw(404, 'no such map');
         }
-      }
 
-      ctx.body = {
-        id,
-        createdAt: item.createdAt.toISOString(),
-        modifiedAt: now.toISOString(),
-        public: pub ?? item.public,
-        writers: writers ?? curWriters,
-        name: name ?? item.name,
-        userId: item.userId,
-        canWrite: true,
-      };
+        const curWriters = (
+          await conn.query(
+            sql`SELECT userId FROM mapWriteAccess WHERE mapId = ${id} FOR UPDATE`,
+          )
+        ).map(({ userId }: { userId: number }) => userId);
+
+        const { name, public: pub, data, writers } = body;
+
+        const user = ctx.state.user!;
+
+        if (
+          !user.isAdmin &&
+          item.userId !== user.id &&
+          (!curWriters.includes(user.id) ||
+            writers !== undefined ||
+            pub !== undefined ||
+            name !== undefined)
+        ) {
+          ctx.throw(403);
+        }
+
+        if (
+          ctx.request.headers['if-unmodified-since'] &&
+          new Date(ctx.request.headers['if-unmodified-since']).getTime() <
+            item.modifiedAt.getTime()
+        ) {
+          ctx.throw(412);
+        }
+
+        const now = new Date();
+
+        await conn.query(sql`UPDATE map SET modifiedAt = ${now}
+            ${name === undefined ? empty : sql`, name = ${name}`}
+            ${pub === undefined ? empty : sql`, public = ${pub}`}
+            ${data === undefined ? empty : sql`, data = ${JSON.stringify(data)}`}
+            WHERE id = ${id}
+          `);
+
+        if (writers) {
+          conn.query(sql`DELETE FROM mapWriteAccess WHERE mapId = ${id}`);
+
+          if (writers.length) {
+            await conn.query(
+              sql`INSERT INTO mapWriteAccess (mapId, userId) VALUES ${bulk(writers.map((writer: number) => [id, writer]))}`,
+            );
+          }
+        }
+
+        ctx.body = {
+          id,
+          createdAt: item.createdAt.toISOString(),
+          modifiedAt: now.toISOString(),
+          public: pub ?? item.public,
+          writers: writers ?? curWriters,
+          name: name ?? item.name,
+          userId: item.userId,
+          canWrite: true,
+        };
+      });
     },
   );
 }

@@ -9,23 +9,22 @@ export function attachDeleteMapHandler(router: Router) {
     '/:id',
     acceptValidator('application/json'),
     authenticator(true),
-    runInTransaction(),
     async (ctx) => {
-      const conn = ctx.state.dbConn!;
+      await runInTransaction(async (conn) => {
+        const [item] = await conn.query(
+          sql`SELECT userId FROM map WHERE id = ${ctx.params.id} FOR UPDATE`,
+        );
 
-      const [item] = await conn.query(
-        sql`SELECT userId FROM map WHERE id = ${ctx.params.id} FOR UPDATE`,
-      );
+        if (!item) {
+          ctx.throw(404, 'no such map');
+        }
 
-      if (!item) {
-        ctx.throw(404, 'no such map');
-      }
+        if (!ctx.state.user!.isAdmin && item.userId !== ctx.state.user!.id) {
+          ctx.throw(403);
+        }
 
-      if (!ctx.state.user!.isAdmin && item.userId !== ctx.state.user!.id) {
-        ctx.throw(403);
-      }
-
-      await conn.query(sql`DELETE FROM map WHERE id = ${ctx.params.id}`);
+        await conn.query(sql`DELETE FROM map WHERE id = ${ctx.params.id}`);
+      });
 
       ctx.status = 204;
     },

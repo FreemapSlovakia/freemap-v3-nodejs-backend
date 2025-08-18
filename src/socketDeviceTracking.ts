@@ -1,6 +1,6 @@
 import net from 'net';
 import sql, { empty } from 'sql-template-tag';
-import { pool } from './database.js';
+import { runInTransaction } from './database.js';
 import { storeTrackPoint } from './deviceTracking.js';
 import { getEnvInteger } from './env.js';
 import { appLogger } from './logger.js';
@@ -29,28 +29,22 @@ export function startSocketDeviceTracking() {
     );
 
     connection.on('data', async (data) => {
-      let conn;
+      const msg = data.toString();
 
-      try {
-        const msg = data.toString();
+      connLogger.debug(`Data: ${msg}`);
 
-        connLogger.debug(`Data: ${msg}`);
+      const result = /^\((.{12})([AB][A-Z]\d\d)(.*).*\)$/.exec(msg);
 
-        const result = /^\((.{12})([AB][A-Z]\d\d)(.*).*\)$/.exec(msg);
+      if (!result) {
+        connection.end();
+        return;
+      }
 
-        if (!result) {
-          connection.end();
-          return;
-        }
+      const [, deviceId, command, args] = result;
 
-        const [, deviceId, command, args] = result;
+      connLogger.debug({ deviceId, command, args }, 'Received command.');
 
-        connLogger.debug({ deviceId, command, args }, 'Received command.');
-
-        conn = await pool.getConnection();
-
-        await conn.beginTransaction();
-
+      await runInTransaction(async (conn) => {
         const [item] = await conn.query(
           sql`SELECT id, maxCount, maxAge FROM trackingDevice WHERE token IN (${`did:${deviceId}`}${imei ? sql`, ${`imei:${imei}`}` : empty})`,
         );
@@ -153,11 +147,7 @@ export function startSocketDeviceTracking() {
         }
 
         await conn.commit();
-      } finally {
-        if (conn) {
-          await conn.release();
-        }
-      }
+      });
     });
 
     connection.on('error', (err) => {

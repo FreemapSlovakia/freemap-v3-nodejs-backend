@@ -7,7 +7,7 @@ import {
   userForResponse,
   UserRow,
 } from '../../authenticator.js';
-import { pool } from '../../database.js';
+import { runInTransaction } from '../../database.js';
 import { assert } from 'typia';
 
 export async function login(
@@ -31,15 +31,9 @@ export async function login(
     // ctx.throw(403, 'unauthenticated');
   }
 
-  const conn = await pool.getConnection();
-
-  let userRow1;
-
   let userId;
 
-  let authToken;
-
-  try {
+  const { userRow, authToken } = await runInTransaction(async (conn) => {
     await conn.beginTransaction();
 
     const [userRow] = await conn.query(
@@ -130,36 +124,36 @@ export async function login(
         // TODO sum purchase expirations
 
         const query = sql`UPDATE user SET
-          email = COALESCE(email, ${email}),
-          lat = COALESCE(lat, ${lat}),
-          lon = COALESCE(lon, ${lon}),
-          language = COALESCE(language, ${language}),
-          createdAt = LEAST(createdAt, ${createdAt}),
-          isAdmin = isAdmin OR ${isAdmin},
-          ${premiumExpiration ? sql`premiumExpiration = COALESCE(GREATEST(premiumExpiration, ${premiumExpiration}), ${premiumExpiration}),` : empty}
-          sendGalleryEmails = sendGalleryEmails OR ${sendGalleryEmails},
-          settings = COALESCE(settings, ${settings}),
-          credits = credits + ${credits},
-          ${join(
-            Object.entries(authData).map(
-              ([column, value]) =>
-                sql`${raw(column)} = COALESCE(${raw(column)}, ${value as RawValue})`,
-            ),
-          )}
-          WHERE id = ${currentUser.id}
-        `;
+        email = COALESCE(email, ${email}),
+        lat = COALESCE(lat, ${lat}),
+        lon = COALESCE(lon, ${lon}),
+        language = COALESCE(language, ${language}),
+        createdAt = LEAST(createdAt, ${createdAt}),
+        isAdmin = isAdmin OR ${isAdmin},
+        ${premiumExpiration ? sql`premiumExpiration = COALESCE(GREATEST(premiumExpiration, ${premiumExpiration}), ${premiumExpiration}),` : empty}
+        sendGalleryEmails = sendGalleryEmails OR ${sendGalleryEmails},
+        settings = COALESCE(settings, ${settings}),
+        credits = credits + ${credits},
+        ${join(
+          Object.entries(authData).map(
+            ([column, value]) =>
+              sql`${raw(column)} = COALESCE(${raw(column)}, ${value as RawValue})`,
+          ),
+        )}
+        WHERE id = ${currentUser.id}
+      `;
 
         await conn.query(query);
       } else {
         if (Object.keys(extraUserFields).length > 0) {
           await conn.query(sql`UPDATE user SET
-            ${join(
-              Object.entries(extraUserFields).map(
-                ([column, value]) => sql`${raw(column)} = ${value as RawValue}`,
-              ),
-            )}
-            WHERE id = ${userRow.id}
-          `);
+          ${join(
+            Object.entries(extraUserFields).map(
+              ([column, value]) => sql`${raw(column)} = ${value as RawValue}`,
+            ),
+          )}
+          WHERE id = ${userRow.id}
+        `);
         }
       }
     } else {
@@ -172,21 +166,21 @@ export async function login(
 
       if (currentUser) {
         await conn.query(sql`UPDATE user SET
-          email = COALESCE(email, ${email}),
-          language = COALESCE(language, ${remoteLanguage}),
-          lat = COALESCE(lat, ${lat}),
-          lon = COALESCE(lon, ${lon}),
-          ${join(
-            Object.entries({
-              [authProviderToColumn[authProvider]]: remoteUserId,
-              ...extraUserFields,
-            }).map(
-              ([column, value]) => sql`${raw(column)} = ${value as RawValue}`,
-            ),
-          )}
+        email = COALESCE(email, ${email}),
+        language = COALESCE(language, ${remoteLanguage}),
+        lat = COALESCE(lat, ${lat}),
+        lon = COALESCE(lon, ${lon}),
+        ${join(
+          Object.entries({
+            [authProviderToColumn[authProvider]]: remoteUserId,
+            ...extraUserFields,
+          }).map(
+            ([column, value]) => sql`${raw(column)} = ${value as RawValue}`,
+          ),
+        )}
 
-          WHERE id = ${currentUser.id}
-      `);
+        WHERE id = ${currentUser.id}
+    `);
       } else {
         userId = (
           await conn.query(
@@ -212,6 +206,8 @@ export async function login(
       }
     }
 
+    let authToken;
+
     if (currentUser) {
       authToken = currentUser.authToken;
     } else {
@@ -226,19 +222,11 @@ export async function login(
       sql`SELECT * FROM user WHERE id = ${userId}`,
     );
 
-    userRow1 = assert<UserRow>(row);
-
-    await conn.commit();
-  } catch (e) {
-    await conn.rollback();
-
-    throw e;
-  } finally {
-    await conn.release();
-  }
+    return { userRow: assert<UserRow>(row), authToken };
+  });
 
   ctx.body = {
-    user: userForResponse(rowToUser(userRow1, authToken)),
+    user: userForResponse(rowToUser(userRow, authToken)),
     connect,
     clientData,
   };

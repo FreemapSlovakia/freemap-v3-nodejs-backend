@@ -1,5 +1,4 @@
 import Router from '@koa/router';
-import { PoolConnection } from 'mariadb';
 import sql from 'sql-template-tag';
 import { assert, tags } from 'typia';
 import { authenticator } from '../../authenticator.js';
@@ -16,7 +15,6 @@ export function attachPostPictureCommentHandler(router: Router) {
     '/pictures/:id/comments',
     authenticator(true),
     acceptValidator('application/json'),
-    runInTransaction(),
     async (ctx) => {
       type Body = {
         webBaseUrl?: string & tags.Format<'uri'>;
@@ -29,26 +27,6 @@ export function attachPostPictureCommentHandler(router: Router) {
         body = assert<Body>(ctx.request.body);
       } catch (err) {
         return ctx.throw(400, err as Error);
-      }
-
-      const conn = ctx.state.dbConn as PoolConnection;
-
-      const [row] = await conn.query(
-        sql`SELECT premium FROM picture WHERE id = ${ctx.params.id} FOR UPDATE`,
-      );
-
-      if (!row) {
-        ctx.throw(404);
-      }
-
-      const user = ctx.state.user!;
-
-      if (
-        row.premium &&
-        (!user.premiumExpiration || user.premiumExpiration < new Date()) &&
-        user.id !== row.userId
-      ) {
-        ctx.throw(402);
       }
 
       const { comment, webBaseUrl: webBaseUrlCandidate } = body;
@@ -67,36 +45,60 @@ export function attachPostPictureCommentHandler(router: Router) {
 
       const webUrl = webBaseUrl.replace(/^https?:\/\//, '');
 
-      const proms: Promise<any>[] = [
-        conn.query(sql`
-          INSERT INTO pictureComment SET
-            pictureId = ${ctx.params.id},
-            userId = ${user!.id},
-            comment = ${comment},
-            createdAt = ${new Date()}
-        `),
-      ];
+      const user = ctx.state.user!;
 
-      if (getEnvBoolean('MAILGIN_ENABLE', false)) {
-        proms.push(
-          conn.query(sql`
-            SELECT IF(sendGalleryEmails, email, NULL) AS email, language, title, userId
-              FROM user
-              JOIN picture ON userId = user.id
-              WHERE picture.id = ${ctx.params.id}
+      const { insertId, picInfo, emails } = await runInTransaction(
+        async (conn) => {
+          const [row] = await conn.query(
+            sql`SELECT premium FROM picture WHERE id = ${ctx.params.id} FOR UPDATE`,
+          );
+
+          if (!row) {
+            ctx.throw(404);
+          }
+
+          if (
+            row.premium &&
+            (!user.premiumExpiration || user.premiumExpiration < new Date()) &&
+            user.id !== row.userId
+          ) {
+            ctx.throw(402);
+          }
+
+          const proms: Promise<any>[] = [
+            conn.query(sql`
+              INSERT INTO pictureComment SET
+                pictureId = ${ctx.params.id},
+                userId = ${user!.id},
+                comment = ${comment},
+                createdAt = ${new Date()}
           `),
+          ];
 
-          conn.query(sql`
-            SELECT DISTINCT email, sendGalleryEmails, language
-              FROM user
-              JOIN pictureComment ON userId = user.id
-              WHERE sendGalleryEmails AND pictureId = ${ctx.params.id} AND userId <> ${user!.id} AND email IS NOT NULL
-          `),
-        );
-      }
+          if (getEnvBoolean('MAILGIN_ENABLE', false)) {
+            proms.push(
+              conn.query(sql`
+                SELECT IF(sendGalleryEmails, email, NULL) AS email, language, title, userId
+                  FROM user
+                  JOIN picture ON userId = user.id
+                  WHERE picture.id = ${ctx.params.id}
+            `),
 
-      const [{ insertId }, [picInfo] = [], emails = []] =
-        await Promise.all(proms);
+              conn.query(sql`
+                SELECT DISTINCT email, sendGalleryEmails, language
+                  FROM user
+                  JOIN pictureComment ON userId = user.id
+                  WHERE sendGalleryEmails AND pictureId = ${ctx.params.id} AND userId <> ${user!.id} AND email IS NOT NULL
+            `),
+            );
+          }
+
+          const [{ insertId }, [picInfo] = [], emails = []] =
+            await Promise.all(proms);
+
+          return { insertId, picInfo, emails };
+        },
+      );
 
       const logger = appLogger.child({
         module: 'postPictureComment',

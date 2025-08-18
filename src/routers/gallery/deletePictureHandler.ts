@@ -6,13 +6,8 @@ import { runInTransaction } from '../../database.js';
 import { picturesDir } from '../gallery/constants.js';
 
 export function attachDeletePictureHandler(router: Router) {
-  router.delete(
-    '/pictures/:id',
-    authenticator(true),
-    runInTransaction(),
-    async (ctx) => {
-      const conn = ctx.state.dbConn!;
-
+  router.delete('/pictures/:id', authenticator(true), async (ctx) => {
+    const pathname = await runInTransaction(async (conn) => {
       const rows = await conn.query(
         sql`SELECT pathname, userId FROM picture WHERE id = ${ctx.params.id} FOR UPDATE`,
       );
@@ -27,9 +22,11 @@ export function attachDeletePictureHandler(router: Router) {
 
       await conn.query(sql`DELETE FROM picture WHERE id = ${ctx.params.id}`);
 
-      await unlink(`${picturesDir}/${rows[0].pathname}`);
+      return rows[0].pathname;
+    });
 
-      ctx.status = 204;
-    },
-  );
+    await unlink(`${picturesDir}/${pathname}`);
+
+    ctx.status = 204;
+  });
 }
