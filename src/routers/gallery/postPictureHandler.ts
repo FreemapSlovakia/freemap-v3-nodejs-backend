@@ -146,7 +146,7 @@ export function attachPostPictureHandler(router: Router) {
 
           if (tags?.length) {
             await conn.query(
-              sql`INSERT INTO pictureTag (name, pictureId) VALUES ${bulk(tags.flatMap((tag) => [tag, insertId]))} ON DUPLICATE KEY UPDATE name = name`,
+              sql`INSERT INTO pictureTag (name, pictureId) VALUES ${bulk(tags.map((tag) => [tag, insertId]))} ON DUPLICATE KEY UPDATE name = name`,
             );
           }
 
