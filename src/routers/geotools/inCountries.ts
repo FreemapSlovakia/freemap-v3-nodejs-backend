@@ -2,9 +2,7 @@ import { ParameterizedContext } from 'koa';
 import { Piscina } from 'piscina';
 import { getEnv } from '../../env.js';
 
-const countriesDb = getEnv('COUNTRIES_DB', '');
-
-const piscina = countriesDb
+const piscina = getEnv('COUNTRIES_DB', '')
   ? new Piscina({
       filename: new URL('./inCountriesWorker.js', import.meta.url).href,
       maxThreads: 4,
