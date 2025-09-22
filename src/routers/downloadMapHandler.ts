@@ -340,7 +340,7 @@ async function download(
 
     const combo = sql`
       INSERT INTO info (minzoom, maxzoom, tilesize, center_x, center_y, zooms, provider)
-        VALUES (${min}, ${max}, ${256 * (scale ?? 1)}, ${cntr.geometry.coordinates[1]}, ${cntr.geometry.coordinates[0]}, ${zooms}, 0)
+        VALUES (${max}, ${min}, ${256 * (scale ?? 1)}, ${cntr.geometry.coordinates[1]}, ${cntr.geometry.coordinates[0]}, ${zooms}, 0)
     `;
 
     db.prepare(combo.sql).run(...combo.values);
