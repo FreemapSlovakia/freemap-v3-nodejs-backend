@@ -335,7 +335,7 @@ async function download(
     const max = 17 - minZoom;
 
     const zooms = Array.from({ length: max - min + 1 }, (_, i) => max - i).join(
-      ',',
+      ';',
     );
 
     const combo = sql`
