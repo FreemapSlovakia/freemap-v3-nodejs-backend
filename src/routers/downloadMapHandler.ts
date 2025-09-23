@@ -281,9 +281,15 @@ async function download(
   translation: Combo,
 ) {
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-  const safeName = name.trim().replace(/[^a-zA-Z0-9._-]+/g, '_');
+
+  const safeName = name
+    .replace(/[^ \p{L}\p{N}._-]+/gu, '_')
+    .replace(/^[. ]+|[. ]+$/g, '');
+
   const dbName = safeName ? safeName + '-' + timestamp : timestamp;
+
   const filename = getEnv('MBTILES_DIR') + `/${dbName}.${format}`;
+
   const db = new Database(filename);
 
   db.exec(`
