@@ -46,7 +46,7 @@
     "kcors": "^2.2.2",
     "koa": "^3.0.1",
     "koa-body": "^6.0.1",
-    "koa-pino-logger": "^4.0.0",
+    "koa-pino-logger": "^5.0.0",
     "koa-websocket": "^7.0.0",
     "mariadb": "^3.4.5",
     "nanoid": "^5.1.6",
@@ -74,11 +74,11 @@
     "@types/koa": "^3.0.0",
     "@types/koa-websocket": "^5.0.10",
     "@types/koa__router": "^12.0.4",
-    "@types/node": "^24.6.2",
+    "@types/node": "^24.7.0",
     "@types/unzipper": "^0.10.11",
     "@types/ws": "^8.18.1",
-    "@typescript-eslint/eslint-plugin": "^8.45.0",
-    "@typescript-eslint/parser": "^8.45.0",
+    "@typescript-eslint/eslint-plugin": "^8.46.0",
+    "@typescript-eslint/parser": "^8.46.0",
     "eslint": "^9.37.0",
     "globals": "^16.4.0",
     "husky": "^9.1.7",
@@ -88,7 +88,7 @@
     "prettier-plugin-organize-imports": "^4.3.0",
     "ts-patch": "^3.3.0",
     "typescript": "~5.9.3",
-    "typescript-eslint": "^8.45.0"
+    "typescript-eslint": "^8.46.0"
   },
   "resolutions": {
     "@types/koa": "^3.0.0"
