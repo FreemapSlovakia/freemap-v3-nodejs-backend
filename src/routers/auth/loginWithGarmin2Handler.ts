@@ -1,4 +1,4 @@
-import Router from '@koa/router';
+import { RouterInstance } from '@koa/router';
 import got from 'got';
 import { authenticator } from '../../authenticator.js';
 import { garminOauth } from '../../garminOauth.js';
@@ -7,19 +7,19 @@ import { tokenSecrets } from './garminTokenSecrets.js';
 import { login } from './loginProcessor.js';
 import { assertGuard } from 'typia';
 
-export function attachLoginWithGarmin2Handler(router: Router) {
+export function attachLoginWithGarmin2Handler(router: RouterInstance) {
   router.post(
     '/login-garmin-2',
     authenticator(false),
     acceptValidator('application/json'),
     // TODO validation
     async (ctx) => {
-      const { token, verifier, language } = ctx.request.body;
+      const { token, verifier, language } = ctx.request.body as any;
 
       const url =
         'https://connectapi.garmin.com/oauth-service/oauth/access_token';
 
-      const session = tokenSecrets.get(ctx.request.body.token);
+      const session = tokenSecrets.get(token);
 
       if (!session) {
         return ctx.throw(403, 'session not found');

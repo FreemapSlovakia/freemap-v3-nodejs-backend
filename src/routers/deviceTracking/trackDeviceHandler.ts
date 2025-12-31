@@ -1,11 +1,11 @@
-import Router from '@koa/router';
+import { RouterInstance } from '@koa/router';
 import { ParameterizedContext } from 'koa';
 import sql from 'sql-template-tag';
 import { assert, tags } from 'typia';
 import { runInTransaction } from '../../database.js';
 import { storeTrackPoint } from '../../deviceTracking.js';
 
-export function attachTrackDeviceHandler(router: Router) {
+export function attachTrackDeviceHandler(router: RouterInstance) {
   for (const method of ['post', 'get'] as const) {
     router[method]('/track/:token', urlEncodedHandler);
   }

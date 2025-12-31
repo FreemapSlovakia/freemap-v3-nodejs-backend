@@ -39,7 +39,7 @@ async function compute(ctx: ParameterizedContext) {
       .match(/[^,]+,[^,]+/g)
       ?.map((pair) => pair.split(',').map((c) => Number.parseFloat(c)));
   } else if (ctx.method === 'POST' && Array.isArray(ctx.request.body)) {
-    cs = ctx.request.body;
+    cs = ctx.request.body as any;
   } else {
     ctx.throw(400, 'invalid request parameters');
   }

@@ -1,10 +1,10 @@
-import Router from '@koa/router';
 import { writeFile } from 'node:fs/promises';
 import shortUuid from 'short-uuid';
 import { assert, tags } from 'typia';
 import { tracklogsDir } from '../../routers/tracklogs/constants.js';
+import { RouterInstance } from '@koa/router';
 
-export function attachCreateTracklogHandler(router: Router) {
+export function attachCreateTracklogHandler(router: RouterInstance) {
   router.post('/', async (ctx) => {
     type Body = {
       data: string & tags.MinLength<10>;

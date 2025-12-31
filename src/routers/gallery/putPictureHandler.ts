@@ -1,10 +1,10 @@
-import Router from '@koa/router';
+import { RouterInstance } from '@koa/router';
 import sql, { bulk } from 'sql-template-tag';
 import { assert, tags } from 'typia';
 import { authenticator } from '../../authenticator.js';
 import { runInTransaction } from '../../database.js';
 
-export function attachPutPictureHandler(router: Router) {
+export function attachPutPictureHandler(router: RouterInstance) {
   router.put('/pictures/:id', authenticator(true), async (ctx) => {
     type Body = {
       position: {

@@ -1,11 +1,11 @@
-import Router from '@koa/router';
+import { RouterInstance } from '@koa/router';
 import sql from 'sql-template-tag';
 import { assert, tags } from 'typia';
 import { authenticator } from '../../authenticator.js';
 import { runInTransaction } from '../../database.js';
 import { acceptValidator } from '../../requestValidators.js';
 
-export function attachPutTokenHandler(router: Router) {
+export function attachPutTokenHandler(router: RouterInstance) {
   router.put(
     '/access-tokens/:id',
     acceptValidator('application/json'),

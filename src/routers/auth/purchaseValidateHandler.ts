@@ -1,10 +1,10 @@
-import Router from '@koa/router';
+import { RouterInstance } from '@koa/router';
 import { createHmac } from 'node:crypto';
 import sql from 'sql-template-tag';
 import { runInTransaction } from '../../database.js';
 import { getEnv } from './../../env.js';
 
-export function attachPurchaseValidateHandler(router: Router) {
+export function attachPurchaseValidateHandler(router: RouterInstance) {
   router.post('/purchaseValidate', async (ctx) => {
     console.log(ctx.request.body);
 
@@ -14,7 +14,7 @@ export function attachPurchaseValidateHandler(router: Router) {
       signature,
       // amount_paid,
       // currency,
-    } = ctx.request.body;
+    } = ctx.request.body as any;
 
     if (
       createHmac('sha256', getEnv('PURCHASE_SECRET'))

@@ -1,4 +1,4 @@
-import Router from '@koa/router';
+import { RouterInstance } from '@koa/router';
 import sql from 'sql-template-tag';
 import { assert, tags } from 'typia';
 import { authenticator } from '../../authenticator.js';
@@ -10,7 +10,7 @@ import { acceptValidator } from '../../requestValidators.js';
 
 const webBaseUrls = getEnv('WEB_BASE_URL').split(',').filter(Boolean);
 
-export function attachPostPictureCommentHandler(router: Router) {
+export function attachPostPictureCommentHandler(router: RouterInstance) {
   router.post(
     '/pictures/:id/comments',
     authenticator(true),

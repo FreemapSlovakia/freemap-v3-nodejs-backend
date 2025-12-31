@@ -1,10 +1,10 @@
-import Router from '@koa/router';
+import { RouterInstance } from '@koa/router';
 import sql from 'sql-template-tag';
 import { assert, tags } from 'typia';
 import { authenticator } from '../../authenticator.js';
 import { runInTransaction } from '../../database.js';
 
-export function attachPostPictureRatingHandler(router: Router) {
+export function attachPostPictureRatingHandler(router: RouterInstance) {
   router.post(
     '/pictures/:id/rating',
     authenticator(true),

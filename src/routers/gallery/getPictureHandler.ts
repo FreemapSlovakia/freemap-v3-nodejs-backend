@@ -1,4 +1,4 @@
-import Router from '@koa/router';
+import { RouterInstance } from '@koa/router';
 import { createHmac } from 'node:crypto';
 import sql, { empty, raw } from 'sql-template-tag';
 import { assertGuard } from 'typia';
@@ -11,7 +11,7 @@ import { PictureRow } from './types.js';
 
 const secret = getEnv('PREMIUM_PHOTO_SECRET', '');
 
-export function attachGetPictureHandler(router: Router) {
+export function attachGetPictureHandler(router: RouterInstance) {
   router.get(
     '/pictures/:id',
     acceptValidator('application/json'),

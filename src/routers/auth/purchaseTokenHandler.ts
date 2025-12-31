@@ -1,4 +1,4 @@
-import Router from '@koa/router';
+import { RouterInstance } from '@koa/router';
 import { createHmac, randomBytes } from 'node:crypto';
 import sql from 'sql-template-tag';
 import { assert } from 'typia';
@@ -98,7 +98,7 @@ type Body =
       amount: number;
     };
 
-export function attachPurchaseTokenHandler(router: Router) {
+export function attachPurchaseTokenHandler(router: RouterInstance) {
   router.post('/purchaseToken', authenticator(true), async (ctx) => {
     let body;
 

@@ -1,4 +1,4 @@
-import Router from '@koa/router';
+import { RouterInstance } from '@koa/router';
 
 import { SqlError } from 'mariadb';
 import sql from 'sql-template-tag';
@@ -15,7 +15,7 @@ export type Body = {
   token?: string;
 };
 
-export function attachPutDeviceHandler(router: Router) {
+export function attachPutDeviceHandler(router: RouterInstance) {
   router.put(
     '/devices/:id',
     acceptValidator('application/json'),

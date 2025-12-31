@@ -1,8 +1,8 @@
-import Router from '@koa/router';
+import { RouterInstance } from '@koa/router';
 import { pool } from '../../database.js';
 import { acceptValidator } from '../../requestValidators.js';
 
-export function attachGetPublicTokensHandler(router: Router) {
+export function attachGetPublicTokensHandler(router: RouterInstance) {
   router.get(
     '/access-tokens',
     acceptValidator('application/json'),

@@ -1,4 +1,4 @@
-import Router from '@koa/router';
+import { RouterInstance } from '@koa/router';
 import { unlink } from 'node:fs/promises';
 import sql from 'sql-template-tag';
 import { authenticator } from '../../authenticator.js';
@@ -6,7 +6,7 @@ import { runInTransaction } from '../../database.js';
 import { appLogger } from '../../logger.js';
 import { picturesDir } from '../gallery/constants.js';
 
-export function attachDeleteUserHandler(router: Router) {
+export function attachDeleteUserHandler(router: RouterInstance) {
   router.delete('/settings', authenticator(true), async (ctx) => {
     const logger = appLogger.child({
       module: 'deleteUser',

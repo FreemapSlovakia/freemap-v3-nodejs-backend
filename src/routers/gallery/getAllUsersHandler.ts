@@ -1,8 +1,8 @@
-import Router from '@koa/router';
+import { RouterInstance } from '@koa/router';
 import { pool } from '../../database.js';
 import { acceptValidator } from '../../requestValidators.js';
 
-export function attachGetAllPictureUsers(router: Router) {
+export function attachGetAllPictureUsers(router: RouterInstance) {
   router.get(
     '/picture-users',
     acceptValidator('application/json'),

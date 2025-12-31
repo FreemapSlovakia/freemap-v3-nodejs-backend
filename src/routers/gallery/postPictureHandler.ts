@@ -1,4 +1,4 @@
-import Router from '@koa/router';
+import { RouterInstance } from '@koa/router';
 import { execFile } from 'child_process';
 import ExifReader from 'exifreader';
 import { promisify } from 'node:util';
@@ -13,7 +13,7 @@ import { picturesDir } from '../../routers/gallery/constants.js';
 
 const execFileAsync = promisify(execFile);
 
-export function attachPostPictureHandler(router: Router) {
+export function attachPostPictureHandler(router: RouterInstance) {
   router.post(
     '/pictures',
     authenticator(true),
@@ -57,12 +57,14 @@ export function attachPostPictureHandler(router: Router) {
             ctx.throw(413);
           }
 
-          if (!ctx.request.body.meta) {
+          const body = ctx.request.body as any;
+
+          if (!body.meta) {
             ctx.throw(400, 'missing meta field');
           }
 
-          if (typeof ctx.request.body.meta === 'string') {
-            ctx.request.body.meta = JSON.parse(ctx.request.body.meta);
+          if (typeof body.meta === 'string') {
+            body.meta = JSON.parse(body.meta);
           }
 
           await next();

@@ -1,9 +1,9 @@
-import Router from '@koa/router';
+import { RouterInstance } from '@koa/router';
 import sql, { join, raw } from 'sql-template-tag';
 import { authenticator } from '../../authenticator.js';
 import { pool } from '../../database.js';
 
-export function attachDisconnectHandler(router: Router) {
+export function attachDisconnectHandler(router: RouterInstance) {
   router.delete('/providers/:provider', authenticator(true), async (ctx) => {
     const providerColumns: Record<string, string[]> = {
       osm: ['osmId'],

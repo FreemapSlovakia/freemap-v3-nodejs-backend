@@ -1,4 +1,4 @@
-import Router from '@koa/router';
+import { RouterInstance } from '@koa/router';
 import { assert, tags } from 'typia';
 import { authenticator } from '../../authenticator.js';
 import { pool } from '../../database.js';
@@ -16,7 +16,7 @@ export type Body = AtLeastOne<{
   language: (string & tags.MinLength<2> & tags.MaxLength<2>) | null;
 }>;
 
-export function attachPatchUserHandler(router: Router) {
+export function attachPatchUserHandler(router: RouterInstance) {
   router.patch('/settings', authenticator(true), async (ctx) => {
     let body;
 

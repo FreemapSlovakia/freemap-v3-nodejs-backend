@@ -1,8 +1,8 @@
-import { Middleware } from '@koa/router';
+import { RouterMiddleware } from '@koa/router';
 
 export function contentTypeMiddleware(
-  map: Record<string, Middleware[]>,
-): Middleware {
+  map: Record<string, RouterMiddleware[]>,
+): RouterMiddleware {
   return async (ctx, next) => {
     const type = ctx.request.headers['content-type']?.split(';')[0].trim();
 

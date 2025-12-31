@@ -1,4 +1,4 @@
-import Router from '@koa/router';
+import { RouterInstance } from '@koa/router';
 import { SqlError } from 'mariadb';
 import sql from 'sql-template-tag';
 import { assert, tags } from 'typia';
@@ -7,7 +7,7 @@ import { pool } from '../../database.js';
 import { nanoid } from '../../randomId.js';
 import { acceptValidator } from '../../requestValidators.js';
 
-export function attachPostDeviceHandler(router: Router) {
+export function attachPostDeviceHandler(router: RouterInstance) {
   router.post(
     '/devices',
     acceptValidator('application/json'),

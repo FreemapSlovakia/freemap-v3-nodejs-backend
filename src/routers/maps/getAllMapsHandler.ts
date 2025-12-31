@@ -1,4 +1,4 @@
-import Router from '@koa/router';
+import { RouterInstance } from '@koa/router';
 import sql from 'sql-template-tag';
 import { authenticator } from '../../authenticator.js';
 import { pool } from '../../database.js';
@@ -6,7 +6,7 @@ import { acceptValidator } from '../../requestValidators.js';
 import { assertGuard } from 'typia';
 import { Map } from './types.js';
 
-export function attachGetAllMapsHandler(router: Router) {
+export function attachGetAllMapsHandler(router: RouterInstance) {
   router.get(
     '/',
     acceptValidator('application/json'),

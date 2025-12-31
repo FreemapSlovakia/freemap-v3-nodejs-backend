@@ -1,4 +1,4 @@
-import Router from '@koa/router';
+import Router, { RouterInstance } from '@koa/router';
 import { pointToTile, Tile, tileToGeoJSON } from '@mapbox/tilebelt';
 import { bbox } from '@turf/bbox';
 import booleanIntersects from '@turf/boolean-intersects';
@@ -140,7 +140,7 @@ type GeoJSONFeature = {
   properties: Record<string, unknown>;
 };
 
-export function attachDownloadMapHandler(router: Router) {
+export function attachDownloadMapHandler(router: RouterInstance) {
   router.post('/downloadMap', authenticator(true), async (ctx) => {
     type Body = {
       map: string;

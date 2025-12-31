@@ -1,4 +1,4 @@
-import Router from '@koa/router';
+import { RouterInstance } from '@koa/router';
 import calculate from 'etag';
 import { createHmac } from 'node:crypto';
 import { createReadStream } from 'node:fs';
@@ -13,7 +13,7 @@ import { picturesDir } from '../../routers/gallery/constants.js';
 
 const secret = getEnv('PREMIUM_PHOTO_SECRET', '');
 
-export function attachGetPictureImageHandler(router: Router) {
+export function attachGetPictureImageHandler(router: RouterInstance) {
   router.get(
     '/pictures/:id/image',
     acceptValidator('image/jpeg'),

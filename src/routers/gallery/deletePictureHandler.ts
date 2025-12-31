@@ -1,11 +1,11 @@
-import Router from '@koa/router';
+import { RouterInstance } from '@koa/router';
 import { unlink } from 'node:fs/promises';
 import sql from 'sql-template-tag';
 import { authenticator } from '../../authenticator.js';
 import { runInTransaction } from '../../database.js';
 import { picturesDir } from '../gallery/constants.js';
 
-export function attachDeletePictureHandler(router: Router) {
+export function attachDeletePictureHandler(router: RouterInstance) {
   router.delete('/pictures/:id', authenticator(true), async (ctx) => {
     const pathname = await runInTransaction(async (conn) => {
       const rows = await conn.query(

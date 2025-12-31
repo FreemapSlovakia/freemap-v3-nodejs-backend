@@ -1,10 +1,10 @@
-import Router from '@koa/router';
+import { RouterInstance } from '@koa/router';
 import sql from 'sql-template-tag';
 import { authenticator } from '../../authenticator.js';
 import { pool } from '../../database.js';
 import { acceptValidator } from '../../requestValidators.js';
 
-export function attachGetTokenHandler(router: Router) {
+export function attachGetTokenHandler(router: RouterInstance) {
   router.get(
     '/access-tokens/:id',
     acceptValidator('application/json'),

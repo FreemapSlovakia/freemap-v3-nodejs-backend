@@ -1,4 +1,4 @@
-import Router from '@koa/router';
+import { RouterInstance } from '@koa/router';
 import got from 'got';
 import { authenticator } from '../../authenticator.js';
 import { getEnv } from '../../env.js';
@@ -12,7 +12,7 @@ const clientSecret = getEnv('OSM_OAUTH2_CLIENT_SECRET');
 
 const redirectUri = getEnv('OSM_OAUTH2_REDIRECT_URI');
 
-export function attachLoginWithOsmHandler(router: Router) {
+export function attachLoginWithOsmHandler(router: RouterInstance) {
   router.get('/login-osm', (ctx) => {
     ctx.body = { clientId };
   });
@@ -23,7 +23,7 @@ export function attachLoginWithOsmHandler(router: Router) {
     acceptValidator('application/json'),
     // TODO validation
     async (ctx) => {
-      const { code, language, connect } = ctx.request.body;
+      const { code, language, connect } = ctx.request.body as any;
 
       const sp = new URLSearchParams({
         client_id: clientId,

@@ -1,9 +1,9 @@
-import Router from '@koa/router';
+import { RouterInstance } from '@koa/router';
 import { authenticator } from '../authenticator.js';
 import { garminOauth } from '../garminOauth.js';
 import { acceptValidator } from '../requestValidators.js';
 
-export function attachPostGarminCourses(router: Router) {
+export function attachPostGarminCourses(router: RouterInstance) {
   router.post(
     '/garmin-courses',
     acceptValidator('application/json'),
@@ -17,7 +17,7 @@ export function attachPostGarminCourses(router: Router) {
         distance,
         elevationGain,
         elevationLoss,
-      } = ctx.request.body;
+      } = ctx.request.body as any;
 
       const url = 'https://apis.garmin.com/training-api/courses/v1/course';
 

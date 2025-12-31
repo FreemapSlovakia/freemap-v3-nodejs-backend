@@ -1,17 +1,17 @@
-import Router from '@koa/router';
+import { RouterInstance } from '@koa/router';
 import { authenticator } from '../../authenticator.js';
 import { acceptValidator } from '../../requestValidators.js';
 import { login } from './loginProcessor.js';
 import { assert } from 'typia';
 
-export function attachLoginWithGoogleHandler(router: Router) {
+export function attachLoginWithGoogleHandler(router: RouterInstance) {
   router.post(
     '/login-google',
     authenticator(false),
     acceptValidator('application/json'),
     // TODO validation
     async (ctx) => {
-      const { accessToken, language, connect } = ctx.request.body;
+      const { accessToken, language, connect } = ctx.request.body as any;
 
       const userinfoRes = await fetch(
         'https://openidconnect.googleapis.com/v1/userinfo',

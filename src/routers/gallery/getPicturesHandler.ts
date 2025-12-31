@@ -1,4 +1,4 @@
-import Router from '@koa/router';
+import { RouterInstance } from '@koa/router';
 import { ParameterizedContext } from 'koa';
 import { createHmac } from 'node:crypto';
 import { assert, assertGuard, http, tags } from 'typia';
@@ -62,7 +62,7 @@ const methods: {
   order: byOrder,
 };
 
-export function attachGetPicturesHandler(router: Router) {
+export function attachGetPicturesHandler(router: RouterInstance) {
   router.get(
     '/pictures',
     acceptValidator('application/json'),

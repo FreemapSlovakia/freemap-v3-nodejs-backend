@@ -1,5 +1,4 @@
-import Router from '@koa/router';
-
+import { RouterInstance } from '@koa/router';
 import { assert } from 'typia';
 
 const levelsAsConst = [
@@ -21,7 +20,7 @@ export type Body = {
   details?: Record<string, unknown>;
 };
 
-export function attachLoggerHandler(router: Router) {
+export function attachLoggerHandler(router: RouterInstance) {
   router.post('/logger', async (ctx) => {
     let body;
 

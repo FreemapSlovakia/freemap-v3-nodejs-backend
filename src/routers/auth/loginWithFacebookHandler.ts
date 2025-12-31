@@ -1,4 +1,4 @@
-import Router from '@koa/router';
+import { RouterInstance } from '@koa/router';
 import got from 'got';
 import { authenticator } from '../../authenticator.js';
 import { login } from './loginProcessor.js';
@@ -13,13 +13,13 @@ async function getUserData(accessToken: string) {
   );
 }
 
-export function attachLoginWithFacebookHandler(router: Router) {
+export function attachLoginWithFacebookHandler(router: RouterInstance) {
   router.post(
     '/login-fb',
     authenticator(false),
     // TODO validation
     async (ctx) => {
-      const { accessToken, language, connect } = ctx.request.body;
+      const { accessToken, language, connect } = ctx.request.body as any;
 
       const { id, name, email } = await getUserData(accessToken);
 

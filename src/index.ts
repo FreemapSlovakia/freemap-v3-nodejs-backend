@@ -104,7 +104,7 @@ app.use(
 );
 
 app.use(
-  koaBody.default({
+  koaBody({
     jsonLimit: '16mb',
     multipart: true,
   }),

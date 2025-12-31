@@ -1,10 +1,10 @@
-import Router from '@koa/router';
 import sql from 'sql-template-tag';
 import { authenticator } from '../../authenticator.js';
 import { runInTransaction } from '../../database.js';
 import { acceptValidator } from '../../requestValidators.js';
+import { RouterInstance } from '@koa/router';
 
-export function attachDeleteMapHandler(router: Router) {
+export function attachDeleteMapHandler(router: RouterInstance) {
   router.delete(
     '/:id',
     acceptValidator('application/json'),

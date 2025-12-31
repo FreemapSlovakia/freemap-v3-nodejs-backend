@@ -1,4 +1,4 @@
-import Router from '@koa/router';
+import { RouterInstance } from '@koa/router';
 
 import sql, { bulk, empty } from 'sql-template-tag';
 import { assert, tags } from 'typia';
@@ -6,7 +6,7 @@ import { authenticator } from '../../authenticator.js';
 import { runInTransaction } from '../../database.js';
 import { acceptValidator } from '../../requestValidators.js';
 
-export function attachPatchMapHandler(router: Router) {
+export function attachPatchMapHandler(router: RouterInstance) {
   router.patch(
     '/:id',
     acceptValidator('application/json'),
