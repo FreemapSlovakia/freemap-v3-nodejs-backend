@@ -65,33 +65,42 @@ export function attachPostPictureCommentHandler(router: Router) {
             ctx.throw(402);
           }
 
-          const proms: Promise<any>[] = [
+          const proms = [
             conn.query(sql`
               INSERT INTO pictureComment SET
                 pictureId = ${ctx.params.id},
                 userId = ${user!.id},
                 comment = ${comment},
                 createdAt = ${new Date()}
-          `),
-          ];
-
-          if (getEnvBoolean('MAILGIN_ENABLE', false)) {
-            proms.push(
-              conn.query(sql`
+            `),
+            ...(getEnvBoolean('MAILGIN_ENABLE', false)
+              ? ([
+                  conn.query(sql`
                 SELECT IF(sendGalleryEmails, email, NULL) AS email, language, title, userId
                   FROM user
                   JOIN picture ON userId = user.id
                   WHERE picture.id = ${ctx.params.id}
-            `),
+              `),
 
-              conn.query(sql`
+                  conn.query(sql`
                 SELECT DISTINCT email, sendGalleryEmails, language
                   FROM user
                   JOIN pictureComment ON userId = user.id
                   WHERE sendGalleryEmails AND pictureId = ${ctx.params.id} AND userId <> ${user!.id} AND email IS NOT NULL
-            `),
-            );
-          }
+              `),
+                ] as [
+                  Promise<
+                    {
+                      title: string | null;
+                      email: string | null;
+                      userId: number | null;
+                      language: string | null;
+                    }[]
+                  >,
+                  Promise<{ email: string; language: string | null }[]>,
+                ])
+              : ([undefined, undefined] as const)),
+          ] as const;
 
           const [{ insertId }, [picInfo] = [], emails = []] =
             await Promise.all(proms);
