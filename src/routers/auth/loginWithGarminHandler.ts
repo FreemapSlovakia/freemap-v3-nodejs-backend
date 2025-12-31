@@ -8,7 +8,7 @@ type Body = {
   connect: unknown;
   clientData: unknown;
   callbackUrl: string;
-  extraQuery: Record<string, unknown>;
+  extraQuery?: Record<string, unknown>;
 };
 
 export function attachLoginWithGarminHandler(router: RouterInstance) {
