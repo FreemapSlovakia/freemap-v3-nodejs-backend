@@ -5,7 +5,13 @@ import { garminOauth } from '../../garminOauth.js';
 import { acceptValidator } from '../../requestValidators.js';
 import { tokenSecrets } from './garminTokenSecrets.js';
 import { login } from './loginProcessor.js';
-import { assertGuard } from 'typia';
+import { assert, assertGuard } from 'typia';
+
+type Body = {
+  token: string;
+  verifier: string;
+  language: string | null;
+};
 
 export function attachLoginWithGarmin2Handler(router: RouterInstance) {
   router.post(
@@ -14,7 +20,15 @@ export function attachLoginWithGarmin2Handler(router: RouterInstance) {
     acceptValidator('application/json'),
     // TODO validation
     async (ctx) => {
-      const { token, verifier, language } = ctx.request.body as any;
+      let body;
+
+      try {
+        body = assert<Body>(ctx.request.body);
+      } catch (err) {
+        return ctx.throw(400, err as Error);
+      }
+
+      const { token, verifier, language } = body;
 
       const url =
         'https://connectapi.garmin.com/oauth-service/oauth/access_token';

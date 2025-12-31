@@ -57,10 +57,12 @@ export function attachPostPictureHandler(router: RouterInstance) {
             ctx.throw(413);
           }
 
-          const body = ctx.request.body as any;
+          let body;
 
-          if (!body.meta) {
-            ctx.throw(400, 'missing meta field');
+          try {
+            body = assert<{ meta: string }>(ctx.request.body);
+          } catch (err) {
+            return ctx.throw(400, err as Error);
           }
 
           if (typeof body.meta === 'string') {

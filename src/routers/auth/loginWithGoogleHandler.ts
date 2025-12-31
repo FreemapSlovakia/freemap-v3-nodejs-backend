@@ -4,6 +4,12 @@ import { acceptValidator } from '../../requestValidators.js';
 import { login } from './loginProcessor.js';
 import { assert } from 'typia';
 
+type Body = {
+  accessToken: string;
+  language: string | null;
+  connect?: boolean;
+};
+
 export function attachLoginWithGoogleHandler(router: RouterInstance) {
   router.post(
     '/login-google',
@@ -11,7 +17,15 @@ export function attachLoginWithGoogleHandler(router: RouterInstance) {
     acceptValidator('application/json'),
     // TODO validation
     async (ctx) => {
-      const { accessToken, language, connect } = ctx.request.body as any;
+      let body;
+
+      try {
+        body = assert<Body>(ctx.request.body);
+      } catch (err) {
+        return ctx.throw(400, err as Error);
+      }
+
+      const { accessToken, language, connect } = body;
 
       const userinfoRes = await fetch(
         'https://openidconnect.googleapis.com/v1/userinfo',

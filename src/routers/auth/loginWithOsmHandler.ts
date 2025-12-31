@@ -4,13 +4,11 @@ import { authenticator } from '../../authenticator.js';
 import { getEnv } from '../../env.js';
 import { acceptValidator } from '../../requestValidators.js';
 import { login } from './loginProcessor.js';
-import { assertGuard } from 'typia';
+import { assert, assertGuard } from 'typia';
 
 const clientId = getEnv('OSM_OAUTH2_CLIENT_ID');
 
 const clientSecret = getEnv('OSM_OAUTH2_CLIENT_SECRET');
-
-const redirectUri = getEnv('OSM_OAUTH2_REDIRECT_URI');
 
 export function attachLoginWithOsmHandler(router: RouterInstance) {
   router.get('/login-osm', (ctx) => {
@@ -23,7 +21,22 @@ export function attachLoginWithOsmHandler(router: RouterInstance) {
     acceptValidator('application/json'),
     // TODO validation
     async (ctx) => {
-      const { code, language, connect } = ctx.request.body as any;
+      let bdy;
+
+      type Body = {
+        code: string;
+        language: string | null;
+        connect?: boolean;
+        redirectUri: string;
+      };
+
+      try {
+        bdy = assert<Body>(ctx.request.body);
+      } catch (err) {
+        return ctx.throw(400, err as Error);
+      }
+
+      const { code, language, connect, redirectUri } = bdy;
 
       const sp = new URLSearchParams({
         client_id: clientId,

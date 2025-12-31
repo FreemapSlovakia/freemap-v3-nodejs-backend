@@ -1,8 +1,15 @@
 import { RouterInstance } from '@koa/router';
-import { getEnv } from '../../env.js';
 import { garminOauth } from '../../garminOauth.js';
 import { acceptValidator } from '../../requestValidators.js';
 import { tokenSecrets } from './garminTokenSecrets.js';
+import { assert } from 'typia';
+
+type Body = {
+  connect: unknown;
+  clientData: unknown;
+  callbackUrl: string;
+  extraQuery: Record<string, unknown>;
+};
 
 export function attachLoginWithGarminHandler(router: RouterInstance) {
   router.post(
@@ -43,7 +50,13 @@ export function attachLoginWithGarminHandler(router: RouterInstance) {
         return ctx.throw(400, 'missing oauth_token_secret');
       }
 
-      const body = ctx.request.body as any;
+      let body;
+
+      try {
+        body = assert<Body>(ctx.request.body);
+      } catch (err) {
+        return ctx.throw(400, err as Error);
+      }
 
       tokenSecrets.set(token, {
         tokenSecret,
@@ -53,7 +66,7 @@ export function attachLoginWithGarminHandler(router: RouterInstance) {
 
       setTimeout(() => tokenSecrets.delete(token), 30 * 60_000); // max 30 minutes
 
-      const callback = new URL(getEnv('GARMIN_OAUTH_CALLBACK'));
+      const callback = new URL(body.callbackUrl);
 
       // extraQuery is unused now
       for (const [key, value] of Object.entries(body.extraQuery ?? {})) {

@@ -13,13 +13,27 @@ async function getUserData(accessToken: string) {
   );
 }
 
+type Body = {
+  accessToken: string;
+  language: string | null;
+  connect?: boolean;
+};
+
 export function attachLoginWithFacebookHandler(router: RouterInstance) {
   router.post(
     '/login-fb',
     authenticator(false),
     // TODO validation
     async (ctx) => {
-      const { accessToken, language, connect } = ctx.request.body as any;
+      let body;
+
+      try {
+        body = assert<Body>(ctx.request.body);
+      } catch (err) {
+        return ctx.throw(400, err as Error);
+      }
+
+      const { accessToken, language, connect } = body;
 
       const { id, name, email } = await getUserData(accessToken);
 

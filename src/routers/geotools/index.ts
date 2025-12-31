@@ -8,6 +8,7 @@ import unzipper from 'unzipper';
 import { getEnv } from '../../env.js';
 import { acceptValidator } from '../../requestValidators.js';
 import { inCountries } from './inCountries.js';
+import { assert } from 'typia';
 
 const hgtDir = getEnv('ELEVATION_DATA_DIRECTORY');
 
@@ -39,7 +40,11 @@ async function compute(ctx: ParameterizedContext) {
       .match(/[^,]+,[^,]+/g)
       ?.map((pair) => pair.split(',').map((c) => Number.parseFloat(c)));
   } else if (ctx.method === 'POST' && Array.isArray(ctx.request.body)) {
-    cs = ctx.request.body as any;
+    try {
+      cs = assert<number[][]>(ctx.request.body);
+    } catch (err) {
+      return ctx.throw(400, err as Error);
+    }
   } else {
     ctx.throw(400, 'invalid request parameters');
   }

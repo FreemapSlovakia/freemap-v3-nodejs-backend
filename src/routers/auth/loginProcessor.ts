@@ -159,7 +159,17 @@ export async function login(
     } else {
       // no such user in DB for this auth provider
 
-      const settings = (ctx.request.body as any).settings || {};
+      let body;
+
+      try {
+        body = assert<{
+          settings: { lat?: number | null; lon?: number | null };
+        }>(ctx.request.body);
+      } catch (err) {
+        return ctx.throw(400, err as Error);
+      }
+
+      const settings = body.settings ?? {};
       const lat = remoteLat ?? settings.lat ?? null;
       const lon = remoteLon ?? settings.lon ?? null;
       const email = remoteEmail || null;

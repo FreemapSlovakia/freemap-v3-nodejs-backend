@@ -89,14 +89,15 @@ const translations: Record<string, Translation> = {
   },
 };
 
-type Body =
+type Body = { callbackUrl: string } & (
   | {
       type: 'premium';
     }
   | {
       type: 'credits';
       amount: number;
-    };
+    }
+);
 
 export function attachPurchaseTokenHandler(router: RouterInstance) {
   router.post('/purchaseToken', authenticator(true), async (ctx) => {
@@ -131,7 +132,7 @@ export function attachPurchaseTokenHandler(router: RouterInstance) {
 
     searchParams.set('token', token);
 
-    searchParams.set('callbackurl', getEnv('PURCHASE_CALLBACK_URL'));
+    searchParams.set('callbackurl', body.callbackUrl);
 
     searchParams.set('expiration', String(expiration));
 

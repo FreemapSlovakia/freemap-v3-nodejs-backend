@@ -3,10 +3,27 @@ import { createHmac } from 'node:crypto';
 import sql from 'sql-template-tag';
 import { runInTransaction } from '../../database.js';
 import { getEnv } from './../../env.js';
+import { assert } from 'typia';
+
+type Body = {
+  token: string;
+  email: string;
+  signature: string;
+  amount_paid?: number;
+  currency?: string;
+};
 
 export function attachPurchaseValidateHandler(router: RouterInstance) {
   router.post('/purchaseValidate', async (ctx) => {
     console.log(ctx.request.body);
+
+    let body;
+
+    try {
+      body = assert<Body>(ctx.request.body);
+    } catch (err) {
+      return ctx.throw(400, err as Error);
+    }
 
     const {
       token,
@@ -14,7 +31,7 @@ export function attachPurchaseValidateHandler(router: RouterInstance) {
       signature,
       // amount_paid,
       // currency,
-    } = ctx.request.body as any;
+    } = body;
 
     if (
       createHmac('sha256', getEnv('PURCHASE_SECRET'))

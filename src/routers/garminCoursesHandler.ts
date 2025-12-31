@@ -2,6 +2,17 @@ import { RouterInstance } from '@koa/router';
 import { authenticator } from '../authenticator.js';
 import { garminOauth } from '../garminOauth.js';
 import { acceptValidator } from '../requestValidators.js';
+import { assert } from 'typia';
+
+type Body = {
+  name: string | undefined;
+  description: string | undefined;
+  activity: string | undefined;
+  coordinates: [number, number, number?][];
+  distance: number;
+  elevationGain: number;
+  elevationLoss: number;
+};
 
 export function attachPostGarminCourses(router: RouterInstance) {
   router.post(
@@ -9,6 +20,14 @@ export function attachPostGarminCourses(router: RouterInstance) {
     acceptValidator('application/json'),
     authenticator(true),
     async (ctx) => {
+      let body;
+
+      try {
+        body = assert<Body>(ctx.request.body);
+      } catch (err) {
+        return ctx.throw(400, err as Error);
+      }
+
       const {
         name,
         description,
@@ -17,7 +36,7 @@ export function attachPostGarminCourses(router: RouterInstance) {
         distance,
         elevationGain,
         elevationLoss,
-      } = ctx.request.body as any;
+      } = body;
 
       const url = 'https://apis.garmin.com/training-api/courses/v1/course';
 
@@ -52,13 +71,11 @@ export function attachPostGarminCourses(router: RouterInstance) {
           elevationGain, // in meters
           elevationLoss, // in meters
           activityType: activity,
-          geoPoints: coordinates.map(
-            ([longitude, latitude, elevation]: [number, number, number?]) => ({
-              latitude,
-              longitude,
-              elevation,
-            }),
-          ),
+          geoPoints: coordinates.map(([longitude, latitude, elevation]) => ({
+            latitude,
+            longitude,
+            elevation,
+          })),
         }),
       });
 
