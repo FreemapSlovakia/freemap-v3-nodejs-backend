@@ -1,7 +1,7 @@
 import Router from '@koa/router';
 import { ParameterizedContext } from 'koa';
 import { createWriteStream } from 'node:fs';
-import { rename, unlink } from 'node:fs/promises';
+import { rename, stat, unlink, writeFile } from 'node:fs/promises';
 import { getEnv } from '../../env.js';
 import { acceptValidator } from '../../requestValidators.js';
 import { inCountries } from './inCountries.js';
@@ -97,42 +97,53 @@ async function compute(ctx: ParameterizedContext) {
             dataset = gdal.open(tifPath);
           } catch {
             await downloadDataSafeSafe(key);
-            dataset = gdal.open(tifPath);
+
+            try {
+              dataset = gdal.open(tifPath);
+            } catch (err) {
+              const s = await stat(tifPath).catch(() => undefined);
+
+              if (!s || s.size > 0) {
+                throw err;
+              }
+            }
           }
 
-          const geoTransform = dataset.geoTransform;
+          if (dataset) {
+            const geoTransform = dataset?.geoTransform;
 
-          if (!geoTransform) {
-            throw new Error(`Invalid geotransform for ${key}`);
+            if (!geoTransform) {
+              throw new Error(`Invalid geotransform for ${key}`);
+            }
+
+            dsMap.set(key, {
+              dataset,
+              band: dataset?.bands.get(1),
+              geoTransform,
+              width: dataset?.rasterSize.x,
+              height: dataset?.rasterSize.y,
+            });
           }
-
-          dsMap.set(key, {
-            dataset,
-            band: dataset.bands.get(1),
-            geoTransform,
-            width: dataset.rasterSize.x,
-            height: dataset.rasterSize.y,
-          });
         }
 
         return [lat, lon, key] as const;
       }),
     );
 
-    type Tuple = [number, number, DatasetInfo];
+    type Tuple = [number, number, DatasetInfo] | null;
 
-    const params = items
-      .map((item) => {
-        const ds = dsMap.get(item[2]);
+    const params = items.map((item) => {
+      const ds = dsMap.get(item[2]);
 
-        return ds && ([item[0], item[1], ds] as Tuple);
-      })
-      .filter((a): a is Tuple => Boolean(a));
+      return ds ? ([item[0], item[1], ds] as Tuple) : null;
+    });
 
-    ctx.response.body = await Promise.all(params.map(computeElevation));
+    ctx.response.body = await Promise.all(
+      params.map((t) => t && computeElevation(t)),
+    );
   } finally {
     for (const { dataset } of dsMap.values()) {
-      dataset.close();
+      dataset?.close();
     }
   }
 }
@@ -169,8 +180,13 @@ async function downloadData(key: string) {
       `https://opentopography.s3.sdsc.edu/raster/SRTM_GL1/SRTM_GL1_srtm/${key}.tif`,
     );
 
+    if (res.status === 404) {
+      await writeFile(fname, '');
+      return;
+    }
+
     if (!res.ok || !res.body) {
-      throw new Error('Bad response.');
+      throw new Error('Bad response: ' + res.status + ' ' + (await res.text()));
     }
 
     await pipeline(Readable.fromWeb(res.body), createWriteStream(tempTif));
@@ -216,9 +232,7 @@ async function computeElevation([
   const sample = (x: number, y: number) => {
     const val = band.pixels.get(x, y);
 
-    return nodata !== null && nodata !== undefined && val === nodata
-      ? null
-      : val;
+    return nodata != null && val === nodata ? null : val;
   };
 
   const v00 = sample(x0, y0);
