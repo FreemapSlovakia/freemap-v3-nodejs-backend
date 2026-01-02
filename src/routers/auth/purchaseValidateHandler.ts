@@ -9,7 +9,7 @@ type Body = {
   token: string;
   email: string;
   signature: string;
-  amount_paid?: number;
+  amount_paid?: number | string; // if paid by chrones then string is sent
   currency?: string;
 };
 

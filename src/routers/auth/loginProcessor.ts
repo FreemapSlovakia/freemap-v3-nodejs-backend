@@ -163,9 +163,11 @@ export async function login(
 
       try {
         body = assert<{
-          settings: { lat?: number | null; lon?: number | null };
+          settings?: { lat?: number | null; lon?: number | null };
         }>(ctx.request.body);
       } catch (err) {
+        ctx.log.warn({ body }, 'Invalid body.');
+
         return ctx.throw(400, err as Error);
       }
 

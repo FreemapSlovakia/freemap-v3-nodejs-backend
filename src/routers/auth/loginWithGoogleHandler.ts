@@ -22,6 +22,8 @@ export function attachLoginWithGoogleHandler(router: RouterInstance) {
       try {
         body = assert<Body>(ctx.request.body);
       } catch (err) {
+        ctx.log.warn({ body }, 'Invalid body.');
+
         return ctx.throw(400, err as Error);
       }
 
