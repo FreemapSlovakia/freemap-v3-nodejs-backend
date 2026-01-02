@@ -42,6 +42,7 @@
     "better-sqlite3": "^12.5.0",
     "etag": "^1.8.1",
     "exifreader": "^4.33.1",
+    "gdal-async": "^3.9.0",
     "got": "^14.6.6",
     "kcors": "^2.2.2",
     "koa": "^3.1.1",
@@ -61,7 +62,6 @@
     "sql-template-tag": "^5.2.1",
     "tsc-watch": "^7.2.0",
     "typia": "^11.0.0",
-    "unzipper": "^0.12.3",
     "ws": "^8.18.3"
   },
   "devDependencies": {
@@ -74,7 +74,6 @@
     "@types/koa": "^3.0.1",
     "@types/koa-websocket": "^5.0.11",
     "@types/node": "^24.10.4",
-    "@types/unzipper": "^0.10.11",
     "@types/ws": "^8.18.1",
     "@typescript-eslint/eslint-plugin": "^8.51.0",
     "@typescript-eslint/parser": "^8.51.0",

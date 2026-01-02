@@ -1,22 +1,26 @@
 import Router from '@koa/router';
-import got from 'got';
 import { ParameterizedContext } from 'koa';
-import { createWriteStream, fstat, read, WriteStream } from 'node:fs';
-import { FileHandle, open, rename, unlink } from 'node:fs/promises';
-import { promisify } from 'node:util';
-import unzipper from 'unzipper';
+import { createWriteStream } from 'node:fs';
+import { rename, unlink } from 'node:fs/promises';
 import { getEnv } from '../../env.js';
 import { acceptValidator } from '../../requestValidators.js';
 import { inCountries } from './inCountries.js';
 import { assert } from 'typia';
+import { Readable } from 'node:stream';
+import { pipeline } from 'node:stream/promises';
+import gdal from 'gdal-async';
 
-const hgtDir = getEnv('ELEVATION_DATA_DIRECTORY');
+const elevationDataDir = getEnv('ELEVATION_DATA_DIRECTORY');
 
 const router = new Router();
 
-const fstatAsync = promisify(fstat);
-
-const readAsync = promisify(read);
+type DatasetInfo = {
+  dataset: gdal.Dataset;
+  band: gdal.RasterBand;
+  geoTransform: number[];
+  width: number;
+  height: number;
+};
 
 router.post('/in-count', inCountries);
 
@@ -65,7 +69,7 @@ async function compute(ctx: ParameterizedContext) {
 
   const allocated = new Set<string>();
 
-  const fdMap = new Map<string, [FileHandle, number]>();
+  const dsMap = new Map<string, DatasetInfo>();
 
   try {
     const items = await Promise.all(
@@ -85,44 +89,51 @@ async function compute(ctx: ParameterizedContext) {
         if (!allocated.has(key)) {
           allocated.add(key);
 
-          const hgtPath = `${hgtDir}/${key}.HGT`;
+          const tifPath = `${elevationDataDir}/${key}.tif`;
 
-          let fd;
+          let dataset: gdal.Dataset | undefined;
 
           try {
-            fd = await open(hgtPath, 'r');
+            dataset = gdal.open(tifPath);
           } catch {
-            try {
-              await fetchSafe(key);
-
-              fd = await open(hgtPath, 'r');
-            } catch {
-              await (await open(hgtPath, 'w')).close();
-
-              fd = await open(hgtPath, 'r');
-            }
+            await downloadDataSafeSafe(key);
+            dataset = gdal.open(tifPath);
           }
 
-          fdMap.set(key, [fd, (await fstatAsync(fd.fd)).size]);
+          const geoTransform = dataset.geoTransform;
+
+          if (!geoTransform) {
+            throw new Error(`Invalid geotransform for ${key}`);
+          }
+
+          dsMap.set(key, {
+            dataset,
+            band: dataset.bands.get(1),
+            geoTransform,
+            width: dataset.rasterSize.x,
+            height: dataset.rasterSize.y,
+          });
         }
 
         return [lat, lon, key] as const;
       }),
     );
 
-    type Tuple = [number, number, FileHandle, number];
+    type Tuple = [number, number, DatasetInfo];
 
     const params = items
       .map((item) => {
-        const f = fdMap.get(item[2]);
+        const ds = dsMap.get(item[2]);
 
-        return f && ([item[0], item[1], f[0], f[1]] as Tuple);
+        return ds && ([item[0], item[1], ds] as Tuple);
       })
       .filter((a): a is Tuple => Boolean(a));
 
     ctx.response.body = await Promise.all(params.map(computeElevation));
   } finally {
-    await Promise.all([...fdMap.values()].map(([fd]) => fd.close()));
+    for (const { dataset } of dsMap.values()) {
+      dataset.close();
+    }
   }
 }
 
@@ -130,14 +141,14 @@ export const geotoolsRouter = router;
 
 const fetching = new Map<string, Promise<void>>();
 
-async function fetchSafe(key: string) {
+async function downloadDataSafeSafe(key: string) {
   let promise = fetching.get(key);
 
   if (promise) {
     return promise;
   }
 
-  promise = fetch(key);
+  promise = downloadData(key);
 
   fetching.set(key, promise);
 
@@ -148,119 +159,82 @@ async function fetchSafe(key: string) {
   return val;
 }
 
-async function fetch(key: string) {
-  const fname = `${hgtDir}/${key}.HGT`;
+async function downloadData(key: string) {
+  const fname = `${elevationDataDir}/${key}.tif`;
 
-  const temp = `${fname}.tmp`;
-
-  let ws;
+  const tempTif = `${fname}.tmp`;
 
   try {
-    await new Promise<void>((resolve, reject) => {
-      ws = createWriteStream(temp);
+    const res = await fetch(
+      `https://opentopography.s3.sdsc.edu/raster/SRTM_GL1/SRTM_GL1_srtm/${key}.tif`,
+    );
 
-      ws.on('finish', () => resolve());
-
-      ws.on('error', (e) => reject(e));
-
-      const unzipOne = unzipper.ParseOne();
-
-      unzipOne.on('error', (e) => reject(e));
-
-      got.stream
-        .get(
-          `https://e4ftl01.cr.usgs.gov/MEASURES/SRTMGL1.003/2000.02.11/${key}.SRTMGL1.hgt.zip`,
-          {
-            hooks: {
-              beforeRedirect: [
-                (options, response) => {
-                  if (
-                    typeof options.url === 'string'
-                      ? options.url
-                      : options.url?.href.startsWith(
-                          'https://urs.earthdata.nasa.gov/oauth/authorize',
-                        )
-                  ) {
-                    options.headers.authorization = `Basic ${Buffer.from(
-                      getEnv('URS_EARTHDATA_NASA_USERNAME') +
-                        ':' +
-                        getEnv('URS_EARTHDATA_NASA_PASSWORD'),
-                    ).toString('base64')}`;
-                  }
-
-                  const c = response.headers['set-cookie'];
-
-                  const m = c && /^(DATA=.*?);/.exec(c[0]);
-
-                  if (m && m[1]) {
-                    options.headers.cookie = m[1];
-                  }
-                },
-              ],
-            },
-          },
-        )
-        .on('error', (e) => reject(e))
-        .pipe(unzipOne)
-        .pipe(ws);
-    });
-
-    await rename(temp, fname);
-  } finally {
-    if (ws) {
-      (ws as WriteStream).close();
-      await unlink(temp).catch(() => {});
+    if (!res.ok || !res.body) {
+      throw new Error('Bad response.');
     }
+
+    await pipeline(Readable.fromWeb(res.body), createWriteStream(tempTif));
+
+    await rename(tempTif, fname);
+  } finally {
+    await unlink(tempTif).catch(() => {});
   }
 }
 
-async function computeElevation([lat, lon, fd, size]: [
-  number,
-  number,
-  FileHandle,
-  number,
-]) {
-  // gdal_translate supports: 1201x1201, 3601x3601 or 1801x3601
-  const rx =
-    size === 1801 * 3601 * 2 ? 1800 : size === 1201 * 1201 * 2 ? 1200 : 3600;
-  const ry = size === 1201 * 1201 * 2 ? 1200 : 3600;
+async function computeElevation([
+  lat,
+  lon,
+  { band, geoTransform, width, height },
+]: [number, number, DatasetInfo]) {
+  const [gt0, gt1, gt2, gt3, gt4, gt5] = geoTransform;
 
-  const alat = Math.abs(lat);
-  const alon = Math.abs(lon);
+  if (gt2 !== 0 || gt4 !== 0) {
+    throw new Error('Rotated geotransforms are not supported');
+  }
 
-  const latFrac = alat - Math.floor(alat);
-  const lonFrac = alon - Math.floor(alon);
-  const y = (lat < 0 ? latFrac : 1 - latFrac) * ry;
-  const x = (lon < 0 ? 1 - lonFrac : lonFrac) * rx;
+  const px = (lon - gt0) / gt1;
+  const py = (lat - gt3) / gt5;
 
-  const x0 = Math.floor(x);
-  const y0 = Math.floor(y);
-  const wx0 = 1 - (x - x0);
-  const wy0 = 1 - (y - y0);
-  const x1 = Math.ceil(x);
-  const y1 = Math.ceil(y);
-  const wx1 = 1 - (x1 - x);
-  const wy1 = 1 - (y1 - y);
+  const x0 = Math.floor(px);
+  const y0 = Math.floor(py);
+  const x1 = Math.min(x0 + 1, width - 1);
+  const y1 = Math.min(y0 + 1, height - 1);
 
-  const buffer = Buffer.alloc(8);
-  await Promise.all([
-    readAsync(fd.fd, buffer, 0, 2, (y0 * (rx + 1) + x0) * 2),
-    readAsync(fd.fd, buffer, 2, 2, (y1 * (rx + 1) + x0) * 2),
-    readAsync(fd.fd, buffer, 4, 2, (y0 * (rx + 1) + x1) * 2),
-    readAsync(fd.fd, buffer, 6, 2, (y1 * (rx + 1) + x1) * 2),
-  ]);
+  if (x0 < 0 || y0 < 0 || x0 >= width || y0 >= height) {
+    return null;
+  }
 
-  const v00 = buffer.readInt16BE(0);
-  const v01 = buffer.readInt16BE(2);
-  const v10 = buffer.readInt16BE(4);
-  const v11 = buffer.readInt16BE(6);
+  const dx = px - x0;
+  const dy = py - y0;
+  const wx0 = 1 - dx;
+  const wy0 = 1 - dy;
+  const wx1 = dx;
+  const wy1 = dy;
 
-  return (
-    (0 +
-      v00 * wx0 * wy0 +
-      v01 * wx0 * wy1 +
-      v10 * wx1 * wy0 +
-      v11 * wx1 * wy1) /
-    (wx0 * wy0 + wx0 * wy1 + wx1 * wy0 + wx1 * wy1)
-  );
+  const nodata = band.noDataValue;
+
+  const sample = (x: number, y: number) => {
+    const val = band.pixels.get(x, y);
+
+    return nodata !== null && nodata !== undefined && val === nodata
+      ? null
+      : val;
+  };
+
+  const v00 = sample(x0, y0);
+  const v01 = sample(x0, y1);
+  const v10 = sample(x1, y0);
+  const v11 = sample(x1, y1);
+
+  const weighted = [
+    [v00, wx0 * wy0],
+    [v01, wx0 * wy1],
+    [v10, wx1 * wy0],
+    [v11, wx1 * wy1],
+  ].filter((entry): entry is [number, number] => entry[0] !== null);
+
+  return weighted.length
+    ? weighted.reduce((acc, [v, w]) => acc + v * w, 0) /
+        weighted.reduce((acc, [, w]) => acc + w, 0)
+    : null;
 }
