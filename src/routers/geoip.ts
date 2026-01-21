@@ -11,7 +11,7 @@ export function attachGeoIp(router: RouterInstance) {
   router.get('/geoip', acceptValidator('application/json'), async (ctx) => {
     const body: Record<string, string | undefined> = {};
 
-    for (const name in [
+    for (const name of [
       'country',
       'country-code',
       'city',
