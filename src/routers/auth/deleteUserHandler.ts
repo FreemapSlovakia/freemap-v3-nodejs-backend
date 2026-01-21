@@ -1,5 +1,5 @@
-import { RouterInstance } from '@koa/router';
 import { unlink } from 'node:fs/promises';
+import { RouterInstance } from '@koa/router';
 import sql from 'sql-template-tag';
 import { authenticator } from '../../authenticator.js';
 import { runInTransaction } from '../../database.js';

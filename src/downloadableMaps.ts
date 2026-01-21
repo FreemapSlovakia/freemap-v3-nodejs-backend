@@ -26,8 +26,7 @@ export const downloadableMaps: DownloadableMap[] = [
     minZoom: 8,
     maxNativeZoom: 16,
     creditsPerMTile: 1000,
-    attribution:
-      'map: © Freemap Slovakia, data: © OpenStreetMap contributors',
+    attribution: 'map: © Freemap Slovakia, data: © OpenStreetMap contributors',
   },
   {
     type: 'T',
@@ -118,8 +117,7 @@ export const downloadableMaps: DownloadableMap[] = [
     minZoom: 8,
     maxNativeZoom: 16,
     creditsPerMTile: 1000,
-    attribution:
-      'map: © Freemap Slovakia, data: © OpenStreetMap contributors',
+    attribution: 'map: © Freemap Slovakia, data: © OpenStreetMap contributors',
   },
   {
     type: 'c',
@@ -127,7 +125,6 @@ export const downloadableMaps: DownloadableMap[] = [
     minZoom: 8,
     maxNativeZoom: 16,
     creditsPerMTile: 1000,
-    attribution:
-      'map: © Freemap Slovakia, data: © OpenStreetMap contributors',
+    attribution: 'map: © Freemap Slovakia, data: © OpenStreetMap contributors',
   },
 ];

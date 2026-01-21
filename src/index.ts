@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs';
+import { unlink } from 'node:fs/promises';
+import { createServer } from 'node:http';
 import Router from '@koa/router';
 import { createServer as createSecureServer } from 'https';
 import cors from 'kcors';
@@ -5,9 +8,6 @@ import Koa from 'koa';
 import koaBody from 'koa-body';
 import koaPinoLogger from 'koa-pino-logger';
 import websockify from 'koa-websocket';
-import { readFileSync } from 'node:fs';
-import { unlink } from 'node:fs/promises';
-import { createServer } from 'node:http';
 import 'source-map-support/register.js';
 import { initDatabase } from './database.js';
 import { getEnv, getEnvInteger } from './env.js';
@@ -17,6 +17,7 @@ import { trackingRouter } from './routers/deviceTracking/index.js';
 import { attachDownloadMapHandler } from './routers/downloadMapHandler.js';
 import { galleryRouter } from './routers/gallery/index.js';
 import { attachPostGarminCourses } from './routers/garminCoursesHandler.js';
+import { attachGeoIp } from './routers/geoip.js';
 import { geotoolsRouter } from './routers/geotools/index.js';
 import { attachGetUsers } from './routers/getUsersHandler.js';
 import { attachLoggerHandler } from './routers/loggerHandler.js';
@@ -24,7 +25,6 @@ import { mapsRouter } from './routers/maps/index.js';
 import { tracklogsRouter } from './routers/tracklogs/index.js';
 import { startSocketDeviceTracking } from './socketDeviceTracking.js';
 import { attachWs } from './ws.js';
-import { attachGeoIp } from './routers/geoip.js';
 
 await initDatabase();
 

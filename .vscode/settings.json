@@ -3,6 +3,18 @@
   "files.trimTrailingWhitespace": true,
   "files.insertFinalNewline": true,
   "html.format.preserveNewLines": false,
-  "editor.formatOnSave": true
-  // "javascript.validate.enable": false
+  "editor.formatOnSave": true,
+  "prettier.enable": false,
+  "eslint.enable": false,
+  "biome.enabled": true,
+  "editor.defaultFormatter": "biomejs.biome",
+  "[typescriptreact]": {
+    "editor.defaultFormatter": "biomejs.biome"
+  },
+  "[json]": {
+    "editor.defaultFormatter": "biomejs.biome"
+  },
+  "editor.codeActionsOnSave": {
+    "source.organizeImports.biome": "explicit"
+  }
 }

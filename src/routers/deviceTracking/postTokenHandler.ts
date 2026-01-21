@@ -1,12 +1,11 @@
 import { RouterInstance } from '@koa/router';
 
 import sql from 'sql-template-tag';
+import { assert, type tags } from 'typia';
 import { authenticator } from '../../authenticator.js';
 import { pool } from '../../database.js';
 import { nanoid } from '../../randomId.js';
 import { acceptValidator } from '../../requestValidators.js';
-
-import { assert, type tags } from 'typia';
 
 export function attachPostTokenHandler(router: RouterInstance) {
   router.post(

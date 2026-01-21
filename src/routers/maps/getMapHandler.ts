@@ -1,10 +1,10 @@
+import { RouterInstance } from '@koa/router';
 import sql from 'sql-template-tag';
+import { assertGuard } from 'typia';
 import { authenticator } from '../../authenticator.js';
 import { pool } from '../../database.js';
 import { acceptValidator } from '../../requestValidators.js';
-import { assertGuard } from 'typia';
-import { Map } from './types.js';
-import { RouterInstance } from '@koa/router';
+import { Map as MyMap } from './types.js';
 
 export function attachGetMapHandler(router: RouterInstance) {
   router.get(
@@ -23,7 +23,7 @@ export function attachGetMapHandler(router: RouterInstance) {
         ctx.throw(404, 'no such map');
       }
 
-      assertGuard<Map>(item);
+      assertGuard<MyMap>(item);
 
       const { user } = ctx.state;
 

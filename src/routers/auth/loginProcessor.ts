@@ -1,14 +1,14 @@
-import { ParameterizedContext } from 'koa';
 import { randomBytes } from 'node:crypto';
-import sql, { RawValue, empty, join, raw } from 'sql-template-tag';
+import { ParameterizedContext } from 'koa';
+import sql, { empty, join, RawValue, raw } from 'sql-template-tag';
+import { assert } from 'typia';
 import {
   authProviderToColumn,
   rowToUser,
-  userForResponse,
   UserRow,
+  userForResponse,
 } from '../../authenticator.js';
 import { runInTransaction } from '../../database.js';
-import { assert } from 'typia';
 
 export async function login(
   ctx: ParameterizedContext,

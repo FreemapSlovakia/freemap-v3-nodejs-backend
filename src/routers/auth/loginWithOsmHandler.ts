@@ -1,10 +1,10 @@
 import { RouterInstance } from '@koa/router';
 import got from 'got';
+import { assert, assertGuard } from 'typia';
 import { authenticator } from '../../authenticator.js';
 import { getEnv } from '../../env.js';
 import { acceptValidator } from '../../requestValidators.js';
 import { login } from './loginProcessor.js';
-import { assert, assertGuard } from 'typia';
 
 const clientId = getEnv('OSM_OAUTH2_CLIENT_ID');
 

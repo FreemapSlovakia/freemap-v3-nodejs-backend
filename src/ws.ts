@@ -1,8 +1,8 @@
 import Router from '@koa/router';
 import KoaWebsocket from 'koa-websocket';
+import { is } from 'typia';
 import type WebSocket from 'ws';
 import { authenticator } from './authenticator.js';
-import { RpcContext } from './rpcHandlerTypes.js';
 import { pingHandler } from './rpcHandlers/pingHandler.js';
 import {
   SubscribeParams,
@@ -12,8 +12,8 @@ import {
   trackingUnsubscribeHandler,
   UnsubscribeParams,
 } from './rpcHandlers/trackingUnsubscribeHandler.js';
+import { RpcContext } from './rpcHandlerTypes.js';
 import { trackRegister } from './trackRegister.js';
-import { is } from 'typia';
 
 export function attachWs(app: KoaWebsocket.App) {
   const wsRouter = new Router();

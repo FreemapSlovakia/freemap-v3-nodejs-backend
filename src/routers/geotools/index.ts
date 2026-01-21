@@ -1,14 +1,14 @@
-import Router from '@koa/router';
-import { ParameterizedContext } from 'koa';
 import { createWriteStream } from 'node:fs';
 import { rename, stat, unlink, writeFile } from 'node:fs/promises';
+import { Readable } from 'node:stream';
+import { pipeline } from 'node:stream/promises';
+import Router from '@koa/router';
+import gdal from 'gdal-async';
+import { ParameterizedContext } from 'koa';
+import { assert } from 'typia';
 import { getEnv } from '../../env.js';
 import { acceptValidator } from '../../requestValidators.js';
 import { inCountries } from './inCountries.js';
-import { assert } from 'typia';
-import { Readable } from 'node:stream';
-import { pipeline } from 'node:stream/promises';
-import gdal from 'gdal-async';
 
 const elevationDataDir = getEnv('ELEVATION_DATA_DIRECTORY');
 
@@ -193,7 +193,7 @@ async function downloadData(key: string) {
 
     await rename(tempTif, fname);
   } finally {
-    await unlink(tempTif).catch(() => {});
+    await unlink(tempTif).catch(() => undefined);
   }
 }
 

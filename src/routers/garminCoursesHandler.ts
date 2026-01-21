@@ -1,8 +1,8 @@
 import { RouterInstance } from '@koa/router';
+import { assert } from 'typia';
 import { authenticator } from '../authenticator.js';
 import { garminOauth } from '../garminOauth.js';
 import { acceptValidator } from '../requestValidators.js';
-import { assert } from 'typia';
 
 type Body = {
   name: string | undefined;

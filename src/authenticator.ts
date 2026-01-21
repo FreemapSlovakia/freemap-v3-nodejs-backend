@@ -1,8 +1,8 @@
 import { Middleware } from 'koa';
 import sql from 'sql-template-tag';
+import { assertGuard } from 'typia';
 import { pool } from './database.js';
 import { User } from './koaTypes.js';
-import { assertGuard } from 'typia';
 
 export const authProviderToColumn = {
   facebook: 'facebookUserId',

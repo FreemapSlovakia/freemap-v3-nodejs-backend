@@ -1,8 +1,8 @@
 import { RouterInstance } from '@koa/router';
 import got from 'got';
+import { assert } from 'typia';
 import { authenticator } from '../../authenticator.js';
 import { login } from './loginProcessor.js';
-import { assert } from 'typia';
 
 async function getUserData(accessToken: string) {
   return assert<{ id: string; name: string; email?: string | null }>(

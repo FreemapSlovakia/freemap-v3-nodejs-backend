@@ -1,8 +1,8 @@
 import { RouterInstance } from '@koa/router';
+import { assert } from 'typia';
 import { authenticator } from '../../authenticator.js';
 import { acceptValidator } from '../../requestValidators.js';
 import { login } from './loginProcessor.js';
-import { assert } from 'typia';
 
 type Body = {
   accessToken: string;

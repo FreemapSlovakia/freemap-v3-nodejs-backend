@@ -1,10 +1,10 @@
+import { RouterInstance } from '@koa/router';
 import sql, { bulk } from 'sql-template-tag';
 import { assert, tags } from 'typia';
 import { authenticator } from '../../authenticator.js';
 import { pool } from '../../database.js';
 import { nanoid } from '../../randomId.js';
 import { acceptValidator } from '../../requestValidators.js';
-import { RouterInstance } from '@koa/router';
 
 export function attachPostMapHandler(router: RouterInstance) {
   router.post(

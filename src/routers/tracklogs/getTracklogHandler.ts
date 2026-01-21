@@ -1,6 +1,6 @@
 import { readFile, stat } from 'node:fs/promises';
-import { tracklogsDir } from '../tracklogs/constants.js';
 import { RouterInstance } from '@koa/router';
+import { tracklogsDir } from '../tracklogs/constants.js';
 
 export function attachGetTracklogHandler(router: RouterInstance) {
   router.get('/:uid', async (ctx) => {

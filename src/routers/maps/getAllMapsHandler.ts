@@ -1,10 +1,10 @@
 import { RouterInstance } from '@koa/router';
 import sql from 'sql-template-tag';
+import { assertGuard } from 'typia';
 import { authenticator } from '../../authenticator.js';
 import { pool } from '../../database.js';
 import { acceptValidator } from '../../requestValidators.js';
-import { assertGuard } from 'typia';
-import { Map } from './types.js';
+import { Map as MyMap } from './types.js';
 
 export function attachGetAllMapsHandler(router: RouterInstance) {
   router.get(
@@ -21,7 +21,7 @@ export function attachGetAllMapsHandler(router: RouterInstance) {
           GROUP BY id, name, public, createdAt, modifiedAt, map.userId
       `);
 
-      assertGuard<Omit<Map, 'data'>[]>(items);
+      assertGuard<Omit<MyMap, 'data'>[]>(items);
 
       ctx.body = items.map((item) => {
         const writers = item.writers?.split(',').map((s) => Number(s)) ?? [];

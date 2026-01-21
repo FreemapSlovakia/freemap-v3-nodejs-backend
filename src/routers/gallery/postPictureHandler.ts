@@ -1,7 +1,7 @@
+import { promisify } from 'node:util';
 import { RouterInstance } from '@koa/router';
 import { execFile } from 'child_process';
 import ExifReader from 'exifreader';
-import { promisify } from 'node:util';
 import shortUuid from 'short-uuid';
 import sql, { bulk } from 'sql-template-tag';
 import { assert, tags } from 'typia';
