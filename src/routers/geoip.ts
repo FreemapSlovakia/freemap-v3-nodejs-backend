@@ -21,7 +21,10 @@ export function attachGeoIp(router: RouterInstance) {
       const value = ctx.req.headers['x-geoip-' + name];
 
       if (typeof value === 'string') {
-        body[name === 'country-code' ? 'countryCode' : name] = value;
+        body[name === 'country-code' ? 'countryCode' : name] = Buffer.from(
+          value,
+          'latin1',
+        ).toString('utf8');
       }
     }
 
