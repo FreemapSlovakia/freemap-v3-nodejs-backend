@@ -24,6 +24,7 @@ import { mapsRouter } from './routers/maps/index.js';
 import { tracklogsRouter } from './routers/tracklogs/index.js';
 import { startSocketDeviceTracking } from './socketDeviceTracking.js';
 import { attachWs } from './ws.js';
+import { attachGeoIp } from './routers/geoip.js';
 
 await initDatabase();
 
@@ -159,6 +160,8 @@ attachDownloadMapHandler(router);
 attachLoggerHandler(router);
 
 attachGetUsers(router);
+
+attachGeoIp(router);
 
 attachPostGarminCourses(router);
 
