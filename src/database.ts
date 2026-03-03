@@ -1,4 +1,4 @@
-import { createPool, SqlError } from 'mariadb';
+import { createPool } from 'mariadb';
 import sql from 'sql-template-tag';
 import { getEnv, getEnvInteger } from './env.js';
 import { appLogger } from './logger.js';
@@ -275,6 +275,7 @@ export async function initDatabase() {
 }
 
 import type { PoolConnection } from 'mariadb';
+import { is } from 'typia';
 
 const MAX_ATTEMPTS = 5;
 const BASE_DELAY_MS = 50;
@@ -290,7 +291,7 @@ function withJitter(ms: number) {
 }
 
 function isRetryableTxError(err: unknown): boolean {
-  return err instanceof SqlError && err.sqlState === '40001';
+  return is<{ sqlState: string }>(err) && err.sqlState === '40001';
 }
 
 export async function runInTransaction<T>(
