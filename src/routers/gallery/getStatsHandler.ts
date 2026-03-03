@@ -56,12 +56,11 @@ export async function attachGetStatsHandler(router: RouterInstance) {
             r.country,
             r.userId,
             r.pictureCount,
-            u.name AS userName,
-            r.countryTotal
+            u.name AS userName
           FROM ranked r
           JOIN user u ON u.id = r.userId
           WHERE r.rn <= 30
-          ORDER BY r.countryTotal DESC, r.pictureCount DESC, r.country ASC, r.userId ASC
+          ORDER BY r.countryTotal DESC, r.pictureCount DESC
         `),
       );
 
@@ -74,13 +73,13 @@ export async function attachGetStatsHandler(router: RouterInstance) {
       >(
         await pool.query(sql`
           SELECT
-            COUNT(*) AS "count",
+            COUNT(*) AS count,
             userId,
             user.name AS userName
           FROM picture
           JOIN user ON picture.userId = user.id
           GROUP BY userId
-          ORDER BY "count" ASC
+          ORDER BY count DESC
           LIMIT 30
         `),
       );
