@@ -1,7 +1,7 @@
 {
   "compilerOptions": {
     "module": "NodeNext",
-    "target": "ES2022",
+    "target": "ES2024",
     "moduleResolution": "NodeNext",
     "noImplicitAny": true,
     "sourceMap": true,
@@ -9,7 +9,7 @@
     "baseUrl": ".",
     "skipLibCheck": true,
     "strict": true,
-    "lib": ["ES2022"],
+    "lib": ["ES2024"],
     "plugins": [
       {
         "transform": "typia/lib/transform"

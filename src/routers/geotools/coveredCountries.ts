@@ -1,8 +1,8 @@
 import { RouterInstance } from '@koa/router';
 import sql from 'sql-template-tag';
-import { acceptValidator } from 'src/requestValidators.js';
 import { assert } from 'typia';
 import { pool } from '../../database.js';
+import { acceptValidator } from '../../requestValidators.js';
 
 export function attachCoveredCountriesHandler(router: RouterInstance) {
   router.post(

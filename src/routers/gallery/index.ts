@@ -5,6 +5,7 @@ import { attachGetAllPictureUsers } from './getAllUsersHandler.js';
 import { attachGetPictureHandler } from './getPictureHandler.js';
 import { attachGetPictureImageHandler } from './getPictureImageHandler.js';
 import { attachGetPicturesHandler } from './getPicturesHandler.js';
+import { attachGetStatsHandler } from './getStatsHandler.js';
 import { attachPostPictureCommentHandler } from './postPictureCommentHandler.js';
 import { attachPostPictureHandler } from './postPictureHandler.js';
 import { attachPostPictureRatingHandler } from './postPictureRatingHandler.js';
@@ -22,5 +23,6 @@ attachPutPictureHandler(router);
 attachPostPictureCommentHandler(router);
 attachPostPictureRatingHandler(router);
 attachGetAllPictureUsers(router);
+attachGetStatsHandler(router);
 
 export const galleryRouter = router;
