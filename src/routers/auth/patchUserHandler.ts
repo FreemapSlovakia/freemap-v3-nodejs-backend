@@ -35,7 +35,7 @@ export function attachPatchUserHandler(router: RouterInstance) {
       sql`UPDATE user SET ${join(
         keys.map(
           (key) =>
-            `${raw(key)} = ${key === 'settings' ? JSON.stringify(body[key]) : body[key]}`,
+            sql`${raw(key)} = ${key === 'settings' ? JSON.stringify(body[key]) : body[key]}`,
         ),
       )} WHERE id = ${ctx.state.user!.id}`,
     );
