@@ -315,7 +315,7 @@ async function byBbox(ctx: ParameterizedContext) {
     const encoding = ctx.acceptsEncodings('br', 'gzip', 'identity');
     ctx.vary('Accept-Encoding');
 
-    if (payload.length >= 0 && encoding && encoding !== 'identity') {
+    if (payload.length >= 1024 && encoding && encoding !== 'identity') {
       if (encoding === 'br') {
         payload = await brotliCompressAsync(payload, {
           params: {

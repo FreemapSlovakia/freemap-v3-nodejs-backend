@@ -1,5 +1,7 @@
+import type { PoolConnection } from 'mariadb';
 import { createPool } from 'mariadb';
 import sql from 'sql-template-tag';
+import { is } from 'typia';
 import { getEnv, getEnvInteger } from './env.js';
 import { appLogger } from './logger.js';
 
@@ -274,9 +276,6 @@ export async function initDatabase() {
   setInterval(cleanup, 60_000 * 60 * 1);
 }
 
-import type { PoolConnection } from 'mariadb';
-import { is } from 'typia';
-
 const MAX_ATTEMPTS = 5;
 const BASE_DELAY_MS = 50;
 const MAX_DELAY_MS = 1500;
@@ -302,6 +301,24 @@ export async function runInTransaction<T>(
     maxDelay?: number;
   } = {},
 ): Promise<T> {
+  const callerStack =
+    new Error('runInTransaction caller stack').stack
+      ?.split('\n')
+      .slice(2)
+      .join('\n') ?? '(stack unavailable)';
+
+  const to1 = setTimeout(() => {
+    console.log('Takes too long 1:', callerStack);
+  }, 3000);
+
+  const to2 = setTimeout(() => {
+    console.log('Takes too long 2:', callerStack);
+  }, 6000);
+
+  const to3 = setTimeout(() => {
+    console.log('Takes too long 3:', callerStack);
+  }, 9000);
+
   const {
     maxAttempts = MAX_ATTEMPTS,
     baseDelay = BASE_DELAY_MS,
@@ -328,9 +345,13 @@ export async function runInTransaction<T>(
         // ignore rollback errors
       }
 
+      if (!isRetryableTxError(err)) {
+        throw err;
+      }
+
       attempt++;
 
-      if (!isRetryableTxError(err) || attempt >= maxAttempts) {
+      if (attempt >= maxAttempts) {
         throw err;
       }
 
@@ -342,6 +363,9 @@ export async function runInTransaction<T>(
       await sleep(delay);
     } finally {
       conn.release();
+      clearTimeout(to1);
+      clearTimeout(to2);
+      clearTimeout(to3);
     }
   }
 }
