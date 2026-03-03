@@ -6,7 +6,7 @@ import { pool } from '../../database.js';
 export async function coveredCountries(ctx: ParameterizedContext) {
   console.log(ctx.request.body);
 
-  const rows = assert<[{ alpha2: string }]>(
+  const rows = assert<{ alpha2: string }[]>(
     await pool.query(
       sql`
       WITH poly AS (
