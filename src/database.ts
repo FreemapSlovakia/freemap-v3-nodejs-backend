@@ -11,6 +11,7 @@ export const pool = createPool({
   database: getEnv('MARIADB_DATABASE'),
   user: getEnv('MARIADB_USER'),
   password: getEnv('MARIADB_PASSWORD'),
+  connectionLimit: getEnvInteger('MARIADB_CONNECTION_LIMIT', 10),
   bigIntAsNumber: true,
   insertIdAsNumber: true,
   decimalAsNumber: true,
@@ -301,24 +302,6 @@ export async function runInTransaction<T>(
     maxDelay?: number;
   } = {},
 ): Promise<T> {
-  const callerStack =
-    new Error('runInTransaction caller stack').stack
-      ?.split('\n')
-      .slice(2)
-      .join('\n') ?? '(stack unavailable)';
-
-  const to1 = setTimeout(() => {
-    console.log('Takes too long 1:', callerStack);
-  }, 3000);
-
-  const to2 = setTimeout(() => {
-    console.log('Takes too long 2:', callerStack);
-  }, 6000);
-
-  const to3 = setTimeout(() => {
-    console.log('Takes too long 3:', callerStack);
-  }, 9000);
-
   const {
     maxAttempts = MAX_ATTEMPTS,
     baseDelay = BASE_DELAY_MS,
@@ -363,9 +346,6 @@ export async function runInTransaction<T>(
       await sleep(delay);
     } finally {
       conn.release();
-      clearTimeout(to1);
-      clearTimeout(to2);
-      clearTimeout(to3);
     }
   }
 }

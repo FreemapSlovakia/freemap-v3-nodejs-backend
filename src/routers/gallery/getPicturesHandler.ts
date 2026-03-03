@@ -142,13 +142,13 @@ async function byRadius(ctx: ParameterizedContext) {
         ? sql`JOIN pictureTag ON pictureId = picture.id AND pictureTag.name = ${tag}`
         : empty
     }
-    WHERE MBRContains(ST_Envelope(ST_GeomFromText(${`LINESTRING(${minLon} ${minLat}, ${maxLon} ${maxLat})`}, 4326)), location)
+    WHERE MBRContains(ST_GeomFromText(${`LINESTRING(${minLon} ${minLat}, ${maxLon} ${maxLat})`}, 4326), location)
     ${takenAtFrom ? sql`AND takenAt >= '${new Date(takenAtFrom)}'` : empty}
     ${takenAtTo ? sql`AND takenAt <= '${new Date(takenAtTo)}'` : empty}
     ${createdAtFrom ? sql`AND createdAt >= '${new Date(createdAtFrom)}'` : empty}
     ${createdAtTo ? sql`AND createdAt <= '${new Date(createdAtTo)}'` : empty}
-    ${pano == null ? empty : sql` AND pano = ${pano}`}
-    ${premium == null ? empty : sql` AND premium = ${premium}`}
+    ${pano == null ? empty : sql`AND pano = ${pano}`}
+    ${premium == null ? empty : sql`AND premium = ${premium}`}
     ${userId ? sql`AND userId = ${userId}` : empty}
     ${
       ctx.state.user?.isAdmin
@@ -230,7 +230,7 @@ async function byBbox(ctx: ParameterizedContext) {
         ? sql`JOIN pictureTag ON pictureTag.pictureId = picture.id AND name = ${tag}`
         : empty
     }
-    WHERE MBRContains(ST_Envelope(ST_GeomFromText(${`LINESTRING(${minLon} ${minLat}, ${maxLon} ${maxLat})`}, 4326)), location)
+    WHERE MBRContains(ST_GeomFromText(${`LINESTRING(${minLon} ${minLat}, ${maxLon} ${maxLat})`}, 4326), location)
     ${takenAtFrom ? sql`AND takenAt >= '${new Date(takenAtFrom)}'` : empty}
     ${takenAtTo ? sql`AND takenAt <= '${new Date(takenAtTo)}'` : empty}
     ${createdAtFrom ? sql`AND createdAt >= '${new Date(createdAtFrom)}'` : empty}
