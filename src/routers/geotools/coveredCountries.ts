@@ -4,9 +4,7 @@ import { assert } from 'typia';
 import { pool } from '../../database.js';
 
 export async function coveredCountries(ctx: ParameterizedContext) {
-  console.log(ctx.request.body);
-
-  const rows = assert<{ alpha2: string }[]>(
+  ctx.body = assert<{ alpha2: string }[]>(
     await pool.query(
       sql`
       WITH poly AS (
@@ -17,7 +15,5 @@ export async function coveredCountries(ctx: ParameterizedContext) {
       CROSS JOIN poly p
       WHERE MBRIntersects(c.geom, p.geom) AND ST_Intersects(c.geom, p.geom)`,
     ),
-  );
-
-  ctx.body = rows.map((row) => row.alpha2);
+  ).map((row) => row.alpha2);
 }
