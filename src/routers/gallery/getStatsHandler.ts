@@ -87,7 +87,7 @@ export async function attachGetStatsHandler(router: RouterInstance) {
 
       const { user } = ctx.state;
 
-      let me: number | undefined;
+      let me: { pictureCount: number; userRank: number } | undefined;
 
       type MeForCountry = {
         country: string;
@@ -127,19 +127,37 @@ export async function attachGetStatsHandler(router: RouterInstance) {
               r.userRank
             FROM ranked r
             WHERE r.userId = ${user.id}
-            ORDER BY r.userRank ASC, r.country ASC
+            ORDER BY r.pictureCount DESC, r.userRank DESC
           `),
         );
 
-        const [{ count }] = assert<[{ count: number }]>(
+        const [meme] = assert<
+          [] | [{ pictureCount: number; userRank: number }]
+        >(
           await pool.query(sql`
-            SELECT COUNT(*) AS "count"
-            FROM picture
+            WITH per_user AS (
+              SELECT
+                userId,
+                COUNT(*) AS pictureCount
+              FROM picture
+              GROUP BY userId
+            ),
+            ranked AS (
+              SELECT
+                userId,
+                pictureCount,
+                DENSE_RANK() OVER (ORDER BY pictureCount DESC) AS userRank
+              FROM per_user
+            )
+            SELECT
+              pictureCount,
+              userRank
+            FROM ranked
             WHERE userId = ${user.id}
           `),
         );
 
-        me = count;
+        me = meme;
       }
 
       const perUserPerCountry: Record<
@@ -164,8 +182,11 @@ export async function attachGetStatsHandler(router: RouterInstance) {
       ctx.body = {
         perUserPerCountry,
         perUser,
-        mePerCountry,
-        me,
+        me: me && {
+          perCountry: mePerCountry,
+          pictureCount: me.pictureCount,
+          userRank: me.userRank,
+        },
       };
     },
   );
