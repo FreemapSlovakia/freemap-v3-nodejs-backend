@@ -8,7 +8,7 @@ import { ParameterizedContext } from 'koa';
 import { assert } from 'typia';
 import { getEnv } from '../../env.js';
 import { acceptValidator } from '../../requestValidators.js';
-import { inCountries } from './inCountries.js';
+import { coveredCountries } from './coveredCountries.js';
 
 const elevationDataDir = getEnv('ELEVATION_DATA_DIRECTORY');
 
@@ -22,7 +22,11 @@ type DatasetInfo = {
   height: number;
 };
 
-router.post('/in-count', inCountries);
+router.post(
+  '/covered-countries',
+  acceptValidator('application/geo+json'),
+  coveredCountries,
+);
 
 router.get('/elevation', compute);
 

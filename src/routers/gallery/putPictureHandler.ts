@@ -1,5 +1,5 @@
 import { RouterInstance } from '@koa/router';
-import sql, { bulk } from 'sql-template-tag';
+import sql, { bulk, empty, join } from 'sql-template-tag';
 import { assert, tags } from 'typia';
 import { authenticator } from '../../authenticator.js';
 import { runInTransaction } from '../../database.js';
@@ -56,8 +56,7 @@ export function attachPutPictureHandler(router: RouterInstance) {
             title = ${title},
             description = ${description},
             takenAt = ${takenAt ? new Date(takenAt) : null},
-            lat = ${lat},
-            lon = ${lon},
+            location = POINT(${lon}, ${lat}),
             azimuth = ${azimuth},
             premium = ${premium}
             WHERE id = ${ctx.params.id}
@@ -65,13 +64,8 @@ export function attachPutPictureHandler(router: RouterInstance) {
 
         // delete missing tags
         conn.query(
-          `DELETE FROM pictureTag WHERE pictureId = ?
-                ${
-                  tags?.length
-                    ? ` AND name NOT IN (${tags.map(() => '?').join(', ')})`
-                    : ''
-                }`,
-          [ctx.params.id, ...(tags ?? [])],
+          sql`DELETE FROM pictureTag WHERE pictureId = ${ctx.params.id}
+            ${tags?.length ? ` AND name NOT IN (${join(tags)})` : empty}`,
         ),
       ];
 

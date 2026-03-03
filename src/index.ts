@@ -104,6 +104,14 @@ app.use(
   }),
 );
 
+app.use((ctx, next) => {
+  if (ctx.request.header['content-type']?.startsWith('application/geo+json')) {
+    ctx.request.header['content-type'] = 'application/json';
+  }
+
+  return next();
+});
+
 app.use(
   koaBody({
     jsonLimit: '16mb',

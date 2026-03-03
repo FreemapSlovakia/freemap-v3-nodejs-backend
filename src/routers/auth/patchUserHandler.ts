@@ -1,4 +1,5 @@
 import { RouterInstance } from '@koa/router';
+import sql, { join, raw } from 'sql-template-tag';
 import { assert, tags } from 'typia';
 import { authenticator } from '../../authenticator.js';
 import { pool } from '../../database.js';
@@ -31,15 +32,12 @@ export function attachPatchUserHandler(router: RouterInstance) {
     // TODO validate duplicates
 
     await pool.query(
-      `UPDATE user SET ${keys
-        .map((key) => `${key} = ?`)
-        .join(', ')} WHERE id = ?`,
-      [
-        ...keys.map((key) =>
-          key === 'settings' ? JSON.stringify(body[key]) : body[key],
+      sql`UPDATE user SET ${join(
+        keys.map(
+          (key) =>
+            `${raw(key)} = ${key === 'settings' ? JSON.stringify(body[key]) : body[key]}`,
         ),
-        ctx.state.user!.id,
-      ],
+      )} WHERE id = ${ctx.state.user!.id}`,
     );
 
     ctx.status = 204;

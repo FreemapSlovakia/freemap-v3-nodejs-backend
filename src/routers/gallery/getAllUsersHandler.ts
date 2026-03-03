@@ -1,4 +1,5 @@
 import { RouterInstance } from '@koa/router';
+import sql from 'sql-template-tag';
 import { pool } from '../../database.js';
 import { acceptValidator } from '../../requestValidators.js';
 
@@ -8,7 +9,7 @@ export function attachGetAllPictureUsers(router: RouterInstance) {
     acceptValidator('application/json'),
     async (ctx) => {
       ctx.body = await pool.query(
-        `SELECT userId AS id, user.name AS name, COUNT(*) AS count
+        sql`SELECT userId AS id, user.name AS name, COUNT(*) AS count
           FROM picture
           JOIN user ON userId = user.id
           GROUP BY userId

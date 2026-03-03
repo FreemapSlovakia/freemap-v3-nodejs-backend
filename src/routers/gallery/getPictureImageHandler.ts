@@ -78,6 +78,8 @@ export function attachGetPictureImageHandler(router: RouterInstance) {
         10,
       );
 
+      sharp.cache(false);
+
       const resize = w ? sharp().resize(w).jpeg() : null;
 
       const fileStream = createReadStream(pathname);

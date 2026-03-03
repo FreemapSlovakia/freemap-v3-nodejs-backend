@@ -1,6 +1,7 @@
 import { createHmac } from 'node:crypto';
 import { RouterInstance } from '@koa/router';
 import { ParameterizedContext } from 'koa';
+import sql, { empty, join, raw, Sql } from 'sql-template-tag';
 import { assert, assertGuard, http, tags } from 'typia';
 import { authenticator } from '../../authenticator.js';
 import { pool } from '../../database.js';
@@ -107,49 +108,44 @@ async function byRadius(ctx: ParameterizedContext) {
   const myUserId = ctx.state.user?.id ?? -1;
 
   // cca 1 degree
-  const lat1 = lat - distance / 43;
-  const lat2 = lat + distance / 43;
-  const lon1 = lon - distance / Math.abs(Math.cos((lat * Math.PI) / 180) * 43);
-  const lon2 = lon + distance / Math.abs(Math.cos((lat * Math.PI) / 180) * 43);
+  const minLat = lat - distance / 43;
+  const maxLat = lat + distance / 43;
+  const k = distance / Math.abs(Math.cos((lat * Math.PI) / 180) * 43);
+  const minLon = lon - k;
+  const maxLon = lon + k;
 
-  const sql = `SELECT id,
-    (6371 * acos(cos(radians(${lat})) * cos(radians(lat)) * cos(radians(lon) - radians(${lon}) ) + sin(radians(${lat})) * sin(radians(lat)))) AS distance
-    ${ratingFrom || ratingTo ? `, ${ratingSubquery}` : ''}
+  const query = sql`SELECT id,
+    ST_Distance_Sphere(location, POINT(${lon}, ${lat})) / 1000 AS distance
+    ${ratingFrom !== undefined || ratingTo !== undefined ? sql`, ${raw(ratingSubquery)}` : empty}
     FROM picture
     ${
       tag
-        ? `JOIN pictureTag ON pictureId = picture.id AND pictureTag.name = ${pool.escape(
-            tag,
-          )}`
-        : ''
+        ? sql`JOIN pictureTag ON pictureId = picture.id AND pictureTag.name = ${tag}`
+        : empty
     }
-    WHERE lat BETWEEN ${lat1} AND ${lat2} AND lon BETWEEN ${lon1} AND ${lon2}
-    ${takenAtFrom ? `AND takenAt >= '${toSqlDate(takenAtFrom)}'` : ''}
-    ${takenAtTo ? `AND takenAt <= '${toSqlDate(takenAtTo)}'` : ''}
-    ${createdAtFrom ? `AND createdAt >= '${toSqlDate(createdAtFrom)}'` : ''}
-    ${createdAtTo ? `AND createdAt <= '${toSqlDate(createdAtTo)}'` : ''}
-    ${pano == null ? '' : ` AND pano = ${pano ? 1 : 0}`}
-    ${premium == null ? '' : ` AND premium = ${premium ? 1 : 0}`}
-    ${userId ? `AND userId = ${userId}` : ''}
+    WHERE MBRContains(ST_Envelope(ST_GeomFromText(${`LINESTRING(${minLon} ${minLat}, ${maxLon} ${maxLat})`}, 4326)), location)
+    ${takenAtFrom ? sql`AND takenAt >= '${new Date(takenAtFrom)}'` : empty}
+    ${takenAtTo ? sql`AND takenAt <= '${new Date(takenAtTo)}'` : empty}
+    ${createdAtFrom ? sql`AND createdAt >= '${new Date(createdAtFrom)}'` : empty}
+    ${createdAtTo ? sql`AND createdAt <= '${new Date(createdAtTo)}'` : empty}
+    ${pano == null ? empty : sql` AND pano = ${pano}`}
+    ${premium == null ? empty : sql` AND premium = ${premium}`}
+    ${userId ? sql`AND userId = ${userId}` : empty}
     ${
       ctx.state.user?.isAdmin
-        ? ''
-        : `AND (id NOT IN (SELECT pictureId FROM pictureTag WHERE name = 'private') OR userId = ${myUserId})`
+        ? empty
+        : sql`AND (id NOT IN (SELECT pictureId FROM pictureTag WHERE name = 'private') OR userId = ${myUserId})`
     }
-    ${tag === '' ? 'AND id NOT IN (SELECT pictureId FROM pictureTag)' : ''}
+    ${tag === '' ? raw('AND id NOT IN (SELECT pictureId FROM pictureTag)') : empty}
     HAVING distance <= ${distance}
-    ${ratingFrom == null ? '' : `AND rating >= ${ratingFrom}`}
-    ${ratingTo == null ? '' : `AND rating <= ${ratingTo}`}
+    ${ratingFrom == null ? empty : sql`AND rating >= ${ratingFrom}`}
+    ${ratingTo == null ? empty : sql`AND rating <= ${ratingTo}`}
     ORDER BY distance
     LIMIT 1000`;
 
-  const rows = assert<{ id: number }[]>(await pool.query(sql));
+  const rows = assert<{ id: number }[]>(await pool.query(query));
 
   ctx.body = rows.map((row) => ({ id: row.id }));
-}
-
-function toSqlDate(d: string) {
-  return d.replace('T', ' ').replace(/(\.\d*)?Z$/, '');
 }
 
 async function byBbox(ctx: ParameterizedContext) {
@@ -182,66 +178,62 @@ async function byBbox(ctx: ParameterizedContext) {
 
   const myUserId = ctx.state.user?.id ?? -1;
 
-  const normFields = fields ?? [];
+  const sqlFields: string[] = (fields ?? []).filter(
+    (f) => f !== 'rating' && f !== 'tags' && f !== 'user' && f !== 'hmac',
+  );
 
-  const flds = [
-    'lat',
-    'lon',
-    ...normFields.filter(
-      (f) => f !== 'rating' && f !== 'tags' && f !== 'user' && f !== 'hmac',
-    ),
-  ];
+  sqlFields.push('ST_X(location) AS lon', 'ST_Y(location) AS lat');
 
-  if (flds.includes('hmac') && !flds.includes('premium')) {
-    flds.push('premium');
+  if (fields?.includes('hmac') && !sqlFields.includes('premium')) {
+    sqlFields.push('premium');
   }
 
-  if (ratingFrom || ratingTo || normFields.includes('rating')) {
-    flds.push(ratingSubquery);
+  if (ratingFrom || ratingTo || fields?.includes('rating')) {
+    sqlFields.push(ratingSubquery);
   }
 
-  if (normFields.includes('tags')) {
-    flds.push(
+  if (fields?.includes('tags')) {
+    sqlFields.push(
       "(SELECT GROUP_CONCAT(name SEPARATOR '\n') FROM pictureTag WHERE pictureId = picture.id) AS tags",
     );
   }
 
-  if (normFields.includes('user')) {
-    flds.push('(SELECT name FROM user WHERE picture.userId = user.id) AS user');
+  if (fields?.includes('user')) {
+    sqlFields.push(
+      '(SELECT name FROM user WHERE picture.userId = user.id) AS user',
+    );
   }
 
-  const sql = `SELECT ${flds.join(',')}
+  const query = sql`SELECT ${raw(sqlFields.join(','))}
     FROM picture
     ${
       tag
-        ? `JOIN pictureTag ON pictureTag.pictureId = picture.id AND name = ${pool.escape(
-            tag,
-          )}`
-        : ''
+        ? sql`JOIN pictureTag ON pictureTag.pictureId = picture.id AND name = ${tag}`
+        : empty
     }
-    WHERE lat BETWEEN ${minLat} AND ${maxLat} AND lon BETWEEN ${minLon} AND ${maxLon}
-    ${takenAtFrom ? `AND takenAt >= '${toSqlDate(takenAtFrom)}'` : ''}
-    ${takenAtTo ? `AND takenAt <= '${toSqlDate(takenAtTo)}'` : ''}
-    ${createdAtFrom ? `AND createdAt >= '${toSqlDate(createdAtFrom)}'` : ''}
-    ${createdAtTo ? `AND createdAt <= '${toSqlDate(createdAtTo)}'` : ''}
-    ${pano == null ? '' : `AND pano = ${pano ? 1 : 0}`}
-    ${premium == null ? '' : `AND premium = ${premium ? 1 : 0}`}
-    ${userId ? `AND userId = ${userId}` : ''}
+    WHERE MBRContains(ST_Envelope(ST_GeomFromText(${`LINESTRING(${minLon} ${minLat}, ${maxLon} ${maxLat})`}, 4326)), location)
+    ${takenAtFrom ? sql`AND takenAt >= '${new Date(takenAtFrom)}'` : empty}
+    ${takenAtTo ? sql`AND takenAt <= '${new Date(takenAtTo)}'` : empty}
+    ${createdAtFrom ? sql`AND createdAt >= '${new Date(createdAtFrom)}'` : empty}
+    ${createdAtTo ? sql`AND createdAt <= '${new Date(createdAtTo)}'` : empty}
+    ${pano == null ? empty : sql`AND pano = ${pano}`}
+    ${premium == null ? empty : sql`AND premium = ${premium}`}
+    ${userId ? sql`AND userId = ${userId}` : empty}
     ${
       ctx.state.user?.isAdmin
-        ? ''
-        : `AND (id NOT IN (SELECT pictureId FROM pictureTag WHERE name = 'private') OR userId = ${myUserId})`
+        ? empty
+        : sql`AND (id NOT IN (SELECT pictureId FROM pictureTag WHERE name = 'private') OR userId = ${myUserId})`
     }
-    ${tag === '' ? 'AND id NOT IN (SELECT pictureId FROM pictureTag)' : ''}
-    ${ratingFrom == null ? '' : `HAVING rating >= ${ratingFrom}`}
+    ${tag === '' ? raw('AND id NOT IN (SELECT pictureId FROM pictureTag)') : empty}
+    ${ratingFrom == null ? empty : sql`HAVING rating >= ${ratingFrom}`}
     ${
       ratingTo == null
-        ? ''
-        : `${ratingTo ? 'AND' : 'HAVING'} rating <= ${ratingTo}`
+        ? empty
+        : `${raw(ratingTo ? 'AND' : 'HAVING')} rating <= ${ratingTo}`
     }
   `;
 
-  const rows = await pool.query(sql);
+  const rows = await pool.query(query);
 
   const getRating = fields?.includes('rating');
 
@@ -264,7 +256,7 @@ async function byBbox(ctx: ParameterizedContext) {
       pano: row.pano ? 1 : undefined,
       premium: row.premium ? 1 : undefined,
       azimuth: row.azimuth ?? undefined,
-      tags: normFields.includes('tags')
+      tags: fields?.includes('tags')
         ? (row.tags?.split('\n') ?? [])
         : undefined,
       hmac:
@@ -305,76 +297,76 @@ async function byOrder(ctx: ParameterizedContext) {
 
   const myUserId = ctx.state.user?.id ?? -1;
 
-  const hv = [];
+  const hv: Sql[] = [];
 
   const wh = ctx.state.user?.isAdmin
     ? []
     : [
-        `(id NOT IN (SELECT pictureId FROM pictureTag WHERE name = 'private') OR userId = ${myUserId})`,
+        sql`(id NOT IN (SELECT pictureId FROM pictureTag WHERE name = 'private') OR userId = ${myUserId})`,
       ];
 
   if (ratingFrom !== undefined) {
-    hv.push(`rating >= ${ratingFrom}`);
+    hv.push(sql`rating >= ${ratingFrom}`);
   }
 
   if (ratingTo !== undefined) {
-    hv.push(`rating <= ${ratingTo}`);
+    hv.push(sql`rating <= ${ratingTo}`);
   }
 
   if (takenAtFrom) {
-    wh.push(`takenAt >= '${toSqlDate(takenAtFrom)}'`);
+    wh.push(sql`takenAt >= '${new Date(takenAtFrom)}'`);
   }
 
   if (takenAtTo) {
-    wh.push(`takenAt <= '${toSqlDate(takenAtTo)}'`);
+    wh.push(sql`takenAt <= '${new Date(takenAtTo)}'`);
   }
 
   if (createdAtFrom) {
-    wh.push(`createdAt >= '${toSqlDate(createdAtFrom)}'`);
+    wh.push(sql`createdAt >= '${new Date(createdAtFrom)}'`);
   }
 
   if (createdAtTo) {
-    wh.push(`createdAt <= '${toSqlDate(createdAtTo)}'`);
+    wh.push(sql`createdAt <= '${new Date(createdAtTo)}'`);
   }
 
   if (pano !== undefined) {
-    wh.push(`pano = ${pano ? 1 : 0}`);
+    wh.push(sql`pano = ${pano ? 1 : 0}`);
   }
 
   if (premium !== undefined) {
-    wh.push(`premium = ${premium ? 1 : 0}`);
+    wh.push(sql`premium = ${premium ? 1 : 0}`);
   }
 
   if (userId !== undefined) {
-    wh.push(`userId = ${userId}`);
+    wh.push(sql`userId = ${userId}`);
   }
 
   if (tag === '') {
-    wh.push('id NOT IN (SELECT pictureId FROM pictureTag)');
+    wh.push(sql`id NOT IN (SELECT pictureId FROM pictureTag)`);
   }
 
-  const sql = `SELECT id ${
-    ratingFrom || ratingTo || orderBy === 'rating' ? `, ${ratingSubquery}` : ''
+  const query = sql`SELECT id ${
+    ratingFrom !== undefined || ratingTo !== undefined || orderBy === 'rating'
+      ? raw(', ' + ratingSubquery)
+      : empty
   }
     FROM picture
     ${
       tag
-        ? `JOIN pictureTag ON pictureTag.pictureId = picture.id AND name = ${pool.escape(
-            tag,
-          )}`
-        : ''
+        ? sql`JOIN pictureTag ON pictureTag.pictureId = picture.id AND name = ${tag}`
+        : empty
     }
-    ${wh.length ? `WHERE ${wh.join(' AND ')}` : ''}
-    ${hv.length ? `HAVING ${hv.join(' AND ')}` : ''}
+    ${wh.length ? sql`WHERE ${join(wh, ' AND ')}` : empty}
+    ${hv.length ? sql`HAVING ${join(hv, ' AND ')}` : empty}
     ORDER BY ${
       orderBy === 'lastCommentedAt'
-        ? `(SELECT MAX(createdAt) FROM pictureComment WHERE pictureId = picture.id)`
-        : orderBy
-    } ${direction}, id ${direction}
+        ? sql`(SELECT MAX(createdAt) FROM pictureComment WHERE pictureId = picture.id)`
+        : raw(orderBy)
+    } ${raw(direction)}, id ${raw(direction)}
     LIMIT 1000
   `;
 
-  const rows = assert<{ id: number }[]>(await pool.query(sql));
+  const rows = assert<{ id: number }[]>(await pool.query(query));
 
   ctx.body = rows.map((row) => ({ id: row.id }));
 }

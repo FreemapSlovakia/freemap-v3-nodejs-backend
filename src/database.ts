@@ -18,7 +18,7 @@ const logger = appLogger.child({ module: 'db' });
 
 export async function initDatabase() {
   const scripts = [
-    `CREATE TABLE IF NOT EXISTS user (
+    sql`CREATE TABLE IF NOT EXISTS user (
       id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
       osmId INT UNSIGNED NULL UNIQUE,
       facebookUserId VARCHAR(32) CHARSET ascii NULL UNIQUE,
@@ -39,7 +39,7 @@ export async function initDatabase() {
       language CHAR(2) NULL
     ) ENGINE=InnoDB`,
 
-    `CREATE TABLE IF NOT EXISTS blockedCredit (
+    sql`CREATE TABLE IF NOT EXISTS blockedCredit (
       id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
       amount FLOAT NOT NULL,
       userId INT UNSIGNED NOT NULL,
@@ -47,7 +47,7 @@ export async function initDatabase() {
       FOREIGN KEY (userId) REFERENCES user (id) ON DELETE CASCADE
     ) ENGINE=InnoDB`,
 
-    `CREATE TABLE IF NOT EXISTS auth (
+    sql`CREATE TABLE IF NOT EXISTS auth (
       authToken VARCHAR(255) CHARSET ascii PRIMARY KEY,
       userId INT UNSIGNED NOT NULL,
       createdAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -55,7 +55,7 @@ export async function initDatabase() {
       FOREIGN KEY (userId) REFERENCES user (id) ON DELETE CASCADE
     ) ENGINE=InnoDB`,
 
-    `CREATE TABLE IF NOT EXISTS purchaseToken (
+    sql`CREATE TABLE IF NOT EXISTS purchaseToken (
       token VARCHAR(255) CHARSET ascii NULL PRIMARY KEY,
       userId INT UNSIGNED NOT NULL,
       createdAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -64,7 +64,7 @@ export async function initDatabase() {
       FOREIGN KEY (userId) REFERENCES user (id) ON DELETE CASCADE
     ) ENGINE=InnoDB`,
 
-    `CREATE TABLE IF NOT EXISTS purchase (
+    sql`CREATE TABLE IF NOT EXISTS purchase (
       userId INT UNSIGNED NOT NULL,
       item JSON NOT NULL,
       createdAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -72,7 +72,7 @@ export async function initDatabase() {
       FOREIGN KEY (userId) REFERENCES user (id) ON DELETE CASCADE
     ) ENGINE=InnoDB`,
 
-    `CREATE TABLE IF NOT EXISTS picture (
+    sql`CREATE TABLE IF NOT EXISTS picture (
       id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
       pathname VARCHAR(255) CHARSET utf8 COLLATE utf8_bin NOT NULL UNIQUE,
       userId INT UNSIGNED NOT NULL,
@@ -80,8 +80,7 @@ export async function initDatabase() {
       description VARCHAR(4096) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL,
       takenAt TIMESTAMP NULL,
       createdAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      lat FLOAT(8, 6) NOT NULL,
-      lon FLOAT(9, 6) NOT NULL,
+      location POINT NOT NULL,
       pano BIT NOT NULL,
       premium BIT NOT NULL DEFAULT FALSE,
       azimuth FLOAT DEFAULT NULL,
@@ -90,11 +89,10 @@ export async function initDatabase() {
       INDEX picPremium (premium),
       INDEX picTakenAtIdx USING BTREE (takenAt),
       INDEX picCreatedAtIdx USING BTREE (createdAt),
-      INDEX picLatIdx USING BTREE (lat),
-      INDEX picLonIdx USING BTREE (lon)
+      SPATIAL INDEX picture_location_spx (location)
     ) ENGINE=InnoDB`,
 
-    `CREATE TABLE IF NOT EXISTS pictureTag (
+    sql`CREATE TABLE IF NOT EXISTS pictureTag (
       pictureId INT UNSIGNED NOT NULL,
       name VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
       PRIMARY KEY (pictureId, name),
@@ -102,7 +100,7 @@ export async function initDatabase() {
       INDEX ptNameIdx (name)
     ) ENGINE=InnoDB`,
 
-    `CREATE TABLE IF NOT EXISTS pictureComment (
+    sql`CREATE TABLE IF NOT EXISTS pictureComment (
       id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
       pictureId INT UNSIGNED NOT NULL,
       userId INT UNSIGNED NOT NULL,
@@ -112,7 +110,7 @@ export async function initDatabase() {
       FOREIGN KEY (userId) REFERENCES user (id) ON DELETE CASCADE
     ) ENGINE=InnoDB`,
 
-    `CREATE TABLE IF NOT EXISTS pictureRating (
+    sql`CREATE TABLE IF NOT EXISTS pictureRating (
       userId INT UNSIGNED NOT NULL,
       pictureId INT UNSIGNED NOT NULL,
       stars TINYINT UNSIGNED NOT NULL,
@@ -122,7 +120,7 @@ export async function initDatabase() {
       FOREIGN KEY (userId) REFERENCES user (id) ON DELETE CASCADE
     ) ENGINE=InnoDB`,
 
-    `CREATE TABLE IF NOT EXISTS trackingDevice (
+    sql`CREATE TABLE IF NOT EXISTS trackingDevice (
       id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
       userId INT UNSIGNED NOT NULL,
       name VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
@@ -133,7 +131,7 @@ export async function initDatabase() {
       CONSTRAINT tdUserFk FOREIGN KEY (userId) REFERENCES user (id) ON DELETE CASCADE
     ) ENGINE=InnoDB`,
 
-    `CREATE TABLE IF NOT EXISTS trackingPoint (
+    sql`CREATE TABLE IF NOT EXISTS trackingPoint (
       id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
       deviceId INT UNSIGNED NOT NULL,
       createdAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -151,7 +149,7 @@ export async function initDatabase() {
       INDEX tpCreatedAtIdx (createdAt)
     ) ENGINE=InnoDB`,
 
-    `CREATE TABLE IF NOT EXISTS trackingAccessToken (
+    sql`CREATE TABLE IF NOT EXISTS trackingAccessToken (
       id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
       deviceId INT UNSIGNED NOT NULL,
       token VARCHAR(255) CHARSET ascii NOT NULL UNIQUE,
@@ -164,7 +162,7 @@ export async function initDatabase() {
       INDEX tatCreatedAtIdx (createdAt)
     ) ENGINE=InnoDB`,
 
-    `CREATE TABLE IF NOT EXISTS map (
+    sql`CREATE TABLE IF NOT EXISTS map (
       id CHAR(8) PRIMARY KEY,
       createdAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
       modifiedAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -176,13 +174,43 @@ export async function initDatabase() {
       INDEX umCreatedAtIdx (createdAt)
     ) ENGINE=InnoDB`,
 
-    `CREATE TABLE IF NOT EXISTS mapWriteAccess (
+    sql`CREATE TABLE IF NOT EXISTS mapWriteAccess (
       mapId CHAR(8) NOT NULL,
       userId INT UNSIGNED NOT NULL,
       PRIMARY KEY (mapId, userId),
       CONSTRAINT mwaUserFk FOREIGN KEY (userId) REFERENCES user (id) ON DELETE CASCADE,
       CONSTRAINT mwaMapFk FOREIGN KEY (mapId) REFERENCES map (id) ON DELETE CASCADE
     ) ENGINE=InnoDB`,
+
+    sql`CREATE TRIGGER IF NOT EXISTS picture_country_bu
+      BEFORE UPDATE ON picture
+      FOR EACH ROW
+      BEGIN
+        IF NOT ST_Equals(NEW.location, OLD.location) THEN
+          SET NEW.country = (
+            SELECT c.alpha2
+            FROM \`country\` c
+            WHERE MBRContains(c.geom, NEW.location)
+              AND ST_Contains(c.geom, NEW.location)
+            LIMIT 1
+          );
+        END IF;
+      END`,
+
+    sql`CREATE TRIGGER IF NOT EXISTS picture_country_bi
+        BEFORE INSERT ON picture
+        FOR EACH ROW
+        BEGIN
+          IF NEW.location IS NOT NULL THEN
+            SET NEW.country = (
+              SELECT c.alpha2
+              FROM \`country\` c
+              WHERE MBRContains(c.geom, NEW.location)
+                AND ST_Contains(c.geom, NEW.location)
+              LIMIT 1
+            );
+          END IF;
+        END`,
   ];
 
   const updates: (string | string[])[] = [];
@@ -214,7 +242,7 @@ export async function initDatabase() {
   }
 
   async function cleanup() {
-    await pool.query('DELETE FROM purchaseToken WHERE expireAt < NOW()');
+    await pool.query(sql`DELETE FROM purchaseToken WHERE expireAt < NOW()`);
 
     await runInTransaction(async (conn) => {
       // TODO track pending downloads taking more than a day :-o

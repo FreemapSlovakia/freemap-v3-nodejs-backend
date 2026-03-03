@@ -124,24 +124,24 @@ export async function login(
         // TODO sum purchase expirations
 
         const query = sql`UPDATE user SET
-        email = COALESCE(email, ${email}),
-        lat = COALESCE(lat, ${lat}),
-        lon = COALESCE(lon, ${lon}),
-        language = COALESCE(language, ${language}),
-        createdAt = LEAST(createdAt, ${createdAt}),
-        isAdmin = isAdmin OR ${isAdmin},
-        ${premiumExpiration ? sql`premiumExpiration = COALESCE(GREATEST(premiumExpiration, ${premiumExpiration}), ${premiumExpiration}),` : empty}
-        sendGalleryEmails = sendGalleryEmails OR ${sendGalleryEmails},
-        settings = COALESCE(settings, ${settings}),
-        credits = credits + ${credits},
-        ${join(
-          Object.entries(authData).map(
-            ([column, value]) =>
-              sql`${raw(column)} = COALESCE(${raw(column)}, ${value as RawValue})`,
-          ),
-        )}
-        WHERE id = ${currentUser.id}
-      `;
+          email = COALESCE(email, ${email}),
+          lat = COALESCE(lat, ${lat}),
+          lon = COALESCE(lon, ${lon}),
+          language = COALESCE(language, ${language}),
+          createdAt = LEAST(createdAt, ${createdAt}),
+          isAdmin = isAdmin OR ${isAdmin},
+          ${premiumExpiration ? sql`premiumExpiration = COALESCE(GREATEST(premiumExpiration, ${premiumExpiration}), ${premiumExpiration}),` : empty}
+          sendGalleryEmails = sendGalleryEmails OR ${sendGalleryEmails},
+          settings = COALESCE(settings, ${settings}),
+          credits = credits + ${credits},
+          ${join(
+            Object.entries(authData).map(
+              ([column, value]) =>
+                sql`${raw(column)} = COALESCE(${raw(column)}, ${value as RawValue})`,
+            ),
+          )}
+          WHERE id = ${currentUser.id}
+        `;
 
         await conn.query(query);
       } else {

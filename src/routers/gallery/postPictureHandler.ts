@@ -139,8 +139,7 @@ export function attachPostPictureHandler(router: RouterInstance) {
                 description = ${description},
                 createdAt = ${new Date()},
                 takenAt = ${takenAt ? new Date(takenAt) : null},
-                lat = ${lat},
-                lon = ${lon},
+                location = POINT(${lon}, ${lat}),
                 azimuth = ${azimuth},
                 pano = ${pano},
                 premium = ${premium}
