@@ -1,5 +1,7 @@
 import { createHmac } from 'node:crypto';
 import { readFileSync } from 'node:fs';
+import { promisify } from 'node:util';
+import { brotliCompress, gzip, constants as zlibConstants } from 'node:zlib';
 import { RouterInstance } from '@koa/router';
 import { ParameterizedContext } from 'koa';
 import protobuf from 'protobufjs';
@@ -13,6 +15,8 @@ import { ratingSubquery } from './ratingConstants.js';
 import { PictureRow } from './types.js';
 
 const secret = getEnv('PREMIUM_PHOTO_SECRET', '');
+const gzipAsync = promisify(gzip);
+const brotliCompressAsync = promisify(brotliCompress);
 
 const picturesResponseType = protobuf
   .parse(readFileSync(new URL('./pictures.proto', import.meta.url), 'utf8'))
@@ -246,6 +250,7 @@ async function byBbox(ctx: ParameterizedContext) {
         ? empty
         : `${raw(ratingTo ? 'AND' : 'HAVING')} rating <= ${ratingTo}`
     }
+    ORDER BY lat, lon
   `;
 
   const rows = await pool.query(query);
@@ -255,48 +260,79 @@ async function byBbox(ctx: ParameterizedContext) {
   const getHmac = fields?.includes('hmac');
 
   assertGuard<
-    Partial<
-      PictureRow & {
-        rating: number | null;
-        tags: string | null;
-      }
-    >[]
+    (Pick<PictureRow, 'lat' | 'lon'> &
+      Partial<
+        Omit<PictureRow, 'lat' | 'lon'> & {
+          rating: number | null;
+          tags: string | null;
+        }
+      >)[]
   >(rows);
 
-  const body = {
-    pictures: rows.map((row) =>
-      Object.assign({}, row, {
-        rating: getRating ? row.rating : undefined,
-        takenAt: row.takenAt?.getTime(),
-        createdAt: row.createdAt?.getTime(),
-        pano: row.pano == null ? undefined : Boolean(row.pano),
-        premium: row.premium == null ? undefined : Boolean(row.premium),
-        azimuth: row.azimuth ?? undefined,
-        tags: fields?.includes('tags')
-          ? (row.tags?.split('\n') ?? [])
+  const pictures = rows.map((row) =>
+    Object.assign({}, row, {
+      rating: getRating ? row.rating : undefined,
+      takenAt: row.takenAt?.getTime(),
+      createdAt: row.createdAt?.getTime(),
+      pano: row.pano == null ? undefined : Boolean(row.pano),
+      premium: row.premium == null ? undefined : Boolean(row.premium),
+      azimuth: row.azimuth ?? undefined,
+      tags: fields?.includes('tags')
+        ? (row.tags?.split('\n') ?? [])
+        : undefined,
+      hmac:
+        getHmac && row.premium && secret
+          ? createHmac('sha256', secret).update(String(row.id)).digest('hex')
           : undefined,
-        hmac:
-          getHmac && row.premium && secret
-            ? createHmac('sha256', secret).update(String(row.id)).digest('hex')
-            : undefined,
-      }),
-    ),
-  };
+    }),
+  );
 
   if (
     ctx.accepts('application/json', 'application/x-protobuf') ===
     'application/x-protobuf'
   ) {
-    const err = picturesResponseType.verify(body);
+    let prevLon: number | undefined;
+    let prevLat: number | undefined;
 
+    for (const picture of pictures) {
+      const lon = Math.round(picture.lon * 1e6);
+      picture.lon = prevLon === undefined ? lon : lon - prevLon;
+      prevLon = lon;
+
+      const lat = Math.round(picture.lat * 1e6);
+      picture.lat = prevLat === undefined ? lat : lat - prevLat;
+      prevLat = lat;
+    }
+
+    const body = { pictures };
+
+    const err = picturesResponseType.verify(body);
     if (err) {
       ctx.throw(500, err);
     }
 
+    let payload = Buffer.from(picturesResponseType.encode(body).finish());
+    const encoding = ctx.acceptsEncodings('br', 'gzip', 'identity');
+    ctx.vary('Accept-Encoding');
+
+    if (payload.length >= 0 && encoding && encoding !== 'identity') {
+      if (encoding === 'br') {
+        payload = await brotliCompressAsync(payload, {
+          params: {
+            [zlibConstants.BROTLI_PARAM_QUALITY]: 4,
+          },
+        });
+        ctx.set('Content-Encoding', 'br');
+      } else if (encoding === 'gzip') {
+        payload = await gzipAsync(payload);
+        ctx.set('Content-Encoding', 'gzip');
+      }
+    }
+
     ctx.type = 'application/x-protobuf';
-    ctx.body = Buffer.from(picturesResponseType.encode(body).finish());
+    ctx.body = payload;
   } else {
-    ctx.body = body;
+    ctx.body = pictures;
   }
 }
 
