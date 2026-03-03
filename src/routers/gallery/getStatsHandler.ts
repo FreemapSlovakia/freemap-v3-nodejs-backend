@@ -1,5 +1,5 @@
 import { RouterInstance } from '@koa/router';
-import sql from 'sql-template-tag';
+import sql, { empty } from 'sql-template-tag';
 import { assert } from 'typia';
 import { authenticator } from '../../authenticator.js';
 import { pool } from '../../database.js';
@@ -11,6 +11,14 @@ export async function attachGetStatsHandler(router: RouterInstance) {
     authenticator(false),
     acceptValidator('application/json'),
     async (ctx) => {
+      const period = ctx.query['period'];
+
+      const days = isNaN(Number(period || 'x'))
+        ? empty
+        : sql` AND picture.createdAt > DATE_SUB(NOW(), INTERVAL ${Number(period)} DAY)`;
+
+      console.log(days);
+
       const usersPerCountry = assert<
         {
           country: string;
@@ -27,7 +35,7 @@ export async function attachGetStatsHandler(router: RouterInstance) {
                 userId,
                 COUNT(*) AS pictureCount
               FROM picture
-              WHERE country IS NOT NULL
+              WHERE country IS NOT NULL ${days}
               GROUP BY country, userId
             ),
             per_country AS (
@@ -35,7 +43,7 @@ export async function attachGetStatsHandler(router: RouterInstance) {
                 country,
                 COUNT(*) AS countryTotal
               FROM picture
-              WHERE country IS NOT NULL
+              WHERE country IS NOT NULL ${days}
               GROUP BY country
               -- HAVING COUNT(*) >= 20
             ),
@@ -78,6 +86,7 @@ export async function attachGetStatsHandler(router: RouterInstance) {
             user.name AS userName
           FROM picture
           JOIN user ON picture.userId = user.id
+          WHERE true ${days}
           GROUP BY userId
           ORDER BY count DESC
           LIMIT 30
@@ -106,7 +115,7 @@ export async function attachGetStatsHandler(router: RouterInstance) {
                   userId,
                   COUNT(*) AS pictureCount
                 FROM picture
-                WHERE country IS NOT NULL
+                WHERE country IS NOT NULL ${days}
                 GROUP BY country, userId
               ),
               ranked AS (
@@ -139,6 +148,7 @@ export async function attachGetStatsHandler(router: RouterInstance) {
                 userId,
                 COUNT(*) AS pictureCount
               FROM picture
+              WHERE true ${days}
               GROUP BY userId
             ),
             ranked AS (
