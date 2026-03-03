@@ -1,6 +1,8 @@
 import { createHmac } from 'node:crypto';
+import { readFileSync } from 'node:fs';
 import { RouterInstance } from '@koa/router';
 import { ParameterizedContext } from 'koa';
+import protobuf from 'protobufjs';
 import sql, { empty, join, raw, Sql } from 'sql-template-tag';
 import { assert, assertGuard, http, tags } from 'typia';
 import { authenticator } from '../../authenticator.js';
@@ -11,6 +13,10 @@ import { ratingSubquery } from './ratingConstants.js';
 import { PictureRow } from './types.js';
 
 const secret = getEnv('PREMIUM_PHOTO_SECRET', '');
+
+const picturesResponseType = protobuf
+  .parse(readFileSync(new URL('./pictures.proto', import.meta.url), 'utf8'))
+  .root.lookupType('PicturesResponse');
 
 type CommonQuery = {
   userId?: number & tags.Type<'uint32'> & tags.Minimum<1>;
@@ -66,13 +72,22 @@ const methods: {
 export function attachGetPicturesHandler(router: RouterInstance) {
   router.get(
     '/pictures',
-    acceptValidator('application/json'),
+    acceptValidator('application/json', 'application/x-protobuf'),
     authenticator(false),
     async (ctx) => {
       const method = methods[ctx.query.by as string];
 
       if (!method) {
         ctx.throw(400, 'by must be one of ' + Object.keys(methods).join(', '));
+      }
+
+      const acceptedType = ctx.accepts(
+        'application/json',
+        'application/x-protobuf',
+      );
+
+      if (acceptedType === 'application/x-protobuf' && method !== byBbox) {
+        ctx.throw(406, 'protobuf response is supported only for by=bbox');
       }
 
       await method(ctx);
@@ -248,27 +263,41 @@ async function byBbox(ctx: ParameterizedContext) {
     >[]
   >(rows);
 
-  ctx.body = rows.map((row) =>
-    Object.assign({}, row, {
-      rating: getRating ? row.rating : undefined,
-      takenAt: toSec(row.takenAt),
-      createdAt: toSec(row.createdAt),
-      pano: row.pano ? 1 : undefined,
-      premium: row.premium ? 1 : undefined,
-      azimuth: row.azimuth ?? undefined,
-      tags: fields?.includes('tags')
-        ? (row.tags?.split('\n') ?? [])
-        : undefined,
-      hmac:
-        getHmac && row.premium && secret
-          ? createHmac('sha256', secret).update(String(row.id)).digest('hex')
+  const body = {
+    pictures: rows.map((row) =>
+      Object.assign({}, row, {
+        rating: getRating ? row.rating : undefined,
+        takenAt: row.takenAt?.getTime(),
+        createdAt: row.createdAt?.getTime(),
+        pano: row.pano == null ? undefined : Boolean(row.pano),
+        premium: row.premium == null ? undefined : Boolean(row.premium),
+        azimuth: row.azimuth ?? undefined,
+        tags: fields?.includes('tags')
+          ? (row.tags?.split('\n') ?? [])
           : undefined,
-    }),
-  );
-}
+        hmac:
+          getHmac && row.premium && secret
+            ? createHmac('sha256', secret).update(String(row.id)).digest('hex')
+            : undefined,
+      }),
+    ),
+  };
 
-function toSec(d: Date | null | undefined) {
-  return d == null ? d : Math.round(d.getTime() / 1000);
+  if (
+    ctx.accepts('application/json', 'application/x-protobuf') ===
+    'application/x-protobuf'
+  ) {
+    const err = picturesResponseType.verify(body);
+
+    if (err) {
+      ctx.throw(500, err);
+    }
+
+    ctx.type = 'application/x-protobuf';
+    ctx.body = Buffer.from(picturesResponseType.encode(body).finish());
+  } else {
+    ctx.body = body;
+  }
 }
 
 async function byOrder(ctx: ParameterizedContext) {
