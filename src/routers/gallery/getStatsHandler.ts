@@ -74,21 +74,21 @@ export async function attachGetStatsHandler(router: RouterInstance) {
 
       const perUser = assert<
         {
-          count: number;
+          pictureCount: number;
           userId: number;
           userName: string;
         }[]
       >(
         await pool.query(sql`
           SELECT
-            COUNT(*) AS count,
+            COUNT(*) AS pictureCount,
             userId,
             user.name AS userName
           FROM picture
           JOIN user ON picture.userId = user.id
           WHERE true ${days}
           GROUP BY userId
-          ORDER BY count DESC
+          ORDER BY pictureCount DESC
           LIMIT 30
         `),
       );
@@ -184,15 +184,25 @@ export async function attachGetStatsHandler(router: RouterInstance) {
         userName,
         pictureCount,
       } of usersPerCountry) {
-        const group = (perUserPerCountry[country] ??= []);
-        group.push({ userId, userName, pictureCount });
+        (perUserPerCountry[country] ??= []).push({
+          userId,
+          userName,
+          pictureCount,
+        });
       }
 
       ctx.body = {
         perUserPerCountry,
         perUser,
         me: me && {
-          perCountry: mePerCountry,
+          perCountry:
+            mePerCountry &&
+            Object.fromEntries(
+              mePerCountry?.map((a) => [
+                a.country,
+                { pictureCount: a.pictureCount, userRank: a.userRank },
+              ]),
+            ),
           pictureCount: me.pictureCount,
           userRank: me.userRank,
         },
