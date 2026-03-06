@@ -143,10 +143,10 @@ async function byRadius(ctx: ParameterizedContext) {
         : empty
     }
     WHERE MBRContains(ST_GeomFromText(${`LINESTRING(${minLon} ${minLat}, ${maxLon} ${maxLat})`}, 4326), location)
-    ${takenAtFrom ? sql`AND takenAt >= '${new Date(takenAtFrom)}'` : empty}
-    ${takenAtTo ? sql`AND takenAt <= '${new Date(takenAtTo)}'` : empty}
-    ${createdAtFrom ? sql`AND createdAt >= '${new Date(createdAtFrom)}'` : empty}
-    ${createdAtTo ? sql`AND createdAt <= '${new Date(createdAtTo)}'` : empty}
+    ${takenAtFrom ? sql`AND takenAt >= ${new Date(takenAtFrom)}` : empty}
+    ${takenAtTo ? sql`AND takenAt <= ${new Date(takenAtTo)}` : empty}
+    ${createdAtFrom ? sql`AND createdAt >= ${new Date(createdAtFrom)}` : empty}
+    ${createdAtTo ? sql`AND createdAt <= ${new Date(createdAtTo)}` : empty}
     ${pano == null ? empty : sql`AND pano = ${pano}`}
     ${premium == null ? empty : sql`AND premium = ${premium}`}
     ${userId ? sql`AND userId = ${userId}` : empty}
@@ -231,10 +231,10 @@ async function byBbox(ctx: ParameterizedContext) {
         : empty
     }
     WHERE MBRContains(ST_GeomFromText(${`LINESTRING(${minLon} ${minLat}, ${maxLon} ${maxLat})`}, 4326), location)
-    ${takenAtFrom ? sql`AND takenAt >= '${new Date(takenAtFrom)}'` : empty}
-    ${takenAtTo ? sql`AND takenAt <= '${new Date(takenAtTo)}'` : empty}
-    ${createdAtFrom ? sql`AND createdAt >= '${new Date(createdAtFrom)}'` : empty}
-    ${createdAtTo ? sql`AND createdAt <= '${new Date(createdAtTo)}'` : empty}
+    ${takenAtFrom ? sql`AND takenAt >= ${new Date(takenAtFrom)}` : empty}
+    ${takenAtTo ? sql`AND takenAt <= ${new Date(takenAtTo)}` : empty}
+    ${createdAtFrom ? sql`AND createdAt >= ${new Date(createdAtFrom)}` : empty}
+    ${createdAtTo ? sql`AND createdAt <= ${new Date(createdAtTo)}` : empty}
     ${pano == null ? empty : sql`AND pano = ${pano}`}
     ${premium == null ? empty : sql`AND premium = ${premium}`}
     ${userId ? sql`AND userId = ${userId}` : empty}
@@ -379,19 +379,19 @@ async function byOrder(ctx: ParameterizedContext) {
   }
 
   if (takenAtFrom) {
-    wh.push(sql`takenAt >= '${new Date(takenAtFrom)}'`);
+    wh.push(sql`takenAt >= ${new Date(takenAtFrom)}`);
   }
 
   if (takenAtTo) {
-    wh.push(sql`takenAt <= '${new Date(takenAtTo)}'`);
+    wh.push(sql`takenAt <= ${new Date(takenAtTo)}`);
   }
 
   if (createdAtFrom) {
-    wh.push(sql`createdAt >= '${new Date(createdAtFrom)}'`);
+    wh.push(sql`createdAt >= ${new Date(createdAtFrom)}`);
   }
 
   if (createdAtTo) {
-    wh.push(sql`createdAt <= '${new Date(createdAtTo)}'`);
+    wh.push(sql`createdAt <= ${new Date(createdAtTo)}`);
   }
 
   if (pano !== undefined) {
