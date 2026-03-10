@@ -50,7 +50,7 @@ export function attachPostPictureHandler(router: RouterInstance) {
         },
         400: {},
         401: {},
-        413: {},
+        413: { description: 'image too large' },
       },
     },
   });
@@ -90,7 +90,7 @@ export function attachPostPictureHandler(router: RouterInstance) {
             Array.isArray(files.image) ||
             files.image.size > 40 * 1024 * 1024
           ) {
-            ctx.throw(413);
+            ctx.throw(413, 'image too large');
           }
 
           let body;

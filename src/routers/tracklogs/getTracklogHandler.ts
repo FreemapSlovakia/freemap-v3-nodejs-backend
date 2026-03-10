@@ -22,7 +22,13 @@ export function attachGetTracklogHandler(router: RouterInstance) {
         },
       ],
       responses: {
-        200: { content: { 'application/json': { schema: ResponseSchema } } },
+        200: {
+          content: {
+            'application/json': {
+              schema: ResponseSchema,
+            },
+          },
+        },
         400: {},
         404: { description: 'gpx file not found' },
       },

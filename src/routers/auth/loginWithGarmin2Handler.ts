@@ -21,13 +21,23 @@ export function attachLoginWithGarmin2Handler(router: RouterInstance) {
   registerPath('/auth/login-garmin-2', {
     post: {
       security: AUTH_OPTIONAL,
-      requestBody: { content: { 'application/json': { schema: BodySchema } } },
+      requestBody: {
+        content: {
+          'application/json': {
+            schema: BodySchema,
+          },
+        },
+      },
       responses: {
         200: {
-          content: { 'application/json': { schema: LoginResponseSchema } },
+          content: {
+            'application/json': {
+              schema: LoginResponseSchema,
+            },
+          },
         },
         400: {},
-        403: {},
+        403: { description: 'session not found' },
       },
     },
   });

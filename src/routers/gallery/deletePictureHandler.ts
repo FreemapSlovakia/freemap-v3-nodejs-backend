@@ -10,7 +10,12 @@ export function attachDeletePictureHandler(router: RouterInstance) {
   registerPath('/gallery/pictures/{id}', {
     delete: {
       parameters: [
-        { in: 'path', name: 'id', required: true, schema: { type: 'integer' } },
+        {
+          in: 'path',
+          name: 'id',
+          required: true,
+          schema: { type: 'integer' },
+        },
       ],
       responses: {
         204: {},

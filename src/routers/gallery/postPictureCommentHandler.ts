@@ -22,7 +22,12 @@ export function attachPostPictureCommentHandler(router: RouterInstance) {
   registerPath('/gallery/pictures/{id}/comments', {
     post: {
       parameters: [
-        { in: 'path', name: 'id', required: true, schema: { type: 'integer' } },
+        {
+          in: 'path',
+          name: 'id',
+          required: true,
+          schema: { type: 'integer' },
+        },
       ],
       requestBody: { content: { 'application/json': { schema: BodySchema } } },
       responses: {

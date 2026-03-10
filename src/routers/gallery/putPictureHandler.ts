@@ -22,9 +22,20 @@ export function attachPutPictureHandler(router: RouterInstance) {
   registerPath('/gallery/pictures/{id}', {
     put: {
       parameters: [
-        { in: 'path', name: 'id', required: true, schema: { type: 'integer' } },
+        {
+          in: 'path',
+          name: 'id',
+          required: true,
+          schema: { type: 'integer' },
+        },
       ],
-      requestBody: { content: { 'application/json': { schema: BodySchema } } },
+      requestBody: {
+        content: {
+          'application/json': {
+            schema: BodySchema,
+          },
+        },
+      },
       responses: {
         204: {},
         400: {},

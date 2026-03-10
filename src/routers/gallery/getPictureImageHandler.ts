@@ -19,7 +19,12 @@ export function attachGetPictureImageHandler(router: RouterInstance) {
     get: {
       security: AUTH_OPTIONAL,
       parameters: [
-        { in: 'path', name: 'id', required: true, schema: { type: 'integer' } },
+        {
+          in: 'path',
+          name: 'id',
+          required: true,
+          schema: { type: 'integer' },
+        },
       ],
       responses: {
         200: {

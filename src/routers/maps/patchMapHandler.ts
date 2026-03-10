@@ -26,11 +26,28 @@ export function attachPatchMapHandler(router: RouterInstance) {
   registerPath('/maps/{id}', {
     patch: {
       parameters: [
-        { in: 'path', name: 'id', required: true, schema: { type: 'string' } },
+        {
+          in: 'path',
+          name: 'id',
+          required: true,
+          schema: { type: 'string' },
+        },
       ],
-      requestBody: { content: { 'application/json': { schema: BodySchema } } },
+      requestBody: {
+        content: {
+          'application/json': {
+            schema: BodySchema,
+          },
+        },
+      },
       responses: {
-        200: { content: { 'application/json': { schema: MapMetaSchema } } },
+        200: {
+          content: {
+            'application/json': {
+              schema: MapMetaSchema,
+            },
+          },
+        },
         401: {},
         403: {},
         404: { description: 'no such map' },

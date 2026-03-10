@@ -20,7 +20,7 @@ const DbRowSchema = z.object({
 
 const ResponseSchema = z.strictObject({
   meta: MapMetaSchema,
-  data: z.unknown(),
+  data: z.record(z.string(), z.unknown()),
 });
 
 export function attachGetMapHandler(router: RouterInstance) {
@@ -28,10 +28,21 @@ export function attachGetMapHandler(router: RouterInstance) {
     get: {
       security: AUTH_OPTIONAL,
       parameters: [
-        { in: 'path', name: 'id', required: true, schema: { type: 'string' } },
+        {
+          in: 'path',
+          name: 'id',
+          required: true,
+          schema: { type: 'string' },
+        },
       ],
       responses: {
-        200: { content: { 'application/json': { schema: ResponseSchema } } },
+        200: {
+          content: {
+            'application/json': {
+              schema: ResponseSchema,
+            },
+          },
+        },
         403: {},
         404: { description: 'no such map' },
       },

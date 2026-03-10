@@ -17,9 +17,21 @@ const ResponseSchema = z.strictObject({ redirectUrl: z.string() });
 export function attachLoginWithGarminHandler(router: RouterInstance) {
   registerPath('/auth/login-garmin', {
     post: {
-      requestBody: { content: { 'application/json': { schema: BodySchema } } },
+      requestBody: {
+        content: {
+          'application/json': {
+            schema: BodySchema,
+          },
+        },
+      },
       responses: {
-        200: { content: { 'application/json': { schema: ResponseSchema } } },
+        200: {
+          content: {
+            'application/json': {
+              schema: ResponseSchema,
+            },
+          },
+        },
         400: {},
       },
     },

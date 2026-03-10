@@ -9,7 +9,12 @@ export function attachDeleteMapHandler(router: RouterInstance) {
   registerPath('/maps/{id}', {
     delete: {
       parameters: [
-        { in: 'path', name: 'id', required: true, schema: { type: 'string' } },
+        {
+          in: 'path',
+          name: 'id',
+          required: true,
+          schema: { type: 'string' },
+        },
       ],
       responses: {
         204: {},

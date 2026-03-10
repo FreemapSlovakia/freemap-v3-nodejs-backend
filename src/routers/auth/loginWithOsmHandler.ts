@@ -44,10 +44,20 @@ export function attachLoginWithOsmHandler(router: RouterInstance) {
     },
     post: {
       security: AUTH_OPTIONAL,
-      requestBody: { content: { 'application/json': { schema: BodySchema } } },
+      requestBody: {
+        content: {
+          'application/json': {
+            schema: BodySchema,
+          },
+        },
+      },
       responses: {
         200: {
-          content: { 'application/json': { schema: LoginResponseSchema } },
+          content: {
+            'application/json': {
+              schema: LoginResponseSchema,
+            },
+          },
         },
         400: {},
       },
