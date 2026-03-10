@@ -1,26 +1,46 @@
 import { RouterInstance } from '@koa/router';
-import { assert } from 'typia';
+import z from 'zod';
 import { authenticator } from '../../authenticator.js';
+import { AUTH_OPTIONAL, registerPath } from '../../openapi.js';
 import { acceptValidator } from '../../requestValidators.js';
+import { LoginResponseSchema } from '../../types.js';
 import { login } from './loginProcessor.js';
 
-type Body = {
-  accessToken: string;
-  language: string | null;
-  connect?: boolean;
-};
+const BodySchema = z.strictObject({
+  accessToken: z.string(),
+  language: z.string().nullable(),
+  connect: z.boolean().optional(),
+});
+
+const GoogleUserSchema = z.object({
+  sub: z.string(),
+  name: z.string().optional(),
+  email: z.string().optional(),
+});
 
 export function attachLoginWithGoogleHandler(router: RouterInstance) {
+  registerPath('/auth/login-google', {
+    post: {
+      security: AUTH_OPTIONAL,
+      requestBody: { content: { 'application/json': { schema: BodySchema } } },
+      responses: {
+        200: {
+          content: { 'application/json': { schema: LoginResponseSchema } },
+        },
+        400: {},
+      },
+    },
+  });
+
   router.post(
     '/login-google',
     authenticator(false),
     acceptValidator('application/json'),
-    // TODO validation
     async (ctx) => {
       let body;
 
       try {
-        body = assert<Body>(ctx.request.body);
+        body = BodySchema.parse(ctx.request.body);
       } catch (err) {
         ctx.log.warn({ body }, 'Invalid body.');
 
@@ -42,11 +62,9 @@ export function attachLoginWithGoogleHandler(router: RouterInstance) {
         throw new Error('Failed to fetch user info from Google');
       }
 
-      const { sub, name, email } = assert<{
-        sub: string;
-        name?: string;
-        email?: string;
-      }>(await userinfoRes.json());
+      const { sub, name, email } = GoogleUserSchema.parse(
+        await userinfoRes.json(),
+      );
 
       await login(
         ctx,

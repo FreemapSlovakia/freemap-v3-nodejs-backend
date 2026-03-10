@@ -9,9 +9,11 @@ import koaBody from 'koa-body';
 import koaPinoLogger from 'koa-pino-logger';
 import websockify from 'koa-websocket';
 import 'source-map-support/register.js';
+import { createDocument } from 'zod-openapi';
 import { initDatabase } from './database.js';
 import { getEnv, getEnvInteger } from './env.js';
 import { appLogger } from './logger.js';
+import { paths } from './openapi.js';
 import { authRouter } from './routers/auth/index.js';
 import { trackingRouter } from './routers/deviceTracking/index.js';
 import { attachDownloadMapHandler } from './routers/downloadMapHandler.js';
@@ -172,6 +174,42 @@ attachGetUsers(router);
 attachGeoIp(router);
 
 attachPostGarminCourses(router);
+
+router.get('/documentation', (ctx) => {
+  ctx.body = createDocument({
+    openapi: '3.1.1',
+    info: {
+      title: 'Freemap.sk API',
+      version: '0.1.0',
+    },
+    components: {
+      securitySchemes: {
+        bearerAuth: { type: 'http', scheme: 'bearer' },
+      },
+    },
+    paths,
+  });
+});
+
+router.get('/scalar', (ctx) => {
+  ctx.type = 'text/html';
+  ctx.body = `
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <title>API Reference</title>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+      </head>
+      <body>
+        <script
+          id="api-reference"
+          data-url="/documentation"
+          src="https://cdn.jsdelivr.net/npm/@scalar/api-reference"></script>
+      </body>
+    </html>
+  `;
+});
 
 app.use(router.routes()).use(router.allowedMethods());
 

@@ -1,50 +1,40 @@
 import { RouterInstance } from '@koa/router';
-import { assert } from 'typia';
+import z from 'zod';
+import { registerPath } from '../openapi.js';
 
-const levelsAsConst = [
-  'trace',
-  'debug',
-  'info',
-  'warn',
-  'error',
-  'fatal',
-] as const;
+const BodySchema = z.strictObject({
+  level: z.enum(['trace', 'debug', 'info', 'warn', 'error', 'fatal']),
+  message: z.string(),
+  details: z.record(z.string(), z.unknown()).optional(),
+});
 
-const levels: string[] = levelsAsConst.map((level) => level);
-
-type LogLevelString = (typeof levelsAsConst)[number];
-
-export type Body = {
-  level: LogLevelString;
-  message: string;
-  details?: Record<string, unknown>;
-};
+const ResponseSchema = z.strictObject({ id: z.string() });
 
 export function attachLoggerHandler(router: RouterInstance) {
+  registerPath('/logger', {
+    post: {
+      requestBody: {
+        content: { 'application/json': { schema: BodySchema } },
+      },
+      responses: {
+        200: { content: { 'application/json': { schema: ResponseSchema } } },
+      },
+    },
+  });
+
   router.post('/logger', async (ctx) => {
     let body;
 
     try {
-      body = assert<Body>(ctx.request.body);
+      body = BodySchema.parse(ctx.request.body);
     } catch (err) {
       return ctx.throw(400, err as Error);
     }
 
     const { level, message, details = {} } = body;
 
-    ctx.log[validateLevel(level)](
-      Object.assign({ subModule: 'client' }, details),
-      message,
-    );
+    ctx.log[level](Object.assign({ subModule: 'client' }, details), message);
 
-    ctx.body = { id: ctx.reqId };
+    ctx.body = ResponseSchema.parse({ id: ctx.reqId });
   });
-}
-
-function validateLevel(level: string): LogLevelString {
-  if (levels.includes(level)) {
-    return level as LogLevelString;
-  }
-
-  throw new Error('invalid loglevel');
 }

@@ -2,20 +2,50 @@ import { RouterInstance } from '@koa/router';
 
 import { SqlError } from 'mariadb';
 import sql from 'sql-template-tag';
-import { assert, tags } from 'typia';
+import z from 'zod';
 import { authenticator } from '../../authenticator.js';
 import { runInTransaction } from '../../database.js';
+import { AUTH_REQUIRED, registerPath } from '../../openapi.js';
 import { nanoid } from '../../randomId.js';
 import { acceptValidator } from '../../requestValidators.js';
+import { DeviceBodySchema } from '../../types.js';
 
-export type Body = {
-  name: string & tags.MinLength<1> & tags.MaxLength<255>;
-  maxCount?: (number & tags.Type<'uint32'>) | null;
-  maxAge?: (number & tags.Type<'uint32'>) | null;
-  token?: string;
-};
+const ResponseBodySchema = z.strictObject({ token: z.string() });
 
 export function attachPutDeviceHandler(router: RouterInstance) {
+  registerPath('/tracking/devices/{id}', {
+    put: {
+      security: AUTH_REQUIRED,
+      parameters: [
+        {
+          in: 'path',
+          name: 'id',
+          required: true,
+          schema: { type: 'integer' },
+        },
+      ],
+      requestBody: {
+        content: {
+          'application/json': {
+            schema: DeviceBodySchema,
+          },
+        },
+      },
+      responses: {
+        200: {
+          content: {
+            'application/json': {
+              schema: ResponseBodySchema,
+            },
+          },
+        },
+        403: {},
+        404: { description: 'no such tracking device' },
+        409: {},
+      },
+    },
+  });
+
   router.put(
     '/devices/:id',
     acceptValidator('application/json'),
@@ -24,14 +54,14 @@ export function attachPutDeviceHandler(router: RouterInstance) {
       let body;
 
       try {
-        body = assert<Body>(ctx.request.body);
+        body = DeviceBodySchema.parse(ctx.request.body);
       } catch (err) {
         return ctx.throw(400, err as Error);
       }
 
       const { id } = ctx.params;
 
-      const { name, maxCount, maxAge, token = '' } = body;
+      const { name, maxCount, maxAge, token = nanoid() } = body;
 
       await runInTransaction(async (conn) => {
         const [item] = await conn.query(
@@ -46,11 +76,9 @@ export function attachPutDeviceHandler(router: RouterInstance) {
           ctx.throw(403);
         }
 
-        const okToken = token || nanoid();
-
         try {
           await conn.query(
-            sql`UPDATE trackingDevice SET name = ${name}, maxCount = ${maxCount}, maxAge = ${maxAge}, token = ${okToken} WHERE id = ${id}`,
+            sql`UPDATE trackingDevice SET name = ${name}, maxCount = ${maxCount}, maxAge = ${maxAge}, token = ${token} WHERE id = ${id}`,
           );
         } catch (err) {
           if (err instanceof SqlError && err.errno === 1062) {

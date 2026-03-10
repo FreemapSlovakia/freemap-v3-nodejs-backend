@@ -1,26 +1,34 @@
 import { createHmac } from 'node:crypto';
 import { RouterInstance } from '@koa/router';
 import sql from 'sql-template-tag';
-import { assert } from 'typia';
+import z from 'zod';
 import { runInTransaction } from '../../database.js';
 import { getEnv } from './../../env.js';
+import { registerPath } from '../../openapi.js';
 
-type Body = {
-  token: string;
-  email: string;
-  signature: string;
-  amount_paid?: number | string; // if paid by chrones then string is sent
-  currency?: string;
-};
+const BodySchema = z.strictObject({
+  token: z.string(),
+  email: z.string(),
+  signature: z.string(),
+  amount_paid: z.union([z.number(), z.string()]).optional(),
+  currency: z.string().optional(),
+});
 
 export function attachPurchaseValidateHandler(router: RouterInstance) {
+  registerPath('/auth/purchaseValidate', {
+    post: {
+      requestBody: { content: { 'application/json': { schema: BodySchema } } },
+      responses: { 204: {}, 400: {}, 403: {} },
+    },
+  });
+
   router.post('/purchaseValidate', async (ctx) => {
     console.log(ctx.request.body);
 
     let body;
 
     try {
-      body = assert<Body>(ctx.request.body);
+      body = BodySchema.parse(ctx.request.body);
     } catch (err) {
       return ctx.throw(400, err as Error);
     }

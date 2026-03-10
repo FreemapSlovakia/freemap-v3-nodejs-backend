@@ -1,30 +1,49 @@
 import { RouterInstance } from '@koa/router';
 import sql from 'sql-template-tag';
-import { assert, tags } from 'typia';
+import z from 'zod';
 import { authenticator } from '../../authenticator.js';
 import { runInTransaction } from '../../database.js';
 import { getEnv, getEnvBoolean } from '../../env.js';
 import { appLogger } from '../../logger.js';
 import { sendMail } from '../../mailer.js';
+import { registerPath } from '../../openapi.js';
 import { acceptValidator } from '../../requestValidators.js';
 
 const webBaseUrls = getEnv('WEB_BASE_URL').split(',').filter(Boolean);
 
+const BodySchema = z.strictObject({
+  webBaseUrl: z.url().optional(),
+  comment: z.string().min(1).max(4096),
+});
+
+const ResponseSchema = z.strictObject({ id: z.uint32() });
+
 export function attachPostPictureCommentHandler(router: RouterInstance) {
+  registerPath('/gallery/pictures/{id}/comments', {
+    post: {
+      parameters: [
+        { in: 'path', name: 'id', required: true, schema: { type: 'integer' } },
+      ],
+      requestBody: { content: { 'application/json': { schema: BodySchema } } },
+      responses: {
+        200: { content: { 'application/json': { schema: ResponseSchema } } },
+        401: {},
+        402: {},
+        403: {},
+        404: { description: 'no such picture' },
+      },
+    },
+  });
+
   router.post(
     '/pictures/:id/comments',
     authenticator(true),
     acceptValidator('application/json'),
     async (ctx) => {
-      type Body = {
-        webBaseUrl?: string & tags.Format<'uri'>;
-        comment: string & tags.MinLength<1> & tags.MaxLength<4096>;
-      };
-
       let body;
 
       try {
-        body = assert<Body>(ctx.request.body);
+        body = BodySchema.parse(ctx.request.body);
       } catch (err) {
         return ctx.throw(400, err as Error);
       }
@@ -54,7 +73,7 @@ export function attachPostPictureCommentHandler(router: RouterInstance) {
           );
 
           if (!row) {
-            ctx.throw(404);
+            ctx.throw(404, 'no such picture');
           }
 
           if (
@@ -197,7 +216,7 @@ export function attachPostPictureCommentHandler(router: RouterInstance) {
 
       await Promise.all(promises);
 
-      ctx.body = { id: insertId };
+      ctx.body = ResponseSchema.parse({ id: insertId });
     },
   );
 }

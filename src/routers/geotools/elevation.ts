@@ -5,8 +5,9 @@ import { pipeline } from 'node:stream/promises';
 import { RouterInstance } from '@koa/router';
 import gdal from 'gdal-async';
 import { ParameterizedContext } from 'koa';
-import { assert } from 'typia';
+import z from 'zod';
 import { getEnv } from '../../env.js';
+import { registerPath } from '../../openapi.js';
 import { acceptValidator } from '../../requestValidators.js';
 
 const elevationDataDir = getEnv('ELEVATION_DATA_DIRECTORY');
@@ -21,7 +22,32 @@ type DatasetInfo = {
   height: number;
 };
 
+const CoordsBodySchema = z.array(z.array(z.number()).length(2));
+
+const ElevationResponseSchema = z.array(z.number().nullable());
+
 export function attachElevationHandler(router: RouterInstance) {
+  registerPath('/geotools/elevation', {
+    get: {
+      responses: {
+        200: {
+          content: { 'application/json': { schema: ElevationResponseSchema } },
+        },
+      },
+    },
+    post: {
+      requestBody: {
+        content: { 'application/json': { schema: CoordsBodySchema } },
+      },
+      responses: {
+        200: {
+          content: { 'application/json': { schema: ElevationResponseSchema } },
+        },
+        400: {},
+      },
+    },
+  });
+
   router.get('/elevation', compute);
 
   router.post('/elevation', acceptValidator('application/json'), compute);
@@ -44,7 +70,7 @@ async function compute(ctx: ParameterizedContext) {
       ?.map((pair) => pair.split(',').map((c) => Number.parseFloat(c)));
   } else if (ctx.method === 'POST' && Array.isArray(ctx.request.body)) {
     try {
-      cs = assert<number[][]>(ctx.request.body);
+      cs = CoordsBodySchema.parse(ctx.request.body);
     } catch (err) {
       return ctx.throw(400, err as Error);
     }
@@ -137,8 +163,8 @@ async function compute(ctx: ParameterizedContext) {
       return ds ? ([item[0], item[1], ds] as Tuple) : null;
     });
 
-    ctx.response.body = await Promise.all(
-      params.map((t) => t && computeElevation(t)),
+    ctx.response.body = ElevationResponseSchema.parse(
+      await Promise.all(params.map((t) => t && computeElevation(t))),
     );
   } finally {
     for (const { dataset } of dsMap.values()) {

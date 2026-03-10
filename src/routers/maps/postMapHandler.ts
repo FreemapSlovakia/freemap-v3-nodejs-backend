@@ -1,28 +1,40 @@
 import { RouterInstance } from '@koa/router';
 import sql, { bulk } from 'sql-template-tag';
-import { assert, tags } from 'typia';
+import z from 'zod';
 import { authenticator } from '../../authenticator.js';
 import { pool } from '../../database.js';
+import { registerPath } from '../../openapi.js';
 import { nanoid } from '../../randomId.js';
 import { acceptValidator } from '../../requestValidators.js';
+import { MapMetaSchema } from '../../types.js';
+
+const BodySchema = z.strictObject({
+  name: z.string().min(1).max(255),
+  data: z.record(z.string(), z.unknown()).optional(),
+  public: z.boolean().optional(),
+  writers: z.array(z.uint32()).optional(),
+});
 
 export function attachPostMapHandler(router: RouterInstance) {
+  registerPath('/maps', {
+    post: {
+      requestBody: { content: { 'application/json': { schema: BodySchema } } },
+      responses: {
+        200: { content: { 'application/json': { schema: MapMetaSchema } } },
+        401: {},
+      },
+    },
+  });
+
   router.post(
     '/',
     acceptValidator('application/json'),
     authenticator(true),
     async (ctx) => {
-      type Body = {
-        name: string & tags.MinLength<1> & tags.MaxLength<255>;
-        data?: Record<string, unknown>;
-        public?: boolean;
-        writers?: (number & tags.Type<'uint32'>)[];
-      };
-
       let body;
 
       try {
-        body = assert<Body>(ctx.request.body);
+        body = BodySchema.parse(ctx.request.body);
       } catch (err) {
         return ctx.throw(400, err as Error);
       }
@@ -52,7 +64,7 @@ export function attachPostMapHandler(router: RouterInstance) {
         );
       }
 
-      ctx.body = {
+      ctx.body = MapMetaSchema.parse({
         id,
         createdAt: now.toISOString(),
         modifiedAt: now.toISOString(),
@@ -61,7 +73,7 @@ export function attachPostMapHandler(router: RouterInstance) {
         name,
         userId,
         canWrite: true,
-      };
+      });
     },
   );
 }

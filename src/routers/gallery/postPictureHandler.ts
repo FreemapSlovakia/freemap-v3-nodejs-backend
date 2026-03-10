@@ -4,31 +4,67 @@ import { execFile } from 'child_process';
 import ExifReader from 'exifreader';
 import shortUuid from 'short-uuid';
 import sql, { bulk } from 'sql-template-tag';
-import { assert, tags } from 'typia';
+import z from 'zod';
 import { authenticator } from '../../authenticator.js';
 import { contentTypeMiddleware } from '../../contentTypeMiddleware.js';
 import { pool, runInTransaction } from '../../database.js';
+import { registerPath } from '../../openapi.js';
 import { acceptValidator } from '../../requestValidators.js';
 import { picturesDir } from '../../routers/gallery/constants.js';
 
 const execFileAsync = promisify(execFile);
 
+const SetAllPremiumBodySchema = z.strictObject({
+  type: z.literal('setAllPremiumOrFree').optional(),
+  payload: z.enum(['premium', 'free']).optional(),
+});
+
+const MetaSchema = z.strictObject({
+  position: z.strictObject({
+    lat: z.number().min(-90).max(90),
+    lon: z.number().min(-180).max(180),
+  }),
+  title: z.string().nullable().optional(),
+  description: z.string().nullable().optional(),
+  takenAt: z.iso.datetime().nullable().optional(),
+  tags: z.array(z.string()).nullable().optional(),
+  premium: z.boolean().optional(),
+  azimuth: z.number().min(0).lt(360).nullable().optional(),
+});
+
+const MultipartBodySchema = z.object({ meta: z.unknown() });
+
+const ResponseSchema = z.strictObject({ id: z.uint32() });
+
 export function attachPostPictureHandler(router: RouterInstance) {
+  registerPath('/gallery/pictures', {
+    post: {
+      responses: {
+        204: {},
+        201: {
+          content: {
+            'application/json': {
+              schema: ResponseSchema,
+            },
+          },
+        },
+        400: {},
+        401: {},
+        413: {},
+      },
+    },
+  });
+
   router.post(
     '/pictures',
     authenticator(true),
     contentTypeMiddleware({
       'application/json': [
         async (ctx) => {
-          type Body = {
-            type?: 'setAllPremiumOrFree';
-            payload?: 'premium' | 'free';
-          };
-
           let body;
 
           try {
-            body = assert<Body>(ctx.request.body);
+            body = SetAllPremiumBodySchema.parse(ctx.request.body);
           } catch (err) {
             return ctx.throw(400, err as Error);
           }
@@ -60,40 +96,27 @@ export function attachPostPictureHandler(router: RouterInstance) {
           let body;
 
           try {
-            body = assert<{ meta: string }>(ctx.request.body);
+            body = MultipartBodySchema.parse(ctx.request.body);
           } catch (err) {
             return ctx.throw(400, err as Error);
           }
 
           if (typeof body.meta === 'string') {
-            body.meta = JSON.parse(body.meta);
+            (ctx.request.body as Record<string, unknown>).meta = JSON.parse(
+              body.meta,
+            );
           }
 
           await next();
         },
         acceptValidator('application/json'),
         async (ctx) => {
-          type Body = {
-            meta: {
-              position: {
-                lat: number & tags.Minimum<-90> & tags.Maximum<90>;
-                lon: number & tags.Minimum<-180> & tags.Maximum<180>;
-              };
-              title?: string | null;
-              description?: string | null;
-              takenAt?: (string & tags.Format<'date-time'>) | null;
-              tags?: string[] | null;
-              premium?: boolean;
-              azimuth?:
-                | (number & tags.Minimum<0> & tags.ExclusiveMaximum<360>)
-                | null;
-            };
-          };
-
-          let body;
+          let meta;
 
           try {
-            body = assert<Body>(ctx.request.body);
+            meta = MetaSchema.parse(
+              (ctx.request.body as Record<string, unknown>).meta,
+            );
           } catch (err) {
             return ctx.throw(400, err as Error);
           }
@@ -113,7 +136,7 @@ export function attachPostPictureHandler(router: RouterInstance) {
             azimuth,
             tags = [],
             premium,
-          } = body.meta;
+          } = meta;
 
           const name = shortUuid.generate();
 
@@ -154,7 +177,8 @@ export function attachPostPictureHandler(router: RouterInstance) {
             return insertId;
           });
 
-          ctx.body = { id };
+          ctx.status = 201;
+          ctx.body = ResponseSchema.parse({ id });
         },
       ],
     }),

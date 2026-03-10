@@ -1,11 +1,57 @@
 import { RouterInstance } from '@koa/router';
 import sql, { empty } from 'sql-template-tag';
-import { assert } from 'typia';
+import z from 'zod';
 import { authenticator } from '../../authenticator.js';
 import { pool } from '../../database.js';
+import { AUTH_OPTIONAL, registerPath } from '../../openapi.js';
 import { acceptValidator } from '../../requestValidators.js';
 
+const UsersPerCountrySchema = z.array(
+  z.object({
+    country: z.string(),
+    userId: z.uint32(),
+    userName: z.string(),
+    pictureCount: z.uint32(),
+  }),
+);
+
+const PerUserSchema = z.array(
+  z.object({
+    pictureCount: z.uint32(),
+    userId: z.uint32(),
+    userName: z.string(),
+  }),
+);
+
+const MePerCountrySchema = z.array(
+  z.object({
+    country: z.string(),
+    pictureCount: z.uint32(),
+    userRank: z.number(),
+  }),
+);
+
+const MeSchema = z
+  .array(
+    z.object({
+      pictureCount: z.uint32(),
+      userRank: z.number(),
+    }),
+  )
+  .max(1);
+
 export async function attachGetStatsHandler(router: RouterInstance) {
+  registerPath('/gallery/stats', {
+    get: {
+      security: AUTH_OPTIONAL,
+      responses: {
+        200: {
+          content: { 'application/json': {} },
+        },
+      },
+    },
+  });
+
   router.get(
     '/stats',
     authenticator(false),
@@ -19,14 +65,7 @@ export async function attachGetStatsHandler(router: RouterInstance) {
 
       console.log(days);
 
-      const usersPerCountry = assert<
-        {
-          country: string;
-          userId: number;
-          userName: string;
-          pictureCount: number;
-        }[]
-      >(
+      const usersPerCountry = UsersPerCountrySchema.parse(
         await pool.query(sql`
           WITH
             per_country_user AS (
@@ -72,13 +111,7 @@ export async function attachGetStatsHandler(router: RouterInstance) {
         `),
       );
 
-      const perUser = assert<
-        {
-          pictureCount: number;
-          userId: number;
-          userName: string;
-        }[]
-      >(
+      const perUser = PerUserSchema.parse(
         await pool.query(sql`
           SELECT
             COUNT(*) AS pictureCount,
@@ -106,7 +139,7 @@ export async function attachGetStatsHandler(router: RouterInstance) {
       let mePerCountry: MeForCountry[] | undefined;
 
       if (user) {
-        mePerCountry = assert<MeForCountry[]>(
+        mePerCountry = MePerCountrySchema.parse(
           await pool.query(sql`
             WITH
               per_country_user AS (
@@ -139,9 +172,7 @@ export async function attachGetStatsHandler(router: RouterInstance) {
           `),
         );
 
-        const [meme] = assert<
-          [] | [{ pictureCount: number; userRank: number }]
-        >(
+        const [meme] = MeSchema.parse(
           await pool.query(sql`
             WITH per_user AS (
               SELECT

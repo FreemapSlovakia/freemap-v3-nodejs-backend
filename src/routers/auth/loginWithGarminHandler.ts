@@ -1,21 +1,33 @@
 import { RouterInstance } from '@koa/router';
-import { assert } from 'typia';
+import z from 'zod';
 import { garminOauth } from '../../garminOauth.js';
+import { registerPath } from '../../openapi.js';
 import { acceptValidator } from '../../requestValidators.js';
 import { tokenSecrets } from './garminTokenSecrets.js';
 
-type Body = {
-  connect: unknown;
-  clientData: unknown;
-  callbackUrl: string;
-  extraQuery?: Record<string, unknown>;
-};
+const BodySchema = z.strictObject({
+  connect: z.unknown(),
+  clientData: z.unknown(),
+  callbackUrl: z.string(),
+  extraQuery: z.record(z.string(), z.unknown()).optional(),
+});
+
+const ResponseSchema = z.strictObject({ redirectUrl: z.string() });
 
 export function attachLoginWithGarminHandler(router: RouterInstance) {
+  registerPath('/auth/login-garmin', {
+    post: {
+      requestBody: { content: { 'application/json': { schema: BodySchema } } },
+      responses: {
+        200: { content: { 'application/json': { schema: ResponseSchema } } },
+        400: {},
+      },
+    },
+  });
+
   router.post(
     '/login-garmin',
     acceptValidator('application/json'),
-    // TODO validation
     async (ctx) => {
       const url =
         'https://connectapi.garmin.com/oauth-service/oauth/request_token';
@@ -53,7 +65,7 @@ export function attachLoginWithGarminHandler(router: RouterInstance) {
       let body;
 
       try {
-        body = assert<Body>(ctx.request.body);
+        body = BodySchema.parse(ctx.request.body);
       } catch (err) {
         return ctx.throw(400, err as Error);
       }
@@ -73,13 +85,13 @@ export function attachLoginWithGarminHandler(router: RouterInstance) {
         callback.searchParams.set(key, String(value));
       }
 
-      ctx.body = {
+      ctx.body = ResponseSchema.parse({
         redirectUrl:
           'https://connect.garmin.com/oauthConfirm?oauth_callback=' +
           encodeURIComponent(callback.toString()) +
           '&oauth_token=' +
           encodeURIComponent(token),
-      };
+      });
     },
   );
 }

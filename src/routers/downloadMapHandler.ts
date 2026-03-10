@@ -9,13 +9,14 @@ import Database from 'better-sqlite3';
 import type { Feature, MultiPolygon, Polygon } from 'geojson';
 import { Logger } from 'pino';
 import sql from 'sql-template-tag';
-import { assert, tags } from 'typia';
+import z from 'zod';
 import { authenticator } from '../authenticator.js';
 import { runInTransaction } from '../database.js';
 import { DownloadableMap, downloadableMaps } from '../downloadableMaps.js';
 import { getEnv } from '../env.js';
 import { appLogger } from '../logger.js';
 import { sendMail } from '../mailer.js';
+import { registerPath } from '../openapi.js';
 
 const CONCURRENCY = 8;
 
@@ -123,40 +124,53 @@ const translations: Record<string, Translation> = {
   },
 };
 
-type Position = [
-  number & tags.Minimum<-180> & tags.Maximum<180>,
-  number & tags.Minimum<-90> & tags.Maximum<90>,
-];
-type LinearRing = Position[];
-type PolygonCoords = LinearRing[];
+const PositionSchema = z.tuple([
+  z.number().min(-180).max(180),
+  z.number().min(-90).max(90),
+]);
+const LinearRingSchema = z.array(PositionSchema);
+const PolygonCoordsSchema = z.array(LinearRingSchema);
 
-type GeoJSONGeometry =
-  | { type: 'Polygon'; coordinates: PolygonCoords }
-  | { type: 'MultiPolygon'; coordinates: PolygonCoords[] };
+const GeoJSONGeometrySchema = z.union([
+  z.strictObject({
+    type: z.literal('Polygon'),
+    coordinates: PolygonCoordsSchema,
+  }),
+  z.strictObject({
+    type: z.literal('MultiPolygon'),
+    coordinates: z.array(PolygonCoordsSchema),
+  }),
+]);
 
-type GeoJSONFeature = {
-  type: 'Feature';
-  geometry: GeoJSONGeometry;
-  properties: Record<string, unknown>;
-};
+const GeoJSONFeatureSchema = z.strictObject({
+  type: z.literal('Feature'),
+  geometry: GeoJSONGeometrySchema,
+  properties: z.record(z.string(), z.unknown()),
+});
+
+const DownloadBodySchema = z.strictObject({
+  map: z.string(),
+  format: z.enum(['mbtiles', 'sqlitedb']),
+  minZoom: z.number().int().min(0),
+  maxZoom: z.number().int().min(0).max(20),
+  boundary: GeoJSONFeatureSchema,
+  name: z.string(),
+  email: z.string().email(),
+  scale: z.number().int().min(1).max(3).optional(),
+});
 
 export function attachDownloadMapHandler(router: RouterInstance) {
-  router.post('/downloadMap', authenticator(true), async (ctx) => {
-    type Body = {
-      map: string;
-      format: 'mbtiles' | 'sqlitedb';
-      minZoom: number & tags.Minimum<0>;
-      maxZoom: number & tags.Minimum<0> & tags.Maximum<20>;
-      boundary: GeoJSONFeature;
-      name: string;
-      email: string & tags.Format<'email'>;
-      scale?: number & tags.Minimum<1> & tags.Maximum<3>;
-    };
+  registerPath('/downloadMap', {
+    post: {
+      responses: { 204: {}, 400: {}, 401: {}, 409: {} },
+    },
+  });
 
+  router.post('/downloadMap', authenticator(true), async (ctx) => {
     let body;
 
     try {
-      body = assert<Body>(ctx.request.body);
+      body = DownloadBodySchema.parse(ctx.request.body);
     } catch (err) {
       return ctx.throw(400, err as Error);
     }

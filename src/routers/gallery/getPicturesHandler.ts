@@ -6,13 +6,13 @@ import { RouterInstance } from '@koa/router';
 import { ParameterizedContext } from 'koa';
 import protobuf from 'protobufjs';
 import sql, { empty, join, raw, Sql } from 'sql-template-tag';
-import { assert, assertGuard, http, tags } from 'typia';
+import z from 'zod';
 import { authenticator } from '../../authenticator.js';
 import { pool } from '../../database.js';
 import { getEnv } from '../../env.js';
+import { registerPath } from '../../openapi.js';
 import { acceptValidator } from '../../requestValidators.js';
 import { ratingSubquery } from './ratingConstants.js';
-import { PictureRow } from './types.js';
 
 const secret = getEnv('PREMIUM_PHOTO_SECRET', '');
 const gzipAsync = promisify(gzip);
@@ -22,48 +22,79 @@ const picturesResponseType = protobuf
   .parse(readFileSync(new URL('./pictures.proto', import.meta.url), 'utf8'))
   .root.lookupType('PicturesResponse');
 
-type CommonQuery = {
-  userId?: number & tags.Type<'uint32'> & tags.Minimum<1>;
-  ratingFrom?: number & tags.Minimum<0> & tags.Maximum<5>;
-  ratingTo?: number & tags.Minimum<0> & tags.Maximum<5>;
-  takenAtFrom?: string & tags.Format<'date-time'>;
-  takenAtTo?: string & tags.Format<'date-time'>;
-  createdAtFrom?: string & tags.Format<'date-time'>;
-  createdAtTo?: string & tags.Format<'date-time'>;
-  tag?: string;
-  pano?: boolean;
-  premium?: boolean;
-};
+const booleanParam = z
+  .enum(['true', 'false'])
+  .transform((v) => v === 'true')
+  .optional();
 
-type RadiusQuery = CommonQuery & {
-  lat: number & tags.Minimum<-90> & tags.Maximum<90>;
-  lon: number & tags.Minimum<-180> & tags.Maximum<180>;
-  distance: number & tags.Minimum<0>;
-};
+const CommonQuerySchema = z.object({
+  userId: z.coerce.number().int().positive().optional(),
+  ratingFrom: z.coerce.number().min(0).max(5).optional(),
+  ratingTo: z.coerce.number().min(0).max(5).optional(),
+  takenAtFrom: z.iso.datetime().optional(),
+  takenAtTo: z.iso.datetime().optional(),
+  createdAtFrom: z.iso.datetime().optional(),
+  createdAtTo: z.iso.datetime().optional(),
+  tag: z.string().optional(),
+  pano: booleanParam,
+  premium: booleanParam,
+});
 
-type BBoxQuery = CommonQuery & {
-  bbox: `${number & tags.Minimum<-180> & tags.Maximum<180>},${number & tags.Minimum<-90> & tags.Maximum<90>},${number & tags.Minimum<-180> & tags.Maximum<180>},${number & tags.Minimum<-90> & tags.Maximum<90>}`;
-  fields?: Array<
-    | 'id'
-    | 'title'
-    | 'description'
-    | 'takenAt'
-    | 'createdAt'
-    | 'rating'
-    | 'userId'
-    | 'user'
-    | 'tags'
-    | 'pano'
-    | 'premium'
-    | 'azimuth'
-    | 'hmac'
-  >;
-};
+const RadiusQuerySchema = CommonQuerySchema.extend({
+  lat: z.coerce.number().min(-90).max(90),
+  lon: z.coerce.number().min(-180).max(180),
+  distance: z.coerce.number().min(0),
+});
 
-type OrderByQuery = CommonQuery & {
-  orderBy: 'createdAt' | 'takenAt' | 'rating' | 'lastCommentedAt';
-  direction: 'desc' | 'asc';
-};
+const fieldValues = [
+  'id',
+  'title',
+  'description',
+  'takenAt',
+  'createdAt',
+  'rating',
+  'userId',
+  'user',
+  'tags',
+  'pano',
+  'premium',
+  'azimuth',
+  'hmac',
+] as const;
+
+const BBoxQuerySchema = CommonQuerySchema.extend({
+  bbox: z.string(),
+  fields: z.preprocess(
+    (v) => (Array.isArray(v) ? v : v ? [v] : undefined),
+    z.array(z.enum(fieldValues)).optional(),
+  ),
+});
+
+const OrderByQuerySchema = CommonQuerySchema.extend({
+  orderBy: z.enum(['createdAt', 'takenAt', 'rating', 'lastCommentedAt']),
+  direction: z.enum(['desc', 'asc']),
+});
+
+const IdRowSchema = z.array(z.object({ id: z.number() }));
+
+const BboxRowSchema = z.array(
+  z.object({
+    lat: z.number(),
+    lon: z.number(),
+    id: z.uint32().optional(),
+    title: z.string().nullable().optional(),
+    description: z.string().nullable().optional(),
+    takenAt: z.date().nullable().optional(),
+    createdAt: z.date().nullable().optional(),
+    userId: z.uint32().nullable().optional(),
+    pano: z.union([z.boolean(), z.number()]).nullable().optional(),
+    premium: z.union([z.boolean(), z.number()]).nullable().optional(),
+    azimuth: z.number().nullable().optional(),
+    rating: z.number().nullable().optional(),
+    tags: z.string().nullable().optional(),
+    user: z.string().nullable().optional(),
+  }),
+);
 
 const methods: {
   [name: string]: (ctx: ParameterizedContext) => Promise<void>;
@@ -74,6 +105,19 @@ const methods: {
 };
 
 export function attachGetPicturesHandler(router: RouterInstance) {
+  registerPath('/gallery/pictures', {
+    get: {
+      responses: {
+        200: {
+          content: {
+            'application/json': {},
+            'application/x-protobuf': {},
+          },
+        },
+      },
+    },
+  });
+
   router.get(
     '/pictures',
     acceptValidator('application/json', 'application/x-protobuf'),
@@ -103,7 +147,7 @@ async function byRadius(ctx: ParameterizedContext) {
   let radiusQuery;
 
   try {
-    radiusQuery = http.assertQuery<RadiusQuery>('?' + ctx.querystring);
+    radiusQuery = RadiusQuerySchema.parse(ctx.query);
   } catch (err) {
     ctx.throw(400, err as Error);
   }
@@ -162,7 +206,7 @@ async function byRadius(ctx: ParameterizedContext) {
     ORDER BY distance
     LIMIT 1000`;
 
-  const rows = assert<{ id: number }[]>(await pool.query(query));
+  const rows = IdRowSchema.parse(await pool.query(query));
 
   ctx.body = rows.map((row) => ({ id: row.id }));
 }
@@ -171,7 +215,7 @@ async function byBbox(ctx: ParameterizedContext) {
   let bboxQuery;
 
   try {
-    bboxQuery = http.assertQuery<BBoxQuery>('?' + ctx.querystring);
+    bboxQuery = BBoxQuerySchema.parse(ctx.query);
   } catch (err) {
     ctx.throw(400, err as Error);
   }
@@ -253,21 +297,11 @@ async function byBbox(ctx: ParameterizedContext) {
     ORDER BY lat, lon
   `;
 
-  const rows = await pool.query(query);
+  const rows = BboxRowSchema.parse(await pool.query(query));
 
   const getRating = fields?.includes('rating');
 
   const getHmac = fields?.includes('hmac');
-
-  assertGuard<
-    (Pick<PictureRow, 'lat' | 'lon'> &
-      Partial<
-        Omit<PictureRow, 'lat' | 'lon'> & {
-          rating: number | null;
-          tags: string | null;
-        }
-      >)[]
-  >(rows);
 
   const pictures = rows.map((row) =>
     Object.assign({}, row, {
@@ -340,7 +374,7 @@ async function byOrder(ctx: ParameterizedContext) {
   let orderByQuery;
 
   try {
-    orderByQuery = http.assertQuery<OrderByQuery>('?' + ctx.querystring);
+    orderByQuery = OrderByQuerySchema.parse(ctx.query);
   } catch (err) {
     ctx.throw(400, err as Error);
   }
@@ -431,7 +465,7 @@ async function byOrder(ctx: ParameterizedContext) {
     LIMIT 1000
   `;
 
-  const rows = assert<{ id: number }[]>(await pool.query(query));
+  const rows = IdRowSchema.parse(await pool.query(query));
 
   ctx.body = rows.map((row) => ({ id: row.id }));
 }

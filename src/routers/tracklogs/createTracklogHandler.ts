@@ -1,19 +1,34 @@
 import { writeFile } from 'node:fs/promises';
 import { RouterInstance } from '@koa/router';
 import shortUuid from 'short-uuid';
-import { assert, tags } from 'typia';
+import z from 'zod';
+import { registerPath } from '../../openapi.js';
 import { tracklogsDir } from '../../routers/tracklogs/constants.js';
 
-export function attachCreateTracklogHandler(router: RouterInstance) {
-  router.post('/', async (ctx) => {
-    type Body = {
-      data: string & tags.MinLength<10>;
-    };
+const BodySchema = z.strictObject({ data: z.string().min(10) });
 
+const ResponseSchema = z.strictObject({ uid: z.string() });
+
+export function attachCreateTracklogHandler(router: RouterInstance) {
+  registerPath('/tracklogs', {
+    post: {
+      requestBody: {
+        content: { 'application/json': { schema: BodySchema } },
+      },
+      responses: {
+        201: {
+          content: { 'application/json': { schema: ResponseSchema } },
+        },
+        400: {},
+      },
+    },
+  });
+
+  router.post('/', async (ctx) => {
     let body;
 
     try {
-      body = assert<Body>(ctx.request.body);
+      body = BodySchema.parse(ctx.request.body);
     } catch (err) {
       return ctx.throw(400, err as Error);
     }

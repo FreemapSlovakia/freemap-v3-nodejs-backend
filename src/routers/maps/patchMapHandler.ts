@@ -1,28 +1,53 @@
 import { RouterInstance } from '@koa/router';
-
 import sql, { bulk, empty } from 'sql-template-tag';
-import { assert, tags } from 'typia';
+import z from 'zod';
 import { authenticator } from '../../authenticator.js';
 import { runInTransaction } from '../../database.js';
+import { registerPath } from '../../openapi.js';
 import { acceptValidator } from '../../requestValidators.js';
+import { MapMetaSchema } from '../../types.js';
+
+const BodySchema = z.strictObject({
+  name: z.string().min(1).max(255).optional(),
+  data: z.record(z.string(), z.unknown()).optional(),
+  public: z.boolean().optional(),
+  writers: z.array(z.uint32()).optional(),
+});
+
+const DbRowSchema = z.object({
+  userId: z.uint32(),
+  name: z.string().nullable(),
+  createdAt: z.date(),
+  modifiedAt: z.date(),
+  public: z.number().int(),
+});
 
 export function attachPatchMapHandler(router: RouterInstance) {
+  registerPath('/maps/{id}', {
+    patch: {
+      parameters: [
+        { in: 'path', name: 'id', required: true, schema: { type: 'string' } },
+      ],
+      requestBody: { content: { 'application/json': { schema: BodySchema } } },
+      responses: {
+        200: { content: { 'application/json': { schema: MapMetaSchema } } },
+        401: {},
+        403: {},
+        404: { description: 'no such map' },
+        412: {},
+      },
+    },
+  });
+
   router.patch(
     '/:id',
     acceptValidator('application/json'),
     authenticator(true),
     async (ctx) => {
-      type Body = {
-        name?: string & tags.MinLength<1> & tags.MaxLength<255>;
-        data?: Record<string, unknown>;
-        public?: boolean;
-        writers?: number[];
-      };
-
       let body;
 
       try {
-        body = assert<Body>(ctx.request.body);
+        body = BodySchema.parse(ctx.request.body);
       } catch (err) {
         return ctx.throw(400, err as Error);
       }
@@ -30,9 +55,13 @@ export function attachPatchMapHandler(router: RouterInstance) {
       const { id } = ctx.params;
 
       await runInTransaction(async (conn) => {
-        const [item] = await conn.query(
-          sql`SELECT userId, name, createdAt, modifiedAt, public FROM map WHERE id = ${id} FOR UPDATE`,
-        );
+        const [item] = DbRowSchema.array()
+          .max(1)
+          .parse(
+            await conn.query(
+              sql`SELECT userId, name, createdAt, modifiedAt, public FROM map WHERE id = ${id} FOR UPDATE`,
+            ),
+          );
 
         if (!item) {
           ctx.throw(404, 'no such map');
@@ -86,16 +115,16 @@ export function attachPatchMapHandler(router: RouterInstance) {
           }
         }
 
-        ctx.body = {
+        ctx.body = MapMetaSchema.parse({
           id,
           createdAt: item.createdAt.toISOString(),
           modifiedAt: now.toISOString(),
-          public: pub ?? item.public,
+          public: !!(pub ?? item.public),
           writers: writers ?? curWriters,
           name: name ?? item.name,
           userId: item.userId,
           canWrite: true,
-        };
+        });
       });
     },
   );

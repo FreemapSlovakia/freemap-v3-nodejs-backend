@@ -3,9 +3,24 @@ import { RouterInstance } from '@koa/router';
 import sql from 'sql-template-tag';
 import { authenticator } from '../../authenticator.js';
 import { runInTransaction } from '../../database.js';
+import { registerPath } from '../../openapi.js';
 import { picturesDir } from '../gallery/constants.js';
 
 export function attachDeletePictureHandler(router: RouterInstance) {
+  registerPath('/gallery/pictures/{id}', {
+    delete: {
+      parameters: [
+        { in: 'path', name: 'id', required: true, schema: { type: 'integer' } },
+      ],
+      responses: {
+        204: {},
+        401: {},
+        403: {},
+        404: { description: 'no such picture' },
+      },
+    },
+  });
+
   router.delete('/pictures/:id', authenticator(true), async (ctx) => {
     const pathname = await runInTransaction(async (conn) => {
       const rows = await conn.query(

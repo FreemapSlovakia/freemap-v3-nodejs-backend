@@ -2,9 +2,29 @@ import { RouterInstance } from '@koa/router';
 import sql from 'sql-template-tag';
 import { authenticator } from '../../authenticator.js';
 import { runInTransaction } from '../../database.js';
+import { AUTH_REQUIRED, registerPath } from '../../openapi.js';
 import { acceptValidator } from '../../requestValidators.js';
 
 export function attachDeleteTokenHandler(router: RouterInstance) {
+  registerPath('/tracking/access-tokens/{id}', {
+    delete: {
+      security: AUTH_REQUIRED,
+      parameters: [
+        {
+          in: 'path',
+          name: 'id',
+          required: true,
+          schema: { type: 'integer' },
+        },
+      ],
+      responses: {
+        204: {},
+        403: {},
+        404: { description: 'no such tracking access token' },
+      },
+    },
+  });
+
   router.delete(
     '/access-tokens/:id',
     acceptValidator('application/json'),

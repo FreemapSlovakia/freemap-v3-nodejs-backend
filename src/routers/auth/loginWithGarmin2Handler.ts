@@ -1,29 +1,46 @@
 import { RouterInstance } from '@koa/router';
 import got from 'got';
-import { assert, assertGuard } from 'typia';
+import z from 'zod';
 import { authenticator } from '../../authenticator.js';
 import { garminOauth } from '../../garminOauth.js';
+import { AUTH_OPTIONAL, registerPath } from '../../openapi.js';
 import { acceptValidator } from '../../requestValidators.js';
+import { LoginResponseSchema } from '../../types.js';
 import { tokenSecrets } from './garminTokenSecrets.js';
 import { login } from './loginProcessor.js';
 
-type Body = {
-  token: string;
-  verifier: string;
-  language: string | null;
-};
+const BodySchema = z.strictObject({
+  token: z.string(),
+  verifier: z.string(),
+  language: z.string().nullable(),
+});
+
+const GarminUserSchema = z.object({ userId: z.string() });
 
 export function attachLoginWithGarmin2Handler(router: RouterInstance) {
+  registerPath('/auth/login-garmin-2', {
+    post: {
+      security: AUTH_OPTIONAL,
+      requestBody: { content: { 'application/json': { schema: BodySchema } } },
+      responses: {
+        200: {
+          content: { 'application/json': { schema: LoginResponseSchema } },
+        },
+        400: {},
+        403: {},
+      },
+    },
+  });
+
   router.post(
     '/login-garmin-2',
     authenticator(false),
     acceptValidator('application/json'),
-    // TODO validation
     async (ctx) => {
       let body;
 
       try {
-        body = assert<Body>(ctx.request.body);
+        body = BodySchema.parse(ctx.request.body);
       } catch (err) {
         return ctx.throw(400, err as Error);
       }
@@ -78,26 +95,26 @@ export function attachLoginWithGarmin2Handler(router: RouterInstance) {
 
       const url2 = 'https://apis.garmin.com/wellness-api/rest/user/id';
 
-      const body2 = await got
-        .get(url2, {
-          headers: {
-            ...garminOauth.toHeader(
-              garminOauth.authorize(
-                {
-                  url: url2,
-                  method: 'GET',
-                },
-                {
-                  key: authToken,
-                  secret: authTokenSecret,
-                },
+      const body2 = GarminUserSchema.parse(
+        await got
+          .get(url2, {
+            headers: {
+              ...garminOauth.toHeader(
+                garminOauth.authorize(
+                  {
+                    url: url2,
+                    method: 'GET',
+                  },
+                  {
+                    key: authToken,
+                    secret: authTokenSecret,
+                  },
+                ),
               ),
-            ),
-          },
-        })
-        .json();
-
-      assertGuard<{ userId: string }>(body2);
+            },
+          })
+          .json(),
+      );
 
       await login(
         ctx,

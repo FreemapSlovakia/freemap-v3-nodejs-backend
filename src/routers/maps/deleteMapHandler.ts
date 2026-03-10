@@ -2,9 +2,24 @@ import { RouterInstance } from '@koa/router';
 import sql from 'sql-template-tag';
 import { authenticator } from '../../authenticator.js';
 import { runInTransaction } from '../../database.js';
+import { registerPath } from '../../openapi.js';
 import { acceptValidator } from '../../requestValidators.js';
 
 export function attachDeleteMapHandler(router: RouterInstance) {
+  registerPath('/maps/{id}', {
+    delete: {
+      parameters: [
+        { in: 'path', name: 'id', required: true, schema: { type: 'string' } },
+      ],
+      responses: {
+        204: {},
+        401: {},
+        403: {},
+        404: { description: 'no such map' },
+      },
+    },
+  });
+
   router.delete(
     '/:id',
     acceptValidator('application/json'),

@@ -5,9 +5,27 @@
 // 'x-geoip-longitude': '18.09050',
 
 import { RouterInstance } from '@koa/router';
+import z from 'zod';
+import { registerPath } from '../openapi.js';
 import { acceptValidator } from '../requestValidators.js';
 
+const ResponseSchema = z.strictObject({
+  country: z.string().optional(),
+  countryCode: z.string().optional(),
+  city: z.string().optional(),
+  latitude: z.string().optional(),
+  longitude: z.string().optional(),
+});
+
 export function attachGeoIp(router: RouterInstance) {
+  registerPath('/geoip', {
+    get: {
+      responses: {
+        200: { content: { 'application/json': { schema: ResponseSchema } } },
+      },
+    },
+  });
+
   router.get('/geoip', acceptValidator('application/json'), async (ctx) => {
     const body: Record<string, string | undefined> = {};
 
@@ -28,6 +46,6 @@ export function attachGeoIp(router: RouterInstance) {
       }
     }
 
-    ctx.body = body;
+    ctx.body = ResponseSchema.parse(body);
   });
 }

@@ -1,20 +1,33 @@
 import { RouterInstance } from '@koa/router';
-import { assert } from 'typia';
+import z from 'zod';
 import { authenticator } from '../authenticator.js';
 import { garminOauth } from '../garminOauth.js';
+import { registerPath } from '../openapi.js';
 import { acceptValidator } from '../requestValidators.js';
 
-type Body = {
-  name: string | undefined;
-  description: string | undefined;
-  activity: string | undefined;
-  coordinates: [number, number, number?][];
-  distance: number;
-  elevationGain: number;
-  elevationLoss: number;
-};
+const BodySchema = z.strictObject({
+  name: z.string().optional(),
+  description: z.string().optional(),
+  activity: z.string().optional(),
+  coordinates: z.array(
+    z.union([
+      z.tuple([z.number(), z.number()]),
+      z.tuple([z.number(), z.number(), z.number()]),
+    ]),
+  ),
+  distance: z.number(),
+  elevationGain: z.number(),
+  elevationLoss: z.number(),
+});
 
 export function attachPostGarminCourses(router: RouterInstance) {
+  registerPath('/garmin-courses', {
+    post: {
+      requestBody: { content: { 'application/json': { schema: BodySchema } } },
+      responses: { 204: {}, 400: {}, 401: {}, 403: {} },
+    },
+  });
+
   router.post(
     '/garmin-courses',
     acceptValidator('application/json'),
@@ -23,7 +36,7 @@ export function attachPostGarminCourses(router: RouterInstance) {
       let body;
 
       try {
-        body = assert<Body>(ctx.request.body);
+        body = BodySchema.parse(ctx.request.body);
       } catch (err) {
         return ctx.throw(400, err as Error);
       }

@@ -1,10 +1,11 @@
 import { createHmac, randomBytes } from 'node:crypto';
 import { RouterInstance } from '@koa/router';
 import sql from 'sql-template-tag';
-import { assert } from 'typia';
+import z from 'zod';
 import { authenticator } from '../../authenticator.js';
 import { pool } from '../../database.js';
 import { getEnv } from '../../env.js';
+import { registerPath } from '../../openapi.js';
 
 type Combo = {
   title: string;
@@ -89,22 +90,34 @@ const translations: Record<string, Translation> = {
   },
 };
 
-type Body = { callbackUrl: string } & (
-  | {
-      type: 'premium';
-    }
-  | {
-      type: 'credits';
-      amount: number;
-    }
-);
+const BodySchema = z.union([
+  z.strictObject({ callbackUrl: z.string(), type: z.literal('premium') }),
+  z.strictObject({
+    callbackUrl: z.string(),
+    type: z.literal('credits'),
+    amount: z.number(),
+  }),
+]);
+
+const ResponseSchema = z.strictObject({ paymentUrl: z.string() });
 
 export function attachPurchaseTokenHandler(router: RouterInstance) {
+  registerPath('/auth/purchaseToken', {
+    post: {
+      requestBody: { content: { 'application/json': { schema: BodySchema } } },
+      responses: {
+        200: { content: { 'application/json': { schema: ResponseSchema } } },
+        400: {},
+        401: {},
+      },
+    },
+  });
+
   router.post('/purchaseToken', authenticator(true), async (ctx) => {
     let body;
 
     try {
-      body = assert<Body>(ctx.request.body);
+      body = BodySchema.parse(ctx.request.body);
     } catch (err) {
       return ctx.throw(400, err as Error);
     }
@@ -180,13 +193,13 @@ export function attachPurchaseTokenHandler(router: RouterInstance) {
 
     const paymentUrlString = paymentUrl.toString();
 
-    ctx.body = {
+    ctx.body = ResponseSchema.parse({
       paymentUrl:
         paymentUrlString +
         '&signature=' +
         createHmac('sha256', getEnv('PURCHASE_SECRET'))
           .update(paymentUrlString)
           .digest('hex'),
-    };
+    });
   });
 }
