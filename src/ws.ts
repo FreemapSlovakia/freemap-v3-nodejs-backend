@@ -36,7 +36,7 @@ export function attachWs(app: KoaWebsocket.App) {
     ws.on('message', (message) => {
       let id: number | string | null | undefined = undefined;
 
-      function respondError(code: number, msg: string) {
+      function respondError(code: number, message: string, data?: unknown) {
         if (ws.readyState === 1) {
           ws.send(
             JSON.stringify({
@@ -44,7 +44,8 @@ export function attachWs(app: KoaWebsocket.App) {
               id,
               error: {
                 code,
-                message: msg,
+                message,
+                data,
               },
             }),
           );
@@ -73,8 +74,8 @@ export function attachWs(app: KoaWebsocket.App) {
         } else {
           throw new Error();
         }
-      } catch {
-        respondError(-32700, 'Parse error');
+      } catch (err) {
+        respondError(-32700, 'Parse error', err);
         return;
       }
 
@@ -102,8 +103,12 @@ export function attachWs(app: KoaWebsocket.App) {
 
       try {
         RequestSchema.parse(msg);
-      } catch {
-        respondError(-32600, 'Invalid Request');
+      } catch (e) {
+        respondError(
+          -32600,
+          'Invalid Request',
+          e instanceof z.ZodError ? z.treeifyError(e) : e,
+        );
         return;
       }
 
@@ -122,7 +127,11 @@ export function attachWs(app: KoaWebsocket.App) {
         ) {
           respondError(-32601, 'Method not found');
         } else {
-          respondError(-32602, 'Invalid params');
+          respondError(
+            -32602,
+            'Invalid params',
+            err instanceof z.ZodError ? z.treeifyError(err) : err,
+          );
         }
 
         return;

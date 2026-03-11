@@ -13,7 +13,7 @@ export const SubscribeParamsSchema = z.intersection(
     maxAge: z.uint32().nullish(),
   }),
   z.union([
-    z.strictObject({ token: z.string() }),
+    z.strictObject({ token: z.string().nonempty() }),
     z.strictObject({ deviceId: z.uint32() }),
   ]),
 );
