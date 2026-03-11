@@ -13,14 +13,11 @@ export function attachPostPictureRatingHandler(router: RouterInstance) {
       summary: 'Rate a gallery picture',
       tags: ['gallery'],
       security: AUTH_REQUIRED,
-      parameters: [
-        {
-          in: 'path',
-          name: 'id',
-          required: true,
-          schema: { type: 'integer' },
-        },
-      ],
+      requestParams: {
+        path: z.object({
+          id: z.uint32(),
+        }),
+      },
       requestBody: {
         content: {
           'application/json': {

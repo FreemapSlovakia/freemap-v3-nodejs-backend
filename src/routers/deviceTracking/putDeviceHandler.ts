@@ -18,14 +18,11 @@ export function attachPutDeviceHandler(router: RouterInstance) {
       summary: 'Update a tracking device',
       tags: ['tracking'],
       security: AUTH_REQUIRED,
-      parameters: [
-        {
-          in: 'path',
-          name: 'id',
-          required: true,
-          schema: { type: 'integer' },
-        },
-      ],
+      requestParams: {
+        path: z.object({
+          id: z.uint32(),
+        }),
+      },
       requestBody: {
         content: {
           'application/json': {

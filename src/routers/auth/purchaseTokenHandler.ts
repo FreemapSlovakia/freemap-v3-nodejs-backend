@@ -91,15 +91,15 @@ const translations: Record<string, Translation> = {
 };
 
 const BodySchema = z.union([
-  z.strictObject({ callbackUrl: z.string(), type: z.literal('premium') }),
+  z.strictObject({ callbackUrl: z.url(), type: z.literal('premium') }),
   z.strictObject({
-    callbackUrl: z.string(),
+    callbackUrl: z.url(),
     type: z.literal('credits'),
     amount: z.number(),
   }),
 ]);
 
-const ResponseSchema = z.strictObject({ paymentUrl: z.string() });
+const ResponseSchema = z.strictObject({ paymentUrl: z.url() });
 
 export function attachPurchaseTokenHandler(router: RouterInstance) {
   registerPath('/auth/purchaseToken', {

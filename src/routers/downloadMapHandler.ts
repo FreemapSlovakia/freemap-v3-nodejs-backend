@@ -145,17 +145,17 @@ const GeoJSONGeometrySchema = z.union([
 const GeoJSONFeatureSchema = z.strictObject({
   type: z.literal('Feature'),
   geometry: GeoJSONGeometrySchema,
-  properties: z.record(z.string(), z.unknown()),
+  properties: z.record(z.string(), z.unknown()).nullable(),
 });
 
 const DownloadBodySchema = z.strictObject({
-  map: z.string(),
+  map: z.string().nonempty(),
   format: z.enum(['mbtiles', 'sqlitedb']),
   minZoom: z.number().int().min(0),
   maxZoom: z.number().int().min(0).max(20),
   boundary: GeoJSONFeatureSchema,
   name: z.string(),
-  email: z.string().email(),
+  email: z.email(),
   scale: z.number().int().min(1).max(3).optional(),
 });
 

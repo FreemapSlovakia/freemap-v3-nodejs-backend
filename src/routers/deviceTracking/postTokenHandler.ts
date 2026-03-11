@@ -11,7 +11,7 @@ import { TokenBodySchema } from '../../types.js';
 
 const ResponseBodySchema = z.strictObject({
   id: z.uint32(),
-  token: z.string(),
+  token: z.string().nonempty(),
 });
 
 export function attachPostTokenHandler(router: RouterInstance) {
@@ -20,14 +20,9 @@ export function attachPostTokenHandler(router: RouterInstance) {
       summary: 'Create an access token for a tracking device',
       tags: ['tracking'],
       security: AUTH_REQUIRED,
-      parameters: [
-        {
-          in: 'path',
-          name: 'id',
-          required: true,
-          schema: { type: 'integer' },
-        },
-      ],
+      requestParams: {
+        path: z.object({ id: z.uint32() }),
+      },
       requestBody: {
         content: {
           'application/json': {

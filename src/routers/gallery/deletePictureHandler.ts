@@ -1,6 +1,7 @@
 import { unlink } from 'node:fs/promises';
 import { RouterInstance } from '@koa/router';
 import sql from 'sql-template-tag';
+import z from 'zod';
 import { authenticator } from '../../authenticator.js';
 import { runInTransaction } from '../../database.js';
 import { AUTH_REQUIRED, registerPath } from '../../openapi.js';
@@ -12,14 +13,11 @@ export function attachDeletePictureHandler(router: RouterInstance) {
       summary: 'Delete a gallery picture',
       tags: ['gallery'],
       security: AUTH_REQUIRED,
-      parameters: [
-        {
-          in: 'path',
-          name: 'id',
-          required: true,
-          schema: { type: 'integer' },
-        },
-      ],
+      requestParams: {
+        path: z.object({
+          id: z.uint32(),
+        }),
+      },
       responses: {
         204: {},
         401: {},

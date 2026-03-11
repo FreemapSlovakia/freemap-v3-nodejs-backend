@@ -11,7 +11,7 @@ import { DeviceBodySchema } from '../../types.js';
 
 const ResponseBodySchema = z.strictObject({
   id: z.uint32(),
-  token: z.string(),
+  token: z.string().nonempty(),
 });
 
 export function attachPostDeviceHandler(router: RouterInstance) {

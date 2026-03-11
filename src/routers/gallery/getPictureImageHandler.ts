@@ -5,6 +5,7 @@ import { RouterInstance } from '@koa/router';
 import calculate from 'etag';
 import sharp from 'sharp';
 import sql from 'sql-template-tag';
+import z from 'zod';
 import { authenticator } from '../../authenticator.js';
 import { pool } from '../../database.js';
 import { getEnv } from '../../env.js';
@@ -20,14 +21,11 @@ export function attachGetPictureImageHandler(router: RouterInstance) {
       summary: 'Get the image file for a gallery picture',
       tags: ['gallery'],
       security: AUTH_OPTIONAL,
-      parameters: [
-        {
-          in: 'path',
-          name: 'id',
-          required: true,
-          schema: { type: 'integer' },
-        },
-      ],
+      requestParams: {
+        path: z.object({
+          id: z.uint32(),
+        }),
+      },
       responses: {
         200: {
           content: {

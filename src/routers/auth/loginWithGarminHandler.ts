@@ -8,7 +8,7 @@ import { tokenSecrets } from './garminTokenSecrets.js';
 const BodySchema = z.strictObject({
   connect: z.unknown(),
   clientData: z.unknown(),
-  callbackUrl: z.string(),
+  callbackUrl: z.url(),
   extraQuery: z.record(z.string(), z.unknown()).optional(),
 });
 

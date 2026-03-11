@@ -7,11 +7,11 @@ import { getEnv } from './../../env.js';
 import { registerPath } from '../../openapi.js';
 
 const BodySchema = z.strictObject({
-  token: z.string(),
+  token: z.string().nonempty(),
   email: z.email(),
-  signature: z.string(),
+  signature: z.string().nonempty(),
   amount_paid: z.union([z.number(), z.string()]).optional(),
-  currency: z.string().optional(),
+  currency: z.string().nonempty().optional(),
 });
 
 export function attachPurchaseValidateHandler(router: RouterInstance) {

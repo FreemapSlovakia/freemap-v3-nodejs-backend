@@ -24,14 +24,11 @@ export function attachPostPictureCommentHandler(router: RouterInstance) {
       summary: 'Post a comment on a gallery picture',
       tags: ['gallery'],
       security: AUTH_REQUIRED,
-      parameters: [
-        {
-          in: 'path',
-          name: 'id',
-          required: true,
-          schema: { type: 'integer' },
-        },
-      ],
+      requestParams: {
+        path: z.object({
+          id: z.uint32(),
+        }),
+      },
       requestBody: { content: { 'application/json': { schema: BodySchema } } },
       responses: {
         200: { content: { 'application/json': { schema: ResponseSchema } } },

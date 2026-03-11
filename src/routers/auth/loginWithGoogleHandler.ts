@@ -7,7 +7,7 @@ import { LoginResponseSchema } from '../../types.js';
 import { login } from './loginProcessor.js';
 
 const BodySchema = z.strictObject({
-  accessToken: z.string(),
+  accessToken: z.string().nonempty(),
   language: z.string().nullable(),
   connect: z.boolean().optional(),
 });

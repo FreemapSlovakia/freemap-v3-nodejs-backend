@@ -13,7 +13,7 @@ const clientId = getEnv('OSM_OAUTH2_CLIENT_ID');
 const clientSecret = getEnv('OSM_OAUTH2_CLIENT_SECRET');
 
 const BodySchema = z.strictObject({
-  code: z.string(),
+  code: z.string().nonempty(),
   language: z.string().nullable(),
   connect: z.boolean().optional(),
   redirectUri: z.url(),

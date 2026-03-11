@@ -7,7 +7,7 @@ import { storeTrackPoint } from '../../deviceTracking.js';
 import { registerPath } from '../../openapi.js';
 
 const LocationBodySchema = z.object({
-  device_id: z.string(),
+  device_id: z.string().nonempty(),
   location: z.object({
     timestamp: z.iso.datetime(),
     coords: z.object({
@@ -33,8 +33,8 @@ const LocationBodySchema = z.object({
 });
 
 const NotificationBodySchema = z.object({
-  id: z.string(),
-  notificationToken: z.string(),
+  id: z.string().nonempty(),
+  notificationToken: z.string().nonempty(),
 });
 
 const JsonBodySchema = z.union([NotificationBodySchema, LocationBodySchema]);
@@ -68,14 +68,11 @@ export function attachTrackDeviceHandler(router: RouterInstance) {
     get: {
       summary: 'Submit a device location update via URL parameters',
       tags: ['tracking'],
-      parameters: [
-        {
-          in: 'path',
-          name: 'token',
-          required: true,
-          schema: { type: 'string' },
-        },
-      ],
+      requestParams: {
+        path: z.object({
+          token: z.string().nonempty(),
+        }),
+      },
       responses: {
         200: {
           content: { 'application/json': { schema: TrackResponseSchema } },
@@ -87,14 +84,11 @@ export function attachTrackDeviceHandler(router: RouterInstance) {
     post: {
       summary: 'Submit a device location update via form-encoded body',
       tags: ['tracking'],
-      parameters: [
-        {
-          in: 'path',
-          name: 'token',
-          required: true,
-          schema: { type: 'string' },
-        },
-      ],
+      requestParams: {
+        path: z.object({
+          token: z.string().nonempty(),
+        }),
+      },
       responses: {
         200: {
           content: { 'application/json': { schema: TrackResponseSchema } },

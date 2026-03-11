@@ -8,14 +8,15 @@ import { acceptValidator } from '../../requestValidators.js';
 import { MapMetaSchema, zDateToIso } from '../../types.js';
 
 const DbRowSchema = z.object({
-  id: z.string(),
+  id: z.string().nonempty(),
   name: z.string().nullable(),
-  public: z.number().transform(Boolean),
+  public: z.boolean(),
   userId: z.uint32(),
   writers: z
     .string()
     .nullable()
-    .transform((w) => (w ? w.split(',').map(Number) : [])),
+    .transform((w) => (w ? w.split(',').map(Number) : []))
+    .pipe(z.number().array()),
   createdAt: zDateToIso,
   modifiedAt: zDateToIso,
 });

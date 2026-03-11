@@ -38,7 +38,7 @@ const CommonQuerySchema = z.object({
   takenAtTo: z.iso.datetime().optional(),
   createdAtFrom: z.iso.datetime().optional(),
   createdAtTo: z.iso.datetime().optional(),
-  tag: z.string().optional(),
+  tag: z.string().nonempty().optional(),
   pano: booleanParam,
   premium: booleanParam,
 });
@@ -68,7 +68,10 @@ const fieldValues = [
 
 const BBoxQuerySchema = CommonQuerySchema.extend({
   by: z.literal('bbox'),
-  bbox: z.string(),
+  bbox: z
+    .string()
+    .transform((s) => s.split(',').map(Number))
+    .pipe(z.number().array()),
   fields: z.preprocess(
     (v) => (Array.isArray(v) ? v : v ? [v] : undefined),
     z.array(z.enum(fieldValues)).optional(),
@@ -93,14 +96,8 @@ const BboxRowSchema = z.array(
     takenAt: zNullishDateToIso,
     createdAt: zNullishDateToIso,
     userId: z.uint32().nullish(),
-    pano: z
-      .number()
-      .nullish()
-      .transform((b) => (b == null ? b : Boolean(b))),
-    premium: z
-      .number()
-      .nullish()
-      .transform((b) => (b == null ? b : Boolean(b))),
+    pano: z.boolean().nullish(),
+    premium: z.boolean().nullish(),
     azimuth: z.number().nullish(),
     rating: z.number().nullish(),
     tags: z
@@ -258,7 +255,7 @@ async function byBbox(ctx: ParameterizedContext) {
   }
 
   const {
-    bbox,
+    bbox: [minLon, minLat, maxLon, maxLat],
     userId,
     tag,
     ratingFrom,
@@ -271,10 +268,6 @@ async function byBbox(ctx: ParameterizedContext) {
     premium,
     fields,
   } = bboxQuery;
-
-  const [minLon, minLat, maxLon, maxLat] = bbox
-    .split(',')
-    .map((a) => Number(a));
 
   const myUserId = ctx.state.user?.id ?? -1;
 

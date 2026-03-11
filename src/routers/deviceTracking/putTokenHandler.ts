@@ -1,5 +1,6 @@
 import { RouterInstance } from '@koa/router';
 import sql from 'sql-template-tag';
+import z from 'zod';
 import { authenticator } from '../../authenticator.js';
 import { runInTransaction } from '../../database.js';
 import { AUTH_REQUIRED, registerPath } from '../../openapi.js';
@@ -12,14 +13,11 @@ export function attachPutTokenHandler(router: RouterInstance) {
       summary: 'Update a tracking access token',
       tags: ['tracking'],
       security: AUTH_REQUIRED,
-      parameters: [
-        {
-          in: 'path',
-          name: 'id',
-          required: true,
-          schema: { type: 'integer' },
-        },
-      ],
+      requestParams: {
+        path: z.object({
+          id: z.uint32(),
+        }),
+      },
       requestBody: {
         content: {
           'application/json': {

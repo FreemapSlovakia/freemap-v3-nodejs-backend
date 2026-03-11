@@ -8,7 +8,7 @@ import { acceptValidator } from '../../requestValidators.js';
 
 const UsersPerCountrySchema = z.array(
   z.object({
-    country: z.string(),
+    country: z.string().nonempty(),
     userId: z.uint32(),
     userName: z.string(),
     pictureCount: z.uint32(),
@@ -19,13 +19,13 @@ const PerUserSchema = z.array(
   z.object({
     pictureCount: z.uint32(),
     userId: z.uint32(),
-    userName: z.string(),
+    userName: z.string().nonempty(),
   }),
 );
 
 const MePerCountrySchema = z.array(
   z.object({
-    country: z.string(),
+    country: z.string().nonempty(),
     pictureCount: z.uint32(),
     userRank: z.number(),
   }),

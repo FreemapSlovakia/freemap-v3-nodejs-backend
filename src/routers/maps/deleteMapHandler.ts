@@ -1,5 +1,6 @@
 import { RouterInstance } from '@koa/router';
 import sql from 'sql-template-tag';
+import z from 'zod';
 import { authenticator } from '../../authenticator.js';
 import { runInTransaction } from '../../database.js';
 import { AUTH_REQUIRED, registerPath } from '../../openapi.js';
@@ -11,14 +12,11 @@ export function attachDeleteMapHandler(router: RouterInstance) {
       summary: 'Delete a map',
       tags: ['maps'],
       security: AUTH_REQUIRED,
-      parameters: [
-        {
-          in: 'path',
-          name: 'id',
-          required: true,
-          schema: { type: 'string' },
-        },
-      ],
+      requestParams: {
+        path: z.object({
+          id: z.string().nonempty(),
+        }),
+      },
       responses: {
         204: {},
         401: {},

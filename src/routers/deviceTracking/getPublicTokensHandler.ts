@@ -9,7 +9,7 @@ import { zDateToIso, zNullableDateToIso } from '../../types.js';
 const AccessTokensSchema = z
   .strictObject({
     id: z.uint32(),
-    token: z.string(),
+    token: z.string().nonempty(),
     createdAt: zDateToIso,
     timeFrom: zNullableDateToIso,
     timeTo: zNullableDateToIso,

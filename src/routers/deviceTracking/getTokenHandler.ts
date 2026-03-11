@@ -11,7 +11,7 @@ const TokenDetailSchema = z
   .strictObject({
     id: z.uint32(),
     userId: z.uint32(),
-    token: z.string(),
+    token: z.string().nonempty(),
     createdAt: zDateToIso,
     timeFrom: zNullableDateToIso,
     timeTo: zNullableDateToIso,
@@ -26,14 +26,11 @@ export function attachGetTokenHandler(router: RouterInstance) {
       summary: 'Get a tracking access token by ID',
       tags: ['tracking'],
       security: AUTH_REQUIRED,
-      parameters: [
-        {
-          in: 'path',
-          name: 'id',
-          required: true,
-          schema: { type: 'integer' },
-        },
-      ],
+      requestParams: {
+        path: z.object({
+          id: z.uint32(),
+        }),
+      },
       responses: {
         200: { content: { 'application/json': { schema: TokenDetailSchema } } },
         403: {},

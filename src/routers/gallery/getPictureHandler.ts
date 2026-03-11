@@ -16,23 +16,17 @@ const secret = getEnv('PREMIUM_PHOTO_SECRET', '');
 const PictureDbRowSchema = z.object({
   pictureId: z.uint32(),
   createdAt: zDateToIso,
-  pathname: z.string(),
+  pathname: z.string().nonempty(),
   title: z.string().nullable(),
   description: z.string().nullable(),
   takenAt: zNullableDateToIso,
   lat: z.number(),
   lon: z.number(),
   azimuth: z.number().nullable(),
-  pano: z
-    .number()
-    .transform((b) => Boolean(b))
-    .pipe(z.boolean()),
+  pano: z.boolean(),
   userId: z.uint32().nullable(),
   name: z.string().nullable(),
-  premium: z
-    .number()
-    .transform((b) => Boolean(b))
-    .pipe(z.boolean()),
+  premium: z.boolean(),
   tags: z
     .string()
     .nullable()
@@ -82,14 +76,11 @@ export function attachGetPictureHandler(router: RouterInstance) {
       summary: 'Get a single gallery picture',
       tags: ['gallery'],
       security: AUTH_OPTIONAL,
-      parameters: [
-        {
-          in: 'path',
-          name: 'id',
-          required: true,
-          schema: { type: 'integer' },
-        },
-      ],
+      requestParams: {
+        path: z.object({
+          id: z.uint32(),
+        }),
+      },
       responses: {
         200: {
           content: { 'application/json': { schema: ResponseBodySchema } },

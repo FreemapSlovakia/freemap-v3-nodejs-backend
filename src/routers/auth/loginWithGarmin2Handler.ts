@@ -10,9 +10,9 @@ import { tokenSecrets } from './garminTokenSecrets.js';
 import { login } from './loginProcessor.js';
 
 const BodySchema = z.strictObject({
-  token: z.string(),
-  verifier: z.string(),
-  language: z.string().nullable(),
+  token: z.string().nonempty(),
+  verifier: z.string().nonempty(),
+  language: z.string().nonempty().nullable(),
 });
 
 const GarminUserSchema = z.object({ userId: z.string() });

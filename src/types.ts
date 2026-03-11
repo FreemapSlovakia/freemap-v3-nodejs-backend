@@ -23,8 +23,8 @@ export const zDateToIso = z
 export const TrackingDeviceSchema = z
   .strictObject({
     id: z.uint32(),
-    name: z.string(),
-    token: z.string(),
+    name: z.string().nonempty(),
+    token: z.string().nonempty(),
     createdAt: zDateToIso,
     maxCount: z.uint32().nullable(),
     maxAge: z.uint32().nullable(),
@@ -35,7 +35,7 @@ export const TrackingDeviceSchema = z
 export const AccessTokenSchema = z
   .strictObject({
     id: z.uint32(),
-    token: z.string(),
+    token: z.string().nonempty(),
     createdAt: zDateToIso,
     timeFrom: zNullableDateToIso,
     timeTo: zNullableDateToIso,
@@ -67,7 +67,7 @@ export const UserResponseSchema = z
     id: z.uint32(),
     name: z.string(),
     email: z.email().nullable(),
-    authToken: z.string(),
+    authToken: z.string().nonempty(),
     authProviders: z.array(z.enum(['osm', 'facebook', 'google', 'garmin'])),
     isAdmin: z.boolean(),
     language: z.string().nullable(),
@@ -90,7 +90,7 @@ export const LoginResponseSchema = z
 
 export const MapMetaSchema = z
   .strictObject({
-    id: z.string(),
+    id: z.string().nonempty(),
     name: z.string().nullable(),
     public: z.boolean(),
     userId: z.uint32(),
@@ -111,19 +111,22 @@ export const UserRowSchema = z.object({
   garminAccessTokenSecret: z.string().nullable(),
   name: z.string(),
   email: z.email().nullable(),
-  isAdmin: z.number().transform(Boolean),
+  isAdmin: z.boolean(),
   createdAt: z.date(),
   lat: z.number().nullable(),
   lon: z.number().nullable(),
-  settings: z.string().transform((s, ctx) => {
-    try {
-      return JSON.parse(s);
-    } catch (e) {
-      ctx.addIssue({ code: 'custom', message: 'Invalid JSON: ' + e });
-      return z.NEVER;
-    }
-  }),
-  sendGalleryEmails: z.number().transform(Boolean),
+  settings: z
+    .string()
+    .transform((s, ctx) => {
+      try {
+        return JSON.parse(s);
+      } catch (e) {
+        ctx.addIssue({ code: 'custom', message: 'Invalid JSON: ' + e });
+        return z.NEVER;
+      }
+    })
+    .pipe(z.record(z.string(), z.unknown())),
+  sendGalleryEmails: z.boolean(),
   premiumExpiration: z.date().nullable(),
   credits: z.number(),
   language: z.string().nullable(),

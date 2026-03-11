@@ -8,9 +8,9 @@ import { acceptValidator } from '../../requestValidators.js';
 import { MapMetaSchema, zDateToIso } from '../../types.js';
 
 const DbRowSchema = z.object({
-  id: z.string(),
+  id: z.string().nonempty(),
   name: z.string().nullable(),
-  public: z.number().transform(Boolean),
+  public: z.boolean(),
   userId: z.uint32(),
   writers: z.string().nullable(),
   createdAt: zDateToIso,
@@ -29,14 +29,11 @@ export function attachGetMapHandler(router: RouterInstance) {
       summary: 'Get a map by ID',
       tags: ['maps'],
       security: AUTH_OPTIONAL,
-      parameters: [
-        {
-          in: 'path',
-          name: 'id',
-          required: true,
-          schema: { type: 'string' },
-        },
-      ],
+      requestParams: {
+        path: z.object({
+          id: z.string().nonempty(),
+        }),
+      },
       responses: {
         200: {
           content: {

@@ -1,5 +1,6 @@
 import { RouterInstance } from '@koa/router';
 import sql, { join, raw } from 'sql-template-tag';
+import z from 'zod';
 import { authenticator } from '../../authenticator.js';
 import { pool } from '../../database.js';
 import { AUTH_REQUIRED, registerPath } from '../../openapi.js';
@@ -10,17 +11,11 @@ export function attachDisconnectHandler(router: RouterInstance) {
       summary: 'Disconnect a linked auth provider',
       tags: ['auth'],
       security: AUTH_REQUIRED,
-      parameters: [
-        {
-          in: 'path',
-          name: 'provider',
-          required: true,
-          schema: {
-            type: 'string',
-            enum: ['osm', 'facebook', 'google', 'garmin'],
-          },
-        },
-      ],
+      requestParams: {
+        path: z.object({
+          provider: z.enum(['osm', 'facebook', 'google', 'garmin']),
+        }),
+      },
       responses: { 204: {}, 401: {} },
     },
   });

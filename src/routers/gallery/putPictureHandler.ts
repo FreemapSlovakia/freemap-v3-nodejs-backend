@@ -24,14 +24,11 @@ export function attachPutPictureHandler(router: RouterInstance) {
       summary: 'Update gallery picture metadata',
       tags: ['gallery'],
       security: AUTH_REQUIRED,
-      parameters: [
-        {
-          in: 'path',
-          name: 'id',
-          required: true,
-          schema: { type: 'integer' },
-        },
-      ],
+      requestParams: {
+        path: z.object({
+          id: z.uint32(),
+        }),
+      },
       requestBody: {
         content: {
           'application/json': {

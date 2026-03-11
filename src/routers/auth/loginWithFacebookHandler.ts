@@ -7,7 +7,7 @@ import { LoginResponseSchema } from '../../types.js';
 import { login } from './loginProcessor.js';
 
 const FacebookUserSchema = z.object({
-  id: z.string(),
+  id: z.string().nonempty(),
   name: z.string(),
   email: z.email().nullish(),
 });
@@ -22,7 +22,7 @@ async function getUserData(accessToken: string) {
 }
 
 const BodySchema = z.strictObject({
-  accessToken: z.string(),
+  accessToken: z.string().nonempty(),
   language: z.string().nullable(),
   connect: z.boolean().optional(),
 });

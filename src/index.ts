@@ -187,6 +187,12 @@ router.get('/documentation', (ctx) => {
         bearerAuth: { type: 'http', scheme: 'bearer' },
       },
     },
+    tags: [
+      { name: 'auth', description: 'Authentication' },
+      { name: 'tracking', description: 'Device location tracking' },
+      { name: 'gallery', description: 'Picture gallery' },
+      { name: 'maps', description: 'Map annotations' },
+    ],
     paths,
   });
 });

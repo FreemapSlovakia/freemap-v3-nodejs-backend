@@ -78,7 +78,6 @@ export function rowToUser(row: UserRow, authToken: string): User {
       .filter(([column, value]) => value && column in columnToAuthProvider)
       .map(([column]) => columnToAuthProvider[column]),
     authToken,
-    settings: row.settings ? JSON.parse(row.settings) : row.settings,
   };
 }
 

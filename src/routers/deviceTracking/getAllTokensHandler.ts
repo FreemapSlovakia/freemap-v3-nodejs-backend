@@ -10,7 +10,7 @@ import { zDateToIso, zNullableDateToIso } from '../../types.js';
 const AccessTokensSchema = z
   .strictObject({
     id: z.uint32(),
-    token: z.string(),
+    token: z.string().nonempty(),
     createdAt: zDateToIso,
     timeFrom: zNullableDateToIso,
     timeTo: zNullableDateToIso,
@@ -25,16 +25,11 @@ export function attachGetAllTokensHandler(router: RouterInstance) {
       summary: 'List access tokens for a tracking device',
       tags: ['tracking'],
       security: AUTH_REQUIRED,
-      parameters: [
-        {
-          in: 'path',
-          name: 'id',
-          required: true,
-          schema: {
-            type: 'integer',
-          },
-        },
-      ],
+      requestParams: {
+        path: z.object({
+          id: z.uint32(),
+        }),
+      },
       responses: {
         200: {
           content: { 'application/json': { schema: AccessTokensSchema } },

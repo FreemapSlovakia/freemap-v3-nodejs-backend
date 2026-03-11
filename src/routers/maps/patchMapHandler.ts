@@ -19,7 +19,7 @@ const DbRowSchema = z.object({
   name: z.string().nullable(),
   createdAt: zDateToIso,
   modifiedAt: z.date(),
-  public: z.number().transform(Boolean),
+  public: z.boolean(),
 });
 
 export function attachPatchMapHandler(router: RouterInstance) {
@@ -28,14 +28,11 @@ export function attachPatchMapHandler(router: RouterInstance) {
       summary: 'Update map metadata or data',
       tags: ['maps'],
       security: AUTH_REQUIRED,
-      parameters: [
-        {
-          in: 'path',
-          name: 'id',
-          required: true,
-          schema: { type: 'string' },
-        },
-      ],
+      requestParams: {
+        path: z.object({
+          id: z.string().nonempty(),
+        }),
+      },
       requestBody: {
         content: {
           'application/json': {

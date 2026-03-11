@@ -4,10 +4,12 @@ import z from 'zod';
 import { registerPath } from '../../openapi.js';
 import { tracklogsDir } from '../tracklogs/constants.js';
 
+const uidSchema = z.string().regex(/^[a-zA-Z0-9]*$/);
+
 const ResponseSchema = z.strictObject({
-  uid: z.string(),
-  data: z.string(),
-  mediaType: z.string(),
+  uid: uidSchema,
+  data: z.base64().nonempty(),
+  mediaType: z.literal('application/gpx+xml'),
 });
 
 export function attachGetTracklogHandler(router: RouterInstance) {
@@ -15,14 +17,11 @@ export function attachGetTracklogHandler(router: RouterInstance) {
     get: {
       summary: 'Retrieve a GPX tracklog by UID',
       tags: ['tracklogs'],
-      parameters: [
-        {
-          in: 'path',
-          name: 'uid',
-          required: true,
-          schema: { type: 'string', pattern: '^[a-zA-Z0-9]*$' },
-        },
-      ],
+      requestParams: {
+        path: z.object({
+          uid: uidSchema,
+        }),
+      },
       responses: {
         200: {
           content: {
