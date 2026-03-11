@@ -5,15 +5,39 @@ import { RouterInstance } from '@koa/router';
 import calculate from 'etag';
 import sharp from 'sharp';
 import sql from 'sql-template-tag';
+import z from 'zod';
 import { authenticator } from '../../authenticator.js';
 import { pool } from '../../database.js';
 import { getEnv } from '../../env.js';
+import { AUTH_OPTIONAL, registerPath } from '../../openapi.js';
 import { acceptValidator } from '../../requestValidators.js';
 import { picturesDir } from '../../routers/gallery/constants.js';
 
 const secret = getEnv('PREMIUM_PHOTO_SECRET', '');
 
 export function attachGetPictureImageHandler(router: RouterInstance) {
+  registerPath('/gallery/pictures/{id}/image', {
+    get: {
+      summary: 'Get the image file for a gallery picture',
+      tags: ['gallery'],
+      security: AUTH_OPTIONAL,
+      requestParams: {
+        path: z.object({
+          id: z.uint32(),
+        }),
+      },
+      responses: {
+        200: {
+          content: {
+            'image/jpeg': {},
+          },
+        },
+        401: {},
+        404: { description: 'no such picture' },
+      },
+    },
+  });
+
   router.get(
     '/pictures/:id/image',
     acceptValidator('image/jpeg'),

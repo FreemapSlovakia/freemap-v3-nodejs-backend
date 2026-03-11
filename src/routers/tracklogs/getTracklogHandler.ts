@@ -1,8 +1,41 @@
 import { readFile, stat } from 'node:fs/promises';
 import { RouterInstance } from '@koa/router';
+import z from 'zod';
+import { registerPath } from '../../openapi.js';
 import { tracklogsDir } from '../tracklogs/constants.js';
 
+const uidSchema = z.string().regex(/^[a-zA-Z0-9]*$/);
+
+const ResponseSchema = z.strictObject({
+  uid: uidSchema,
+  data: z.base64().nonempty(),
+  mediaType: z.literal('application/gpx+xml'),
+});
+
 export function attachGetTracklogHandler(router: RouterInstance) {
+  registerPath('/tracklogs/{uid}', {
+    get: {
+      summary: 'Retrieve a GPX tracklog by UID',
+      tags: ['tracklogs'],
+      requestParams: {
+        path: z.object({
+          uid: uidSchema,
+        }),
+      },
+      responses: {
+        200: {
+          content: {
+            'application/json': {
+              schema: ResponseSchema,
+            },
+          },
+        },
+        400: {},
+        404: { description: 'gpx file not found' },
+      },
+    },
+  });
+
   router.get('/:uid', async (ctx) => {
     const fileUID = ctx.params.uid;
 
@@ -20,10 +53,10 @@ export function attachGetTracklogHandler(router: RouterInstance) {
 
     const b64gpx = await readFile(filePath, 'utf8');
 
-    ctx.body = {
+    ctx.body = ResponseSchema.parse({
       uid: fileUID,
       data: b64gpx,
       mediaType: 'application/gpx+xml',
-    };
+    });
   });
 }

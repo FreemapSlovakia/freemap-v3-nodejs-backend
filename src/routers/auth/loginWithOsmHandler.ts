@@ -1,16 +1,73 @@
 import { RouterInstance } from '@koa/router';
 import got from 'got';
-import { assert, assertGuard } from 'typia';
+import z from 'zod';
 import { authenticator } from '../../authenticator.js';
 import { getEnv } from '../../env.js';
+import { AUTH_OPTIONAL, registerPath } from '../../openapi.js';
 import { acceptValidator } from '../../requestValidators.js';
+import { LoginResponseSchema } from '../../types.js';
 import { login } from './loginProcessor.js';
 
 const clientId = getEnv('OSM_OAUTH2_CLIENT_ID');
 
 const clientSecret = getEnv('OSM_OAUTH2_CLIENT_SECRET');
 
+const BodySchema = z.strictObject({
+  code: z.string().nonempty(),
+  language: z.string().nullable(),
+  connect: z.boolean().optional(),
+  redirectUri: z.url(),
+});
+
+const OsmTokenSchema = z.object({ access_token: z.string() });
+
+const OsmUserDetailsSchema = z.object({
+  user: z.object({
+    id: z.uint32(),
+    display_name: z.string(),
+    home: z.object({ lat: z.number(), lon: z.number() }).optional(),
+  }),
+});
+
 export function attachLoginWithOsmHandler(router: RouterInstance) {
+  registerPath('/auth/login-osm', {
+    get: {
+      summary: 'Get OSM OAuth client ID to initiate login',
+      tags: ['auth'],
+      responses: {
+        200: {
+          content: {
+            'application/json': {
+              schema: z.strictObject({ clientId: z.string() }),
+            },
+          },
+        },
+      },
+    },
+    post: {
+      summary: 'Complete OSM OAuth login',
+      tags: ['auth'],
+      security: AUTH_OPTIONAL,
+      requestBody: {
+        content: {
+          'application/json': {
+            schema: BodySchema,
+          },
+        },
+      },
+      responses: {
+        200: {
+          content: {
+            'application/json': {
+              schema: LoginResponseSchema,
+            },
+          },
+        },
+        400: {},
+      },
+    },
+  });
+
   router.get('/login-osm', (ctx) => {
     ctx.body = { clientId };
   });
@@ -19,19 +76,11 @@ export function attachLoginWithOsmHandler(router: RouterInstance) {
     '/login-osm',
     authenticator(false),
     acceptValidator('application/json'),
-    // TODO validation
     async (ctx) => {
       let bdy;
 
-      type Body = {
-        code: string;
-        language: string | null;
-        connect?: boolean;
-        redirectUri: string;
-      };
-
       try {
-        bdy = assert<Body>(ctx.request.body);
+        bdy = BodySchema.parse(ctx.request.body);
       } catch (err) {
         return ctx.throw(400, err as Error);
       }
@@ -47,31 +96,25 @@ export function attachLoginWithOsmHandler(router: RouterInstance) {
           redirectUri + (connect === undefined ? '' : '?connect=' + connect),
       });
 
-      const body = await got
-        .post('https://www.openstreetmap.org/oauth2/token?' + sp.toString(), {
-          headers: {
-            'content-type': 'application/x-www-form-urlencoded', // otherwise server returns 415
-          },
-        })
-        .json();
+      const body = OsmTokenSchema.parse(
+        await got
+          .post('https://www.openstreetmap.org/oauth2/token?' + sp.toString(), {
+            headers: {
+              'content-type': 'application/x-www-form-urlencoded', // otherwise server returns 415
+            },
+          })
+          .json(),
+      );
 
-      assertGuard<{ access_token: string }>(body);
-
-      const userDetails = await got
-        .get('https://api.openstreetmap.org/api/0.6/user/details', {
-          headers: {
-            authorization: 'Bearer ' + body.access_token,
-          },
-        })
-        .json();
-
-      assertGuard<{
-        user: {
-          id: number;
-          display_name: string;
-          home?: { lat: number; lon: number };
-        };
-      }>(userDetails);
+      const userDetails = OsmUserDetailsSchema.parse(
+        await got
+          .get('https://api.openstreetmap.org/api/0.6/user/details', {
+            headers: {
+              authorization: 'Bearer ' + body.access_token,
+            },
+          })
+          .json(),
+      );
 
       const {
         user: { display_name: osmName, id: osmId, home },

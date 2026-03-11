@@ -1,28 +1,56 @@
 import { RouterInstance } from '@koa/router';
 import sql, { bulk, empty, join } from 'sql-template-tag';
-import { assert, tags } from 'typia';
+import z from 'zod';
 import { authenticator } from '../../authenticator.js';
 import { runInTransaction } from '../../database.js';
+import { AUTH_REQUIRED, registerPath } from '../../openapi.js';
+
+const BodySchema = z.strictObject({
+  position: z.strictObject({
+    lat: z.number(),
+    lon: z.number(),
+  }),
+  azimuth: z.number().nullish(),
+  title: z.string().nullish(),
+  description: z.string().nullish(),
+  takenAt: z.iso.datetime().nullish(),
+  tags: z.array(z.string()).nullish(),
+  premium: z.boolean().optional(),
+});
 
 export function attachPutPictureHandler(router: RouterInstance) {
-  router.put('/pictures/:id', authenticator(true), async (ctx) => {
-    type Body = {
-      position: {
-        lat: number;
-        lon: number;
-      };
-      azimuth?: number | null;
-      title?: string | null;
-      description?: string | null;
-      takenAt?: (string & tags.Format<'date-time'>) | null;
-      tags?: string[] | null;
-      premium?: boolean;
-    };
+  registerPath('/gallery/pictures/{id}', {
+    put: {
+      summary: 'Update gallery picture metadata',
+      tags: ['gallery'],
+      security: AUTH_REQUIRED,
+      requestParams: {
+        path: z.object({
+          id: z.uint32(),
+        }),
+      },
+      requestBody: {
+        content: {
+          'application/json': {
+            schema: BodySchema,
+          },
+        },
+      },
+      responses: {
+        204: {},
+        400: {},
+        401: {},
+        403: {},
+        404: { description: 'no such picture' },
+      },
+    },
+  });
 
+  router.put('/pictures/:id', authenticator(true), async (ctx) => {
     let body;
 
     try {
-      body = assert<Body>(ctx.request.body);
+      body = BodySchema.parse(ctx.request.body);
     } catch (err) {
       return ctx.throw(400, err as Error);
     }

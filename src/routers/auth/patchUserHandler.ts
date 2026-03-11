@@ -1,33 +1,47 @@
 import { RouterInstance } from '@koa/router';
 import sql, { join, raw } from 'sql-template-tag';
-import { assert, tags } from 'typia';
+import z from 'zod';
 import { authenticator } from '../../authenticator.js';
 import { pool } from '../../database.js';
+import { AUTH_REQUIRED, registerPath } from '../../openapi.js';
 
-type AtLeastOne<T> = { [K in keyof T]: Required<Pick<T, K>> }[keyof T] &
-  Partial<T>;
-
-export type Body = AtLeastOne<{
-  name: string;
-  email: (string & tags.Format<'email'>) | null;
-  lat: number;
-  lon: number;
-  settings: Record<string, unknown>;
-  sendGalleryEmails: boolean | null;
-  language: (string & tags.MinLength<2> & tags.MaxLength<2>) | null;
-}>;
+const BodySchema = z
+  .strictObject({
+    name: z.string().optional(),
+    email: z.email().nullish(),
+    lat: z.number().optional(),
+    lon: z.number().optional(),
+    settings: z.record(z.string(), z.unknown()).optional(),
+    sendGalleryEmails: z.boolean().nullish(),
+    language: z.string().min(2).max(2).nullish(),
+  })
+  .refine((data) => Object.values(data).some((v) => v !== undefined), {
+    message: 'At least one field must be provided',
+  });
 
 export function attachPatchUserHandler(router: RouterInstance) {
+  registerPath('/auth/settings', {
+    patch: {
+      summary: 'Update authenticated user settings',
+      tags: ['auth'],
+      security: AUTH_REQUIRED,
+      requestBody: { content: { 'application/json': { schema: BodySchema } } },
+      responses: { 204: {}, 400: {}, 401: {} },
+    },
+  });
+
   router.patch('/settings', authenticator(true), async (ctx) => {
     let body;
 
     try {
-      body = assert<Body>(ctx.request.body);
+      body = BodySchema.parse(ctx.request.body);
     } catch (err) {
       return ctx.throw(400, err as Error);
     }
 
-    const keys = Object.keys(body) as (keyof Body)[];
+    const keys = (Object.keys(body) as (keyof typeof body)[]).filter(
+      (k) => body[k] !== undefined,
+    );
 
     // TODO validate duplicates
 

@@ -1,10 +1,13 @@
-import { tags } from 'typia';
+import z from 'zod';
 import { RpcContext } from '../rpcHandlerTypes.js';
 import { trackRegister } from '../trackRegister.js';
 
-export type UnsubscribeParams =
-  | { token: string }
-  | { deviceId: number & tags.Type<'uint32'> };
+export const UnsubscribeParamsSchema = z.union([
+  z.strictObject({ token: z.string() }),
+  z.strictObject({ deviceId: z.uint32() }),
+]);
+
+export type UnsubscribeParams = z.infer<typeof UnsubscribeParamsSchema>;
 
 export function trackingUnsubscribeHandler(
   ctx: RpcContext,

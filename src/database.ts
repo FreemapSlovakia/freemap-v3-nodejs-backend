@@ -1,7 +1,7 @@
 import type { PoolConnection } from 'mariadb';
 import { createPool } from 'mariadb';
 import sql from 'sql-template-tag';
-import { is } from 'typia';
+import z from 'zod';
 import { getEnv, getEnvInteger } from './env.js';
 import { appLogger } from './logger.js';
 
@@ -31,12 +31,12 @@ export async function initDatabase() {
       garminAccessTokenSecret VARCHAR(255) CHARSET ascii NULL,
       name VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
       email VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL,
-      isAdmin BOOL NOT NULL DEFAULT 0,
+      isAdmin BIT NOT NULL DEFAULT 0,
       createdAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
       lat FLOAT(8, 6) NULL,
       lon FLOAT(9, 6) NULL,
       settings VARCHAR(4096) CHARSET utf8 COLLATE utf8_bin NOT NULL DEFAULT '{}',
-      sendGalleryEmails BOOL NOT NULL DEFAULT 1,
+      sendGalleryEmails BIT NOT NULL DEFAULT true,
       premiumExpiration TIMESTAMP NULL,
       credits FLOAT NOT NULL DEFAULT 0,
       language CHAR(2) NULL
@@ -171,7 +171,7 @@ export async function initDatabase() {
       modifiedAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
       name VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL,
       userId INT UNSIGNED NOT NULL,
-      public BOOL NOT NULL DEFAULT 0,
+      public BIT NOT NULL DEFAULT false,
       data MEDIUMTEXT CHARSET utf8 COLLATE utf8_bin NOT NULL DEFAULT '{}',
       CONSTRAINT umUserFk FOREIGN KEY (userId) REFERENCES user (id) ON DELETE CASCADE,
       INDEX umCreatedAtIdx (createdAt)
@@ -216,7 +216,11 @@ export async function initDatabase() {
         END`,
   ];
 
-  const updates: (string | string[])[] = [];
+  const updates: (string | string[])[] = [
+    'ALTER TABLE user MODIFY COLUMN isAdmin BIT NOT NULL DEFAULT false',
+    'ALTER TABLE user MODIFY COLUMN sendGalleryEmails BIT NOT NULL DEFAULT true',
+    'ALTER TABLE map MODIFY COLUMN public BIT NOT NULL DEFAULT false',
+  ];
 
   const db = await pool.getConnection();
 
@@ -291,7 +295,7 @@ function withJitter(ms: number) {
 }
 
 function isRetryableTxError(err: unknown): boolean {
-  return is<{ sqlState: string }>(err) && err.sqlState === '40001';
+  return z.object({ sqlState: z.literal('40001') }).safeParse(err).success;
 }
 
 export async function runInTransaction<T>(

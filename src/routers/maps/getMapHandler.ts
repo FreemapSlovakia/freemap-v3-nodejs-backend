@@ -1,29 +1,72 @@
 import { RouterInstance } from '@koa/router';
 import sql from 'sql-template-tag';
-import { assertGuard } from 'typia';
+import z from 'zod';
 import { authenticator } from '../../authenticator.js';
 import { pool } from '../../database.js';
+import { AUTH_OPTIONAL, registerPath } from '../../openapi.js';
 import { acceptValidator } from '../../requestValidators.js';
-import { Map as MyMap } from './types.js';
+import { MapMetaSchema, zDateToIso } from '../../types.js';
+
+const DbRowSchema = z.object({
+  id: z.string().nonempty(),
+  name: z.string().nullable(),
+  public: z.boolean(),
+  userId: z.uint32(),
+  writers: z.string().nullable(),
+  createdAt: zDateToIso,
+  modifiedAt: zDateToIso,
+  data: z.string(),
+});
+
+const ResponseSchema = z.strictObject({
+  meta: MapMetaSchema,
+  data: z.record(z.string(), z.unknown()),
+});
 
 export function attachGetMapHandler(router: RouterInstance) {
+  registerPath('/maps/{id}', {
+    get: {
+      summary: 'Get a map by ID',
+      tags: ['maps'],
+      security: AUTH_OPTIONAL,
+      requestParams: {
+        path: z.object({
+          id: z.string().nonempty(),
+        }),
+      },
+      responses: {
+        200: {
+          content: {
+            'application/json': {
+              schema: ResponseSchema,
+            },
+          },
+        },
+        403: {},
+        404: { description: 'no such map' },
+      },
+    },
+  });
+
   router.get(
     '/:id',
     acceptValidator('application/json'),
     authenticator(false),
     async (ctx) => {
-      const [item] = await pool.query(sql`
-        SELECT id, name, public, data, createdAt, modifiedAt, map.userId, GROUP_CONCAT(mapWriteAccess.userId) AS writers
-          FROM map LEFT JOIN mapWriteAccess ON (mapWriteAccess.mapId = id)
-          WHERE id = ${ctx.params.id}
-          GROUP BY id, name, public, data, createdAt, map.userId
-      `);
+      const [item] = DbRowSchema.array()
+        .max(1)
+        .parse(
+          await pool.query(sql`
+          SELECT id, name, public, data, createdAt, modifiedAt, map.userId, GROUP_CONCAT(mapWriteAccess.userId) AS writers
+            FROM map LEFT JOIN mapWriteAccess ON (mapWriteAccess.mapId = id)
+            WHERE id = ${ctx.params.id}
+            GROUP BY id, name, public, data, createdAt, map.userId
+        `),
+        );
 
       if (!item) {
         ctx.throw(404, 'no such map');
       }
-
-      assertGuard<MyMap>(item);
 
       const { user } = ctx.state;
 
@@ -37,22 +80,21 @@ export function attachGetMapHandler(router: RouterInstance) {
       const writers =
         item.writers?.split(',').map((s: string) => Number(s)) ?? [];
 
-      ctx.body = {
-        meta: {
+      ctx.body = ResponseSchema.parse({
+        meta: MapMetaSchema.parse({
           id: item.id,
-          createdAt: item.createdAt.toISOString(),
-          modifiedAt: item.modifiedAt.toISOString(),
+          createdAt: item.createdAt,
+          modifiedAt: item.modifiedAt,
           name: item.name,
           userId: item.userId,
-          public: !!item.public,
+          public: item.public,
           writers: item.userId === user?.id ? writers : undefined,
-          canWrite: !!(
-            user &&
-            (item.userId === user.id || writers.includes(user.id))
+          canWrite: Boolean(
+            user && (item.userId === user.id || writers.includes(user.id)),
           ),
-        },
+        }),
         data: JSON.parse(item.data),
-      };
+      });
     },
   );
 }

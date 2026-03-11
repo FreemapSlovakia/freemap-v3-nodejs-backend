@@ -1,12 +1,41 @@
 import { RouterInstance } from '@koa/router';
 import sql from 'sql-template-tag';
-import { assertGuard } from 'typia';
+import z from 'zod';
 import { authenticator } from '../../authenticator.js';
 import { pool } from '../../database.js';
+import { AUTH_REQUIRED, registerPath } from '../../openapi.js';
 import { acceptValidator } from '../../requestValidators.js';
-import { Map as MyMap } from './types.js';
+import { MapMetaSchema, zDateToIso } from '../../types.js';
+
+const DbRowSchema = z.object({
+  id: z.string().nonempty(),
+  name: z.string().nullable(),
+  public: z.boolean(),
+  userId: z.uint32(),
+  writers: z
+    .string()
+    .nullable()
+    .transform((w) => (w ? w.split(',').map(Number) : []))
+    .pipe(z.number().array()),
+  createdAt: zDateToIso,
+  modifiedAt: zDateToIso,
+});
 
 export function attachGetAllMapsHandler(router: RouterInstance) {
+  registerPath('/maps', {
+    get: {
+      tags: ['maps'],
+      summary: 'List all maps owned by the authenticated user',
+      security: AUTH_REQUIRED,
+      responses: {
+        200: {
+          content: { 'application/json': { schema: MapMetaSchema.array() } },
+        },
+        401: {},
+      },
+    },
+  });
+
   router.get(
     '/',
     acceptValidator('application/json'),
@@ -14,28 +43,26 @@ export function attachGetAllMapsHandler(router: RouterInstance) {
     async (ctx) => {
       const user = ctx.state.user!;
 
-      const items = await pool.query(sql`
-        SELECT id, name, public, createdAt, modifiedAt, map.userId, GROUP_CONCAT(mapWriteAccess.userId) AS writers
-          FROM map LEFT JOIN mapWriteAccess ON (mapWriteAccess.mapId = id)
-          WHERE map.userId = ${user.id}
-          GROUP BY id, name, public, createdAt, modifiedAt, map.userId
-      `);
-
-      assertGuard<Omit<MyMap, 'data'>[]>(items);
+      const items = DbRowSchema.array().parse(
+        await pool.query(sql`
+          SELECT id, name, public, createdAt, modifiedAt, map.userId, GROUP_CONCAT(mapWriteAccess.userId) AS writers
+            FROM map LEFT JOIN mapWriteAccess ON (mapWriteAccess.mapId = id)
+            WHERE map.userId = ${user.id}
+            GROUP BY id, name, public, createdAt, modifiedAt, map.userId
+        `),
+      );
 
       ctx.body = items.map((item) => {
-        const writers = item.writers?.split(',').map((s) => Number(s)) ?? [];
-
-        return {
+        return MapMetaSchema.parse({
           id: item.id,
-          createdAt: item.createdAt.toISOString(),
-          modifiedAt: item.modifiedAt.toISOString(),
+          createdAt: item.createdAt,
+          modifiedAt: item.modifiedAt,
           name: item.name,
           userId: item.userId,
-          public: !!item.public,
-          writers: item.userId === user.id ? writers : undefined,
-          canWrite: item.userId === user.id || writers.includes(user.id),
-        };
+          public: item.public,
+          writers: item.userId === user.id ? item.writers : undefined,
+          canWrite: item.userId === user.id || item.writers.includes(user.id),
+        });
       });
     },
   );

@@ -5,8 +5,9 @@ import { pipeline } from 'node:stream/promises';
 import { RouterInstance } from '@koa/router';
 import gdal from 'gdal-async';
 import { ParameterizedContext } from 'koa';
-import { assert } from 'typia';
+import z from 'zod';
 import { getEnv } from '../../env.js';
+import { registerPath } from '../../openapi.js';
 import { acceptValidator } from '../../requestValidators.js';
 
 const elevationDataDir = getEnv('ELEVATION_DATA_DIRECTORY');
@@ -21,49 +22,75 @@ type DatasetInfo = {
   height: number;
 };
 
+const CoordSchema = z.tuple([
+  z.number().min(-90).max(90).meta({ description: 'latitude' }),
+  z.number().min(-180).max(180).meta({ description: 'longitude' }),
+]);
+
+const CoordsSchema = z.union([CoordSchema, CoordSchema.array()]);
+
+const CoordSchemaC = z
+  .string()
+  .transform((s) => s.split(',').map(Number))
+  .pipe(CoordSchema);
+
+const CoordsSchemaC = z.union([CoordSchemaC, CoordSchemaC.array()]);
+
+const ElevationResponseSchema = z.array(
+  z
+    .number()
+    .nullable()
+    .meta({ description: 'elevation in meters above sea level' }),
+);
+
 export function attachElevationHandler(router: RouterInstance) {
+  registerPath('/geotools/elevation', {
+    get: {
+      summary: 'Get elevation for coordinates (query params)',
+      tags: ['geotools'],
+      requestParams: {
+        query: z.object({
+          coordinates: CoordsSchemaC,
+        }),
+      },
+      responses: {
+        200: {
+          content: { 'application/json': { schema: ElevationResponseSchema } },
+        },
+      },
+    },
+    post: {
+      summary: 'Get elevation for a list of coordinates',
+      tags: ['geotools'],
+      requestBody: {
+        content: { 'application/json': { schema: CoordsSchema } },
+      },
+      responses: {
+        200: {
+          content: { 'application/json': { schema: ElevationResponseSchema } },
+        },
+        400: {},
+      },
+    },
+  });
+
   router.get('/elevation', compute);
 
   router.post('/elevation', acceptValidator('application/json'), compute);
 }
 
 async function compute(ctx: ParameterizedContext) {
-  const coordinates = Array.isArray(ctx.query.coordinates)
-    ? ctx.query.coordinates.join(',')
-    : ctx.query.coordinates;
+  let cs: [number, number][];
 
-  let cs: number[][] | undefined;
+  try {
+    const a =
+      ctx.method === 'POST'
+        ? CoordsSchema.parse(ctx.request.body)
+        : CoordsSchemaC.parse(ctx.query.coordinates);
 
-  if (
-    ctx.method === 'GET' &&
-    coordinates &&
-    /^([^,]+,[^,]+)(,[^,]+,[^,]+)*$/.test(coordinates)
-  ) {
-    cs = coordinates
-      .match(/[^,]+,[^,]+/g)
-      ?.map((pair) => pair.split(',').map((c) => Number.parseFloat(c)));
-  } else if (ctx.method === 'POST' && Array.isArray(ctx.request.body)) {
-    try {
-      cs = assert<number[][]>(ctx.request.body);
-    } catch (err) {
-      return ctx.throw(400, err as Error);
-    }
-  } else {
-    ctx.throw(400, 'invalid request parameters');
-  }
-
-  if (
-    !cs?.every(
-      (x) =>
-        Array.isArray(x) &&
-        x.length === 2 &&
-        x[0] >= -90 &&
-        x[0] <= 90 &&
-        x[1] >= -180 &&
-        x[1] <= 180,
-    )
-  ) {
-    ctx.throw(400, 'coordinate not in valid range');
+    cs = (Array.isArray(a[0]) ? a : [a]) as [number, number][];
+  } catch (err) {
+    return ctx.throw(400, err as Error);
   }
 
   const allocated = new Set<string>();
@@ -137,8 +164,8 @@ async function compute(ctx: ParameterizedContext) {
       return ds ? ([item[0], item[1], ds] as Tuple) : null;
     });
 
-    ctx.response.body = await Promise.all(
-      params.map((t) => t && computeElevation(t)),
+    ctx.response.body = ElevationResponseSchema.parse(
+      await Promise.all(params.map((t) => t && computeElevation(t))),
     );
   } finally {
     for (const { dataset } of dsMap.values()) {

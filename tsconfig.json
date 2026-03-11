@@ -10,11 +10,6 @@
     "skipLibCheck": true,
     "strict": true,
     "lib": ["ES2024"],
-    "plugins": [
-      {
-        "transform": "typia/lib/transform"
-      }
-    ],
     "strictNullChecks": true
   }
 }

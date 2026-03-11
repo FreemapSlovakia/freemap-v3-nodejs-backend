@@ -4,9 +4,19 @@ import sql from 'sql-template-tag';
 import { authenticator } from '../../authenticator.js';
 import { runInTransaction } from '../../database.js';
 import { appLogger } from '../../logger.js';
+import { AUTH_REQUIRED, registerPath } from '../../openapi.js';
 import { picturesDir } from '../gallery/constants.js';
 
 export function attachDeleteUserHandler(router: RouterInstance) {
+  registerPath('/auth/settings', {
+    delete: {
+      summary: "Delete the authenticated user's account",
+      tags: ['auth'],
+      security: AUTH_REQUIRED,
+      responses: { 204: {}, 401: {} },
+    },
+  });
+
   router.delete('/settings', authenticator(true), async (ctx) => {
     const logger = appLogger.child({
       module: 'deleteUser',

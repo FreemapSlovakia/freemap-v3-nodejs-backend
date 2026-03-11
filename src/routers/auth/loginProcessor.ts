@@ -1,14 +1,23 @@
 import { randomBytes } from 'node:crypto';
 import { ParameterizedContext } from 'koa';
 import sql, { empty, join, RawValue, raw } from 'sql-template-tag';
-import { assert } from 'typia';
+import z from 'zod';
 import {
   authProviderToColumn,
   rowToUser,
-  UserRow,
   userForResponse,
 } from '../../authenticator.js';
 import { runInTransaction } from '../../database.js';
+import { LoginResponseSchema, UserRowSchema } from '../../types.js';
+
+const SettingsBodySchema = z.object({
+  settings: z
+    .object({
+      lat: z.number().nullish(),
+      lon: z.number().nullish(),
+    })
+    .optional(),
+});
 
 export async function login(
   ctx: ParameterizedContext,
@@ -162,9 +171,7 @@ export async function login(
       let body;
 
       try {
-        body = assert<{
-          settings?: { lat?: number | null; lon?: number | null };
-        }>(ctx.request.body);
+        body = SettingsBodySchema.parse(ctx.request.body);
       } catch (err) {
         ctx.log.warn({ body }, 'Invalid body.');
 
@@ -234,12 +241,12 @@ export async function login(
       sql`SELECT * FROM user WHERE id = ${userId}`,
     );
 
-    return { userRow: assert<UserRow>(row), authToken };
+    return { userRow: UserRowSchema.parse(row), authToken };
   });
 
-  ctx.body = {
+  ctx.body = LoginResponseSchema.parse({
     user: userForResponse(rowToUser(userRow, authToken)),
     connect,
     clientData,
-  };
+  });
 }

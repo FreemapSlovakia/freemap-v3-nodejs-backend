@@ -1,5 +1,4 @@
 import Router from '@koa/router';
-
 import { attachDeleteDeviceHandler } from './deleteDeviceHandler.js';
 import { attachDeleteTokenHandler } from './deleteTokenHandler.js';
 import { attachGetAllDevicesHandler } from './getAllDevicesHandler.js';

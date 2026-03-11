@@ -9,13 +9,3 @@ export function acceptValidator(...type: string[]): Middleware {
     await next();
   };
 }
-
-export function contentTypeValidator(...type: string[]): Middleware {
-  return async (ctx, next) => {
-    if (!ctx.is(type)) {
-      ctx.throw(415);
-    }
-
-    await next();
-  };
-}

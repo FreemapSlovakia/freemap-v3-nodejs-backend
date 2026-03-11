@@ -1,16 +1,16 @@
 import Router from '@koa/router';
 import KoaWebsocket from 'koa-websocket';
-import { is } from 'typia';
 import type WebSocket from 'ws';
+import z from 'zod';
 import { authenticator } from './authenticator.js';
 import { pingHandler } from './rpcHandlers/pingHandler.js';
 import {
-  SubscribeParams,
+  SubscribeParamsSchema,
   trackingSubscribeHandler,
 } from './rpcHandlers/trackingSubscribeHandler.js';
 import {
   trackingUnsubscribeHandler,
-  UnsubscribeParams,
+  UnsubscribeParamsSchema,
 } from './rpcHandlers/trackingUnsubscribeHandler.js';
 import { RpcContext } from './rpcHandlerTypes.js';
 import { trackRegister } from './trackRegister.js';
@@ -36,7 +36,7 @@ export function attachWs(app: KoaWebsocket.App) {
     ws.on('message', (message) => {
       let id: number | string | null | undefined = undefined;
 
-      function respondError(code: number, msg: string) {
+      function respondError(code: number, message: string, data?: unknown) {
         if (ws.readyState === 1) {
           ws.send(
             JSON.stringify({
@@ -44,7 +44,8 @@ export function attachWs(app: KoaWebsocket.App) {
               id,
               error: {
                 code,
-                message: msg,
+                message,
+                data,
               },
             }),
           );
@@ -73,45 +74,66 @@ export function attachWs(app: KoaWebsocket.App) {
         } else {
           throw new Error();
         }
-      } catch {
-        respondError(-32700, 'Parse error');
+      } catch (err) {
+        respondError(-32700, 'Parse error', err);
         return;
       }
 
-      type Request = {
-        jsonrpc: '2.0';
-        method: string;
-        id?: string | number | null;
-        params?: unknown;
-      };
+      const RequestSchema = z.object({
+        jsonrpc: z.literal('2.0'),
+        method: z.string(),
+        id: z.union([z.string(), z.number(), z.null()]),
+        params: z.unknown().optional(),
+      });
 
-      type KnownRequest =
-        | {
-            method: 'tracking.subscribe';
-            params: SubscribeParams;
-          }
-        | {
-            method: 'tracking.unsubscribe';
-            params: UnsubscribeParams;
-          }
-        | {
-            method: 'ping';
-          };
+      const KnownRequestSchema = z.intersection(
+        RequestSchema,
+        z.discriminatedUnion('method', [
+          z.object({
+            method: z.literal('tracking.subscribe'),
+            params: SubscribeParamsSchema,
+          }),
+          z.object({
+            method: z.literal('tracking.unsubscribe'),
+            params: UnsubscribeParamsSchema,
+          }),
+          z.object({ method: z.literal('ping') }),
+        ]),
+      );
 
-      if (!is<Request>(msg)) {
-        respondError(-32600, 'Invalid Request');
+      try {
+        RequestSchema.parse(msg);
+      } catch (e) {
+        respondError(
+          -32600,
+          'Invalid Request',
+          e instanceof z.ZodError ? z.treeifyError(e) : e,
+        );
         return;
       }
 
       id = msg.id;
 
-      if (!is<Pick<KnownRequest, 'method'>>(msg)) {
-        respondError(-32601, 'Method not found');
-        return;
-      }
+      try {
+        msg = KnownRequestSchema.parse(msg);
+      } catch (err) {
+        if (
+          err instanceof z.ZodError &&
+          err.issues.some(
+            (issue) =>
+              issue.code === 'invalid_union' &&
+              issue.discriminator === 'method',
+          )
+        ) {
+          respondError(-32601, 'Method not found');
+        } else {
+          respondError(
+            -32602,
+            'Invalid params',
+            err instanceof z.ZodError ? z.treeifyError(err) : err,
+          );
+        }
 
-      if (!is<KnownRequest>(msg)) {
-        respondError(-32602, 'Invalid params');
         return;
       }
 
@@ -147,6 +169,5 @@ export function attachWs(app: KoaWebsocket.App) {
     ws.on('error', handleCloseOrError);
   });
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   app.ws.use(wsRouter.routes() as any).use(wsRouter.allowedMethods() as any);
 }

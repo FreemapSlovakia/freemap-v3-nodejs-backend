@@ -1,27 +1,47 @@
 import { RouterInstance } from '@koa/router';
 import sql from 'sql-template-tag';
-import { assert, tags } from 'typia';
+import z from 'zod';
 import { authenticator } from '../../authenticator.js';
 import { runInTransaction } from '../../database.js';
+import { AUTH_REQUIRED, registerPath } from '../../openapi.js';
 import { acceptValidator } from '../../requestValidators.js';
+import { TokenBodySchema } from '../../types.js';
 
 export function attachPutTokenHandler(router: RouterInstance) {
+  registerPath('/tracking/access-tokens/{id}', {
+    put: {
+      summary: 'Update a tracking access token',
+      tags: ['tracking'],
+      security: AUTH_REQUIRED,
+      requestParams: {
+        path: z.object({
+          id: z.uint32(),
+        }),
+      },
+      requestBody: {
+        content: {
+          'application/json': {
+            schema: TokenBodySchema,
+          },
+        },
+      },
+      responses: {
+        204: {},
+        403: {},
+        404: { description: 'no such tracking access token' },
+      },
+    },
+  });
+
   router.put(
     '/access-tokens/:id',
     acceptValidator('application/json'),
     authenticator(true),
     async (ctx) => {
-      type Body = {
-        timeFrom?: (string & tags.Format<'date-time'>) | null;
-        timeTo?: (string & tags.Format<'date-time'>) | null;
-        note?: (string & tags.MaxLength<255>) | null;
-        listingLabel?: (string & tags.MaxLength<255>) | null;
-      };
-
       let body;
 
       try {
-        body = assert<Body>(ctx.request.body);
+        body = TokenBodySchema.parse(ctx.request.body);
       } catch (err) {
         return ctx.throw(400, err as Error);
       }
