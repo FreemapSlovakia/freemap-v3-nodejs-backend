@@ -3,12 +3,15 @@ import { RouterInstance } from '@koa/router';
 import sql from 'sql-template-tag';
 import { authenticator } from '../../authenticator.js';
 import { runInTransaction } from '../../database.js';
-import { registerPath } from '../../openapi.js';
+import { AUTH_REQUIRED, registerPath } from '../../openapi.js';
 import { picturesDir } from '../gallery/constants.js';
 
 export function attachDeletePictureHandler(router: RouterInstance) {
   registerPath('/gallery/pictures/{id}', {
     delete: {
+      summary: 'Delete a gallery picture',
+      tags: ['gallery'],
+      security: AUTH_REQUIRED,
       parameters: [
         {
           in: 'path',

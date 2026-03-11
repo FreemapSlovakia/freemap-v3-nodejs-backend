@@ -9,7 +9,7 @@ import { login } from './loginProcessor.js';
 const FacebookUserSchema = z.object({
   id: z.string(),
   name: z.string(),
-  email: z.string().nullable().optional(),
+  email: z.email().nullish(),
 });
 
 async function getUserData(accessToken: string) {
@@ -30,6 +30,8 @@ const BodySchema = z.strictObject({
 export function attachLoginWithFacebookHandler(router: RouterInstance) {
   registerPath('/auth/login-fb', {
     post: {
+      summary: 'Log in with Facebook OAuth',
+      tags: ['auth'],
       security: AUTH_OPTIONAL,
       requestBody: { content: { 'application/json': { schema: BodySchema } } },
       responses: {
@@ -40,7 +42,6 @@ export function attachLoginWithFacebookHandler(router: RouterInstance) {
       },
     },
   });
-
   router.post('/login-fb', authenticator(false), async (ctx) => {
     let body;
 

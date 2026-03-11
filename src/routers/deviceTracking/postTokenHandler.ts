@@ -17,6 +17,8 @@ const ResponseBodySchema = z.strictObject({
 export function attachPostTokenHandler(router: RouterInstance) {
   registerPath('/tracking/devices/{id}/access-tokens', {
     post: {
+      summary: 'Create an access token for a tracking device',
+      tags: ['tracking'],
       security: AUTH_REQUIRED,
       parameters: [
         {
@@ -35,11 +37,7 @@ export function attachPostTokenHandler(router: RouterInstance) {
       },
       responses: {
         200: {
-          content: {
-            'application/json': {
-              schema: ResponseBodySchema,
-            },
-          },
+          content: { 'application/json': { schema: ResponseBodySchema } },
         },
         403: {},
         404: { description: 'no such tracking device' },

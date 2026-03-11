@@ -5,7 +5,6 @@ import z from 'zod';
 import {
   authProviderToColumn,
   rowToUser,
-  UserRow,
   userForResponse,
 } from '../../authenticator.js';
 import { runInTransaction } from '../../database.js';
@@ -14,8 +13,8 @@ import { LoginResponseSchema, UserRowSchema } from '../../types.js';
 const SettingsBodySchema = z.object({
   settings: z
     .object({
-      lat: z.number().nullable().optional(),
-      lon: z.number().nullable().optional(),
+      lat: z.number().nullish(),
+      lon: z.number().nullish(),
     })
     .optional(),
 });
@@ -242,7 +241,7 @@ export async function login(
       sql`SELECT * FROM user WHERE id = ${userId}`,
     );
 
-    return { userRow: UserRowSchema.parse(row) as UserRow, authToken };
+    return { userRow: UserRowSchema.parse(row), authToken };
   });
 
   ctx.body = LoginResponseSchema.parse({

@@ -20,21 +20,13 @@ const GarminUserSchema = z.object({ userId: z.string() });
 export function attachLoginWithGarmin2Handler(router: RouterInstance) {
   registerPath('/auth/login-garmin-2', {
     post: {
+      summary: 'Complete Garmin OAuth login (step 2 — exchange token)',
+      tags: ['auth'],
       security: AUTH_OPTIONAL,
-      requestBody: {
-        content: {
-          'application/json': {
-            schema: BodySchema,
-          },
-        },
-      },
+      requestBody: { content: { 'application/json': { schema: BodySchema } } },
       responses: {
         200: {
-          content: {
-            'application/json': {
-              schema: LoginResponseSchema,
-            },
-          },
+          content: { 'application/json': { schema: LoginResponseSchema } },
         },
         400: {},
         403: { description: 'session not found' },

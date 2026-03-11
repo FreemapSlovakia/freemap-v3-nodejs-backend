@@ -13,6 +13,8 @@ const ResponseSchema = z.strictObject({ id: z.string() });
 export function attachLoggerHandler(router: RouterInstance) {
   registerPath('/logger', {
     post: {
+      summary: 'Submit a client-side log entry',
+      tags: ['misc'],
       requestBody: {
         content: { 'application/json': { schema: BodySchema } },
       },

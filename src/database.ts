@@ -1,7 +1,7 @@
 import type { PoolConnection } from 'mariadb';
 import { createPool } from 'mariadb';
 import sql from 'sql-template-tag';
-import { is } from 'typia';
+import z from 'zod';
 import { getEnv, getEnvInteger } from './env.js';
 import { appLogger } from './logger.js';
 
@@ -291,7 +291,7 @@ function withJitter(ms: number) {
 }
 
 function isRetryableTxError(err: unknown): boolean {
-  return is<{ sqlState: string }>(err) && err.sqlState === '40001';
+  return z.object({ sqlState: z.literal('40001') }).safeParse(err).success;
 }
 
 export async function runInTransaction<T>(

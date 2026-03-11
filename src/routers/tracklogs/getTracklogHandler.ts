@@ -13,6 +13,8 @@ const ResponseSchema = z.strictObject({
 export function attachGetTracklogHandler(router: RouterInstance) {
   registerPath('/tracklogs/{uid}', {
     get: {
+      summary: 'Retrieve a GPX tracklog by UID',
+      tags: ['tracklogs'],
       parameters: [
         {
           in: 'path',

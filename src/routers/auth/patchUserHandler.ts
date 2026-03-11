@@ -3,17 +3,17 @@ import sql, { join, raw } from 'sql-template-tag';
 import z from 'zod';
 import { authenticator } from '../../authenticator.js';
 import { pool } from '../../database.js';
-import { registerPath } from '../../openapi.js';
+import { AUTH_REQUIRED, registerPath } from '../../openapi.js';
 
 const BodySchema = z
   .strictObject({
     name: z.string().optional(),
-    email: z.string().email().nullable().optional(),
+    email: z.email().nullish(),
     lat: z.number().optional(),
     lon: z.number().optional(),
     settings: z.record(z.string(), z.unknown()).optional(),
-    sendGalleryEmails: z.boolean().nullable().optional(),
-    language: z.string().min(2).max(2).nullable().optional(),
+    sendGalleryEmails: z.boolean().nullish(),
+    language: z.string().min(2).max(2).nullish(),
   })
   .refine((data) => Object.values(data).some((v) => v !== undefined), {
     message: 'At least one field must be provided',
@@ -22,6 +22,9 @@ const BodySchema = z
 export function attachPatchUserHandler(router: RouterInstance) {
   registerPath('/auth/settings', {
     patch: {
+      summary: 'Update authenticated user settings',
+      tags: ['auth'],
+      security: AUTH_REQUIRED,
       requestBody: { content: { 'application/json': { schema: BodySchema } } },
       responses: { 204: {}, 400: {}, 401: {} },
     },

@@ -44,6 +44,9 @@ const TrackResponseSchema = z.strictObject({ id: z.uint32() });
 export function attachTrackDeviceHandler(router: RouterInstance) {
   registerPath('/tracking/track', {
     post: {
+      summary:
+        'Submit a device location update (JSON/BackgroundGeolocation format)',
+      tags: ['tracking'],
       requestBody: {
         content: {
           'application/json': {
@@ -53,11 +56,7 @@ export function attachTrackDeviceHandler(router: RouterInstance) {
       },
       responses: {
         200: {
-          content: {
-            'application/json': {
-              schema: TrackResponseSchema,
-            },
-          },
+          content: { 'application/json': { schema: TrackResponseSchema } },
         },
         400: {},
         404: { description: 'no such tracking device' },
@@ -67,6 +66,8 @@ export function attachTrackDeviceHandler(router: RouterInstance) {
 
   registerPath('/tracking/track/{token}', {
     get: {
+      summary: 'Submit a device location update via URL parameters',
+      tags: ['tracking'],
       parameters: [
         {
           in: 'path',
@@ -77,17 +78,15 @@ export function attachTrackDeviceHandler(router: RouterInstance) {
       ],
       responses: {
         200: {
-          content: {
-            'application/json': {
-              schema: TrackResponseSchema,
-            },
-          },
+          content: { 'application/json': { schema: TrackResponseSchema } },
         },
         400: {},
         404: { description: 'no such tracking device' },
       },
     },
     post: {
+      summary: 'Submit a device location update via form-encoded body',
+      tags: ['tracking'],
       parameters: [
         {
           in: 'path',
@@ -98,11 +97,7 @@ export function attachTrackDeviceHandler(router: RouterInstance) {
       ],
       responses: {
         200: {
-          content: {
-            'application/json': {
-              schema: TrackResponseSchema,
-            },
-          },
+          content: { 'application/json': { schema: TrackResponseSchema } },
         },
         400: {},
         404: { description: 'no such tracking device' },

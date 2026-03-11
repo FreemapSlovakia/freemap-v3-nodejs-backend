@@ -3,13 +3,16 @@ import sql from 'sql-template-tag';
 import z from 'zod';
 import { authenticator } from '../../authenticator.js';
 import { runInTransaction } from '../../database.js';
-import { registerPath } from '../../openapi.js';
+import { AUTH_REQUIRED, registerPath } from '../../openapi.js';
 
 const BodySchema = z.strictObject({ stars: z.uint32().min(1).max(5) });
 
 export function attachPostPictureRatingHandler(router: RouterInstance) {
   registerPath('/gallery/pictures/{id}/rating', {
     post: {
+      summary: 'Rate a gallery picture',
+      tags: ['gallery'],
+      security: AUTH_REQUIRED,
       parameters: [
         {
           in: 'path',

@@ -5,7 +5,7 @@ import z from 'zod';
 import { authenticator } from '../../authenticator.js';
 import { pool } from '../../database.js';
 import { getEnv } from '../../env.js';
-import { registerPath } from '../../openapi.js';
+import { AUTH_REQUIRED, registerPath } from '../../openapi.js';
 
 type Combo = {
   title: string;
@@ -104,6 +104,9 @@ const ResponseSchema = z.strictObject({ paymentUrl: z.string() });
 export function attachPurchaseTokenHandler(router: RouterInstance) {
   registerPath('/auth/purchaseToken', {
     post: {
+      summary: 'Create a payment URL for a premium or credits purchase',
+      tags: ['auth'],
+      security: AUTH_REQUIRED,
       requestBody: { content: { 'application/json': { schema: BodySchema } } },
       responses: {
         200: { content: { 'application/json': { schema: ResponseSchema } } },

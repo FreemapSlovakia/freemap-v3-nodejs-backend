@@ -3,7 +3,7 @@ import sql from 'sql-template-tag';
 import z from 'zod';
 import { authenticator } from '../../authenticator.js';
 import { pool } from '../../database.js';
-import { registerPath } from '../../openapi.js';
+import { AUTH_REQUIRED, registerPath } from '../../openapi.js';
 
 const ResponseSchema = z.array(
   z.strictObject({ item: z.string(), createdAt: z.iso.datetime() }),
@@ -12,6 +12,9 @@ const ResponseSchema = z.array(
 export function attachGetPurchasesHandler(router: RouterInstance) {
   registerPath('/auth/purchases', {
     get: {
+      summary: "List the authenticated user's purchases",
+      tags: ['auth'],
+      security: AUTH_REQUIRED,
       responses: {
         200: { content: { 'application/json': { schema: ResponseSchema } } },
         401: {},

@@ -15,12 +15,14 @@ const BodySchema = z.strictObject({
 const GoogleUserSchema = z.object({
   sub: z.string(),
   name: z.string().optional(),
-  email: z.string().optional(),
+  email: z.email().optional(),
 });
 
 export function attachLoginWithGoogleHandler(router: RouterInstance) {
   registerPath('/auth/login-google', {
     post: {
+      summary: 'Log in with Google OAuth',
+      tags: ['auth'],
       security: AUTH_OPTIONAL,
       requestBody: { content: { 'application/json': { schema: BodySchema } } },
       responses: {

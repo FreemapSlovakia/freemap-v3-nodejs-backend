@@ -7,6 +7,8 @@ import { AUTH_REQUIRED, registerPath } from '../../openapi.js';
 export function attachLogoutHandler(router: RouterInstance) {
   registerPath('/auth/logout', {
     post: {
+      summary: 'Log out and invalidate the current session',
+      tags: ['auth'],
       security: AUTH_REQUIRED,
       responses: { 204: {}, 401: {} },
     },

@@ -15,6 +15,8 @@ const ResponseSchema = z.array(
 export function attachGetAllTagsHandler(router: RouterInstance) {
   registerPath('/gallery/picture-tags', {
     get: {
+      summary: 'List all gallery picture tags',
+      tags: ['gallery'],
       responses: {
         200: { content: { 'application/json': { schema: ResponseSchema } } },
       },

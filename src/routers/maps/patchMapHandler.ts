@@ -3,28 +3,31 @@ import sql, { bulk, empty } from 'sql-template-tag';
 import z from 'zod';
 import { authenticator } from '../../authenticator.js';
 import { runInTransaction } from '../../database.js';
-import { registerPath } from '../../openapi.js';
+import { AUTH_REQUIRED, registerPath } from '../../openapi.js';
 import { acceptValidator } from '../../requestValidators.js';
-import { MapMetaSchema } from '../../types.js';
+import { MapMetaSchema, zDateToIso } from '../../types.js';
 
 const BodySchema = z.strictObject({
   name: z.string().min(1).max(255).optional(),
   data: z.record(z.string(), z.unknown()).optional(),
   public: z.boolean().optional(),
-  writers: z.array(z.uint32()).optional(),
+  writers: z.array(z.uint32()).optional().meta({ description: 'User IDs' }),
 });
 
 const DbRowSchema = z.object({
   userId: z.uint32(),
   name: z.string().nullable(),
-  createdAt: z.date(),
+  createdAt: zDateToIso,
   modifiedAt: z.date(),
-  public: z.number().int(),
+  public: z.number().transform(Boolean),
 });
 
 export function attachPatchMapHandler(router: RouterInstance) {
   registerPath('/maps/{id}', {
     patch: {
+      summary: 'Update map metadata or data',
+      tags: ['maps'],
+      security: AUTH_REQUIRED,
       parameters: [
         {
           in: 'path',
@@ -134,9 +137,9 @@ export function attachPatchMapHandler(router: RouterInstance) {
 
         ctx.body = MapMetaSchema.parse({
           id,
-          createdAt: item.createdAt.toISOString(),
+          createdAt: item.createdAt,
           modifiedAt: now.toISOString(),
-          public: !!(pub ?? item.public),
+          public: pub ?? item.public,
           writers: writers ?? curWriters,
           name: name ?? item.name,
           userId: item.userId,

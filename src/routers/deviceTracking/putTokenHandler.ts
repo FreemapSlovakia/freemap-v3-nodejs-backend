@@ -9,6 +9,8 @@ import { TokenBodySchema } from '../../types.js';
 export function attachPutTokenHandler(router: RouterInstance) {
   registerPath('/tracking/access-tokens/{id}', {
     put: {
+      summary: 'Update a tracking access token',
+      tags: ['tracking'],
       security: AUTH_REQUIRED,
       parameters: [
         {

@@ -15,6 +15,8 @@ const ResponseBodySchema = z.strictObject({ token: z.string() });
 export function attachPutDeviceHandler(router: RouterInstance) {
   registerPath('/tracking/devices/{id}', {
     put: {
+      summary: 'Update a tracking device',
+      tags: ['tracking'],
       security: AUTH_REQUIRED,
       parameters: [
         {
@@ -33,11 +35,7 @@ export function attachPutDeviceHandler(router: RouterInstance) {
       },
       responses: {
         200: {
-          content: {
-            'application/json': {
-              schema: ResponseBodySchema,
-            },
-          },
+          content: { 'application/json': { schema: ResponseBodySchema } },
         },
         403: {},
         404: { description: 'no such tracking device' },

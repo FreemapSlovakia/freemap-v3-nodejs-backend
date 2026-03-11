@@ -8,7 +8,7 @@ import { registerPath } from '../../openapi.js';
 
 const BodySchema = z.strictObject({
   token: z.string(),
-  email: z.string(),
+  email: z.email(),
   signature: z.string(),
   amount_paid: z.union([z.number(), z.string()]).optional(),
   currency: z.string().optional(),
@@ -17,6 +17,9 @@ const BodySchema = z.strictObject({
 export function attachPurchaseValidateHandler(router: RouterInstance) {
   registerPath('/auth/purchaseValidate', {
     post: {
+      summary:
+        'Payment provider webhook to validate and apply a completed purchase',
+      tags: ['auth'],
       requestBody: { content: { 'application/json': { schema: BodySchema } } },
       responses: { 204: {}, 400: {}, 403: {} },
     },

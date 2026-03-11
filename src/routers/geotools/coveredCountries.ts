@@ -10,6 +10,8 @@ const RowSchema = z.strictObject({ alpha2: z.string() });
 export function attachCoveredCountriesHandler(router: RouterInstance) {
   registerPath('/geotools/covered-countries', {
     post: {
+      summary: 'Get countries covered by a geometry',
+      tags: ['geotools'],
       responses: {
         200: {
           content: { 'application/json': { schema: z.array(z.string()) } },

@@ -1,8 +1,8 @@
 import { Middleware } from 'koa';
 import sql from 'sql-template-tag';
-import { assertGuard } from 'typia';
 import { pool } from './database.js';
 import { User } from './koaTypes.js';
+import { UserRow, UserRowSchema } from './types.js';
 
 export const authProviderToColumn = {
   facebook: 'facebookUserId',
@@ -14,27 +14,6 @@ export const authProviderToColumn = {
 export const columnToAuthProvider = Object.fromEntries(
   Object.entries(authProviderToColumn).map(([k, v]) => [v, k]),
 );
-
-export type UserRow = {
-  id: number;
-  osmId: number | null;
-  facebookUserId: string | null;
-  googleUserId: string | null;
-  garminUserId: string | null;
-  garminAccessToken: string | null;
-  garminAccessTokenSecret: string | null;
-  name: string;
-  email: string | null;
-  isAdmin: 0 | 1;
-  createdAt: Date;
-  lat: number | null;
-  lon: number | null;
-  settings: string;
-  sendGalleryEmails: 0 | 1;
-  premiumExpiration: Date | null;
-  credits: number;
-  language: string | null;
-};
 
 export function authenticator(require?: boolean): Middleware {
   return async function authorize(ctx, next) {
@@ -86,9 +65,7 @@ export function authenticator(require?: boolean): Middleware {
       return;
     }
 
-    assertGuard<UserRow>(userRow);
-
-    ctx.state.user = rowToUser(userRow, authToken);
+    ctx.state.user = rowToUser(UserRowSchema.parse(userRow), authToken);
 
     await next();
   };
@@ -97,13 +74,11 @@ export function authenticator(require?: boolean): Middleware {
 export function rowToUser(row: UserRow, authToken: string): User {
   return {
     ...row,
-    isAdmin: Boolean(row.isAdmin),
     authProviders: Object.entries(row)
       .filter(([column, value]) => value && column in columnToAuthProvider)
       .map(([column]) => columnToAuthProvider[column]),
     authToken,
     settings: row.settings ? JSON.parse(row.settings) : row.settings,
-    sendGalleryEmails: Boolean(row.sendGalleryEmails),
   };
 }
 
@@ -135,8 +110,8 @@ export function userForResponse(user: User) {
     lat,
     lon,
     name,
-    premiumExpiration: premiumExpiration?.toISOString() ?? null,
-    sendGalleryEmails: Boolean(sendGalleryEmails),
+    premiumExpiration: premiumExpiration && premiumExpiration.toISOString(),
+    sendGalleryEmails,
     settings,
   };
 }

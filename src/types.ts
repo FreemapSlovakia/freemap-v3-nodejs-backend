@@ -8,6 +8,13 @@ export const zNullableDateToIso = z
   .pipe(z.iso.datetime())
   .nullable();
 
+export const zNullishDateToIso = z
+  .date()
+  .nullish()
+  .transform((d) => (d == null ? null : d.toISOString()))
+  .pipe(z.iso.datetime())
+  .nullish();
+
 export const zDateToIso = z
   .date()
   .transform((d) => d.toISOString())
@@ -59,9 +66,9 @@ export const UserResponseSchema = z
   .strictObject({
     id: z.uint32(),
     name: z.string(),
-    email: z.string().nullable(),
+    email: z.email().nullable(),
     authToken: z.string(),
-    authProviders: z.array(z.string()),
+    authProviders: z.array(z.enum(['osm', 'facebook', 'google', 'garmin'])),
     isAdmin: z.boolean(),
     language: z.string().nullable(),
     lat: z.number().nullable(),
@@ -69,7 +76,7 @@ export const UserResponseSchema = z
     premiumExpiration: z.iso.datetime().nullable(),
     sendGalleryEmails: z.boolean(),
     settings: z.record(z.string(), z.unknown()).nullable(),
-    credits: z.number(),
+    credits: z.number().nonnegative(),
   })
   .meta({ id: 'UserResponse' });
 
@@ -89,7 +96,7 @@ export const MapMetaSchema = z
     userId: z.uint32(),
     createdAt: z.iso.datetime(),
     modifiedAt: z.iso.datetime(),
-    writers: z.array(z.uint32()).optional(),
+    writers: z.array(z.uint32()).optional().meta({ description: 'User IDs' }),
     canWrite: z.boolean(),
   })
   .meta({ id: 'MapMeta' });
@@ -103,14 +110,23 @@ export const UserRowSchema = z.object({
   garminAccessToken: z.string().nullable(),
   garminAccessTokenSecret: z.string().nullable(),
   name: z.string(),
-  email: z.string().nullable(),
-  isAdmin: z.union([z.literal(0), z.literal(1)]),
+  email: z.email().nullable(),
+  isAdmin: z.number().transform(Boolean),
   createdAt: z.date(),
   lat: z.number().nullable(),
   lon: z.number().nullable(),
-  settings: z.string(),
-  sendGalleryEmails: z.union([z.literal(0), z.literal(1)]),
+  settings: z.string().transform((s, ctx) => {
+    try {
+      return JSON.parse(s);
+    } catch (e) {
+      ctx.addIssue({ code: 'custom', message: 'Invalid JSON: ' + e });
+      return z.NEVER;
+    }
+  }),
+  sendGalleryEmails: z.number().transform(Boolean),
   premiumExpiration: z.date().nullable(),
   credits: z.number(),
   language: z.string().nullable(),
 });
+
+export type UserRow = z.infer<typeof UserRowSchema>;

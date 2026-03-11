@@ -3,23 +3,29 @@ import sql from 'sql-template-tag';
 import z from 'zod';
 import { authenticator } from '../../authenticator.js';
 import { pool } from '../../database.js';
-import { registerPath } from '../../openapi.js';
+import { AUTH_REQUIRED, registerPath } from '../../openapi.js';
 import { acceptValidator } from '../../requestValidators.js';
-import { MapMetaSchema } from '../../types.js';
+import { MapMetaSchema, zDateToIso } from '../../types.js';
 
 const DbRowSchema = z.object({
   id: z.string(),
   name: z.string().nullable(),
-  public: z.number().int(),
+  public: z.number().transform(Boolean),
   userId: z.uint32(),
-  writers: z.string().nullable(),
-  createdAt: z.date(),
-  modifiedAt: z.date(),
+  writers: z
+    .string()
+    .nullable()
+    .transform((w) => (w ? w.split(',').map(Number) : [])),
+  createdAt: zDateToIso,
+  modifiedAt: zDateToIso,
 });
 
 export function attachGetAllMapsHandler(router: RouterInstance) {
   registerPath('/maps', {
     get: {
+      tags: ['maps'],
+      summary: 'List all maps owned by the authenticated user',
+      security: AUTH_REQUIRED,
       responses: {
         200: {
           content: { 'application/json': { schema: MapMetaSchema.array() } },
@@ -46,17 +52,15 @@ export function attachGetAllMapsHandler(router: RouterInstance) {
       );
 
       ctx.body = items.map((item) => {
-        const writers = item.writers?.split(',').map((s) => Number(s)) ?? [];
-
         return MapMetaSchema.parse({
           id: item.id,
-          createdAt: item.createdAt.toISOString(),
-          modifiedAt: item.modifiedAt.toISOString(),
+          createdAt: item.createdAt,
+          modifiedAt: item.modifiedAt,
           name: item.name,
           userId: item.userId,
-          public: !!item.public,
-          writers: item.userId === user.id ? writers : undefined,
-          canWrite: item.userId === user.id || writers.includes(user.id),
+          public: item.public,
+          writers: item.userId === user.id ? item.writers : undefined,
+          canWrite: item.userId === user.id || item.writers.includes(user.id),
         });
       });
     },

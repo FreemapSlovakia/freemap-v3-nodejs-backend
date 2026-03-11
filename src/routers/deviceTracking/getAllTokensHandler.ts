@@ -22,6 +22,8 @@ const AccessTokensSchema = z
 export function attachGetAllTokensHandler(router: RouterInstance) {
   registerPath('/tracking/devices/{id}/access-tokens', {
     get: {
+      summary: 'List access tokens for a tracking device',
+      tags: ['tracking'],
       security: AUTH_REQUIRED,
       parameters: [
         {
@@ -35,11 +37,7 @@ export function attachGetAllTokensHandler(router: RouterInstance) {
       ],
       responses: {
         200: {
-          content: {
-            'application/json': {
-              schema: AccessTokensSchema,
-            },
-          },
+          content: { 'application/json': { schema: AccessTokensSchema } },
         },
         403: {},
         404: { description: 'no such tracking device' },

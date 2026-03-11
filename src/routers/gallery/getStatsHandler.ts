@@ -40,13 +40,52 @@ const MeSchema = z
   )
   .max(1);
 
+const StatsSchema = z.strictObject({
+  perUserPerCountry: z.record(
+    z.string(),
+    z
+      .strictObject({
+        userId: z.uint32(),
+        userName: z.string(),
+        pictureCount: z.uint32(),
+      })
+      .array(),
+  ),
+  perUser: z
+    .strictObject({
+      pictureCount: z.uint32(),
+      userId: z.uint32(),
+      userName: z.string(),
+    })
+    .array(),
+  me: z
+    .strictObject({
+      perCountry: z
+        .record(
+          z.string(),
+          z.strictObject({
+            pictureCount: z.uint32(),
+            userRank: z.uint32(),
+          }),
+        )
+        .optional(),
+      pictureCount: z.uint32(),
+      userRank: z.uint32(),
+    })
+    .optional(),
+});
+
+type Stats = z.infer<typeof StatsSchema>;
+
 export async function attachGetStatsHandler(router: RouterInstance) {
   registerPath('/gallery/stats', {
     get: {
+      summary: 'Get gallery statistics',
+      tags: ['gallery'],
       security: AUTH_OPTIONAL,
       responses: {
         200: {
-          content: { 'application/json': {} },
+          content: { 'application/json': { schema: StatsSchema } },
         },
       },
     },
@@ -231,13 +270,16 @@ export async function attachGetStatsHandler(router: RouterInstance) {
             Object.fromEntries(
               mePerCountry?.map((a) => [
                 a.country,
-                { pictureCount: a.pictureCount, userRank: a.userRank },
+                {
+                  pictureCount: a.pictureCount,
+                  userRank: a.userRank,
+                },
               ]),
             ),
           pictureCount: me.pictureCount,
           userRank: me.userRank,
         },
-      };
+      } satisfies Stats;
     },
   );
 }

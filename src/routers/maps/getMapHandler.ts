@@ -5,16 +5,16 @@ import { authenticator } from '../../authenticator.js';
 import { pool } from '../../database.js';
 import { AUTH_OPTIONAL, registerPath } from '../../openapi.js';
 import { acceptValidator } from '../../requestValidators.js';
-import { MapMetaSchema } from '../../types.js';
+import { MapMetaSchema, zDateToIso } from '../../types.js';
 
 const DbRowSchema = z.object({
   id: z.string(),
   name: z.string().nullable(),
-  public: z.number().int(),
+  public: z.number().transform(Boolean),
   userId: z.uint32(),
   writers: z.string().nullable(),
-  createdAt: z.date(),
-  modifiedAt: z.date(),
+  createdAt: zDateToIso,
+  modifiedAt: zDateToIso,
   data: z.string(),
 });
 
@@ -26,6 +26,8 @@ const ResponseSchema = z.strictObject({
 export function attachGetMapHandler(router: RouterInstance) {
   registerPath('/maps/{id}', {
     get: {
+      summary: 'Get a map by ID',
+      tags: ['maps'],
       security: AUTH_OPTIONAL,
       parameters: [
         {
@@ -84,15 +86,14 @@ export function attachGetMapHandler(router: RouterInstance) {
       ctx.body = ResponseSchema.parse({
         meta: MapMetaSchema.parse({
           id: item.id,
-          createdAt: item.createdAt.toISOString(),
-          modifiedAt: item.modifiedAt.toISOString(),
+          createdAt: item.createdAt,
+          modifiedAt: item.modifiedAt,
           name: item.name,
           userId: item.userId,
-          public: !!item.public,
+          public: item.public,
           writers: item.userId === user?.id ? writers : undefined,
-          canWrite: !!(
-            user &&
-            (item.userId === user.id || writers.includes(user.id))
+          canWrite: Boolean(
+            user && (item.userId === user.id || writers.includes(user.id)),
           ),
         }),
         data: JSON.parse(item.data),

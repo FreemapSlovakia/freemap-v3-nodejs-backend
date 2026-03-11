@@ -12,6 +12,8 @@ const ResponseSchema = z.strictObject({ uid: z.string() });
 export function attachCreateTracklogHandler(router: RouterInstance) {
   registerPath('/tracklogs', {
     post: {
+      summary: 'Upload a GPX tracklog',
+      tags: ['tracklogs'],
       requestBody: {
         content: { 'application/json': { schema: BodySchema } },
       },

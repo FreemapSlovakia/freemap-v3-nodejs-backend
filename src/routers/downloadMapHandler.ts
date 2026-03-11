@@ -16,7 +16,7 @@ import { DownloadableMap, downloadableMaps } from '../downloadableMaps.js';
 import { getEnv } from '../env.js';
 import { appLogger } from '../logger.js';
 import { sendMail } from '../mailer.js';
-import { registerPath } from '../openapi.js';
+import { AUTH_REQUIRED, registerPath } from '../openapi.js';
 
 const CONCURRENCY = 8;
 
@@ -162,6 +162,10 @@ const DownloadBodySchema = z.strictObject({
 export function attachDownloadMapHandler(router: RouterInstance) {
   registerPath('/downloadMap', {
     post: {
+      summary:
+        'Request an offline map tile package download (async, costs credits)',
+      tags: ['maps'],
+      security: AUTH_REQUIRED,
       responses: { 204: {}, 400: {}, 401: {}, 409: {} },
     },
   });

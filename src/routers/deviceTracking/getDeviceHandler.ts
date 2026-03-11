@@ -9,6 +9,8 @@ import { TrackingDeviceSchema } from '../../types.js';
 export function attachGetDeviceHandler(router: RouterInstance) {
   registerPath('/tracking/devices/{id}', {
     get: {
+      summary: 'Get a tracking device by ID',
+      tags: ['tracking'],
       security: AUTH_REQUIRED,
       parameters: [
         {

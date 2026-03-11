@@ -20,6 +20,8 @@ const ResponseSchema = z.strictObject({
 export function attachGeoIp(router: RouterInstance) {
   registerPath('/geoip', {
     get: {
+      summary: "Get geolocation info for the requester's IP",
+      tags: ['geotools'],
       responses: {
         200: { content: { 'application/json': { schema: ResponseSchema } } },
       },

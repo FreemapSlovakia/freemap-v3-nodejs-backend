@@ -29,6 +29,8 @@ const ElevationResponseSchema = z.array(z.number().nullable());
 export function attachElevationHandler(router: RouterInstance) {
   registerPath('/geotools/elevation', {
     get: {
+      summary: 'Get elevation for coordinates (query params)',
+      tags: ['geotools'],
       responses: {
         200: {
           content: { 'application/json': { schema: ElevationResponseSchema } },
@@ -36,6 +38,8 @@ export function attachElevationHandler(router: RouterInstance) {
       },
     },
     post: {
+      summary: 'Get elevation for a list of coordinates',
+      tags: ['geotools'],
       requestBody: {
         content: { 'application/json': { schema: CoordsBodySchema } },
       },

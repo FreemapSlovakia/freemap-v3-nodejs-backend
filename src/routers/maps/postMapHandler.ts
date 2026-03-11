@@ -3,7 +3,7 @@ import sql, { bulk } from 'sql-template-tag';
 import z from 'zod';
 import { authenticator } from '../../authenticator.js';
 import { pool } from '../../database.js';
-import { registerPath } from '../../openapi.js';
+import { AUTH_REQUIRED, registerPath } from '../../openapi.js';
 import { nanoid } from '../../randomId.js';
 import { acceptValidator } from '../../requestValidators.js';
 import { MapMetaSchema } from '../../types.js';
@@ -18,6 +18,9 @@ const BodySchema = z.strictObject({
 export function attachPostMapHandler(router: RouterInstance) {
   registerPath('/maps', {
     post: {
+      summary: 'Create a new map',
+      tags: ['maps'],
+      security: AUTH_REQUIRED,
       requestBody: { content: { 'application/json': { schema: BodySchema } } },
       responses: {
         200: { content: { 'application/json': { schema: MapMetaSchema } } },
@@ -68,7 +71,7 @@ export function attachPostMapHandler(router: RouterInstance) {
         id,
         createdAt: now.toISOString(),
         modifiedAt: now.toISOString(),
-        public: !!pub,
+        public: Boolean(pub),
         writers,
         name,
         userId,

@@ -8,6 +8,8 @@ import { acceptValidator } from '../../requestValidators.js';
 export function attachDeleteDeviceHandler(router: RouterInstance) {
   registerPath('/tracking/devices/{id}', {
     delete: {
+      summary: 'Delete a tracking device',
+      tags: ['tracking'],
       security: AUTH_REQUIRED,
       parameters: [
         {

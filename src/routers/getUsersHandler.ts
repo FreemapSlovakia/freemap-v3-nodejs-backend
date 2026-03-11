@@ -12,6 +12,8 @@ const ResponseSchema = z.array(
 export function attachGetUsers(router: RouterInstance) {
   registerPath('/users', {
     get: {
+      summary: 'List users',
+      tags: ['users'],
       responses: {
         200: { content: { 'application/json': { schema: ResponseSchema } } },
       },

@@ -11,15 +11,11 @@ const DevicesSchema = TrackingDeviceSchema.array();
 export function attachGetAllDevicesHandler(router: RouterInstance) {
   registerPath('/tracking/devices', {
     get: {
+      summary: 'List all tracking devices for the authenticated user',
+      tags: ['tracking'],
       security: AUTH_REQUIRED,
       responses: {
-        200: {
-          content: {
-            'application/json': {
-              schema: DevicesSchema,
-            },
-          },
-        },
+        200: { content: { 'application/json': { schema: DevicesSchema } } },
       },
     },
   });

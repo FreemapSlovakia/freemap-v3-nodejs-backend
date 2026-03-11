@@ -8,6 +8,8 @@ import { acceptValidator } from '../../requestValidators.js';
 export function attachDeleteTokenHandler(router: RouterInstance) {
   registerPath('/tracking/access-tokens/{id}', {
     delete: {
+      summary: 'Delete a tracking access token',
+      tags: ['tracking'],
       security: AUTH_REQUIRED,
       parameters: [
         {

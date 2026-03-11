@@ -7,11 +7,13 @@ import { ParameterizedContext } from 'koa';
 import protobuf from 'protobufjs';
 import sql, { empty, join, raw, Sql } from 'sql-template-tag';
 import z from 'zod';
+import { createSchema } from 'zod-openapi';
 import { authenticator } from '../../authenticator.js';
 import { pool } from '../../database.js';
 import { getEnv } from '../../env.js';
-import { registerPath } from '../../openapi.js';
+import { AUTH_OPTIONAL, registerPath } from '../../openapi.js';
 import { acceptValidator } from '../../requestValidators.js';
+import { zNullishDateToIso } from '../../types.js';
 import { ratingSubquery } from './ratingConstants.js';
 
 const secret = getEnv('PREMIUM_PHOTO_SECRET', '');
@@ -25,6 +27,7 @@ const picturesResponseType = protobuf
 const booleanParam = z
   .enum(['true', 'false'])
   .transform((v) => v === 'true')
+  .pipe(z.boolean())
   .optional();
 
 const CommonQuerySchema = z.object({
@@ -41,10 +44,11 @@ const CommonQuerySchema = z.object({
 });
 
 const RadiusQuerySchema = CommonQuerySchema.extend({
+  by: z.literal('radius'),
   lat: z.coerce.number().min(-90).max(90),
   lon: z.coerce.number().min(-180).max(180),
   distance: z.coerce.number().min(0),
-});
+}).meta({ title: 'radius' });
 
 const fieldValues = [
   'id',
@@ -63,17 +67,19 @@ const fieldValues = [
 ] as const;
 
 const BBoxQuerySchema = CommonQuerySchema.extend({
+  by: z.literal('bbox'),
   bbox: z.string(),
   fields: z.preprocess(
     (v) => (Array.isArray(v) ? v : v ? [v] : undefined),
     z.array(z.enum(fieldValues)).optional(),
   ),
-});
+}).meta({ title: 'bbox' });
 
 const OrderByQuerySchema = CommonQuerySchema.extend({
+  by: z.literal('order'),
   orderBy: z.enum(['createdAt', 'takenAt', 'rating', 'lastCommentedAt']),
   direction: z.enum(['desc', 'asc']),
-});
+}).meta({ title: 'order' });
 
 const IdRowSchema = z.array(z.object({ id: z.number() }));
 
@@ -82,17 +88,26 @@ const BboxRowSchema = z.array(
     lat: z.number(),
     lon: z.number(),
     id: z.uint32().optional(),
-    title: z.string().nullable().optional(),
-    description: z.string().nullable().optional(),
-    takenAt: z.date().nullable().optional(),
-    createdAt: z.date().nullable().optional(),
-    userId: z.uint32().nullable().optional(),
-    pano: z.union([z.boolean(), z.number()]).nullable().optional(),
-    premium: z.union([z.boolean(), z.number()]).nullable().optional(),
-    azimuth: z.number().nullable().optional(),
-    rating: z.number().nullable().optional(),
-    tags: z.string().nullable().optional(),
-    user: z.string().nullable().optional(),
+    title: z.string().nullish(),
+    description: z.string().nullish(),
+    takenAt: zNullishDateToIso,
+    createdAt: zNullishDateToIso,
+    userId: z.uint32().nullish(),
+    pano: z
+      .number()
+      .nullish()
+      .transform((b) => (b == null ? b : Boolean(b))),
+    premium: z
+      .number()
+      .nullish()
+      .transform((b) => (b == null ? b : Boolean(b))),
+    azimuth: z.number().nullish(),
+    rating: z.number().nullish(),
+    tags: z
+      .string()
+      .nullish()
+      .transform((t) => (t === undefined ? t : t && t.split('\n'))),
+    user: z.string().nullish(),
   }),
 );
 
@@ -107,6 +122,28 @@ const methods: {
 export function attachGetPicturesHandler(router: RouterInstance) {
   registerPath('/gallery/pictures', {
     get: {
+      summary: 'List gallery pictures with filtering',
+      tags: ['gallery'],
+      security: AUTH_OPTIONAL,
+      parameters: [
+        {
+          in: 'query',
+          name: 'q',
+          style: 'form',
+          explode: true,
+          required: true,
+          schema: {
+            discriminator: { propertyName: 'by' },
+            ...createSchema(
+              z.discriminatedUnion('by', [
+                RadiusQuerySchema,
+                BBoxQuerySchema,
+                OrderByQuerySchema,
+              ]),
+            ).schema,
+          },
+        },
+      ],
       responses: {
         200: {
           content: {
@@ -306,14 +343,12 @@ async function byBbox(ctx: ParameterizedContext) {
   const pictures = rows.map((row) =>
     Object.assign({}, row, {
       rating: getRating ? row.rating : undefined,
-      takenAt: row.takenAt?.getTime(),
-      createdAt: row.createdAt?.getTime(),
-      pano: row.pano == null ? undefined : Boolean(row.pano),
-      premium: row.premium == null ? undefined : Boolean(row.premium),
-      azimuth: row.azimuth ?? undefined,
-      tags: fields?.includes('tags')
-        ? (row.tags?.split('\n') ?? [])
-        : undefined,
+      takenAt: row.takenAt,
+      createdAt: row.createdAt,
+      pano: row.pano,
+      premium: row.premium,
+      azimuth: row.azimuth,
+      tags: row.tags,
       hmac:
         getHmac && row.premium && secret
           ? createHmac('sha256', secret).update(String(row.id)).digest('hex')

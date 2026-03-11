@@ -20,13 +20,11 @@ const AccessTokensSchema = z
 export function attachGetPublicTokensHandler(router: RouterInstance) {
   registerPath('/tracking/access-tokens', {
     get: {
+      summary: 'List publicly listed tracking access tokens',
+      tags: ['tracking'],
       responses: {
         200: {
-          content: {
-            'application/json': {
-              schema: AccessTokensSchema,
-            },
-          },
+          content: { 'application/json': { schema: AccessTokensSchema } },
         },
       },
     },

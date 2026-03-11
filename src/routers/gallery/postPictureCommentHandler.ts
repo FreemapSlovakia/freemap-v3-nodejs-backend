@@ -6,7 +6,7 @@ import { runInTransaction } from '../../database.js';
 import { getEnv, getEnvBoolean } from '../../env.js';
 import { appLogger } from '../../logger.js';
 import { sendMail } from '../../mailer.js';
-import { registerPath } from '../../openapi.js';
+import { AUTH_REQUIRED, registerPath } from '../../openapi.js';
 import { acceptValidator } from '../../requestValidators.js';
 
 const webBaseUrls = getEnv('WEB_BASE_URL').split(',').filter(Boolean);
@@ -21,6 +21,9 @@ const ResponseSchema = z.strictObject({ id: z.uint32() });
 export function attachPostPictureCommentHandler(router: RouterInstance) {
   registerPath('/gallery/pictures/{id}/comments', {
     post: {
+      summary: 'Post a comment on a gallery picture',
+      tags: ['gallery'],
+      security: AUTH_REQUIRED,
       parameters: [
         {
           in: 'path',

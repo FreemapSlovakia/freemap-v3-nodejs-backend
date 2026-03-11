@@ -16,7 +16,7 @@ const BodySchema = z.strictObject({
   code: z.string(),
   language: z.string().nullable(),
   connect: z.boolean().optional(),
-  redirectUri: z.string(),
+  redirectUri: z.url(),
 });
 
 const OsmTokenSchema = z.object({ access_token: z.string() });
@@ -32,6 +32,8 @@ const OsmUserDetailsSchema = z.object({
 export function attachLoginWithOsmHandler(router: RouterInstance) {
   registerPath('/auth/login-osm', {
     get: {
+      summary: 'Get OSM OAuth client ID to initiate login',
+      tags: ['auth'],
       responses: {
         200: {
           content: {
@@ -43,6 +45,8 @@ export function attachLoginWithOsmHandler(router: RouterInstance) {
       },
     },
     post: {
+      summary: 'Complete OSM OAuth login',
+      tags: ['auth'],
       security: AUTH_OPTIONAL,
       requestBody: {
         content: {

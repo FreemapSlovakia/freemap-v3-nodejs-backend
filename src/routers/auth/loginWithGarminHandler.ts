@@ -17,6 +17,8 @@ const ResponseSchema = z.strictObject({ redirectUrl: z.string() });
 export function attachLoginWithGarminHandler(router: RouterInstance) {
   registerPath('/auth/login-garmin', {
     post: {
+      summary: 'Initiate Garmin OAuth login (step 1 — get redirect URL)',
+      tags: ['auth'],
       requestBody: {
         content: {
           'application/json': {

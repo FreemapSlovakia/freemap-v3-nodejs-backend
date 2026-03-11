@@ -23,6 +23,8 @@ const TokenDetailSchema = z
 export function attachGetTokenHandler(router: RouterInstance) {
   registerPath('/tracking/access-tokens/{id}', {
     get: {
+      summary: 'Get a tracking access token by ID',
+      tags: ['tracking'],
       security: AUTH_REQUIRED,
       parameters: [
         {
@@ -33,13 +35,7 @@ export function attachGetTokenHandler(router: RouterInstance) {
         },
       ],
       responses: {
-        200: {
-          content: {
-            'application/json': {
-              schema: TokenDetailSchema,
-            },
-          },
-        },
+        200: { content: { 'application/json': { schema: TokenDetailSchema } } },
         403: {},
         404: { description: 'no such tracking access token' },
       },

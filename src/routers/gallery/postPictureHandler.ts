@@ -8,7 +8,7 @@ import z from 'zod';
 import { authenticator } from '../../authenticator.js';
 import { contentTypeMiddleware } from '../../contentTypeMiddleware.js';
 import { pool, runInTransaction } from '../../database.js';
-import { registerPath } from '../../openapi.js';
+import { AUTH_REQUIRED, registerPath } from '../../openapi.js';
 import { acceptValidator } from '../../requestValidators.js';
 import { picturesDir } from '../../routers/gallery/constants.js';
 
@@ -24,12 +24,12 @@ const MetaSchema = z.strictObject({
     lat: z.number().min(-90).max(90),
     lon: z.number().min(-180).max(180),
   }),
-  title: z.string().nullable().optional(),
-  description: z.string().nullable().optional(),
-  takenAt: z.iso.datetime().nullable().optional(),
-  tags: z.array(z.string()).nullable().optional(),
+  title: z.string().nullish(),
+  description: z.string().nullish(),
+  takenAt: z.iso.datetime().nullish(),
+  tags: z.array(z.string()).nullish(),
   premium: z.boolean().optional(),
-  azimuth: z.number().min(0).lt(360).nullable().optional(),
+  azimuth: z.number().min(0).lt(360).nullish(),
 });
 
 const MultipartBodySchema = z.object({ meta: z.unknown() });
@@ -39,6 +39,9 @@ const ResponseSchema = z.strictObject({ id: z.uint32() });
 export function attachPostPictureHandler(router: RouterInstance) {
   registerPath('/gallery/pictures', {
     post: {
+      summary: 'Upload a new gallery picture',
+      tags: ['gallery'],
+      security: AUTH_REQUIRED,
       responses: {
         204: {},
         201: {

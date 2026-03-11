@@ -2,7 +2,7 @@ import { RouterInstance } from '@koa/router';
 import z from 'zod';
 import { authenticator } from '../authenticator.js';
 import { garminOauth } from '../garminOauth.js';
-import { registerPath } from '../openapi.js';
+import { AUTH_REQUIRED, registerPath } from '../openapi.js';
 import { acceptValidator } from '../requestValidators.js';
 
 const BodySchema = z.strictObject({
@@ -23,6 +23,9 @@ const BodySchema = z.strictObject({
 export function attachPostGarminCourses(router: RouterInstance) {
   registerPath('/garmin-courses', {
     post: {
+      summary: 'Export a route to Garmin Connect as a course',
+      tags: ['tracking'],
+      security: AUTH_REQUIRED,
       requestBody: { content: { 'application/json': { schema: BodySchema } } },
       responses: { 204: {}, 400: {}, 401: {}, 403: {} },
     },

@@ -17,6 +17,8 @@ const secret = getEnv('PREMIUM_PHOTO_SECRET', '');
 export function attachGetPictureImageHandler(router: RouterInstance) {
   registerPath('/gallery/pictures/{id}/image', {
     get: {
+      summary: 'Get the image file for a gallery picture',
+      tags: ['gallery'],
       security: AUTH_OPTIONAL,
       parameters: [
         {

@@ -1,22 +1,24 @@
 import sql, { empty } from 'sql-template-tag';
-import { assertGuard, tags } from 'typia';
+
 import WebSocket from 'ws';
+import z from 'zod';
 import { pool } from '../database.js';
 import { RpcContext } from '../rpcHandlerTypes.js';
 import { trackRegister } from '../trackRegister.js';
 
-export type SubscribeParams = {
-  fromTime?: null | (string & tags.Format<'date-time'>);
-  maxCount?: null | (number & tags.Type<'uint32'>);
-  maxAge?: null | (number & tags.Type<'uint32'>);
-} & (
-  | {
-      token: string;
-    }
-  | {
-      deviceId: number & tags.Type<'uint32'>;
-    }
+export const SubscribeParamsSchema = z.intersection(
+  z.object({
+    fromTime: z.iso.datetime().nullish(),
+    maxCount: z.uint32().nullish(),
+    maxAge: z.uint32().nullish(),
+  }),
+  z.union([
+    z.strictObject({ token: z.string() }),
+    z.strictObject({ deviceId: z.uint32() }),
+  ]),
 );
+
+export type SubscribeParams = z.infer<typeof SubscribeParamsSchema>;
 
 export function trackingSubscribeHandler(
   ctx: RpcContext,
@@ -103,22 +105,23 @@ export function trackingSubscribeHandler(
       result.reverse();
     }
 
-    assertGuard<
-      {
-        id: number;
-        createdAt: Date;
-        lat: number;
-        lon: number;
-        message: string | null;
-        altitude: number | null;
-        speed: number | null;
-        accuracy: number | null;
-        hdop: number | null;
-        bearing: number | null;
-        battery: number | null;
-        gsmSignal: number | null;
-      }[]
-    >(result);
+    result = z
+      .strictObject({
+        id: z.number(),
+        createdAt: z.date(),
+        lat: z.number(),
+        lon: z.number(),
+        message: z.string().nullable(),
+        altitude: z.number().nullable(),
+        speed: z.number().nullable(),
+        accuracy: z.number().nullable(),
+        hdop: z.number().nullable(),
+        bearing: z.number().nullable(),
+        battery: z.number().nullable(),
+        gsmSignal: z.number().nullable(),
+      })
+      .array()
+      .parse(result);
 
     ctx.respondResult(
       result.map((item) => ({

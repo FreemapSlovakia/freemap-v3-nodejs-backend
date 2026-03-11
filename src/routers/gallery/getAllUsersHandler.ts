@@ -16,6 +16,8 @@ const ResponseSchema = z.array(
 export function attachGetAllPictureUsers(router: RouterInstance) {
   registerPath('/gallery/picture-users', {
     get: {
+      summary: 'List all users who have uploaded pictures',
+      tags: ['gallery'],
       responses: {
         200: { content: { 'application/json': { schema: ResponseSchema } } },
       },
