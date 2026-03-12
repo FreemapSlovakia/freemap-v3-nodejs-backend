@@ -5,7 +5,10 @@ import z from 'zod';
 import { registerPath } from '../../openapi.js';
 import { tracklogsDir } from '../../routers/tracklogs/constants.js';
 
-const BodySchema = z.strictObject({ data: z.string().min(10) });
+const BodySchema = z.strictObject({
+  data: z.string().min(10),
+  mediaType: z.literal('application/gpx+xml'),
+});
 
 const ResponseSchema = z.strictObject({ uid: z.string() });
 
