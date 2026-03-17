@@ -18,6 +18,8 @@ const BodySchema = z.strictObject({
   distance: z.number(),
   elevationGain: z.number(),
   elevationLoss: z.number(),
+  elapsedSeconds: z.number().optional(),
+  speedMetersPerSecond: z.number().optional(),
 });
 
 export function attachPostGarminCourses(router: RouterInstance) {
@@ -52,6 +54,8 @@ export function attachPostGarminCourses(router: RouterInstance) {
         distance,
         elevationGain,
         elevationLoss,
+        elapsedSeconds,
+        speedMetersPerSecond,
       } = body;
 
       const url = 'https://apis.garmin.com/training-api/courses/v1/course';
@@ -87,6 +91,8 @@ export function attachPostGarminCourses(router: RouterInstance) {
           elevationGain, // in meters
           elevationLoss, // in meters
           activityType: activity,
+          elapsedSeconds,
+          speedMetersPerSecond,
           geoPoints: coordinates.map(([longitude, latitude, elevation]) => ({
             latitude,
             longitude,
