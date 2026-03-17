@@ -131,13 +131,15 @@ export function attachPurchaseTokenHandler(router: RouterInstance) {
 
     const user = ctx.state.user!;
 
+    const { callbackUrl, ...item } = body;
+
     await pool.query(
       sql`INSERT INTO purchaseToken SET
         userId = ${user.id},
         createdAt = NOW(),
         token = ${token},
         expireAt = ${expireAt},
-        item = ${JSON.stringify(body)}`,
+        item = ${JSON.stringify(item)}`,
     );
 
     const expiration = Math.floor(expireAt.getTime() / 1000);
@@ -148,7 +150,7 @@ export function attachPurchaseTokenHandler(router: RouterInstance) {
 
     searchParams.set('token', token);
 
-    searchParams.set('callbackurl', body.callbackUrl);
+    searchParams.set('callbackurl', callbackUrl);
 
     searchParams.set('expiration', String(expiration));
 
@@ -163,21 +165,21 @@ export function attachPurchaseTokenHandler(router: RouterInstance) {
 
     searchParams.set('lang', lang);
 
-    const translation = translations[lang]![body.type];
+    const translation = translations[lang]![item.type];
 
     searchParams.set('name', translation.title);
 
     searchParams.set('description', translation.description);
 
-    switch (body.type) {
+    switch (item.type) {
       case 'premium':
         searchParams.set('price_eur', '800');
         searchParams.set('price_chr', '80');
 
         break;
       case 'credits': {
-        searchParams.set('price_eur', String(body.amount)); // let the exchange rate is 1
-        searchParams.set('price_chr', String(Math.ceil(body.amount / 10)));
+        searchParams.set('price_eur', String(item.amount)); // let the exchange rate is 1
+        searchParams.set('price_chr', String(Math.ceil(item.amount / 10)));
 
         searchParams.set(
           'description',
@@ -186,7 +188,7 @@ export function attachPurchaseTokenHandler(router: RouterInstance) {
             Intl.NumberFormat(lang, {
               minimumFractionDigits: 0,
               maximumFractionDigits: 0,
-            }).format(body.amount),
+            }).format(item.amount),
           ),
         );
 
