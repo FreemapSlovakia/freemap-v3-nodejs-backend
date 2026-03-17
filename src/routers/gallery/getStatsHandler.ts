@@ -102,8 +102,6 @@ export async function attachGetStatsHandler(router: RouterInstance) {
         ? empty
         : sql` AND picture.createdAt > DATE_SUB(NOW(), INTERVAL ${Number(period)} DAY)`;
 
-      console.log(days);
-
       const usersPerCountry = UsersPerCountrySchema.parse(
         await pool.query(sql`
           WITH
