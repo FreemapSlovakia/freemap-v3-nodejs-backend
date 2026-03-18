@@ -1,10 +1,9 @@
 import { RouterInstance } from '@koa/router';
 
-import { SqlError } from 'mariadb';
 import sql from 'sql-template-tag';
 import z from 'zod';
 import { authenticator } from '../../authenticator.js';
-import { runInTransaction } from '../../database.js';
+import { isSqlDuplicateError, runInTransaction } from '../../database.js';
 import { AUTH_REQUIRED, registerPath } from '../../openapi.js';
 import { nanoid } from '../../randomId.js';
 import { acceptValidator } from '../../requestValidators.js';
@@ -76,7 +75,7 @@ export function attachPutDeviceHandler(router: RouterInstance) {
             sql`UPDATE trackingDevice SET name = ${name}, maxCount = ${maxCount}, maxAge = ${maxAge}, token = ${token} WHERE id = ${id}`,
           );
         } catch (err) {
-          if (err instanceof SqlError && err.errno === 1062) {
+          if (isSqlDuplicateError(err)) {
             ctx.throw(409);
           }
 

@@ -1,9 +1,8 @@
 import { RouterInstance } from '@koa/router';
-import { SqlError } from 'mariadb';
 import sql from 'sql-template-tag';
 import z from 'zod';
 import { authenticator } from '../../authenticator.js';
-import { pool } from '../../database.js';
+import { isSqlDuplicateError, pool } from '../../database.js';
 import { AUTH_REQUIRED, registerPath } from '../../openapi.js';
 import { nanoid } from '../../randomId.js';
 import { acceptValidator } from '../../requestValidators.js';
@@ -65,7 +64,7 @@ export function attachPostDeviceHandler(router: RouterInstance) {
 
         ctx.body = ResponseBodySchema.parse({ id: insertId, token: okToken });
       } catch (err) {
-        if (err instanceof SqlError && err.errno === 1062) {
+        if (isSqlDuplicateError(err)) {
           ctx.throw(409);
         }
 

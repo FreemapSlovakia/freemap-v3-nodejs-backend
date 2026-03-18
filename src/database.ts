@@ -290,8 +290,11 @@ function sleep(ms: number) {
 }
 
 function withJitter(ms: number) {
-  const jitter = Math.floor(Math.random() * ms);
-  return ms + jitter;
+  return ms + Math.floor(Math.random() * ms);
+}
+
+export function isSqlDuplicateError(err: unknown): boolean {
+  return z.object({ errno: z.literal(1062) }).safeParse(err).success;
 }
 
 function isRetryableTxError(err: unknown): boolean {
