@@ -36,6 +36,8 @@ const app = new Koa();
 
 const wsApp = websockify(app);
 
+const httpHostname = getEnv('HTTP_HOSTNAME', '127.0.0.1');
+
 const httpPort = getEnvInteger('HTTP_PORT', 0);
 
 if (httpPort) {
@@ -43,10 +45,12 @@ if (httpPort) {
 
   wsApp.ws.listen({ server: httpServer });
 
-  httpServer.listen(httpPort, () => {
+  httpServer.listen(httpPort, httpHostname, () => {
     logger.info(`Freemap v3 HTTP API listening on port ${httpPort}.`);
   });
 }
+
+const httpsHostname = getEnv('HTTPS_HOSTNAME', '127.0.0.1');
 
 const httpsPort = getEnvInteger('HTTPS_PORT', 0);
 
@@ -60,7 +64,7 @@ if (httpsPort) {
 
   wsApp.ws.listen({ server: httpsServer });
 
-  httpsServer.listen(httpsPort, () => {
+  httpsServer.listen(httpsPort, httpsHostname, () => {
     logger.info(`Freemap v3 HTTPS API listening on port ${httpsPort}.`);
   });
 }
@@ -140,6 +144,12 @@ app.use(async (ctx, next) => {
 });
 
 const router = new Router();
+
+router.post('/traccar', (ctx) => {
+  console.log(ctx.request.body);
+
+  ctx.status = 200;
+});
 
 router.use(
   '/tracklogs',
