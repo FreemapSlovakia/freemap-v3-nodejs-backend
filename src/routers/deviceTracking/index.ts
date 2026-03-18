@@ -10,7 +10,9 @@ import { attachPostDeviceHandler } from './postDeviceHandler.js';
 import { attachPostTokenHandler } from './postTokenHandler.js';
 import { attachPutDeviceHandler } from './putDeviceHandler.js';
 import { attachPutTokenHandler } from './putTokenHandler.js';
-import { attachTrackDeviceHandler } from './trackDeviceHandler.js';
+import { attachTrackDeviceJsonHandler } from './trackDeviceHandlerJson.js';
+import { attachTrackDeviceTraccarHandler } from './trackDeviceHandlerTraccar.js';
+import { attachTrackDeviceUrlEncodedHandler } from './trackDeviceHandlerUrlEncoded.js';
 
 const router = new Router();
 
@@ -19,7 +21,9 @@ attachGetAllDevicesHandler(router);
 attachGetDeviceHandler(router);
 attachPostDeviceHandler(router);
 attachPutDeviceHandler(router);
-attachTrackDeviceHandler(router);
+attachTrackDeviceJsonHandler(router);
+attachTrackDeviceUrlEncodedHandler(router);
+attachTrackDeviceTraccarHandler(router);
 attachDeleteTokenHandler(router);
 attachGetAllTokensHandler(router);
 attachGetPublicTokensHandler(router);
