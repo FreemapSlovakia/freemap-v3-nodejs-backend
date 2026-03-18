@@ -145,12 +145,6 @@ app.use(async (ctx, next) => {
 
 const router = new Router();
 
-router.post('/traccar', (ctx) => {
-  console.log(ctx.request.body);
-
-  ctx.status = 200;
-});
-
 router.use(
   '/tracklogs',
   tracklogsRouter.routes(),

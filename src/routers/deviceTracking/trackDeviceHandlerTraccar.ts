@@ -35,10 +35,11 @@ const TraccarPositionSchema = z.object({
       // pdop: z.number().min(0).optional(),
       // sat: z.number().optional(), // satellites used
       // satVisible: z.number().optional(), // satellites visible
-      // motion / odometry
+
+      // === motion / odometry ===
       // distance: z.number().optional(), // meters since last point
       // totalDistance: z.number().optional(), // cumulative meters
-      // motion: z.boolean().optional(),
+      motion: z.boolean().optional(),
       // odometer: z.number().optional(), // meters
       // tripOdometer: z.number().optional(),
       // hours: z.number().optional(), // engine hours in ms
@@ -49,7 +50,7 @@ const TraccarPositionSchema = z.object({
       // power: z.number().optional(), // external power voltage (V)
       // charge: z.boolean().optional(),
 
-      // engine / OBD
+      // === engine / OBD ===
       // ignition: z.boolean().optional(),
       // rpm: z.number().optional(),
       // throttle: z.number().optional(),
@@ -67,14 +68,18 @@ const TraccarPositionSchema = z.object({
       // input: z.number().optional(), // digital inputs bitmask
       // output: z.number().optional(), // digital outputs bitmask
       // blocked: z.boolean().optional(),
-      // alarms / events
-      // alarm: z.string().optional(),
+
+      // === alarms / events ===
+      alarm: z.string().optional(),
       // status: z.number().optional(), // raw status bitmask
       // event: z.union([z.number(), z.string()]).optional(),
-      // driver / identification
+      activity: z.string().optional(), // passthrough from BackgroundGeolocation
+
+      // === driver / identification ===
       // driverUniqueId: z.string().optional(),
-      // connectivity
-      // rssi: z.number().optional(),
+
+      // === connectivity ===
+      rssi: z.number().optional(),
       // ip: z.string().optional(),
       // iccid: z.string().optional(),
 
@@ -174,8 +179,25 @@ async function traccarHandler(ctx: ParameterizedContext) {
         position.attributes?.hdop,
         position.course,
         position.attributes?.batteryLevel,
-        undefined,
-        undefined,
+        position.attributes?.rssi !== undefined
+          ? Math.round(
+              Math.max(
+                0,
+                Math.min(100, ((position.attributes?.rssi + 113) / 62) * 100),
+              ),
+            )
+          : undefined,
+        [
+          position.attributes?.alarm,
+          position.attributes?.activity,
+          position.attributes?.motion === true
+            ? 'moving'
+            : position.attributes?.motion === false
+              ? 'still'
+              : undefined,
+        ]
+          .filter(Boolean)
+          .join(', ') || undefined,
         new Date(position.fixTime),
       );
 
