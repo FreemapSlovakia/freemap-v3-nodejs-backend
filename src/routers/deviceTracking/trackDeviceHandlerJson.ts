@@ -41,6 +41,9 @@ const JsonBodySchema = z.union([NotificationBodySchema, LocationBodySchema]);
 
 const TrackResponseSchema = z.strictObject({ id: z.uint32() });
 
+/**
+ * @deprecated use tracking via Traccar server
+ */
 export function attachTrackDeviceJsonHandler(router: RouterInstance) {
   registerPath('/tracking/track', {
     post: {

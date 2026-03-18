@@ -9,6 +9,9 @@ const logger = appLogger.child({ module: 'socketDeviceTracking' });
 
 let id = 0;
 
+/**
+ * @deprecated use tracking via Traccar server
+ */
 export function startSocketDeviceTracking() {
   const port = getEnvInteger('TRACKING_SOCKET_PORT', 0);
 
