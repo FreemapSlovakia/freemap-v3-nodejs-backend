@@ -187,17 +187,19 @@ async function traccarHandler(ctx: ParameterizedContext) {
               ),
             )
           : undefined,
-        [
-          position.attributes?.alarm,
-          position.attributes?.activity,
-          position.attributes?.motion === true
-            ? 'moving'
-            : position.attributes?.motion === false
-              ? 'still'
-              : undefined,
-        ]
-          .filter(Boolean)
-          .join(', ') || undefined,
+        Array.from(
+          new Set(
+            [
+              position.attributes?.alarm,
+              position.attributes?.activity,
+              position.attributes?.motion === true
+                ? 'moving'
+                : position.attributes?.motion === false
+                  ? 'still'
+                  : undefined,
+            ].filter(Boolean),
+          ),
+        ).join(', ') || undefined,
         new Date(position.fixTime),
       );
 
