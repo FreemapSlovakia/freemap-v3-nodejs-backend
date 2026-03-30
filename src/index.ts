@@ -104,8 +104,9 @@ app.use(
     origin: (ctx) =>
       !ctx.header.origin
         ? ''
-        : /\.freemap\.(sk|eu)(:\d+)?$/.test(ctx.header.origin)
-          ? ctx.header.origin!
+        : /\.freemap\.(sk|eu)(:\d+)?$/.test(ctx.header.origin) ||
+            ctx.header.origin === 'https://freemap.bigware.sk'
+          ? ctx.header.origin
           : '',
   }),
 );
