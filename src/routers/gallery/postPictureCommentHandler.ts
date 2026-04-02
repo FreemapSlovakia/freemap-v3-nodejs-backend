@@ -97,7 +97,7 @@ export function attachPostPictureCommentHandler(router: RouterInstance) {
                 comment = ${comment},
                 createdAt = ${new Date()}
             `),
-            ...(getEnvBoolean('MAILGIN_ENABLE', false)
+            ...(getEnvBoolean('MAILGUN_ENABLE', false)
               ? ([
                   conn.query(sql`
                 SELECT IF(sendGalleryEmails, email, NULL) AS email, language, title, userId
