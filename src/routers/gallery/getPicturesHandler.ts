@@ -103,7 +103,9 @@ const BboxRowSchema = z.array(
     tags: z
       .string()
       .nullish()
-      .transform((t) => (t === undefined ? t : t && t.split('\n'))),
+      .transform((t) =>
+        t === undefined ? t : t === null ? [] : t.split('\n'),
+      ),
     user: z.string().nullish(),
   }),
 );
@@ -369,12 +371,15 @@ async function byBbox(ctx: ParameterizedContext) {
     const body = { pictures };
 
     const err = picturesResponseType.verify(body);
+
     if (err) {
       ctx.throw(500, err);
     }
 
     let payload = Buffer.from(picturesResponseType.encode(body).finish());
+
     const encoding = ctx.acceptsEncodings('br', 'gzip', 'identity');
+
     ctx.vary('Accept-Encoding');
 
     if (payload.length >= 1024 && encoding && encoding !== 'identity') {
@@ -384,9 +389,11 @@ async function byBbox(ctx: ParameterizedContext) {
             [zlibConstants.BROTLI_PARAM_QUALITY]: 4,
           },
         });
+
         ctx.set('Content-Encoding', 'br');
       } else if (encoding === 'gzip') {
         payload = await gzipAsync(payload);
+
         ctx.set('Content-Encoding', 'gzip');
       }
     }
