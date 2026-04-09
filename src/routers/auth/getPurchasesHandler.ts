@@ -6,18 +6,32 @@ import { pool } from '../../database.js';
 import { AUTH_REQUIRED, registerPath } from '../../openapi.js';
 import { zDateToIso } from '../../types.js';
 
-const ResponseSchema = z.array(
+const PurchaseItemSchema = z.discriminatedUnion('type', [
+  z.strictObject({ type: z.literal('premium') }),
   z.strictObject({
-    item: z.discriminatedUnion('type', [
-      z.strictObject({ type: z.literal('premium') }),
-      z.strictObject({
-        type: z.literal('credits'),
-        amount: z.number().positive(),
-      }),
-    ]),
-    createdAt: zDateToIso,
+    type: z.literal('credits'),
+    amount: z.number().positive(),
   }),
-);
+]);
+
+const PurchaseSchema = z.strictObject({
+  item: PurchaseItemSchema,
+  createdAt: zDateToIso,
+});
+
+const PurchaseIntentSchema = z.strictObject({
+  item: PurchaseItemSchema,
+  status: z.enum(['created', 'awaiting_payment', 'rejected']),
+  createdAt: zDateToIso,
+  updatedAt: zDateToIso,
+  expireAt: zDateToIso,
+  bankIntentStatus: z.string().nullable(),
+});
+
+const ResponseSchema = z.strictObject({
+  purchases: z.array(PurchaseSchema),
+  intents: z.array(PurchaseIntentSchema),
+});
 
 export function attachGetPurchasesHandler(router: RouterInstance) {
   registerPath('/auth/purchases', {
@@ -33,10 +47,21 @@ export function attachGetPurchasesHandler(router: RouterInstance) {
   });
 
   router.get('/purchases', authenticator(true), async (ctx) => {
-    ctx.body = ResponseSchema.parse(
-      await pool.query(
-        sql`SELECT item, createdAt FROM purchase WHERE userId = ${ctx.state.user!.id}`,
-      ),
+    const userId = ctx.state.user!.id;
+
+    const purchases = await pool.query(
+      sql`SELECT item, createdAt FROM purchase WHERE userId = ${userId}`,
     );
+
+    const intents = await pool.query(
+      sql`SELECT item, status, createdAt, updatedAt, expireAt, bankIntentStatus
+          FROM purchaseIntent
+          WHERE userId = ${userId}
+            AND status IN ('created','awaiting_payment','rejected')
+            AND expireAt > (NOW() - INTERVAL 7 DAY)
+          ORDER BY updatedAt DESC`,
+    );
+
+    ctx.body = ResponseSchema.parse({ purchases, intents });
   });
 }

@@ -7,6 +7,24 @@ import { pool } from '../../database.js';
 import { getEnv } from '../../env.js';
 import { AUTH_REQUIRED, registerPath } from '../../openapi.js';
 
+function buildCanonicalRovasUrlToSign(url: URL): string {
+  // Rovas expects signature over the URL without the `signature` parameter,
+  // with query params sorted by name and encoded as x-www-form-urlencoded.
+  const entries = [...url.searchParams.entries()].filter(
+    ([k]) => k.toLowerCase() !== 'signature',
+  );
+
+  entries.sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
+
+  const canonical = new URL(url.origin + url.pathname);
+
+  for (const [k, v] of entries) {
+    canonical.searchParams.append(k, v);
+  }
+
+  return canonical.toString();
+}
+
 type Combo = {
   title: string;
   description: string;
@@ -127,7 +145,7 @@ export function attachPurchaseTokenHandler(router: RouterInstance) {
 
     const token = randomBytes(32).toString('hex');
 
-    const expireAt = new Date(Date.now() + 3_600_000); // 1 hour
+    const expireAt = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000); // 3 days
 
     const user = ctx.state.user!;
 
@@ -140,6 +158,16 @@ export function attachPurchaseTokenHandler(router: RouterInstance) {
         token = ${token},
         expireAt = ${expireAt},
         item = ${JSON.stringify(item)}`,
+    );
+
+    await pool.query(
+      sql`INSERT INTO purchaseIntent SET
+        userId = ${user.id},
+        createdAt = NOW(),
+        token = ${token},
+        expireAt = ${expireAt},
+        item = ${JSON.stringify(body)},
+        status = 'created'`,
     );
 
     const expiration = Math.floor(expireAt.getTime() / 1000);
@@ -173,7 +201,7 @@ export function attachPurchaseTokenHandler(router: RouterInstance) {
 
     switch (item.type) {
       case 'premium':
-        searchParams.set('price_eur', '800');
+        searchParams.set('price_eur', '8');
         searchParams.set('price_chr', '80');
 
         break;
@@ -196,14 +224,15 @@ export function attachPurchaseTokenHandler(router: RouterInstance) {
       }
     }
 
-    const paymentUrlString = paymentUrl.toString();
+    const canonicalToSign = buildCanonicalRovasUrlToSign(paymentUrl);
 
     ctx.body = ResponseSchema.parse({
       paymentUrl:
-        paymentUrlString +
-        '&signature=' +
+        canonicalToSign +
+        (canonicalToSign.includes('?') ? '&' : '?') +
+        'signature=' +
         createHmac('sha256', getEnv('PURCHASE_SECRET'))
-          .update(paymentUrlString)
+          .update(canonicalToSign)
           .digest('hex'),
     });
   });

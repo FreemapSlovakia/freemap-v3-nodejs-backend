@@ -1,4 +1,4 @@
-import { createHmac } from 'node:crypto';
+import { createHmac, timingSafeEqual } from 'node:crypto';
 import { RouterInstance } from '@koa/router';
 import sql from 'sql-template-tag';
 import z from 'zod';
@@ -6,7 +6,7 @@ import { runInTransaction } from '../../database.js';
 import { getEnv } from './../../env.js';
 import { registerPath } from '../../openapi.js';
 
-const BodySchema = z.strictObject({
+const LegacyBodySchema = z.strictObject({
   token: z.string().nonempty(),
   email: z.email(),
   signature: z.string().nonempty(),
@@ -14,47 +14,214 @@ const BodySchema = z.strictObject({
   currency: z.string().nonempty().optional(),
 });
 
+const ImmediateWebhookSchema = z.strictObject({
+  event: z.literal('payment-completed'),
+  delayed: z.literal(0),
+  token: z.string().nonempty(),
+  signature: z.string().nonempty(),
+  amount_paid: z.number(),
+  currency: z.enum(['EUR', 'CHR']),
+  email: z.email(),
+  occurred_at: z.number().int(),
+  expiration: z.number().int().optional(),
+});
+
+const DelayedWebhookSchema = z.strictObject({
+  event: z.enum(['order-placed', 'delayed-confirmed', 'delayed-rejected']),
+  delayed: z.literal(1),
+  delivery_id: z.string().nonempty(),
+  token: z.string().nonempty(),
+  signature: z.string().nonempty(),
+  amount_paid: z.number(),
+  currency: z.literal('EUR'),
+  email: z.email(),
+  occurred_at: z.number().int(),
+  expiration: z.number().int().optional(),
+  bank_intent_status: z.string().nonempty(),
+});
+
+const WebhookSchema = z.discriminatedUnion('delayed', [
+  ImmediateWebhookSchema,
+  DelayedWebhookSchema,
+]);
+
+const RequestSchema = z.union([WebhookSchema, LegacyBodySchema]);
+
+function verifyTokenSignatureOrThrow(token: string, providedHex: string) {
+  const expectedHex = createHmac('sha256', getEnv('PURCHASE_SECRET'))
+    .update(token)
+    .digest('hex');
+
+  // Constant-time compare (normalize to buffers of same length).
+  const exp = Buffer.from(expectedHex, 'hex');
+  const prov = Buffer.from(providedHex, 'hex');
+
+  if (prov.length !== exp.length || !timingSafeEqual(prov, exp)) {
+    throw new Error('invalid signature');
+  }
+}
+
+function enforceFreshnessOrThrow(occurredAt: number, expiration?: number) {
+  const now = Math.floor(Date.now() / 1000);
+  // Allow some skew; this is replay mitigation, not the primary auth mechanism.
+  const maxSkewSec = 10 * 60;
+  if (Math.abs(now - occurredAt) > maxSkewSec) {
+    throw new Error('stale occurred_at');
+  }
+  if (expiration != null && occurredAt > expiration) {
+    throw new Error('expired');
+  }
+}
+
 export function attachPurchaseValidateHandler(router: RouterInstance) {
   registerPath('/auth/purchaseValidate', {
     post: {
       summary:
         'Payment provider webhook to validate and apply a completed purchase',
       tags: ['auth'],
-      requestBody: { content: { 'application/json': { schema: BodySchema } } },
+      requestBody: {
+        content: { 'application/json': { schema: RequestSchema } },
+      },
       responses: { 204: {}, 400: {}, 403: {} },
     },
   });
 
   router.post('/purchaseValidate', async (ctx) => {
-    console.log(ctx.request.body);
+    const raw = ctx.request.body;
 
-    let body;
+    // Prefer the documented webhook schemas; keep legacy body for backward compatibility.
+    const webhookRes = WebhookSchema.safeParse(raw);
+    const webhook = webhookRes.success ? webhookRes.data : undefined;
 
+    if (webhook) {
+      try {
+        verifyTokenSignatureOrThrow(webhook.token, webhook.signature);
+        enforceFreshnessOrThrow(webhook.occurred_at, webhook.expiration);
+      } catch (err) {
+        return ctx.throw(403, err as Error);
+      }
+
+      await runInTransaction(async (conn) => {
+        if ('delivery_id' in webhook) {
+          // Deduplicate retries for delayed events.
+          try {
+            await conn.query(
+              sql`INSERT INTO rovasWebhookDelivery SET
+                deliveryId = ${webhook.delivery_id},
+                token = ${webhook.token},
+                event = ${webhook.event},
+                occurredAt = ${webhook.occurred_at}`,
+            );
+          } catch {
+            // Already processed this delivery id.
+            ctx.status = 204;
+            return;
+          }
+        }
+
+        const [intent] = await conn.query(
+          sql`SELECT userId, item, status FROM purchaseIntent
+              WHERE token = ${webhook.token} AND expireAt > NOW()
+              FOR UPDATE`,
+        );
+
+        if (!intent) {
+          ctx.throw(403, 'no such token');
+        }
+
+        // Track last-seen webhook info.
+        await conn.query(
+          sql`UPDATE purchaseIntent SET
+              lastEvent = ${webhook.event},
+              lastOccurredAt = ${webhook.occurred_at},
+              amountPaid = ${webhook.amount_paid},
+              currency = ${webhook.currency},
+              email = ${webhook.email},
+              bankIntentStatus = ${'bank_intent_status' in webhook ? webhook.bank_intent_status : null}
+            WHERE token = ${webhook.token}`,
+        );
+
+        if (webhook.event === 'order-placed') {
+          await conn.query(
+            sql`UPDATE purchaseIntent SET status = 'awaiting_payment' WHERE token = ${webhook.token}`,
+          );
+          return;
+        }
+
+        if (webhook.event === 'delayed-rejected') {
+          await conn.query(
+            sql`UPDATE purchaseIntent SET status = 'rejected' WHERE token = ${webhook.token}`,
+          );
+          // Do not grant access.
+          return;
+        }
+
+        // payment-completed OR delayed-confirmed => grant access (idempotently).
+        if (intent.status === 'confirmed') {
+          return;
+        }
+
+        const { userId, item } = intent;
+
+        await conn.query(
+          sql`INSERT INTO purchase SET userId = ${userId}, item = ${item}, createdAt = NOW(), note = ${webhook.event}`,
+        );
+
+        switch (item.type) {
+          case 'premium':
+            await conn.query(
+              sql`UPDATE user
+                SET premiumExpiration =
+                  CASE WHEN premiumExpiration IS NULL OR premiumExpiration < NOW()
+                    THEN NOW()
+                    ELSE premiumExpiration
+                  END + INTERVAL 1 YEAR,
+                  email = COALESCE(email, ${webhook.email})
+                WHERE id = ${userId}`,
+            );
+            break;
+
+          case 'credits':
+            await conn.query(
+              sql`UPDATE user
+                  SET credits = credits + ${item.amount},
+                      email = COALESCE(email, ${webhook.email})
+                WHERE id = ${userId}`,
+            );
+            break;
+
+          default:
+            ctx.throw(new Error('invalid item type in purchase intent: ' + item.type));
+        }
+
+        await conn.query(
+          sql`UPDATE purchaseIntent SET status = 'confirmed' WHERE token = ${webhook.token}`,
+        );
+
+        await conn.query(sql`DELETE FROM purchaseToken WHERE token = ${webhook.token}`);
+      });
+
+      ctx.status = 204;
+      return;
+    }
+
+    // Legacy: minimal body without `event`.
+    let legacy: z.infer<typeof LegacyBodySchema>;
     try {
-      body = BodySchema.parse(ctx.request.body);
+      legacy = LegacyBodySchema.parse(raw);
     } catch (err) {
       return ctx.throw(400, err as Error);
     }
 
-    const {
-      token,
-      email,
-      signature,
-      // amount_paid,
-      // currency,
-    } = body;
-
-    if (
-      createHmac('sha256', getEnv('PURCHASE_SECRET'))
-        .update(token)
-        .digest('hex') !== signature
-    ) {
-      ctx.throw(403, 'invalid signature');
+    try {
+      verifyTokenSignatureOrThrow(legacy.token, legacy.signature);
+    } catch (err) {
+      return ctx.throw(403, err as Error);
     }
 
     await runInTransaction(async (conn) => {
       const [row] = await conn.query(
-        sql`SELECT userId, item FROM purchaseToken WHERE token = ${token} AND expireAt > NOW() FOR UPDATE`,
+        sql`SELECT userId, item FROM purchaseToken WHERE token = ${legacy.token} AND expireAt > NOW() FOR UPDATE`,
       );
 
       if (!row) {
@@ -76,24 +243,25 @@ export function attachPurchaseValidateHandler(router: RouterInstance) {
                   THEN NOW()
                   ELSE premiumExpiration
                 END + INTERVAL 1 YEAR,
-                email = COALESCE(email, ${email})
+                email = COALESCE(email, ${legacy.email})
               WHERE id = ${userId}`,
           );
           break;
 
         case 'credits':
           await conn.query(
-            sql`UPDATE user SET credits = credits + ${item.amount}, email = COALESCE(email, ${email}) WHERE id = ${userId}`,
+            sql`UPDATE user SET credits = credits + ${item.amount}, email = COALESCE(email, ${legacy.email}) WHERE id = ${userId}`,
           );
           break;
 
         default:
-          ctx.throw(
-            new Error('invalid item type in purchase token: ' + item.type),
-          );
+          ctx.throw(new Error('invalid item type in purchase token: ' + item.type));
       }
 
-      await conn.query(sql`DELETE FROM purchaseToken WHERE token = ${token}`);
+      await conn.query(sql`DELETE FROM purchaseToken WHERE token = ${legacy.token}`);
+      await conn.query(
+        sql`UPDATE purchaseIntent SET status = 'confirmed' WHERE token = ${legacy.token}`,
+      );
     });
 
     ctx.status = 204;
