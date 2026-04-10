@@ -7,14 +7,6 @@ import { pool } from '../../database.js';
 import { getEnv } from '../../env.js';
 import { AUTH_REQUIRED, registerPath } from '../../openapi.js';
 
-function buildCanonicalRovasUrlToSign(url: URL): string {
-  // Rovas expects signature over the full absolute URL without the `signature`
-  // parameter, preserving the exact query parameter order used to build the link.
-  const canonical = new URL(url.toString());
-  canonical.searchParams.delete('signature');
-  return canonical.toString();
-}
-
 type Combo = {
   title: string;
   description: string;
@@ -219,7 +211,7 @@ export function attachPurchaseTokenHandler(router: RouterInstance) {
       }
     }
 
-    const canonicalToSign = buildCanonicalRovasUrlToSign(paymentUrl);
+    const canonicalToSign = paymentUrl.toString();
 
     ctx.body = ResponseSchema.parse({
       paymentUrl:

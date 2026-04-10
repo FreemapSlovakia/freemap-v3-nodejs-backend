@@ -87,16 +87,6 @@ export async function initDatabase() {
       INDEX piExpireAtIdx (expireAt)
     ) ENGINE=InnoDB`,
 
-    sql`CREATE TABLE IF NOT EXISTS rovasWebhookDelivery (
-      deliveryId VARCHAR(128) CHARSET ascii NOT NULL PRIMARY KEY,
-      token VARCHAR(255) CHARSET ascii NULL,
-      event VARCHAR(32) CHARSET ascii NOT NULL,
-      occurredAt INT UNSIGNED NULL,
-      createdAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      INDEX rwdTokenIdx (token),
-      INDEX rwdCreatedAtIdx (createdAt)
-    ) ENGINE=InnoDB`,
-
     sql`CREATE TABLE IF NOT EXISTS purchase (
       userId INT UNSIGNED NOT NULL,
       item JSON NOT NULL,
@@ -281,10 +271,8 @@ export async function initDatabase() {
 
   async function cleanup() {
     await pool.query(sql`DELETE FROM purchaseToken WHERE expireAt < NOW()`);
+
     await pool.query(sql`DELETE FROM purchaseIntent WHERE expireAt < NOW()`);
-    await pool.query(
-      sql`DELETE FROM rovasWebhookDelivery WHERE createdAt < (NOW() - INTERVAL 30 DAY)`,
-    );
 
     await runInTransaction(async (conn) => {
       // TODO track pending downloads taking more than a day :-o
