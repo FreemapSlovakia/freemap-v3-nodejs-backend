@@ -8,20 +8,10 @@ import { getEnv } from '../../env.js';
 import { AUTH_REQUIRED, registerPath } from '../../openapi.js';
 
 function buildCanonicalRovasUrlToSign(url: URL): string {
-  // Rovas expects signature over the URL without the `signature` parameter,
-  // with query params sorted by name and encoded as x-www-form-urlencoded.
-  const entries = [...url.searchParams.entries()].filter(
-    ([k]) => k.toLowerCase() !== 'signature',
-  );
-
-  entries.sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
-
-  const canonical = new URL(url.origin + url.pathname);
-
-  for (const [k, v] of entries) {
-    canonical.searchParams.append(k, v);
-  }
-
+  // Rovas expects signature over the full absolute URL without the `signature`
+  // parameter, preserving the exact query parameter order used to build the link.
+  const canonical = new URL(url.toString());
+  canonical.searchParams.delete('signature');
   return canonical.toString();
 }
 
@@ -176,9 +166,11 @@ export function attachPurchaseTokenHandler(router: RouterInstance) {
 
     const { searchParams } = paymentUrl;
 
+    // NOTE: query parameter order matters for the signed string; keep a stable order
+    // by appending in the intended sequence.
     searchParams.set('token', token);
 
-    searchParams.set('callbackurl', callbackUrl);
+    searchParams.set('callback_url', callbackUrl);
 
     searchParams.set('expiration', String(expiration));
 
@@ -201,13 +193,16 @@ export function attachPurchaseTokenHandler(router: RouterInstance) {
 
     switch (item.type) {
       case 'premium':
-        searchParams.set('price_eur', '8');
-        searchParams.set('price_chr', '80');
+        // Prices are in minor units: euro cents / chron cents.
+        searchParams.set('price_eur', '800');
+        searchParams.set('price_chr', '8000');
 
         break;
       case 'credits': {
-        searchParams.set('price_eur', String(item.amount)); // let the exchange rate is 1
-        searchParams.set('price_chr', String(Math.ceil(item.amount / 10)));
+        // `amount` is the number of credits; price is expressed in euro cents.
+        // 1 EUR = 10 CHR, so 1 euro cent = 10 chron cents.
+        searchParams.set('price_eur', String(item.amount));
+        searchParams.set('price_chr', String(item.amount * 10));
 
         searchParams.set(
           'description',

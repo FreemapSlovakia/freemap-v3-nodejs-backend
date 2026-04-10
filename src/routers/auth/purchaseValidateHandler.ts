@@ -16,7 +16,6 @@ const LegacyBodySchema = z.strictObject({
 
 const ImmediateWebhookSchema = z.strictObject({
   event: z.literal('payment-completed'),
-  delayed: z.literal(0),
   token: z.string().nonempty(),
   signature: z.string().nonempty(),
   amount_paid: z.number(),
@@ -26,9 +25,9 @@ const ImmediateWebhookSchema = z.strictObject({
   expiration: z.number().int().optional(),
 });
 
-const DelayedWebhookSchema = z.strictObject({
+const DelayedWebhookSchema = z
+  .object({
   event: z.enum(['order-placed', 'delayed-confirmed', 'delayed-rejected']),
-  delayed: z.literal(1),
   delivery_id: z.string().nonempty(),
   token: z.string().nonempty(),
   signature: z.string().nonempty(),
@@ -37,13 +36,13 @@ const DelayedWebhookSchema = z.strictObject({
   email: z.email(),
   occurred_at: z.number().int(),
   expiration: z.number().int().optional(),
-  bank_intent_status: z.string().nonempty(),
-});
+  // Spec allows empty string and unknown future values; handle defensively.
+  bank_intent_status: z.string(),
+})
+  // Delayed webhooks may include nested objects for compatibility; allow extras.
+  .passthrough();
 
-const WebhookSchema = z.discriminatedUnion('delayed', [
-  ImmediateWebhookSchema,
-  DelayedWebhookSchema,
-]);
+const WebhookSchema = z.union([ImmediateWebhookSchema, DelayedWebhookSchema]);
 
 const RequestSchema = z.union([WebhookSchema, LegacyBodySchema]);
 
@@ -94,6 +93,22 @@ export function attachPurchaseValidateHandler(router: RouterInstance) {
     const webhook = webhookRes.success ? webhookRes.data : undefined;
 
     if (webhook) {
+      // If headers are present, ensure they match the body for defense-in-depth.
+      const hdrEvent = ctx.get('X-Rovas-Event');
+      if (hdrEvent && hdrEvent !== webhook.event) {
+        return ctx.throw(400, 'X-Rovas-Event does not match body.event');
+      }
+
+      if ('delivery_id' in webhook) {
+        const hdrDeliveryId = ctx.get('X-Rovas-Delivery-Id');
+        if (hdrDeliveryId && hdrDeliveryId !== webhook.delivery_id) {
+          return ctx.throw(
+            400,
+            'X-Rovas-Delivery-Id does not match body.delivery_id',
+          );
+        }
+      }
+
       try {
         verifyTokenSignatureOrThrow(webhook.token, webhook.signature);
         enforceFreshnessOrThrow(webhook.occurred_at, webhook.expiration);
