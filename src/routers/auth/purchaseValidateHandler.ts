@@ -3,7 +3,7 @@ import { RouterInstance } from '@koa/router';
 import sql from 'sql-template-tag';
 import z from 'zod';
 import { runInTransaction } from '../../database.js';
-import { getEnv } from './../../env.js';
+import { getEnv, getEnvInteger } from './../../env.js';
 import { registerPath } from '../../openapi.js';
 
 const LegacyBodySchema = z.strictObject({
@@ -60,11 +60,32 @@ function verifyTokenSignatureOrThrow(token: string, providedHex: string) {
   }
 }
 
-function enforceFreshnessOrThrow(occurredAt: number, expiration?: number) {
+function normalizeUnixSeconds(ts: number): number {
+  // Accept either UNIX seconds or UNIX milliseconds from providers.
+  return ts > 1_000_000_000_000 ? Math.floor(ts / 1000) : ts;
+}
+
+function enforceFreshnessOrThrow(occurredAtRaw: number, expirationRaw?: number) {
   const now = Math.floor(Date.now() / 1000);
-  // Allow some skew; this is replay mitigation, not the primary auth mechanism.
-  const maxSkewSec = 10 * 60;
-  if (Math.abs(now - occurredAt) > maxSkewSec) {
+  const occurredAt = normalizeUnixSeconds(occurredAtRaw);
+  const expiration =
+    expirationRaw == null ? undefined : normalizeUnixSeconds(expirationRaw);
+
+  // Replay mitigation window; can be widened in dev/staging where webhook clocks
+  // or delivery timings may differ. Set to 0 to disable the stale-age check.
+  const maxAgeSec = getEnvInteger(
+    'PURCHASE_WEBHOOK_MAX_AGE_SEC',
+    14 * 24 * 60 * 60,
+  );
+  const maxFutureSkewSec = getEnvInteger(
+    'PURCHASE_WEBHOOK_MAX_FUTURE_SKEW_SEC',
+    10 * 60,
+  );
+
+  if (occurredAt > now + maxFutureSkewSec) {
+    throw new Error('occurred_at is too far in the future');
+  }
+  if (maxAgeSec > 0 && now - occurredAt > maxAgeSec) {
     throw new Error('stale occurred_at');
   }
   if (expiration != null && occurredAt > expiration) {
