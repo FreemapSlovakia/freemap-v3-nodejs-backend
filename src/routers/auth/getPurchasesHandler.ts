@@ -33,6 +33,15 @@ const ResponseSchema = z.strictObject({
   intents: z.array(PurchaseIntentSchema),
 });
 
+function stripLegacyPurchaseItemFields(item: unknown) {
+  if (!item || typeof item !== 'object' || Array.isArray(item)) {
+    return item;
+  }
+
+  const { callbackUrl: _callbackUrl, ...rest } = item as Record<string, unknown>;
+  return rest;
+}
+
 export function attachGetPurchasesHandler(router: RouterInstance) {
   registerPath('/auth/purchases', {
     get: {
@@ -62,6 +71,15 @@ export function attachGetPurchasesHandler(router: RouterInstance) {
           ORDER BY updatedAt DESC`,
     );
 
-    ctx.body = ResponseSchema.parse({ purchases, intents });
+    ctx.body = ResponseSchema.parse({
+      purchases: purchases.map((purchase: { item: unknown }) => ({
+        ...purchase,
+        item: stripLegacyPurchaseItemFields(purchase.item),
+      })),
+      intents: intents.map((intent: { item: unknown }) => ({
+        ...intent,
+        item: stripLegacyPurchaseItemFields(intent.item),
+      })),
+    });
   });
 }

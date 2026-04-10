@@ -156,7 +156,7 @@ export function attachPurchaseTokenHandler(router: RouterInstance) {
         createdAt = NOW(),
         token = ${token},
         expireAt = ${expireAt},
-        item = ${JSON.stringify(body)},
+        item = ${JSON.stringify(item)},
         status = 'created'`,
     );
 
