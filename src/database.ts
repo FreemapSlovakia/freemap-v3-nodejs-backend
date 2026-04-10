@@ -67,6 +67,36 @@ export async function initDatabase() {
       FOREIGN KEY (userId) REFERENCES user (id) ON DELETE CASCADE
     ) ENGINE=InnoDB`,
 
+    sql`CREATE TABLE IF NOT EXISTS purchaseIntent (
+      token VARCHAR(255) CHARSET ascii NULL PRIMARY KEY,
+      userId INT UNSIGNED NOT NULL,
+      createdAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updatedAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      expireAt TIMESTAMP NOT NULL,
+      item JSON NOT NULL,
+      status ENUM('created','awaiting_payment','confirmed','rejected') NOT NULL DEFAULT 'created',
+      lastEvent VARCHAR(32) CHARSET ascii NULL,
+      lastOccurredAt INT UNSIGNED NULL,
+      amountPaid INT UNSIGNED NULL,
+      currency CHAR(3) CHARSET ascii NULL,
+      email VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL,
+      bankIntentStatus VARCHAR(32) CHARSET ascii NULL,
+      FOREIGN KEY (userId) REFERENCES user (id) ON DELETE CASCADE,
+      INDEX piUserIdIdx (userId),
+      INDEX piStatusIdx (status),
+      INDEX piExpireAtIdx (expireAt)
+    ) ENGINE=InnoDB`,
+
+    sql`CREATE TABLE IF NOT EXISTS rovasWebhookDelivery (
+      deliveryId VARCHAR(128) CHARSET ascii NOT NULL PRIMARY KEY,
+      token VARCHAR(255) CHARSET ascii NULL,
+      event VARCHAR(32) CHARSET ascii NOT NULL,
+      occurredAt INT UNSIGNED NULL,
+      createdAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      INDEX rwdTokenIdx (token),
+      INDEX rwdCreatedAtIdx (createdAt)
+    ) ENGINE=InnoDB`,
+
     sql`CREATE TABLE IF NOT EXISTS purchase (
       userId INT UNSIGNED NOT NULL,
       item JSON NOT NULL,
@@ -84,6 +114,7 @@ export async function initDatabase() {
       takenAt TIMESTAMP NULL,
       createdAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
       location POINT NOT NULL,
+      country CHAR(2) CHARSET ascii NULL,
       pano BIT NOT NULL,
       premium BIT NOT NULL DEFAULT FALSE,
       azimuth FLOAT DEFAULT NULL,
@@ -250,6 +281,10 @@ export async function initDatabase() {
 
   async function cleanup() {
     await pool.query(sql`DELETE FROM purchaseToken WHERE expireAt < NOW()`);
+    await pool.query(sql`DELETE FROM purchaseIntent WHERE expireAt < NOW()`);
+    await pool.query(
+      sql`DELETE FROM rovasWebhookDelivery WHERE createdAt < (NOW() - INTERVAL 30 DAY)`,
+    );
 
     await runInTransaction(async (conn) => {
       // TODO track pending downloads taking more than a day :-o

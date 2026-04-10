@@ -7,6 +7,14 @@ import { pool } from '../../database.js';
 import { getEnv } from '../../env.js';
 import { AUTH_REQUIRED, registerPath } from '../../openapi.js';
 
+function buildCanonicalRovasUrlToSign(url: URL): string {
+  // Rovas expects signature over the full absolute URL without the `signature`
+  // parameter, preserving the exact query parameter order used to build the link.
+  const canonical = new URL(url.toString());
+  canonical.searchParams.delete('signature');
+  return canonical.toString();
+}
+
 type Combo = {
   title: string;
   description: string;
@@ -127,7 +135,7 @@ export function attachPurchaseTokenHandler(router: RouterInstance) {
 
     const token = randomBytes(32).toString('hex');
 
-    const expireAt = new Date(Date.now() + 3_600_000); // 1 hour
+    const expireAt = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000); // 3 days
 
     const user = ctx.state.user!;
 
@@ -142,15 +150,27 @@ export function attachPurchaseTokenHandler(router: RouterInstance) {
         item = ${JSON.stringify(item)}`,
     );
 
+    await pool.query(
+      sql`INSERT INTO purchaseIntent SET
+        userId = ${user.id},
+        createdAt = NOW(),
+        token = ${token},
+        expireAt = ${expireAt},
+        item = ${JSON.stringify(item)},
+        status = 'created'`,
+    );
+
     const expiration = Math.floor(expireAt.getTime() / 1000);
 
     const paymentUrl = new URL(getEnv('PURCHASE_URL_PREFIX'));
 
     const { searchParams } = paymentUrl;
 
+    // NOTE: query parameter order matters for the signed string; keep a stable order
+    // by appending in the intended sequence.
     searchParams.set('token', token);
 
-    searchParams.set('callbackurl', callbackUrl);
+    searchParams.set('callback_url', callbackUrl);
 
     searchParams.set('expiration', String(expiration));
 
@@ -173,13 +193,16 @@ export function attachPurchaseTokenHandler(router: RouterInstance) {
 
     switch (item.type) {
       case 'premium':
+        // Prices are in minor units: euro cents / chron cents.
         searchParams.set('price_eur', '800');
-        searchParams.set('price_chr', '80');
+        searchParams.set('price_chr', '8000');
 
         break;
       case 'credits': {
-        searchParams.set('price_eur', String(item.amount)); // let the exchange rate is 1
-        searchParams.set('price_chr', String(Math.ceil(item.amount / 10)));
+        // `amount` is the number of credits; price is expressed in euro cents.
+        // 1 EUR = 10 CHR, so 1 euro cent = 10 chron cents.
+        searchParams.set('price_eur', String(item.amount));
+        searchParams.set('price_chr', String(item.amount * 10));
 
         searchParams.set(
           'description',
@@ -196,14 +219,15 @@ export function attachPurchaseTokenHandler(router: RouterInstance) {
       }
     }
 
-    const paymentUrlString = paymentUrl.toString();
+    const canonicalToSign = buildCanonicalRovasUrlToSign(paymentUrl);
 
     ctx.body = ResponseSchema.parse({
       paymentUrl:
-        paymentUrlString +
-        '&signature=' +
+        canonicalToSign +
+        (canonicalToSign.includes('?') ? '&' : '?') +
+        'signature=' +
         createHmac('sha256', getEnv('PURCHASE_SECRET'))
-          .update(paymentUrlString)
+          .update(canonicalToSign)
           .digest('hex'),
     });
   });
