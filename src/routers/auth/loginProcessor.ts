@@ -214,6 +214,7 @@ export async function login(
                 sendGalleryEmails: true,
                 isAdmin: false,
                 settings: JSON.stringify(settings),
+                credits: 100,
                 [authProviderToColumn[authProvider]]: remoteUserId,
                 ...extraUserFields,
               }).map(
