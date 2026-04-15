@@ -38,7 +38,10 @@ function stripLegacyPurchaseItemFields(item: unknown) {
     return item;
   }
 
-  const { callbackUrl: _callbackUrl, ...rest } = item as Record<string, unknown>;
+  const { callbackUrl: _callbackUrl, ...rest } = item as Record<
+    string,
+    unknown
+  >;
   return rest;
 }
 
@@ -59,7 +62,7 @@ export function attachGetPurchasesHandler(router: RouterInstance) {
     const userId = ctx.state.user!.id;
 
     const purchases = await pool.query(
-      sql`SELECT item, createdAt FROM purchase WHERE userId = ${userId}`,
+      sql`SELECT item, createdAt FROM purchase WHERE userId = ${userId} ORDER BY createdAt DESC`,
     );
 
     const intents = await pool.query(
