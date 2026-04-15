@@ -132,17 +132,17 @@ const LinearRingSchema = z.array(PositionSchema);
 const PolygonCoordsSchema = z.array(LinearRingSchema);
 
 const GeoJSONGeometrySchema = z.union([
-  z.strictObject({
+  z.object({
     type: z.literal('Polygon'),
     coordinates: PolygonCoordsSchema,
   }),
-  z.strictObject({
+  z.object({
     type: z.literal('MultiPolygon'),
     coordinates: z.array(PolygonCoordsSchema),
   }),
 ]);
 
-const GeoJSONFeatureSchema = z.strictObject({
+const GeoJSONFeatureSchema = z.object({
   type: z.literal('Feature'),
   geometry: GeoJSONGeometrySchema,
   properties: z.record(z.string(), z.unknown()).nullable(),
