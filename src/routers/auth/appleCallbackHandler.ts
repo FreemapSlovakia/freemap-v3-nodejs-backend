@@ -37,8 +37,8 @@ export function attachAppleCallbackHandler(router: RouterInstance) {
     if (!window.opener) {
       window.location.replace("${intentUrl}");
     } else {
-      // Apple JS will handle the Web popup closure and promise resolution, 
-      // but if we reach here we can attempt to close the popup.
+      // Apple JS and Flutter sign_in_with_apple_web expect the data as a query string message
+      window.opener.postMessage("?" + "${searchParams}", "*");
       window.close();
     }
   </script>
