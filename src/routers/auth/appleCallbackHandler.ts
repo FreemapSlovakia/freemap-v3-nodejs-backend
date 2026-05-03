@@ -18,15 +18,28 @@ export function attachAppleCallbackHandler(router: RouterInstance) {
   router.post('/apple-callback', async (ctx) => {
     // Apple sends application/x-www-form-urlencoded
     const body = ctx.request.body || {};
-    
+    const userAgent = (ctx.request.header['user-agent'] || '').toLowerCase();
+    const isAndroid = userAgent.includes('android');
+
     const searchParams = new URLSearchParams(body as Record<string, string>).toString();
     const intentUrl = `intent://callback?${searchParams}#Intent;package=sk.bigware.freemap;scheme=signinwithapple;end`;
-    
-    ctx.log.info({ intentUrl }, 'Handling Apple Sign In callback');
-    
-    ctx.status = 200;
-    ctx.type = 'text/html';
-    ctx.body = `<!DOCTYPE html>
+
+    ctx.log.info({ intentUrl, isAndroid, userAgent: ctx.request.header['user-agent'] }, 'Handling Apple Sign In callback');
+
+    if (isAndroid) {
+      // Chrome Custom Tab blocks JS-based intent:// redirects (no user gesture).
+      // Server-side 307 redirects ARE allowed and followed by Chrome Custom Tab.
+      // 307 is specifically used because it preserves the POST method of the Apple callback request.
+      ctx.status = 307;
+      ctx.set('Location', intentUrl);
+      ctx.body = '';
+    } else {
+      // Web popup flow: Apple JS SDK handles popup communication.
+      // If window.opener exists it means we are in a popup - just close it.
+      // Otherwise show a fallback page.
+      ctx.status = 200;
+      ctx.type = 'text/html';
+      ctx.body = `<!DOCTYPE html>
 <html>
 <head>
   <meta charset="utf-8">
@@ -34,15 +47,15 @@ export function attachAppleCallbackHandler(router: RouterInstance) {
 </head>
 <body>
   <script>
-    if (!window.opener) {
-      window.location.replace("${intentUrl}");
-    } else {
-      // Apple JS will handle the Web popup closure and promise resolution, 
-      // but if we reach here we can attempt to close the popup.
+    if (window.opener) {
       window.close();
+    } else {
+      // Fallback: show manual link for non-popup, non-Android contexts
+      document.write('<p>Prihlásenie dokončené. Vráťte sa do aplikácie.</p>');
     }
   </script>
 </body>
 </html>`;
+    }
   });
 }
