@@ -342,10 +342,14 @@ async function byBbox(ctx: ParameterizedContext) {
     Object.assign({}, row, {
       rating: getRating ? row.rating : undefined,
       takenAt: isProtobuf
-        ? row.takenAt?.getTime()
+        ? row.takenAt == null
+          ? row.takenAt
+          : row.takenAt.getTime() / 1000
         : (row.takenAt?.toISOString() ?? row.takenAt),
       createdAt: isProtobuf
-        ? row.createdAt?.getTime()
+        ? row.createdAt == null
+          ? row.createdAt
+          : row.createdAt.getTime() / 1000
         : (row.createdAt?.toISOString() ?? row.createdAt),
       pano: row.pano,
       premium: row.premium,
