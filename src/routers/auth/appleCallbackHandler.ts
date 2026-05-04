@@ -27,9 +27,9 @@ export function attachAppleCallbackHandler(router: RouterInstance) {
 
     if (isAndroid) {
       // Chrome Custom Tab blocks JS-based intent:// redirects (no user gesture).
-      // Server-side 307 redirects ARE allowed and followed by Chrome Custom Tab.
-      // 307 is specifically used because it preserves the POST method of the Apple callback request.
-      ctx.status = 307;
+      // Server-side 302 redirects ARE allowed and followed by Chrome Custom Tab.
+      // 302 is specifically used instead of 307 because Chrome often blocks POST redirects to intent:// URIs.
+      ctx.status = 302;
       ctx.set('Location', intentUrl);
       ctx.body = '';
       return;
