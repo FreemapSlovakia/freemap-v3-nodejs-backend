@@ -23,7 +23,6 @@ export function attachAppleCallbackHandler(router: RouterInstance) {
 
     const searchParams = new URLSearchParams(body as Record<string, string>).toString();
     const intentUrl = `intent://callback?${searchParams}#Intent;package=sk.bigware.freemap;scheme=signinwithapple;end`;
-
     ctx.log.info({ intentUrl, isAndroid, userAgent: ctx.request.header['user-agent'] }, 'Handling Apple Sign In callback');
 
     if (isAndroid) {
@@ -33,13 +32,15 @@ export function attachAppleCallbackHandler(router: RouterInstance) {
       ctx.status = 307;
       ctx.set('Location', intentUrl);
       ctx.body = '';
-    } else {
-      // Web popup flow: Apple JS SDK handles popup communication.
-      // If window.opener exists it means we are in a popup - just close it.
-      // Otherwise show a fallback page.
-      ctx.status = 200;
-      ctx.type = 'text/html';
-      ctx.body = `<!DOCTYPE html>
+      return;
+    }
+
+    // Web popup flow: Apple JS SDK handles popup communication.
+    // If window.opener exists it means we are in a popup - postMessage to Flutter web.
+    // Otherwise show a fallback page or try JS redirect.
+    ctx.status = 200;
+    ctx.type = 'text/html';
+    ctx.body = `<!DOCTYPE html>
 <html>
 <head>
   <meta charset="utf-8">
@@ -48,14 +49,16 @@ export function attachAppleCallbackHandler(router: RouterInstance) {
 <body>
   <script>
     if (window.opener) {
+      // Apple JS and Flutter sign_in_with_apple_web expect the data as a query string message
+      window.opener.postMessage("?" + "${searchParams}", "*");
       window.close();
     } else {
-      // Fallback: show manual link for non-popup, non-Android contexts
+      // Fallback: JS redirect just in case, or show manual link
+      window.location.replace("${intentUrl}");
       document.write('<p>Prihlásenie dokončené. Vráťte sa do aplikácie.</p>');
     }
   </script>
 </body>
 </html>`;
-    }
   });
 }
