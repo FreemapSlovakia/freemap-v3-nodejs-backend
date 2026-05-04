@@ -13,7 +13,6 @@ import { pool } from '../../database.js';
 import { getEnv } from '../../env.js';
 import { AUTH_OPTIONAL, registerPath } from '../../openapi.js';
 import { acceptValidator } from '../../requestValidators.js';
-import { zNullishDateToIso } from '../../types.js';
 import { ratingSubquery } from './ratingConstants.js';
 
 const secret = getEnv('PREMIUM_PHOTO_SECRET', '');
@@ -93,8 +92,8 @@ const BboxRowSchema = z.array(
     id: z.uint32().optional(),
     title: z.string().nullish(),
     description: z.string().nullish(),
-    takenAt: zNullishDateToIso,
-    createdAt: zNullishDateToIso,
+    takenAt: z.date().nullish(),
+    createdAt: z.date().nullish(),
     userId: z.uint32().nullish(),
     pano: z.boolean().nullish(),
     premium: z.boolean().nullish(),
@@ -335,11 +334,19 @@ async function byBbox(ctx: ParameterizedContext) {
 
   const getHmac = fields?.includes('hmac');
 
+  const isProtobuf =
+    ctx.accepts('application/json', 'application/x-protobuf') ===
+    'application/x-protobuf';
+
   const pictures = rows.map((row) =>
     Object.assign({}, row, {
       rating: getRating ? row.rating : undefined,
-      takenAt: row.takenAt,
-      createdAt: row.createdAt,
+      takenAt: isProtobuf
+        ? row.takenAt?.getTime()
+        : (row.takenAt?.toISOString() ?? row.takenAt),
+      createdAt: isProtobuf
+        ? row.createdAt?.getTime()
+        : (row.createdAt?.toISOString() ?? row.createdAt),
       pano: row.pano,
       premium: row.premium,
       azimuth: row.azimuth,
@@ -351,58 +358,57 @@ async function byBbox(ctx: ParameterizedContext) {
     }),
   );
 
-  if (
-    ctx.accepts('application/json', 'application/x-protobuf') ===
-    'application/x-protobuf'
-  ) {
-    let prevLon: number | undefined;
-    let prevLat: number | undefined;
-
-    for (const picture of pictures) {
-      const lon = Math.round(picture.lon * 1e6);
-      picture.lon = prevLon === undefined ? lon : lon - prevLon;
-      prevLon = lon;
-
-      const lat = Math.round(picture.lat * 1e6);
-      picture.lat = prevLat === undefined ? lat : lat - prevLat;
-      prevLat = lat;
-    }
-
-    const body = { pictures };
-
-    const err = picturesResponseType.verify(body);
-
-    if (err) {
-      ctx.throw(500, err);
-    }
-
-    let payload = Buffer.from(picturesResponseType.encode(body).finish());
-
-    const encoding = ctx.acceptsEncodings('br', 'gzip', 'identity');
-
-    ctx.vary('Accept-Encoding');
-
-    if (payload.length >= 1024 && encoding && encoding !== 'identity') {
-      if (encoding === 'br') {
-        payload = await brotliCompressAsync(payload, {
-          params: {
-            [zlibConstants.BROTLI_PARAM_QUALITY]: 4,
-          },
-        });
-
-        ctx.set('Content-Encoding', 'br');
-      } else if (encoding === 'gzip') {
-        payload = await gzipAsync(payload);
-
-        ctx.set('Content-Encoding', 'gzip');
-      }
-    }
-
-    ctx.type = 'application/x-protobuf';
-    ctx.body = payload;
-  } else {
+  if (!isProtobuf) {
     ctx.body = pictures;
+
+    return;
   }
+
+  let prevLon: number | undefined;
+  let prevLat: number | undefined;
+
+  for (const picture of pictures) {
+    const lon = Math.round(picture.lon * 1e6);
+    picture.lon = prevLon === undefined ? lon : lon - prevLon;
+    prevLon = lon;
+
+    const lat = Math.round(picture.lat * 1e6);
+    picture.lat = prevLat === undefined ? lat : lat - prevLat;
+    prevLat = lat;
+  }
+
+  const body = { pictures };
+
+  const err = picturesResponseType.verify(body);
+
+  if (err) {
+    ctx.throw(500, err);
+  }
+
+  let payload = Buffer.from(picturesResponseType.encode(body).finish());
+
+  const encoding = ctx.acceptsEncodings('br', 'gzip', 'identity');
+
+  ctx.vary('Accept-Encoding');
+
+  if (payload.length >= 1024 && encoding && encoding !== 'identity') {
+    if (encoding === 'br') {
+      payload = await brotliCompressAsync(payload, {
+        params: {
+          [zlibConstants.BROTLI_PARAM_QUALITY]: 4,
+        },
+      });
+
+      ctx.set('Content-Encoding', 'br');
+    } else if (encoding === 'gzip') {
+      payload = await gzipAsync(payload);
+
+      ctx.set('Content-Encoding', 'gzip');
+    }
+  }
+
+  ctx.type = 'application/x-protobuf';
+  ctx.body = payload;
 }
 
 async function byOrder(ctx: ParameterizedContext) {
