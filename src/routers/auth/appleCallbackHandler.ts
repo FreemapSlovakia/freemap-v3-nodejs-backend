@@ -22,7 +22,7 @@ export function attachAppleCallbackHandler(router: RouterInstance) {
     const isAndroid = userAgent.includes('android');
 
     const searchParams = new URLSearchParams(body as Record<string, string>).toString();
-    const intentUrl = `intent://callback?${searchParams}#Intent;package=sk.bigware.freemap;scheme=signinwithapple;end`;
+    const intentUrl = `signinwithapple://callback?${searchParams}`;
     ctx.log.info({ intentUrl, isAndroid, userAgent: ctx.request.header['user-agent'] }, 'Handling Apple Sign In callback');
 
     if (isAndroid) {
