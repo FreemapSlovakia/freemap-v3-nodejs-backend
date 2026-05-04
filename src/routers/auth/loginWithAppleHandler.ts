@@ -9,9 +9,9 @@ import { login } from './loginProcessor.js';
 
 const BodySchema = z.strictObject({
   identityToken: z.string().nonempty(),
-  name: z.string().optional(),
-  language: z.string().nullable(),
-  connect: z.boolean().optional(),
+  name: z.string().nullish(),
+  language: z.string().nullish(),
+  connect: z.boolean().nullish(),
 });
 
 export function attachLoginWithAppleHandler(router: RouterInstance) {

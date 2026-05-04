@@ -203,7 +203,7 @@ export async function login(
           await conn.query(
             sql`INSERT INTO user SET ${join(
               Object.entries({
-                name: remoteName,
+                name: remoteName || email?.split('@')[0] || 'Apple User',
                 email,
                 language: remoteLanguage,
                 createdAt: now,
