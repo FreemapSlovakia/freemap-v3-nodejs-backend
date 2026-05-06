@@ -199,28 +199,35 @@ export async function login(
         WHERE id = ${currentUser.id}
     `);
       } else {
-        userId = (
-          await conn.query(
-            sql`INSERT INTO user SET ${join(
-              Object.entries({
-                name: remoteName || email?.split('@')[0] || 'Apple User',
-                email,
-                language: remoteLanguage,
-                createdAt: now,
-                lat: lat ?? null,
-                lon: lon ?? null,
-                sendGalleryEmails: true,
-                isAdmin: false,
-                settings: JSON.stringify(settings),
-                credits: 100,
-                [authProviderToColumn[authProvider]]: remoteUserId,
-                ...extraUserFields,
-              }).map(
-                ([column, value]) => sql`${raw(column)} = ${value as RawValue}`,
-              ),
-            )}`,
-          )
-        ).insertId;
+        const insertRes = await conn.query(
+          sql`INSERT INTO user SET ${join(
+            Object.entries({
+              name: remoteName || email?.split('@')[0] || 'Apple User',
+              email,
+              language: remoteLanguage,
+              createdAt: now,
+              lat: lat ?? null,
+              lon: lon ?? null,
+              sendGalleryEmails: true,
+              isAdmin: false,
+              settings: JSON.stringify(settings),
+              credits: 100,
+              [authProviderToColumn[authProvider]]: remoteUserId,
+              ...extraUserFields,
+            }).map(
+              ([column, value]) => sql`${raw(column)} = ${value as RawValue}`,
+            ),
+          )}`,
+        );
+
+        userId = insertRes.insertId;
+
+        if (!userId) {
+          ctx.log.error(
+            { insertRes, authProvider, remoteUserId },
+            'Failed to get insertId for new user',
+          );
+        }
       }
     }
 
@@ -239,6 +246,14 @@ export async function login(
     const [row] = await conn.query(
       sql`SELECT * FROM user WHERE id = ${userId}`,
     );
+
+    if (!row) {
+      ctx.log.error(
+        { userId, authProvider, remoteUserId },
+        'User row not found after login/insert',
+      );
+      return ctx.throw(500, 'User row not found after login process.');
+    }
 
     return { userRow: UserRowSchema.parse(row), authToken };
   });
