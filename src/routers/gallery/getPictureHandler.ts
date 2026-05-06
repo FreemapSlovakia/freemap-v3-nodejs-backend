@@ -10,6 +10,8 @@ import { AUTH_OPTIONAL, registerPath } from '../../openapi.js';
 import { acceptValidator } from '../../requestValidators.js';
 import { zDateToIso, zNullableDateToIso } from '../../types.js';
 import { ratingSubquery } from './ratingConstants.js';
+import { stat } from 'node:fs/promises';
+import { picturesDir } from './constants.js';
 
 const secret = getEnv('PREMIUM_PHOTO_SECRET', '');
 
@@ -66,6 +68,7 @@ const ResponseBodySchema = PictureDbRowSchema.omit({
     })
     .array(),
   hmac: z.string().optional(),
+  sizeMB: z.number().optional(),
 });
 
 type ResponseBody = z.infer<typeof ResponseBodySchema>;
@@ -153,7 +156,16 @@ export function attachGetPictureHandler(router: RouterInstance) {
         myStars,
         pano,
         premium,
+        pathname,
       } = row;
+
+      let sizeMB: number | undefined;
+      try {
+        const stats = await stat(`${picturesDir}/${pathname}`);
+        sizeMB = stats.size / (1024 * 1024);
+      } catch {
+        // Ignored if missing
+      }
 
       ctx.body = {
         id: pictureId,
@@ -183,6 +195,7 @@ export function attachGetPictureHandler(router: RouterInstance) {
                 .update(String(pictureId))
                 .digest('hex')
             : undefined,
+        sizeMB,
       } satisfies ResponseBody;
     },
   );
