@@ -12,6 +12,7 @@ import { zDateToIso, zNullableDateToIso } from '../../types.js';
 import { ratingSubquery } from './ratingConstants.js';
 import { stat } from 'node:fs/promises';
 import { picturesDir } from './constants.js';
+import path from 'node:path';
 
 const secret = getEnv('PREMIUM_PHOTO_SECRET', '');
 
@@ -159,12 +160,11 @@ export function attachGetPictureHandler(router: RouterInstance) {
         pathname,
       } = row;
 
-      let size: number | undefined;
+      let size;
       try {
-        const stats = await stat(`${picturesDir}/${pathname}`);
-        size = stats.size;
+        size = (await stat(path.join(picturesDir, pathname))).size;
       } catch {
-        // Ignored if missing
+        // ignore
       }
 
       ctx.body = {
