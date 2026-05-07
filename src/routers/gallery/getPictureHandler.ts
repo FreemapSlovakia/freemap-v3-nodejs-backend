@@ -68,7 +68,7 @@ const ResponseBodySchema = PictureDbRowSchema.omit({
     })
     .array(),
   hmac: z.string().optional(),
-  sizeMB: z.number().optional(),
+  size: z.number().optional(),
 });
 
 type ResponseBody = z.infer<typeof ResponseBodySchema>;
@@ -159,10 +159,10 @@ export function attachGetPictureHandler(router: RouterInstance) {
         pathname,
       } = row;
 
-      let sizeMB: number | undefined;
+      let size: number | undefined;
       try {
         const stats = await stat(`${picturesDir}/${pathname}`);
-        sizeMB = stats.size / (1024 * 1024);
+        size = stats.size;
       } catch {
         // Ignored if missing
       }
@@ -195,7 +195,7 @@ export function attachGetPictureHandler(router: RouterInstance) {
                 .update(String(pictureId))
                 .digest('hex')
             : undefined,
-        sizeMB,
+        size,
       } satisfies ResponseBody;
     },
   );
