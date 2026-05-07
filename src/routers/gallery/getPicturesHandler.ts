@@ -30,14 +30,21 @@ const booleanParam = z
   .optional();
 
 const CommonQuerySchema = z.object({
-  userId: z.coerce.number().int().positive().optional(),
+  userId: z.preprocess(
+    (v) => (Array.isArray(v) ? v : v ? [v] : undefined),
+    z.array(z.coerce.number().int().positive()).optional(),
+  ),
   ratingFrom: z.coerce.number().min(0).max(5).optional(),
   ratingTo: z.coerce.number().min(0).max(5).optional(),
   takenAtFrom: z.iso.datetime().optional(),
   takenAtTo: z.iso.datetime().optional(),
   createdAtFrom: z.iso.datetime().optional(),
   createdAtTo: z.iso.datetime().optional(),
-  tag: z.string().nonempty().optional(),
+  tag: z.preprocess(
+    (v) => (Array.isArray(v) ? v : v ? [v] : undefined),
+    z.array(z.string().nonempty()).optional(),
+  ),
+  tagMode: z.enum(['any', 'all']).default('any'),
   pano: booleanParam,
   premium: booleanParam,
 });
@@ -190,6 +197,7 @@ async function byRadius(ctx: ParameterizedContext) {
   const {
     userId,
     tag,
+    tagMode,
     ratingFrom,
     ratingTo,
     takenAtFrom,
@@ -204,6 +212,9 @@ async function byRadius(ctx: ParameterizedContext) {
   } = radiusQuery;
 
   const myUserId = ctx.state.user?.id ?? -1;
+  
+  const userIdArray = userId || [];
+  const tagArray = tag || [];
 
   // cca 1 degree
   const minLat = lat - distance / 43;
@@ -212,13 +223,15 @@ async function byRadius(ctx: ParameterizedContext) {
   const minLon = lon - k;
   const maxLon = lon + k;
 
-  const query = sql`SELECT id,
+  const query = sql`SELECT picture.id,
     ST_Distance_Sphere(location, POINT(${lon}, ${lat})) / 1000 AS distance
     ${ratingFrom !== undefined || ratingTo !== undefined ? sql`, ${raw(ratingSubquery)}` : empty}
     FROM picture
     ${
-      tag
-        ? sql`JOIN pictureTag ON pictureId = picture.id AND pictureTag.name = ${tag}`
+      tagArray.length > 0
+        ? tagMode === 'all'
+          ? sql`JOIN (SELECT pictureId FROM pictureTag WHERE name IN (${join(tagArray)}) GROUP BY pictureId HAVING COUNT(DISTINCT name) = ${tagArray.length}) AS pt ON pt.pictureId = picture.id`
+          : sql`JOIN (SELECT DISTINCT pictureId FROM pictureTag WHERE name IN (${join(tagArray)})) AS pt ON pt.pictureId = picture.id`
         : empty
     }
     WHERE MBRContains(ST_GeomFromText(${`LINESTRING(${minLon} ${minLat}, ${maxLon} ${maxLat})`}, 4326), location)
@@ -228,13 +241,13 @@ async function byRadius(ctx: ParameterizedContext) {
     ${createdAtTo ? sql`AND createdAt <= ${new Date(createdAtTo)}` : empty}
     ${pano == null ? empty : sql`AND pano = ${pano}`}
     ${premium == null ? empty : sql`AND premium = ${premium}`}
-    ${userId ? sql`AND userId = ${userId}` : empty}
+    ${userIdArray.length > 0 ? sql`AND userId IN (${join(userIdArray)})` : empty}
     ${
       ctx.state.user?.isAdmin
         ? empty
-        : sql`AND (id NOT IN (SELECT pictureId FROM pictureTag WHERE name = 'private') OR userId = ${myUserId})`
+        : sql`AND (picture.id NOT IN (SELECT pictureId FROM pictureTag WHERE name = 'private') OR userId = ${myUserId})`
     }
-    ${tag === '' ? raw('AND id NOT IN (SELECT pictureId FROM pictureTag)') : empty}
+    ${tagArray.length === 0 && tag !== undefined ? raw('AND picture.id NOT IN (SELECT pictureId FROM pictureTag)') : empty}
     HAVING distance <= ${distance}
     ${ratingFrom == null ? empty : sql`AND rating >= ${ratingFrom}`}
     ${ratingTo == null ? empty : sql`AND rating <= ${ratingTo}`}
@@ -259,6 +272,7 @@ async function byBbox(ctx: ParameterizedContext) {
     bbox: [minLon, minLat, maxLon, maxLat],
     userId,
     tag,
+    tagMode,
     ratingFrom,
     ratingTo,
     takenAtFrom,
@@ -271,6 +285,8 @@ async function byBbox(ctx: ParameterizedContext) {
   } = bboxQuery;
 
   const myUserId = ctx.state.user?.id ?? -1;
+  const userIdArray = userId || [];
+  const tagArray = tag || [];
 
   const sqlFields: string[] = (fields ?? []).filter(
     (f) => f !== 'rating' && f !== 'tags' && f !== 'user' && f !== 'hmac',
@@ -301,8 +317,10 @@ async function byBbox(ctx: ParameterizedContext) {
   const query = sql`SELECT ${raw(sqlFields.join(','))}
     FROM picture
     ${
-      tag
-        ? sql`JOIN pictureTag ON pictureTag.pictureId = picture.id AND name = ${tag}`
+      tagArray.length > 0
+        ? tagMode === 'all'
+          ? sql`JOIN (SELECT pictureId FROM pictureTag WHERE name IN (${join(tagArray)}) GROUP BY pictureId HAVING COUNT(DISTINCT name) = ${tagArray.length}) AS pt ON pt.pictureId = picture.id`
+          : sql`JOIN (SELECT DISTINCT pictureId FROM pictureTag WHERE name IN (${join(tagArray)})) AS pt ON pt.pictureId = picture.id`
         : empty
     }
     WHERE MBRContains(ST_GeomFromText(${`LINESTRING(${minLon} ${minLat}, ${maxLon} ${maxLat})`}, 4326), location)
@@ -312,13 +330,13 @@ async function byBbox(ctx: ParameterizedContext) {
     ${createdAtTo ? sql`AND createdAt <= ${new Date(createdAtTo)}` : empty}
     ${pano == null ? empty : sql`AND pano = ${pano}`}
     ${premium == null ? empty : sql`AND premium = ${premium}`}
-    ${userId ? sql`AND userId = ${userId}` : empty}
+    ${userIdArray.length > 0 ? sql`AND userId IN (${join(userIdArray)})` : empty}
     ${
       ctx.state.user?.isAdmin
         ? empty
-        : sql`AND (id NOT IN (SELECT pictureId FROM pictureTag WHERE name = 'private') OR userId = ${myUserId})`
+        : sql`AND (picture.id NOT IN (SELECT pictureId FROM pictureTag WHERE name = 'private') OR userId = ${myUserId})`
     }
-    ${tag === '' ? raw('AND id NOT IN (SELECT pictureId FROM pictureTag)') : empty}
+    ${tagArray.length === 0 && tag !== undefined ? raw('AND picture.id NOT IN (SELECT pictureId FROM pictureTag)') : empty}
     ${ratingFrom == null ? empty : sql`HAVING rating >= ${ratingFrom}`}
     ${
       ratingTo == null
@@ -427,6 +445,7 @@ async function byOrder(ctx: ParameterizedContext) {
   const {
     userId,
     tag,
+    tagMode,
     ratingFrom,
     ratingTo,
     takenAtFrom,
@@ -440,13 +459,15 @@ async function byOrder(ctx: ParameterizedContext) {
   } = orderByQuery;
 
   const myUserId = ctx.state.user?.id ?? -1;
+  const userIdArray = userId || [];
+  const tagArray = tag || [];
 
   const hv: Sql[] = [];
 
   const wh = ctx.state.user?.isAdmin
     ? []
     : [
-        sql`(id NOT IN (SELECT pictureId FROM pictureTag WHERE name = 'private') OR userId = ${myUserId})`,
+        sql`(picture.id NOT IN (SELECT pictureId FROM pictureTag WHERE name = 'private') OR userId = ${myUserId})`,
       ];
 
   if (ratingFrom !== undefined) {
@@ -481,23 +502,25 @@ async function byOrder(ctx: ParameterizedContext) {
     wh.push(sql`premium = ${premium ? 1 : 0}`);
   }
 
-  if (userId !== undefined) {
-    wh.push(sql`userId = ${userId}`);
+  if (userIdArray.length > 0) {
+    wh.push(sql`userId IN (${join(userIdArray)})`);
   }
 
-  if (tag === '') {
-    wh.push(sql`id NOT IN (SELECT pictureId FROM pictureTag)`);
+  if (tagArray.length === 0 && tag !== undefined) {
+    wh.push(sql`picture.id NOT IN (SELECT pictureId FROM pictureTag)`);
   }
 
-  const query = sql`SELECT id ${
+  const query = sql`SELECT picture.id ${
     ratingFrom !== undefined || ratingTo !== undefined || orderBy === 'rating'
       ? raw(', ' + ratingSubquery)
       : empty
   }
     FROM picture
     ${
-      tag
-        ? sql`JOIN pictureTag ON pictureTag.pictureId = picture.id AND name = ${tag}`
+      tagArray.length > 0
+        ? tagMode === 'all'
+          ? sql`JOIN (SELECT pictureId FROM pictureTag WHERE name IN (${join(tagArray)}) GROUP BY pictureId HAVING COUNT(DISTINCT name) = ${tagArray.length}) AS pt ON pt.pictureId = picture.id`
+          : sql`JOIN (SELECT DISTINCT pictureId FROM pictureTag WHERE name IN (${join(tagArray)})) AS pt ON pt.pictureId = picture.id`
         : empty
     }
     ${wh.length ? sql`WHERE ${join(wh, ' AND ')}` : empty}
