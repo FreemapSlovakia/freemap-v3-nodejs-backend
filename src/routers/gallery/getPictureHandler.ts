@@ -1,5 +1,7 @@
 import { createHmac } from 'node:crypto';
+import { stat } from 'node:fs/promises';
 import { type } from 'node:os';
+import path from 'node:path';
 import { RouterInstance } from '@koa/router';
 import sql, { empty, raw } from 'sql-template-tag';
 import z from 'zod';
@@ -9,10 +11,8 @@ import { getEnv } from '../../env.js';
 import { AUTH_OPTIONAL, registerPath } from '../../openapi.js';
 import { acceptValidator } from '../../requestValidators.js';
 import { zDateToIso, zNullableDateToIso } from '../../types.js';
-import { ratingSubquery } from './ratingConstants.js';
-import { stat } from 'node:fs/promises';
 import { picturesDir } from './constants.js';
-import path from 'node:path';
+import { ratingSubquery } from './ratingConstants.js';
 
 const secret = getEnv('PREMIUM_PHOTO_SECRET', '');
 

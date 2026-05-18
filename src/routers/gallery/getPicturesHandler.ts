@@ -212,7 +212,7 @@ async function byRadius(ctx: ParameterizedContext) {
   } = radiusQuery;
 
   const myUserId = ctx.state.user?.id ?? -1;
-  
+
   const userIdArray = userId || [];
   const tagArray = tag || [];
 

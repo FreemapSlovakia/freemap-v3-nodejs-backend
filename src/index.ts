@@ -123,6 +123,7 @@ app.use(
   koaBody({
     jsonLimit: '16mb',
     multipart: true,
+    jsonTypes: ['application/json', 'application/geo+json'],
   }),
 );
 
