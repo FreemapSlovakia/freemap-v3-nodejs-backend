@@ -20,7 +20,10 @@
     "url": "https://github.com/FreemapSlovakia/freemap-v3-nodejs-backend/issues"
   },
   "lint-staged": {
-    "*.{js,ts}": ["biome check", "git add"]
+    "*.{js,ts}": [
+      "biome check",
+      "git add"
+    ]
   },
   "scripts": {
     "start": "node --enable-source-maps build/index.js",
@@ -41,7 +44,7 @@
     "apple-signin-auth": "^2.0.0",
     "better-sqlite3": "^12.10.0",
     "etag": "^1.8.1",
-    "exifreader": "^4.38.1",
+    "exifreader": "^4.39.0",
     "gdal-async": "^3.12.3",
     "got": "^15.0.5",
     "kcors": "^2.2.2",
@@ -78,7 +81,7 @@
     "@types/ws": "^8.18.1",
     "globals": "^17.6.0",
     "husky": "^9.1.7",
-    "lint-staged": "^17.0.4",
+    "lint-staged": "^17.0.5",
     "node-addon-api": "^8.7.0",
     "node-gyp": "^12.3.0",
     "pino-pretty": "^13.1.3",
