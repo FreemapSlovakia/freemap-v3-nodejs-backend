@@ -214,10 +214,6 @@ async function byRadius(ctx: ParameterizedContext) {
   } = radiusQuery;
 
   const myUserId = ctx.state.user?.id ?? -1;
-  
-  const userIdArray = userId || [];
-  const tagArray = tag || [];
-
   const userIdArray = userId || [];
   const tagArray = tag || [];
 
@@ -294,7 +290,12 @@ async function byBbox(ctx: ParameterizedContext) {
   const tagArray = tag || [];
 
   const sqlFields: string[] = (fields ?? []).filter(
-    (f) => f !== 'rating' && f !== 'tags' && f !== 'user' && f !== 'hmac' && f !== 'lastCommentedAt',
+    (f) =>
+      f !== 'rating' &&
+      f !== 'tags' &&
+      f !== 'user' &&
+      f !== 'hmac' &&
+      f !== 'lastCommentedAt',
   );
 
   sqlFields.push('ST_X(location) AS lon', 'ST_Y(location) AS lat');
