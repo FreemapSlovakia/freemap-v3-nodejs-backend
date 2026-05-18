@@ -70,6 +70,7 @@ const fieldValues = [
   'premium',
   'azimuth',
   'hmac',
+  'lastCommentedAt',
 ] as const;
 
 const BBoxQuerySchema = CommonQuerySchema.extend({
@@ -101,6 +102,7 @@ const BboxRowSchema = z.array(
     description: z.string().nullish(),
     takenAt: z.date().nullish(),
     createdAt: z.date().nullish(),
+    lastCommentedAt: z.date().nullish(),
     userId: z.uint32().nullish(),
     pano: z.boolean().nullish(),
     premium: z.boolean().nullish(),
@@ -212,6 +214,9 @@ async function byRadius(ctx: ParameterizedContext) {
   } = radiusQuery;
 
   const myUserId = ctx.state.user?.id ?? -1;
+  
+  const userIdArray = userId || [];
+  const tagArray = tag || [];
 
   const userIdArray = userId || [];
   const tagArray = tag || [];
@@ -289,7 +294,7 @@ async function byBbox(ctx: ParameterizedContext) {
   const tagArray = tag || [];
 
   const sqlFields: string[] = (fields ?? []).filter(
-    (f) => f !== 'rating' && f !== 'tags' && f !== 'user' && f !== 'hmac',
+    (f) => f !== 'rating' && f !== 'tags' && f !== 'user' && f !== 'hmac' && f !== 'lastCommentedAt',
   );
 
   sqlFields.push('ST_X(location) AS lon', 'ST_Y(location) AS lat');
@@ -311,6 +316,12 @@ async function byBbox(ctx: ParameterizedContext) {
   if (fields?.includes('user')) {
     sqlFields.push(
       '(SELECT name FROM user WHERE picture.userId = user.id) AS user',
+    );
+  }
+
+  if (fields?.includes('lastCommentedAt')) {
+    sqlFields.push(
+      '(SELECT MAX(createdAt) FROM pictureComment WHERE pictureId = picture.id) AS lastCommentedAt',
     );
   }
 
@@ -369,6 +380,11 @@ async function byBbox(ctx: ParameterizedContext) {
           ? row.createdAt
           : row.createdAt.getTime() / 1000
         : (row.createdAt?.toISOString() ?? row.createdAt),
+      lastCommentedAt: isProtobuf
+        ? row.lastCommentedAt == null
+          ? row.lastCommentedAt
+          : row.lastCommentedAt.getTime() / 1000
+        : (row.lastCommentedAt?.toISOString() ?? row.lastCommentedAt),
       pano: row.pano,
       premium: row.premium,
       azimuth: row.azimuth,
