@@ -10,7 +10,7 @@ import { pool } from '../../database.js';
 import { getEnv } from '../../env.js';
 import { AUTH_OPTIONAL, registerPath } from '../../openapi.js';
 import { acceptValidator } from '../../requestValidators.js';
-import { zDateToIso, zNullableDateToIso } from '../../types.js';
+import { UserRowSchema, zDateToIso, zNullableDateToIso } from '../../types.js';
 import { picturesDir } from './constants.js';
 import { ratingSubquery } from './ratingConstants.js';
 
@@ -30,6 +30,7 @@ const PictureDbRowSchema = z.object({
   userId: z.uint32().nullable(),
   name: z.string().nullable(),
   hasPicture: z.coerce.boolean(),
+  userPremium: z.coerce.boolean(),
   premium: z.boolean(),
   tags: z
     .string()
@@ -47,6 +48,14 @@ const CommentDbRowSchema = z.object({
   userId: z.uint32(),
   name: z.string(),
   hasPicture: z.coerce.boolean(),
+  premium: z.coerce.boolean(),
+});
+
+const UserSchema = z.strictObject({
+  id: z.uint32(),
+  name: z.string(),
+  hasPicture: z.boolean(),
+  premium: z.boolean(),
 });
 
 const ResponseBodySchema = PictureDbRowSchema.omit({
@@ -55,26 +64,18 @@ const ResponseBodySchema = PictureDbRowSchema.omit({
   userId: true,
   name: true,
   hasPicture: true,
+  userPremium: true,
 }).extend({
   id: z.uint32(),
-  user: z
-    .strictObject({
-      id: z.uint32(),
-      name: z.string(),
-      hasPicture: z.boolean(),
-    })
-    .nullable(),
+  user: UserSchema.nullable(),
   comments: CommentDbRowSchema.omit({
     userId: true,
     name: true,
     hasPicture: true,
+    premium: true,
   })
     .extend({
-      user: z.strictObject({
-        id: z.uint32(),
-        name: z.string(),
-        hasPicture: z.boolean(),
-      }),
+      user: UserSchema,
     })
     .array(),
   hmac: z.string().optional(),
@@ -113,8 +114,22 @@ export function attachGetPictureHandler(router: RouterInstance) {
         .max(1)
         .parse(
           await pool.query<unknown>(sql`
-            SELECT picture.id AS pictureId, picture.createdAt, pathname, title, picture.description, takenAt, ST_X(location) AS lon, ST_Y(location) AS lat, azimuth, pano,
-              user.id as userId, user.name, user.picture IS NOT NULL AS hasPicture, premium,
+            SELECT
+              picture.id AS pictureId,
+              picture.createdAt,
+              pathname,
+              title,
+              picture.description,
+              takenAt,
+              ST_X(location) AS lon,
+              ST_Y(location) AS lat,
+              azimuth,
+              pano,
+              premium,
+              user.id as userId,
+              user.name,
+              user.picture IS NOT NULL AS hasPicture,
+              (user.premiumExpiration IS NOT NULL AND user.premiumExpiration > NOW()) AS userPremium,
               (SELECT GROUP_CONCAT(name SEPARATOR '\n') FROM pictureTag WHERE pictureId = picture.id) AS tags, ${raw(ratingSubquery)}
               ${
                 ctx.state.user
@@ -133,15 +148,22 @@ export function attachGetPictureHandler(router: RouterInstance) {
 
       const commentRows = CommentDbRowSchema.array().parse(
         await pool.query<unknown>(sql`
-          SELECT pictureComment.id, pictureComment.createdAt, comment, user.name, userId, user.picture IS NOT NULL AS hasPicture
-            FROM pictureComment JOIN user ON (userId = user.id)
-            WHERE pictureId = ${ctx.params.id}
-            ORDER BY pictureComment.createdAt
+          SELECT
+            pictureComment.id,
+            pictureComment.createdAt,
+            comment,
+            user.name,
+            userId,
+            user.picture IS NOT NULL AS hasPicture,
+            (user.premiumExpiration IS NOT NULL AND user.premiumExpiration > NOW()) AS premium
+          FROM pictureComment JOIN user ON (userId = user.id)
+          WHERE pictureId = ${ctx.params.id}
+          ORDER BY pictureComment.createdAt
         `),
       );
 
       const comments = commentRows.map(
-        ({ id, createdAt, comment, userId, name, hasPicture }) => ({
+        ({ id, createdAt, comment, userId, name, hasPicture, premium }) => ({
           id,
           createdAt,
           comment,
@@ -149,6 +171,7 @@ export function attachGetPictureHandler(router: RouterInstance) {
             id: userId,
             name,
             hasPicture,
+            premium,
           },
         }),
       );
@@ -165,6 +188,7 @@ export function attachGetPictureHandler(router: RouterInstance) {
         userId,
         name,
         hasPicture,
+        userPremium,
         tags,
         rating,
         myStars,
@@ -196,6 +220,7 @@ export function attachGetPictureHandler(router: RouterInstance) {
                 id: userId,
                 name,
                 hasPicture,
+                premium: userPremium,
               },
         tags,
         comments,

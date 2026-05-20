@@ -71,10 +71,8 @@ const CommonUserSchema = {
   credits: z.number().nonnegative(),
   language: z.string().nullable(),
   sendGalleryEmails: z.boolean(),
-  hasPicture: z
-    .union([z.boolean(), z.number(), z.bigint()])
-    .transform((v) => Boolean(typeof v === 'bigint' ? Number(v) : v))
-    .pipe(z.boolean()),
+  hasPicture: z.coerce.boolean(),
+  premium: z.coerce.boolean(),
 };
 
 const USER_COLUMN_NAMES = [
@@ -102,12 +100,15 @@ const USER_COLUMN_NAMES = [
 
 /** SQL column list for SELECTing user rows without loading the picture bytes. */
 export const USER_COLUMNS_SQL =
-  USER_COLUMN_NAMES.join(', ') + ', picture IS NOT NULL AS hasPicture';
+  USER_COLUMN_NAMES.join(', ') +
+  ', picture IS NOT NULL AS hasPicture' +
+  ', (premiumExpiration IS NOT NULL AND premiumExpiration > NOW()) AS premium';
 
 /** Same, with each column qualified by `user.` (for joins). */
 export const USER_COLUMNS_SQL_PREFIXED =
   USER_COLUMN_NAMES.map((c) => `user.${c}`).join(', ') +
-  ', user.picture IS NOT NULL AS hasPicture';
+  ', user.picture IS NOT NULL AS hasPicture' +
+  ', (user.premiumExpiration IS NOT NULL AND user.premiumExpiration > NOW()) AS premium';
 
 export const UserResponseSchema = z
   .object({

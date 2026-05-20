@@ -10,12 +10,14 @@ const UserSchema = z.object({
   id: z.uint32(),
   name: z.string(),
   hasPicture: z.boolean(),
+  premium: z.boolean(),
 });
 
 const UserDbSchema = z.object({
   userId: z.uint32(),
   userName: z.string(),
   userHasPicture: z.coerce.boolean(),
+  userPremium: z.coerce.boolean(),
 });
 
 const UsersPerCountryDbSchema = z
@@ -151,7 +153,8 @@ export async function attachGetStatsHandler(router: RouterInstance) {
             r.userId,
             r.pictureCount,
             u.name AS userName,
-            u.picture IS NOT NULL AS userHasPicture
+            u.picture IS NOT NULL AS userHasPicture,
+            (u.premiumExpiration IS NOT NULL AND u.premiumExpiration > NOW()) AS userPremium
           FROM ranked r
           JOIN user u ON u.id = r.userId
           WHERE r.rn <= 30
@@ -165,7 +168,8 @@ export async function attachGetStatsHandler(router: RouterInstance) {
             COUNT(*) AS pictureCount,
             userId,
             user.name AS userName,
-            user.picture IS NOT NULL AS userHasPicture
+            user.picture IS NOT NULL AS userHasPicture,
+            (user.premiumExpiration IS NOT NULL AND user.premiumExpiration > NOW()) AS userPremium
           FROM picture
           JOIN user ON picture.userId = user.id
           WHERE true ${days}
@@ -256,6 +260,7 @@ export async function attachGetStatsHandler(router: RouterInstance) {
         userId,
         userName,
         userHasPicture,
+        userPremium,
         pictureCount,
       } of usersPerCountry) {
         (perUserPerCountry[country] ??= []).push({
@@ -263,6 +268,7 @@ export async function attachGetStatsHandler(router: RouterInstance) {
             id: userId,
             name: userName,
             hasPicture: userHasPicture,
+            premium: userPremium,
           },
           pictureCount,
         });
@@ -275,6 +281,7 @@ export async function attachGetStatsHandler(router: RouterInstance) {
             id: u.userId,
             name: u.userName,
             hasPicture: u.userHasPicture,
+            premium: u.userPremium,
           },
           pictureCount: u.pictureCount,
         })),
