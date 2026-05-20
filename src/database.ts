@@ -1,10 +1,11 @@
 import type { PoolConnection } from 'mariadb';
 import { createPool } from 'mariadb';
-import sql from 'sql-template-tag';
+import sql, { raw } from 'sql-template-tag';
 import z from 'zod';
 import { getEnv, getEnvInteger } from './env.js';
 import { appLogger } from './logger.js';
-import { UserRowSchema } from './types.js';
+import { USER_COLUMNS_SQL, UserRowSchema } from './types.js';
+import { MergeConflictError, mergeUserAccounts } from './userMerge.js';
 
 export const pool = createPool({
   host: getEnv('MARIADB_HOST'),
@@ -274,6 +275,14 @@ export async function initDatabase() {
     db.release();
   }
 
+  const dedup = await mergeDuplicateUsers();
+
+  if (dedup.merged || dedup.conflicts || dedup.missing) {
+    logger.info(
+      `User dedup: merged=${dedup.merged}, conflicts=${dedup.conflicts}, missing=${dedup.missing}`,
+    );
+  }
+
   async function cleanup() {
     await pool.query<unknown>(
       sql`DELETE FROM purchaseToken WHERE expireAt < NOW()`,
@@ -391,4 +400,86 @@ export async function runInTransaction<T>(
       conn.release();
     }
   }
+}
+
+const DuplicateGroupSchema = z.object({
+  ids: z
+    .string()
+    .transform((s) => s.split(',').map((x) => Number.parseInt(x, 10))),
+});
+
+/**
+ * Merges users that share `(name, email)`. Winner is the oldest by
+ * `createdAt`. Each merge runs in its own transaction. Groups with
+ * conflicting UNIQUE auth-provider IDs are skipped and counted.
+ */
+async function mergeDuplicateUsers(): Promise<{
+  merged: number;
+  conflicts: number;
+  missing: number;
+}> {
+  const rows = await pool.query<unknown[]>(
+    sql`SELECT GROUP_CONCAT(id ORDER BY createdAt, id) AS ids
+        FROM user
+        WHERE email IS NOT NULL
+        GROUP BY name, email
+        HAVING COUNT(*) > 1`,
+  );
+
+  const groups = z
+    .array(DuplicateGroupSchema)
+    .parse(rows)
+    .map((r) => r.ids);
+
+  let merged = 0;
+  let conflicts = 0;
+  let missing = 0;
+
+  for (const ids of groups) {
+    const [targetId, ...sourceIds] = ids;
+
+    for (const sourceId of sourceIds) {
+      await runInTransaction(async (conn) => {
+        const [tRow] = await conn.query<unknown[]>(
+          sql`SELECT ${raw(USER_COLUMNS_SQL)} FROM user WHERE id = ${targetId} FOR UPDATE`,
+        );
+
+        const [sRow] = await conn.query<unknown[]>(
+          sql`SELECT ${raw(USER_COLUMNS_SQL)} FROM user WHERE id = ${sourceId} FOR UPDATE`,
+        );
+
+        if (!tRow || !sRow) {
+          missing++;
+
+          return;
+        }
+
+        try {
+          await mergeUserAccounts(
+            conn,
+            UserRowSchema.parse(tRow),
+            UserRowSchema.parse(sRow),
+          );
+
+          logger.info(`Merged user ${sourceId} into ${targetId}`);
+
+          merged++;
+        } catch (err) {
+          if (err instanceof MergeConflictError) {
+            logger.warn(
+              `Conflict merging user ${sourceId} into ${targetId}: ${err.column}`,
+            );
+
+            conflicts++;
+
+            return;
+          }
+
+          throw err;
+        }
+      });
+    }
+  }
+
+  return { merged, conflicts, missing };
 }

@@ -1,6 +1,6 @@
 import { randomBytes } from 'node:crypto';
 import { ParameterizedContext } from 'koa';
-import sql, { empty, join, RawValue, raw } from 'sql-template-tag';
+import sql, { join, RawValue, raw } from 'sql-template-tag';
 import z from 'zod';
 import { authProviderToColumn, rowToUser } from '../../authenticator.js';
 import { pool, runInTransaction } from '../../database.js';
@@ -10,6 +10,7 @@ import {
   USER_COLUMNS_SQL,
   UserRowSchema,
 } from '../../types.js';
+import { MergeConflictError, mergeUserAccounts } from '../../userMerge.js';
 
 const SettingsBodySchema = z.object({
   settings: z
@@ -98,118 +99,28 @@ export async function login(
     const now = new Date();
 
     if (user) {
-      const cols = [
-        'garminUserId',
-        'garminAccessToken',
-        'garminAccessTokenSecret',
-        'osmId',
-        'facebookUserId',
-        'googleUserId',
-        'appleUserId',
-      ] as const;
-
       // found user in DB for this auth provider
-
-      const authData: Partial<
-        Record<(typeof cols)[number], string | number | null>
-      > = {};
-
-      for (const col of cols) {
-        authData[col] = user[col];
-      }
 
       if (currentUser) {
         if (currentUser[authProviderToColumn[authProvider]]) {
           ctx.throw(400, 'provider already set');
         }
 
-        for (const col of [
-          'garminUserId',
-          'osmId',
-          'facebookUserId',
-          'googleUserId',
-          'appleUserId',
-        ] as const) {
-          if (currentUser[col] && user[col] && currentUser[col] !== user[col]) {
+        try {
+          await mergeUserAccounts(conn, currentUser, user, {
+            extraTargetFields: {
+              [authProviderToColumn[authProvider]]: remoteUserId,
+              ...extraUserFields,
+            },
+            newPicture,
+          });
+        } catch (err) {
+          if (err instanceof MergeConflictError) {
             ctx.throw(400, 'conflicting providers');
           }
+
+          throw err;
         }
-
-        Object.assign(authData, {
-          [authProviderToColumn[authProvider]]: remoteUserId,
-          ...extraUserFields,
-        });
-
-        const {
-          id,
-          email,
-          coordinates,
-          language,
-          createdAt,
-          isAdmin,
-          sendGalleryEmails,
-          settings,
-          premiumExpiration,
-          credits,
-        } = user;
-
-        await conn.query<unknown>(sql`DELETE FROM auth WHERE userId = ${id}`);
-
-        for (const table of [
-          'picture',
-          'pictureComment',
-          'trackingDevice',
-          'map',
-          'purchase',
-          'purchaseToken',
-          'purchaseIntent',
-          'blockedCredit',
-        ]) {
-          await conn.query<unknown>(
-            sql`UPDATE ${raw(table)} SET userId = ${currentUser.id} WHERE userId = ${id}`,
-          );
-        }
-
-        // Composite PK contains userId — winner may already have a row for
-        // the same picture/map, so use UPDATE IGNORE and discard leftovers.
-        for (const table of ['pictureRating', 'mapWriteAccess']) {
-          await conn.query<unknown>(
-            sql`UPDATE IGNORE ${raw(table)} SET userId = ${currentUser.id} WHERE userId = ${id}`,
-          );
-
-          await conn.query<unknown>(
-            sql`DELETE FROM ${raw(table)} WHERE userId = ${id}`,
-          );
-        }
-
-        const query = sql`
-          UPDATE user SET
-            email = COALESCE(email, ${email}),
-            lat = COALESCE(lat, ${coordinates?.lat}),
-            lon = COALESCE(lon, ${coordinates?.lon}),
-            language = COALESCE(language, ${language}),
-            createdAt = LEAST(createdAt, ${createdAt}),
-            isAdmin = isAdmin OR ${isAdmin},
-            ${premiumExpiration ? sql`premiumExpiration = COALESCE(GREATEST(premiumExpiration, ${premiumExpiration}), ${premiumExpiration}),` : empty}
-            sendGalleryEmails = sendGalleryEmails OR ${sendGalleryEmails},
-            settings = ${JSON.stringify({
-              ...settings,
-              ...currentUser.settings,
-            })},
-            credits = credits + ${credits},
-            picture = COALESCE(picture, ${newPicture}, (SELECT picture FROM (SELECT picture FROM user WHERE id = ${id}) t)),
-            ${join(
-              Object.entries(authData).map(
-                ([column, value]) =>
-                  sql`${raw(column)} = COALESCE(${raw(column)}, ${value})`,
-              ),
-            )}
-          WHERE id = ${currentUser.id}
-        `;
-
-        await conn.query<unknown>(query);
-
-        await conn.query<unknown>(sql`DELETE FROM user WHERE id = ${id}`);
       } else if (matchedByEmail) {
         await conn.query<unknown>(sql`UPDATE user SET
           language = COALESCE(language, ${remoteLanguage}),
