@@ -155,50 +155,61 @@ export async function login(
 
         await conn.query<unknown>(sql`DELETE FROM auth WHERE userId = ${id}`);
 
-        await Promise.all([
-          ...[
-            'picture',
-            'pictureComment',
-            'pictureRating', // TODO may conflict
-            'trackingDevice',
-            'map',
-            'mapWriteAccess', // TODO may conflict
-            'purchase',
-            'purchaseToken',
-          ].map((table) =>
-            conn.query<unknown>(
-              sql`UPDATE ${raw(table)} SET userId = ${currentUser.id} WHERE userId = ${id}`,
-            ),
-          ),
-        ]);
+        for (const table of [
+          'picture',
+          'pictureComment',
+          'trackingDevice',
+          'map',
+          'purchase',
+          'purchaseToken',
+          'purchaseIntent',
+          'blockedCredit',
+        ]) {
+          await conn.query<unknown>(
+            sql`UPDATE ${raw(table)} SET userId = ${currentUser.id} WHERE userId = ${id}`,
+          );
+        }
 
-        await conn.query<unknown>(sql`DELETE FROM user WHERE id = ${id}`);
+        // Composite PK contains userId — winner may already have a row for
+        // the same picture/map, so use UPDATE IGNORE and discard leftovers.
+        for (const table of ['pictureRating', 'mapWriteAccess']) {
+          await conn.query<unknown>(
+            sql`UPDATE IGNORE ${raw(table)} SET userId = ${currentUser.id} WHERE userId = ${id}`,
+          );
 
-        // TODO merge settings
-        // TODO sum purchase expirations
+          await conn.query<unknown>(
+            sql`DELETE FROM ${raw(table)} WHERE userId = ${id}`,
+          );
+        }
 
-        const query = sql`UPDATE user SET
-          email = COALESCE(email, ${email}),
-          lat = COALESCE(lat, ${coordinates?.lat}),
-          lon = COALESCE(lon, ${coordinates?.lon}),
-          language = COALESCE(language, ${language}),
-          createdAt = LEAST(createdAt, ${createdAt}),
-          isAdmin = isAdmin OR ${isAdmin},
-          ${premiumExpiration ? sql`premiumExpiration = COALESCE(GREATEST(premiumExpiration, ${premiumExpiration}), ${premiumExpiration}),` : empty}
-          sendGalleryEmails = sendGalleryEmails OR ${sendGalleryEmails},
-          settings = COALESCE(settings, ${settings}),
-          credits = credits + ${credits},
-          picture = COALESCE(picture, ${newPicture}),
-          ${join(
-            Object.entries(authData).map(
-              ([column, value]) =>
-                sql`${raw(column)} = COALESCE(${raw(column)}, ${value})`,
-            ),
-          )}
+        const query = sql`
+          UPDATE user SET
+            email = COALESCE(email, ${email}),
+            lat = COALESCE(lat, ${coordinates?.lat}),
+            lon = COALESCE(lon, ${coordinates?.lon}),
+            language = COALESCE(language, ${language}),
+            createdAt = LEAST(createdAt, ${createdAt}),
+            isAdmin = isAdmin OR ${isAdmin},
+            ${premiumExpiration ? sql`premiumExpiration = COALESCE(GREATEST(premiumExpiration, ${premiumExpiration}), ${premiumExpiration}),` : empty}
+            sendGalleryEmails = sendGalleryEmails OR ${sendGalleryEmails},
+            settings = ${JSON.stringify({
+              ...settings,
+              ...currentUser.settings,
+            })},
+            credits = credits + ${credits},
+            picture = COALESCE(picture, ${newPicture}, (SELECT picture FROM (SELECT picture FROM user WHERE id = ${id}) t)),
+            ${join(
+              Object.entries(authData).map(
+                ([column, value]) =>
+                  sql`${raw(column)} = COALESCE(${raw(column)}, ${value})`,
+              ),
+            )}
           WHERE id = ${currentUser.id}
         `;
 
         await conn.query<unknown>(query);
+
+        await conn.query<unknown>(sql`DELETE FROM user WHERE id = ${id}`);
       } else if (matchedByEmail) {
         await conn.query<unknown>(sql`UPDATE user SET
           language = COALESCE(language, ${remoteLanguage}),

@@ -38,7 +38,7 @@ export async function initDatabase() {
       createdAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
       lat FLOAT(8, 6) NULL,
       lon FLOAT(9, 6) NULL,
-      settings VARCHAR(4096) CHARSET utf8 COLLATE utf8_bin NOT NULL DEFAULT '{}',
+      settings JSON NOT NULL DEFAULT '{}',
       sendGalleryEmails BIT NOT NULL DEFAULT true,
       premiumExpiration TIMESTAMP NULL,
       credits FLOAT NOT NULL DEFAULT 0,
@@ -245,6 +245,7 @@ export async function initDatabase() {
     'ALTER TABLE user ADD COLUMN appleUserId VARCHAR(255) DEFAULT NULL',
     'CREATE UNIQUE INDEX user_appleUserId ON user(appleUserId)',
     'ALTER TABLE user ADD COLUMN picture MEDIUMBLOB NULL',
+    "ALTER TABLE user MODIFY COLUMN settings JSON NOT NULL DEFAULT '{}'",
   ];
 
   const db = await pool.getConnection();

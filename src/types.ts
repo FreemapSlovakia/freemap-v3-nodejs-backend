@@ -162,17 +162,7 @@ export const UserRowSchema = z
     createdAt: z.date(),
     lat: z.number().nullable(),
     lon: z.number().nullable(),
-    settings: z
-      .string()
-      .transform((s, ctx) => {
-        try {
-          return JSON.parse(s);
-        } catch (e) {
-          ctx.addIssue({ code: 'custom', message: 'Invalid JSON: ' + e });
-          return z.NEVER;
-        }
-      })
-      .pipe(z.record(z.string(), z.unknown())),
+    settings: z.record(z.string(), z.unknown()),
     premiumExpiration: z.date().nullable(),
   })
   .transform(({ lat, lon, ...user }) => ({
