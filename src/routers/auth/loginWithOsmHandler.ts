@@ -26,6 +26,7 @@ const OsmUserDetailsSchema = z.object({
     id: z.uint32(),
     display_name: z.string(),
     home: z.object({ lat: z.number(), lon: z.number() }).optional(),
+    img: z.object({ href: z.url() }).optional(),
   }),
 });
 
@@ -117,7 +118,7 @@ export function attachLoginWithOsmHandler(router: RouterInstance) {
       );
 
       const {
-        user: { display_name: osmName, id: osmId, home },
+        user: { display_name: osmName, id: osmId, home, img },
       } = userDetails;
 
       const { lat, lon } = home ?? {};
@@ -132,6 +133,9 @@ export function attachLoginWithOsmHandler(router: RouterInstance) {
         lon === undefined ? undefined : lon,
         language,
         connect,
+        undefined,
+        undefined,
+        img?.href ?? null,
       );
     },
   );

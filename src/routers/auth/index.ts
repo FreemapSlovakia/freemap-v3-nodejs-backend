@@ -3,6 +3,7 @@ import { attachAppleCallbackHandler } from './appleCallbackHandler.js';
 import { attachDeleteUserHandler } from './deleteUserHandler.js';
 import { attachDisconnectHandler } from './disconnectHandler.js';
 import { attachGetPurchasesHandler } from './getPurchasesHandler.js';
+import { attachGetUserPictureHandler } from './getUserPictureHandler.js';
 import { attachLoginWithAppleHandler } from './loginWithAppleHandler.js';
 import { attachLoginWithFacebookHandler } from './loginWithFacebookHandler.js';
 import { attachLoginWithGarmin2Handler } from './loginWithGarmin2Handler.js';
@@ -32,5 +33,6 @@ attachPurchaseValidateHandler(router);
 attachGetPurchasesHandler(router);
 attachDeleteUserHandler(router);
 attachDisconnectHandler(router);
+attachGetUserPictureHandler(router);
 
 export const authRouter = router;

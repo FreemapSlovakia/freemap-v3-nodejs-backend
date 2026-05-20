@@ -1,8 +1,8 @@
 import { Middleware } from 'koa';
-import sql from 'sql-template-tag';
+import sql, { raw } from 'sql-template-tag';
 import { pool } from './database.js';
 import { User } from './koaTypes.js';
-import { UserRow, UserRowSchema } from './types.js';
+import { USER_COLUMNS_SQL_PREFIXED, UserRow, UserRowSchema } from './types.js';
 
 export const authProviderToColumn = {
   facebook: 'facebookUserId',
@@ -46,7 +46,7 @@ export function authenticator(require?: boolean): Middleware {
     }
 
     const [userRow] = await pool.query<unknown[]>(sql`
-      SELECT user.*
+      SELECT ${raw(USER_COLUMNS_SQL_PREFIXED)}
       FROM user INNER JOIN auth ON (userId = id)
       WHERE authToken = ${authToken}
     `);

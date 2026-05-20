@@ -10,12 +10,20 @@ const FacebookUserSchema = z.object({
   id: z.string().nonempty(),
   name: z.string(),
   email: z.email().nullish(),
+  picture: z
+    .object({
+      data: z.object({
+        url: z.url().optional(),
+        is_silhouette: z.boolean().optional(),
+      }),
+    })
+    .nullish(),
 });
 
 async function getUserData(accessToken: string) {
   return FacebookUserSchema.parse(
     await got(
-      'https://graph.facebook.com/v20.0/me?fields=id,name,email&access_token=' +
+      'https://graph.facebook.com/v20.0/me?fields=id,name,email,picture.width(256).height(256)&access_token=' +
         encodeURIComponent(accessToken),
     ).json(),
   );
@@ -53,7 +61,11 @@ export function attachLoginWithFacebookHandler(router: RouterInstance) {
 
     const { accessToken, language, connect } = body;
 
-    const { id, name, email } = await getUserData(accessToken);
+    const { id, name, email, picture } = await getUserData(accessToken);
+
+    const pictureUrl = picture?.data.is_silhouette
+      ? null
+      : (picture?.data.url ?? null);
 
     await login(
       ctx,
@@ -65,6 +77,9 @@ export function attachLoginWithFacebookHandler(router: RouterInstance) {
       undefined,
       language,
       connect,
+      undefined,
+      undefined,
+      pictureUrl,
     );
   });
 }

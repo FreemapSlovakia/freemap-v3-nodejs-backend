@@ -3,8 +3,13 @@ import { ParameterizedContext } from 'koa';
 import sql, { empty, join, RawValue, raw } from 'sql-template-tag';
 import z from 'zod';
 import { authProviderToColumn, rowToUser } from '../../authenticator.js';
-import { runInTransaction } from '../../database.js';
-import { LoginResponseSchema, UserRowSchema } from '../../types.js';
+import { pool, runInTransaction } from '../../database.js';
+import { fetchAndProcessProfilePicture } from '../../profilePicture.js';
+import {
+  LoginResponseSchema,
+  USER_COLUMNS_SQL,
+  UserRowSchema,
+} from '../../types.js';
 
 const SettingsBodySchema = z.object({
   settings: z
@@ -27,6 +32,7 @@ export async function login(
   connect = false,
   extraUserFields: Record<string, unknown> = {},
   clientData?: unknown,
+  remotePictureUrl?: string | null,
 ) {
   const currentUser = connect ? ctx.state.user : undefined;
 
@@ -36,13 +42,33 @@ export async function login(
     // ctx.throw(403, 'unauthenticated');
   }
 
+  // Fetch and process the provider's picture before opening the transaction
+  // (to avoid holding row locks during HTTP). Skip the fetch when the
+  // provider-matched user already has a picture stored — pictures are never
+  // overwritten anyway, so the download would be discarded.
+  let newPicture: Buffer | null = null;
+
+  if (remotePictureUrl) {
+    const existingRows = await pool.query<{ hasPicture: number | bigint }[]>(
+      sql`SELECT picture IS NOT NULL AS hasPicture FROM user
+          WHERE ${raw(authProviderToColumn[authProvider])} = ${remoteUserId}`,
+    );
+
+    const alreadyHasPicture =
+      existingRows.length > 0 && Boolean(Number(existingRows[0].hasPicture));
+
+    if (!alreadyHasPicture) {
+      newPicture = await fetchAndProcessProfilePicture(remotePictureUrl);
+    }
+  }
+
   let userId;
 
   const { userRow, authToken } = await runInTransaction(async (conn) => {
     await conn.beginTransaction();
 
     const [userRow] = await conn.query<unknown[]>(
-      sql`SELECT * FROM user WHERE ${raw(authProviderToColumn[authProvider])} = ${remoteUserId} FOR UPDATE`,
+      sql`SELECT ${raw(USER_COLUMNS_SQL)} FROM user WHERE ${raw(authProviderToColumn[authProvider])} = ${remoteUserId} FOR UPDATE`,
     );
 
     let user = userRow ? UserRowSchema.parse(userRow) : undefined;
@@ -54,7 +80,7 @@ export async function login(
     // user has no account on this provider yet.
     if (!user && !currentUser && remoteEmail) {
       const emailUserRows = await conn.query<unknown[]>(
-        sql`SELECT * FROM user WHERE email = ${remoteEmail} FOR UPDATE`,
+        sql`SELECT ${raw(USER_COLUMNS_SQL)} FROM user WHERE email = ${remoteEmail} FOR UPDATE`,
       );
 
       if (emailUserRows.length === 1) {
@@ -162,6 +188,7 @@ export async function login(
           sendGalleryEmails = sendGalleryEmails OR ${sendGalleryEmails},
           settings = COALESCE(settings, ${settings}),
           credits = credits + ${credits},
+          picture = COALESCE(picture, ${newPicture}),
           ${join(
             Object.entries(authData).map(
               ([column, value]) =>
@@ -177,6 +204,7 @@ export async function login(
           language = COALESCE(language, ${remoteLanguage}),
           lat = COALESCE(lat, ${remoteLat ?? null}),
           lon = COALESCE(lon, ${remoteLon ?? null}),
+          picture = COALESCE(picture, ${newPicture}),
           ${join(
             Object.entries({
               [authProviderToColumn[authProvider]]: remoteUserId,
@@ -185,15 +213,22 @@ export async function login(
           )}
           WHERE id = ${user.id}
         `);
-      } else if (Object.keys(extraUserFields).length > 0) {
-        await conn.query<unknown>(sql`UPDATE user SET
-          ${join(
-            Object.entries(extraUserFields).map(
-              ([column, value]) => sql`${raw(column)} = ${value}`,
-            ),
-          )}
-          WHERE id = ${user.id}
-        `);
+      } else {
+        const setExprs: RawValue[] = [];
+
+        if (newPicture && !user.hasPicture) {
+          setExprs.push(sql`picture = ${newPicture}`);
+        }
+
+        for (const [column, value] of Object.entries(extraUserFields)) {
+          setExprs.push(sql`${raw(column)} = ${value}`);
+        }
+
+        if (setExprs.length > 0) {
+          await conn.query<unknown>(
+            sql`UPDATE user SET ${join(setExprs)} WHERE id = ${user.id}`,
+          );
+        }
       }
     } else {
       // no such user in DB for this auth provider
@@ -219,6 +254,7 @@ export async function login(
           language = COALESCE(language, ${remoteLanguage}),
           lat = COALESCE(lat, ${lat}),
           lon = COALESCE(lon, ${lon}),
+          picture = COALESCE(picture, ${newPicture}),
           ${join(
             Object.entries({
               [authProviderToColumn[authProvider]]: remoteUserId,
@@ -243,6 +279,7 @@ export async function login(
                 isAdmin: false,
                 settings: JSON.stringify(settings),
                 credits: 100,
+                picture: newPicture,
                 [authProviderToColumn[authProvider]]: remoteUserId,
                 ...extraUserFields,
               }).map(([column, value]) => sql`${raw(column)} = ${value}`),
@@ -265,7 +302,7 @@ export async function login(
     }
 
     const [row] = await conn.query<unknown[]>(
-      sql`SELECT * FROM user WHERE id = ${userId}`,
+      sql`SELECT ${raw(USER_COLUMNS_SQL)} FROM user WHERE id = ${userId}`,
     );
 
     return { userRow: UserRowSchema.parse(row), authToken };

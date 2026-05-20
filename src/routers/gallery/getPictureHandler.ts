@@ -29,6 +29,7 @@ const PictureDbRowSchema = z.object({
   pano: z.boolean(),
   userId: z.uint32().nullable(),
   name: z.string().nullable(),
+  hasPicture: z.coerce.boolean(),
   premium: z.boolean(),
   tags: z
     .string()
@@ -45,6 +46,7 @@ const CommentDbRowSchema = z.object({
   comment: z.string(),
   userId: z.uint32(),
   name: z.string(),
+  hasPicture: z.coerce.boolean(),
 });
 
 const ResponseBodySchema = PictureDbRowSchema.omit({
@@ -52,19 +54,26 @@ const ResponseBodySchema = PictureDbRowSchema.omit({
   pathname: true,
   userId: true,
   name: true,
+  hasPicture: true,
 }).extend({
   id: z.uint32(),
   user: z
     .strictObject({
       id: z.uint32(),
       name: z.string(),
+      hasPicture: z.boolean(),
     })
     .nullable(),
-  comments: CommentDbRowSchema.omit({ userId: true, name: true })
+  comments: CommentDbRowSchema.omit({
+    userId: true,
+    name: true,
+    hasPicture: true,
+  })
     .extend({
       user: z.strictObject({
         id: z.uint32(),
         name: z.string(),
+        hasPicture: z.boolean(),
       }),
     })
     .array(),
@@ -105,7 +114,7 @@ export function attachGetPictureHandler(router: RouterInstance) {
         .parse(
           await pool.query<unknown>(sql`
             SELECT picture.id AS pictureId, picture.createdAt, pathname, title, picture.description, takenAt, ST_X(location) AS lon, ST_Y(location) AS lat, azimuth, pano,
-              user.id as userId, user.name, premium,
+              user.id as userId, user.name, user.picture IS NOT NULL AS hasPicture, premium,
               (SELECT GROUP_CONCAT(name SEPARATOR '\n') FROM pictureTag WHERE pictureId = picture.id) AS tags, ${raw(ratingSubquery)}
               ${
                 ctx.state.user
@@ -116,13 +125,15 @@ export function attachGetPictureHandler(router: RouterInstance) {
             WHERE picture.id = ${ctx.params.id}`),
         );
 
+      console.log(row);
+
       if (!row) {
         ctx.throw(404, 'no such picture');
       }
 
       const commentRows = CommentDbRowSchema.array().parse(
         await pool.query<unknown>(sql`
-          SELECT pictureComment.id, pictureComment.createdAt, comment, user.name, userId
+          SELECT pictureComment.id, pictureComment.createdAt, comment, user.name, userId, user.picture IS NOT NULL AS hasPicture
             FROM pictureComment JOIN user ON (userId = user.id)
             WHERE pictureId = ${ctx.params.id}
             ORDER BY pictureComment.createdAt
@@ -130,13 +141,14 @@ export function attachGetPictureHandler(router: RouterInstance) {
       );
 
       const comments = commentRows.map(
-        ({ id, createdAt, comment, userId, name }) => ({
+        ({ id, createdAt, comment, userId, name, hasPicture }) => ({
           id,
           createdAt,
           comment,
           user: {
             id: userId,
             name,
+            hasPicture,
           },
         }),
       );
@@ -152,6 +164,7 @@ export function attachGetPictureHandler(router: RouterInstance) {
         azimuth,
         userId,
         name,
+        hasPicture,
         tags,
         rating,
         myStars,
@@ -182,6 +195,7 @@ export function attachGetPictureHandler(router: RouterInstance) {
             : {
                 id: userId,
                 name,
+                hasPicture,
               },
         tags,
         comments,

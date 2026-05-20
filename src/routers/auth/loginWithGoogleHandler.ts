@@ -16,6 +16,7 @@ const GoogleUserSchema = z.object({
   sub: z.string(),
   name: z.string().optional(),
   email: z.email().optional(),
+  picture: z.url().optional(),
 });
 
 export function attachLoginWithGoogleHandler(router: RouterInstance) {
@@ -64,9 +65,15 @@ export function attachLoginWithGoogleHandler(router: RouterInstance) {
         throw new Error('Failed to fetch user info from Google');
       }
 
-      const { sub, name, email } = GoogleUserSchema.parse(
+      const { sub, name, email, picture } = GoogleUserSchema.parse(
         await userinfoRes.json(),
       );
+
+      // Default Google picture URL is 96px (=s96-c). Request 256 so the
+      // 128x128 cover-resize doesn't upscale.
+      const pictureUrl = picture
+        ? picture.replace(/=s\d+(-c)?$/, '=s256-c')
+        : null;
 
       await login(
         ctx,
@@ -78,6 +85,9 @@ export function attachLoginWithGoogleHandler(router: RouterInstance) {
         undefined,
         language,
         connect,
+        undefined,
+        undefined,
+        pictureUrl,
       );
     },
   );

@@ -71,7 +71,43 @@ const CommonUserSchema = {
   credits: z.number().nonnegative(),
   language: z.string().nullable(),
   sendGalleryEmails: z.boolean(),
+  hasPicture: z
+    .union([z.boolean(), z.number(), z.bigint()])
+    .transform((v) => Boolean(typeof v === 'bigint' ? Number(v) : v))
+    .pipe(z.boolean()),
 };
+
+const USER_COLUMN_NAMES = [
+  'id',
+  'osmId',
+  'facebookUserId',
+  'googleUserId',
+  'garminUserId',
+  'garminAccessToken',
+  'garminAccessTokenSecret',
+  'name',
+  'email',
+  'description',
+  'isAdmin',
+  'createdAt',
+  'lat',
+  'lon',
+  'settings',
+  'sendGalleryEmails',
+  'premiumExpiration',
+  'credits',
+  'language',
+  'appleUserId',
+] as const;
+
+/** SQL column list for SELECTing user rows without loading the picture bytes. */
+export const USER_COLUMNS_SQL =
+  USER_COLUMN_NAMES.join(', ') + ', picture IS NOT NULL AS hasPicture';
+
+/** Same, with each column qualified by `user.` (for joins). */
+export const USER_COLUMNS_SQL_PREFIXED =
+  USER_COLUMN_NAMES.map((c) => `user.${c}`).join(', ') +
+  ', user.picture IS NOT NULL AS hasPicture';
 
 export const UserResponseSchema = z
   .object({

@@ -33,8 +33,8 @@ importers:
         specifier: ^1.8.1
         version: 1.8.1
       exifreader:
-        specifier: ^4.39.0
-        version: 4.39.0
+        specifier: ^4.39.1
+        version: 4.39.1
       gdal-async:
         specifier: ^3.12.3
         version: 3.12.3
@@ -75,8 +75,8 @@ importers:
         specifier: ^2.0.1
         version: 2.0.1
       protobufjs:
-        specifier: ^8.3.0
-        version: 8.3.0
+        specifier: ^8.4.0
+        version: 8.4.0
       sharp:
         specifier: 0.35.0-rc.0
         version: 0.35.0-rc.0
@@ -824,8 +824,8 @@ packages:
     resolution: {integrity: sha512-8uSpZZocAZRBAPIEINJj3Lo9HyGitllczc27Eh5YYojjMFMn8yHMDMaUHE2Jqfq05D/wucwI4JGURyXt1vchyg==}
     engines: {node: '>=10'}
 
-  exifreader@4.39.0:
-    resolution: {integrity: sha512-lP/BslNNbT3zZDtNyVli8XaPCxKE8f0OXb5hGhPVqaoIGCvOVanICwM3FXO45MkDjI3KHgFBk0KKVAw/W4xP2A==}
+  exifreader@4.39.1:
+    resolution: {integrity: sha512-mQyOcAXK/mE+5rdzeqv/6tK431Vv8HCIVMYIJZJgJ+1ydd6nmg13awWcaEAzj/3M+Ii7A5v1gMokDOiK6RDcpw==}
 
   expand-template@2.0.3:
     resolution: {integrity: sha512-XYfuKMvj4O35f/pOXLObndIRvyQ+/+6AhODh+OKWj9S9498pHHn/IMszH+gt0fBCRWMNfk1ZSp5x3AifmnI2vg==}
@@ -1318,8 +1318,8 @@ packages:
   process-warning@5.0.0:
     resolution: {integrity: sha512-a39t9ApHNx2L4+HBnQKqxxHNs1r7KF+Intd8Q/g1bUh6q0WIp9voPXJ/x0j+ZL45KF1pJd9+q2jLIRMfvEshkA==}
 
-  protobufjs@8.3.0:
-    resolution: {integrity: sha512-JpJpFaR7yKNb6WqKvJJ1MLbiuIQWQnbUUb06nDtf2/i8YWYYLEfP6xf9BwSJoJQg1wAy61EQB8dssQg64oX4aA==}
+  protobufjs@8.4.0:
+    resolution: {integrity: sha512-iriNhQ57SYA5Jbdi+41AyPdx6jPPkFO7DODzkOBmqFhgYn/JzX2HxgxYPY18eQAs3CP/AWqtPvkWn8rclRAxdQ==}
     engines: {node: '>=12.0.0'}
 
   ps-tree@1.2.0:
@@ -2321,7 +2321,7 @@ snapshots:
       signal-exit: 3.0.7
       strip-final-newline: 2.0.0
 
-  exifreader@4.39.0:
+  exifreader@4.39.1:
     optionalDependencies:
       '@xmldom/xmldom': 0.9.10
 
@@ -2839,7 +2839,7 @@ snapshots:
 
   process-warning@5.0.0: {}
 
-  protobufjs@8.3.0:
+  protobufjs@8.4.0:
     dependencies:
       long: 5.3.2
 

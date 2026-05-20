@@ -31,6 +31,7 @@ export async function initDatabase() {
       garminAccessToken VARCHAR(255) CHARSET ascii NULL,
       garminAccessTokenSecret VARCHAR(255) CHARSET ascii NULL,
       name VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+      picture MEDIUMBLOB NULL,
       email VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL,
       description TEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL,
       isAdmin BIT NOT NULL DEFAULT 0,
@@ -243,6 +244,7 @@ export async function initDatabase() {
     'ALTER TABLE user ADD COLUMN description TEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL',
     'ALTER TABLE user ADD COLUMN appleUserId VARCHAR(255) DEFAULT NULL',
     'CREATE UNIQUE INDEX user_appleUserId ON user(appleUserId)',
+    'ALTER TABLE user ADD COLUMN picture MEDIUMBLOB NULL',
   ];
 
   const db = await pool.getConnection();
