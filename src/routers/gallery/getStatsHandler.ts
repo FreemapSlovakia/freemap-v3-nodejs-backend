@@ -6,32 +6,42 @@ import { pool } from '../../database.js';
 import { AUTH_OPTIONAL, registerPath } from '../../openapi.js';
 import { acceptValidator } from '../../requestValidators.js';
 
-const UsersPerCountrySchema = z.array(
-  z.object({
+const UserSchema = z.object({
+  id: z.uint32(),
+  name: z.string(),
+  hasPicture: z.boolean(),
+});
+
+const UserDbSchema = z.object({
+  userId: z.uint32(),
+  userName: z.string(),
+  userHasPicture: z.coerce.boolean(),
+});
+
+const UsersPerCountryDbSchema = z
+  .object({
+    ...UserDbSchema.shape,
+    pictureCount: z.uint32(),
     country: z.string().nonempty(),
-    userId: z.uint32(),
-    userName: z.string(),
-    pictureCount: z.uint32(),
-  }),
-);
+  })
+  .array();
 
-const PerUserSchema = z.array(
-  z.object({
+const PerUserDbSchema = z
+  .object({
+    ...UserDbSchema.shape,
     pictureCount: z.uint32(),
-    userId: z.uint32(),
-    userName: z.string().nonempty(),
-  }),
-);
+  })
+  .array();
 
-const MePerCountrySchema = z.array(
-  z.object({
+const MePerCountryDbSchema = z
+  .object({
     country: z.string().nonempty(),
     pictureCount: z.uint32(),
     userRank: z.number(),
-  }),
-);
+  })
+  .array();
 
-const MeSchema = z
+const MeDbSchema = z
   .array(
     z.object({
       pictureCount: z.uint32(),
@@ -40,22 +50,22 @@ const MeSchema = z
   )
   .max(1);
 
-const StatsSchema = z.strictObject({
-  perUserPerCountry: z.record(
-    z.string(),
-    z
-      .strictObject({
-        userId: z.uint32(),
-        userName: z.string(),
-        pictureCount: z.uint32(),
-      })
-      .array(),
-  ),
-  perUser: z
-    .strictObject({
+const PerUserPerCountrySchema = z.record(
+  z.string(),
+  z
+    .object({
+      user: UserSchema,
       pictureCount: z.uint32(),
-      userId: z.uint32(),
-      userName: z.string(),
+    })
+    .array(),
+);
+
+const StatsSchema = z.strictObject({
+  perUserPerCountry: PerUserPerCountrySchema,
+  perUser: z
+    .object({
+      user: UserSchema,
+      pictureCount: z.uint32(),
     })
     .array(),
   me: z
@@ -102,7 +112,7 @@ export async function attachGetStatsHandler(router: RouterInstance) {
         ? empty
         : sql` AND picture.createdAt > DATE_SUB(NOW(), INTERVAL ${Number(period)} DAY)`;
 
-      const usersPerCountry = UsersPerCountrySchema.parse(
+      const usersPerCountry = UsersPerCountryDbSchema.parse(
         await pool.query<unknown>(sql`
           WITH
             per_country_user AS (
@@ -140,7 +150,8 @@ export async function attachGetStatsHandler(router: RouterInstance) {
             r.country,
             r.userId,
             r.pictureCount,
-            u.name AS userName
+            u.name AS userName,
+            u.picture IS NOT NULL AS userHasPicture
           FROM ranked r
           JOIN user u ON u.id = r.userId
           WHERE r.rn <= 30
@@ -148,12 +159,13 @@ export async function attachGetStatsHandler(router: RouterInstance) {
         `),
       );
 
-      const perUser = PerUserSchema.parse(
+      const perUser = PerUserDbSchema.parse(
         await pool.query<unknown>(sql`
           SELECT
             COUNT(*) AS pictureCount,
             userId,
-            user.name AS userName
+            user.name AS userName,
+            user.picture IS NOT NULL AS userHasPicture
           FROM picture
           JOIN user ON picture.userId = user.id
           WHERE true ${days}
@@ -176,7 +188,7 @@ export async function attachGetStatsHandler(router: RouterInstance) {
       let mePerCountry: MeForCountry[] | undefined;
 
       if (user) {
-        mePerCountry = MePerCountrySchema.parse(
+        mePerCountry = MePerCountryDbSchema.parse(
           await pool.query<unknown>(sql`
             WITH
               per_country_user AS (
@@ -209,7 +221,7 @@ export async function attachGetStatsHandler(router: RouterInstance) {
           `),
         );
 
-        const [meme] = MeSchema.parse(
+        const [meme] = MeDbSchema.parse(
           await pool.query<unknown>(sql`
             WITH per_user AS (
               SELECT
@@ -237,31 +249,35 @@ export async function attachGetStatsHandler(router: RouterInstance) {
         me = meme;
       }
 
-      const perUserPerCountry: Record<
-        string,
-        {
-          userId: number;
-          userName: string;
-          pictureCount: number;
-        }[]
-      > = {};
+      const perUserPerCountry: z.infer<typeof PerUserPerCountrySchema> = {};
 
       for (const {
         country,
         userId,
         userName,
+        userHasPicture,
         pictureCount,
       } of usersPerCountry) {
         (perUserPerCountry[country] ??= []).push({
-          userId,
-          userName,
+          user: {
+            id: userId,
+            name: userName,
+            hasPicture: userHasPicture,
+          },
           pictureCount,
         });
       }
 
       ctx.body = {
         perUserPerCountry,
-        perUser,
+        perUser: perUser.map((u) => ({
+          user: {
+            id: u.userId,
+            name: u.userName,
+            hasPicture: u.userHasPicture,
+          },
+          pictureCount: u.pictureCount,
+        })),
         me: me && {
           perCountry:
             mePerCountry &&
