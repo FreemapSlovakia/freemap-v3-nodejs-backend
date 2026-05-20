@@ -140,8 +140,6 @@ export function attachGetPictureHandler(router: RouterInstance) {
             WHERE picture.id = ${ctx.params.id}`),
         );
 
-      console.log(row);
-
       if (!row) {
         ctx.throw(404, 'no such picture');
       }
