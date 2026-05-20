@@ -6,7 +6,7 @@ const logger = appLogger.child({ module: 'profilePicture' });
 
 const FETCH_TIMEOUT_MS = 10_000;
 export const MAX_PICTURE_INPUT_BYTES = 5 * 1024 * 1024;
-const SIZE = 128;
+const SIZE = 256;
 
 export async function processProfilePicture(
   input: Uint8Array,
