@@ -2,7 +2,7 @@ import type { PoolConnection } from 'mariadb';
 import { createPool } from 'mariadb';
 import sql, { raw } from 'sql-template-tag';
 import z from 'zod';
-import { getEnv, getEnvInteger } from './env.js';
+import { getEnv, getEnvBoolean, getEnvInteger } from './env.js';
 import { appLogger } from './logger.js';
 import { USER_COLUMNS_SQL, UserRowSchema } from './types.js';
 import { MergeConflictError, mergeUserAccounts } from './userMerge.js';
@@ -275,12 +275,14 @@ export async function initDatabase() {
     db.release();
   }
 
-  const dedup = await mergeDuplicateUsers();
+  if (getEnvBoolean('ALLOW_EMAIL_ACCOUNT_LINKING', false)) {
+    const dedup = await mergeDuplicateUsers();
 
-  if (dedup.merged || dedup.conflicts || dedup.missing) {
-    logger.info(
-      `User dedup: merged=${dedup.merged}, conflicts=${dedup.conflicts}, missing=${dedup.missing}`,
-    );
+    if (dedup.merged || dedup.conflicts || dedup.missing) {
+      logger.info(
+        `User dedup: merged=${dedup.merged}, conflicts=${dedup.conflicts}, missing=${dedup.missing}`,
+      );
+    }
   }
 
   async function cleanup() {

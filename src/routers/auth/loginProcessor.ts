@@ -4,6 +4,7 @@ import sql, { join, RawValue, raw } from 'sql-template-tag';
 import z from 'zod';
 import { authProviderToColumn, rowToUser } from '../../authenticator.js';
 import { pool, runInTransaction } from '../../database.js';
+import { getEnvBoolean } from '../../env.js';
 import { fetchAndProcessProfilePicture } from '../../profilePicture.js';
 import {
   LoginResponseSchema,
@@ -11,6 +12,14 @@ import {
   UserRowSchema,
 } from '../../types.js';
 import { MergeConflictError, mergeUserAccounts } from '../../userMerge.js';
+
+// Auto-link a new provider sign-in to an existing account when the emails
+// match. Unsafe in general (we don't verify stored emails), so off by
+// default. Same env flag also enables the startup bulk dedup.
+const LINK_USER_ACCOUNTS_BY_NAME_AND_EMAIL_ON_STARTUP = getEnvBoolean(
+  'LINK_USER_ACCOUNTS_BY_NAME_AND_EMAIL_ON_STARTUP',
+  false,
+);
 
 const SettingsBodySchema = z.object({
   settings: z
@@ -75,11 +84,12 @@ export async function login(
     let user = userRow ? UserRowSchema.parse(userRow) : undefined;
     let matchedByEmail = false;
 
-    // First-time login from this provider: if a user with the same email
-    // already exists, link the provider to that account instead of creating
-    // a new one. Only link when the match is unambiguous and the existing
-    // user has no account on this provider yet.
-    if (!user && !currentUser && remoteEmail) {
+    if (
+      LINK_USER_ACCOUNTS_BY_NAME_AND_EMAIL_ON_STARTUP &&
+      !user &&
+      !currentUser &&
+      remoteEmail
+    ) {
       const emailUserRows = await conn.query<unknown[]>(
         sql`SELECT ${raw(USER_COLUMNS_SQL)} FROM user WHERE email = ${remoteEmail} FOR UPDATE`,
       );
