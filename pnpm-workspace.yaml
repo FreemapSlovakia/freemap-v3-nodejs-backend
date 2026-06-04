@@ -5,6 +5,8 @@ allowBuilds:
   protobufjs: true
 ignoredBuiltDependencies:
   - protobufjs
+minimumReleaseAgeExclude:
+  - exifreader@4.40.5
 onlyBuiltDependencies:
   - better-sqlite3
   - exifreader
