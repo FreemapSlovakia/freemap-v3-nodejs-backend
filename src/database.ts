@@ -31,6 +31,9 @@ export async function initDatabase() {
       garminUserId VARCHAR(60) CHARSET ascii NULL UNIQUE,
       garminAccessToken VARCHAR(255) CHARSET ascii NULL,
       garminAccessTokenSecret VARCHAR(255) CHARSET ascii NULL,
+      githubUserId VARCHAR(32) CHARSET ascii NULL,
+      stravaUserId VARCHAR(32) CHARSET ascii NULL,
+      microsoftUserId VARCHAR(64) CHARSET ascii NULL,
       name VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
       picture MEDIUMBLOB NULL,
       email VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL,
@@ -247,6 +250,12 @@ export async function initDatabase() {
     'CREATE UNIQUE INDEX user_appleUserId ON user(appleUserId)',
     'ALTER TABLE user ADD COLUMN picture MEDIUMBLOB NULL',
     "ALTER TABLE user MODIFY COLUMN settings JSON NOT NULL DEFAULT '{}'",
+    'ALTER TABLE user ADD COLUMN githubUserId VARCHAR(32) CHARSET ascii DEFAULT NULL',
+    'CREATE UNIQUE INDEX user_githubUserId ON user(githubUserId)',
+    'ALTER TABLE user ADD COLUMN stravaUserId VARCHAR(32) CHARSET ascii DEFAULT NULL',
+    'CREATE UNIQUE INDEX user_stravaUserId ON user(stravaUserId)',
+    'ALTER TABLE user ADD COLUMN microsoftUserId VARCHAR(64) CHARSET ascii DEFAULT NULL',
+    'CREATE UNIQUE INDEX user_microsoftUserId ON user(microsoftUserId)',
   ];
 
   const db = await pool.getConnection();

@@ -13,7 +13,15 @@ export function attachDisconnectHandler(router: RouterInstance) {
       security: AUTH_REQUIRED,
       requestParams: {
         path: z.object({
-          provider: z.enum(['osm', 'facebook', 'google', 'garmin']),
+          provider: z.enum([
+            'osm',
+            'facebook',
+            'google',
+            'garmin',
+            'github',
+            'strava',
+            'microsoft',
+          ]),
         }),
       },
       responses: { 204: {}, 401: {} },
@@ -26,6 +34,9 @@ export function attachDisconnectHandler(router: RouterInstance) {
       facebook: ['facebookUserId'],
       google: ['googleUserId'],
       garmin: ['garminUserId', 'garminAccessToken', 'garminAccessTokenSecret'],
+      github: ['githubUserId'],
+      strava: ['stravaUserId'],
+      microsoft: ['microsoftUserId'],
     };
 
     const columns = providerColumns[ctx.params.provider];

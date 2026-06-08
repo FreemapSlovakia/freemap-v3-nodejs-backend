@@ -10,6 +10,9 @@ export const authProviderToColumn = {
   garmin: 'garminUserId',
   google: 'googleUserId',
   apple: 'appleUserId',
+  github: 'githubUserId',
+  strava: 'stravaUserId',
+  microsoft: 'microsoftUserId',
 } as const;
 
 export const columnToAuthProvider = Object.fromEntries(
