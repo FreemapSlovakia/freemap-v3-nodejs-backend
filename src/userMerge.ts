@@ -8,6 +8,9 @@ const PROVIDER_COLS = [
   'googleUserId',
   'garminUserId',
   'appleUserId',
+  'githubUserId',
+  'stravaUserId',
+  'microsoftUserId',
 ] as const;
 
 const SOURCE_AUTH_COLS = [
@@ -18,6 +21,9 @@ const SOURCE_AUTH_COLS = [
   'facebookUserId',
   'googleUserId',
   'appleUserId',
+  'githubUserId',
+  'stravaUserId',
+  'microsoftUserId',
 ] as const;
 
 const SIMPLE_FK_TABLES = [
@@ -99,9 +105,11 @@ export async function mergeUserAccounts(
   // Free source's UNIQUE auth-provider IDs before the consolidating UPDATE,
   // otherwise transferring them to target would briefly duplicate the value
   // and trip the UNIQUE constraint. Values are already captured in authData.
-  await conn.query<unknown>(sql`UPDATE user SET ${join(
-    PROVIDER_COLS.map((c) => sql`${raw(c)} = NULL`),
-  )} WHERE id = ${source.id}`);
+  await conn.query<unknown>(
+    sql`UPDATE user SET ${join(
+      PROVIDER_COLS.map((c) => sql`${raw(c)} = NULL`),
+    )} WHERE id = ${source.id}`,
+  );
 
   const mergedSettings = JSON.stringify({
     ...source.settings,

@@ -96,6 +96,9 @@ const USER_COLUMN_NAMES = [
   'credits',
   'language',
   'appleUserId',
+  'githubUserId',
+  'stravaUserId',
+  'microsoftUserId',
 ] as const;
 
 /** SQL column list for SELECTing user rows without loading the picture bytes. */
@@ -115,7 +118,16 @@ export const UserResponseSchema = z
     ...CommonUserSchema,
     authToken: z.string().nonempty(),
     authProviders: z.array(
-      z.enum(['osm', 'facebook', 'google', 'garmin', 'apple']),
+      z.enum([
+        'osm',
+        'facebook',
+        'google',
+        'garmin',
+        'apple',
+        'github',
+        'strava',
+        'microsoft',
+      ]),
     ),
     coordinates: z
       .strictObject({ lat: z.number(), lon: z.number() })
@@ -157,6 +169,9 @@ export const UserRowSchema = z
     googleUserId: z.string().nullable(),
     garminUserId: z.string().nullable(),
     appleUserId: z.string().nullable(),
+    githubUserId: z.string().nullable(),
+    stravaUserId: z.string().nullable(),
+    microsoftUserId: z.string().nullable(),
     garminAccessToken: z.string().nullable(),
     garminAccessTokenSecret: z.string().nullable(),
     createdAt: z.date(),
