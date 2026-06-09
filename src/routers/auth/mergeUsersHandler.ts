@@ -34,10 +34,7 @@ const UserSummarySchema = z
     credits: z.number(),
     isAdmin: z.boolean(),
     hasPicture: z.boolean(),
-    providers: z.record(
-      z.enum(PROVIDER_FIELDS),
-      z.union([z.string(), z.number()]),
-    ),
+    providers: z.record(z.string(), z.union([z.string(), z.number()])),
   })
   .meta({ id: 'UserSummary' });
 
