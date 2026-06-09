@@ -1,4 +1,5 @@
 import Router from '@koa/router';
+import { attachAdminPatchUserHandler } from './adminPatchUserHandler.js';
 import { attachAppleCallbackHandler } from './appleCallbackHandler.js';
 import { attachDeleteUserHandler } from './deleteUserHandler.js';
 import { attachDisconnectHandler } from './disconnectHandler.js';
@@ -14,6 +15,7 @@ import { attachLoginWithMicrosoftHandler } from './loginWithMicrosoftHandler.js'
 import { attachLoginWithOsmHandler } from './loginWithOsmHandler.js';
 import { attachLoginWithStravaHandler } from './loginWithStravaHandler.js';
 import { attachLogoutHandler } from './logoutHandler.js';
+import { attachMergeUsersHandler } from './mergeUsersHandler.js';
 import { attachPatchUserHandler } from './patchUserHandler.js';
 import { attachPurchaseTokenHandler } from './purchaseTokenHandler.js';
 import { attachPurchaseValidateHandler } from './purchaseValidateHandler.js';
@@ -40,5 +42,7 @@ attachGetPurchasesHandler(router);
 attachDeleteUserHandler(router);
 attachDisconnectHandler(router);
 attachGetUserPictureHandler(router);
+attachMergeUsersHandler(router);
+attachAdminPatchUserHandler(router);
 
 export const authRouter = router;
