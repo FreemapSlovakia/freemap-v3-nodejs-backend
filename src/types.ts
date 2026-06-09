@@ -62,7 +62,7 @@ export const TokenBodySchema = z
   })
   .meta({ id: 'TokenBody' });
 
-const CommonUserSchema = {
+export const CommonUserSchema = {
   id: z.uint32(),
   name: z.string(),
   email: z.email().nullable(),
@@ -75,12 +75,21 @@ const CommonUserSchema = {
   premium: z.coerce.boolean(),
 };
 
-const USER_COLUMN_NAMES = [
-  'id',
+/** UNIQUE auth-provider ID columns on the user table. */
+export const PROVIDER_ID_COLUMNS = [
   'osmId',
   'facebookUserId',
   'googleUserId',
   'garminUserId',
+  'appleUserId',
+  'githubUserId',
+  'stravaUserId',
+  'microsoftUserId',
+] as const;
+
+const USER_COLUMN_NAMES = [
+  'id',
+  ...PROVIDER_ID_COLUMNS,
   'garminAccessToken',
   'garminAccessTokenSecret',
   'name',
@@ -95,10 +104,6 @@ const USER_COLUMN_NAMES = [
   'premiumExpiration',
   'credits',
   'language',
-  'appleUserId',
-  'githubUserId',
-  'stravaUserId',
-  'microsoftUserId',
 ] as const;
 
 /** SQL column list for SELECTing user rows without loading the picture bytes. */

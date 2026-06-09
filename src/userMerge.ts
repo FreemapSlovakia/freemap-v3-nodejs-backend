@@ -1,17 +1,8 @@
 import type { PoolConnection } from 'mariadb';
 import sql, { empty, join, raw } from 'sql-template-tag';
-import type { UserRow } from './types.js';
+import { PROVIDER_ID_COLUMNS, type UserRow } from './types.js';
 
-const PROVIDER_COLS = [
-  'osmId',
-  'facebookUserId',
-  'googleUserId',
-  'garminUserId',
-  'appleUserId',
-  'githubUserId',
-  'stravaUserId',
-  'microsoftUserId',
-] as const;
+const PROVIDER_COLS = PROVIDER_ID_COLUMNS;
 
 const SOURCE_AUTH_COLS = [
   'garminUserId',

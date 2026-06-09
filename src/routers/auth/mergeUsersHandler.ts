@@ -4,39 +4,9 @@ import z from 'zod';
 import { authenticator } from '../../authenticator.js';
 import { pool, runInTransaction } from '../../database.js';
 import { AUTH_REQUIRED, registerPath } from '../../openapi.js';
-import {
-  USER_COLUMNS_SQL,
-  UserRow,
-  UserRowSchema,
-  zDateToIso,
-  zNullableDateToIso,
-} from '../../types.js';
+import { USER_COLUMNS_SQL, UserRowSchema } from '../../types.js';
 import { MergeConflictError, mergeUserAccounts } from '../../userMerge.js';
-
-const PROVIDER_FIELDS = [
-  'osmId',
-  'facebookUserId',
-  'googleUserId',
-  'garminUserId',
-  'appleUserId',
-  'githubUserId',
-  'stravaUserId',
-  'microsoftUserId',
-] as const;
-
-const UserSummarySchema = z
-  .strictObject({
-    id: z.uint32(),
-    name: z.string(),
-    email: z.email().nullable(),
-    createdAt: zDateToIso,
-    premiumExpiration: zNullableDateToIso,
-    credits: z.number(),
-    isAdmin: z.boolean(),
-    hasPicture: z.boolean(),
-    providers: z.record(z.string(), z.union([z.string(), z.number()])),
-  })
-  .meta({ id: 'UserSummary' });
+import { summarize, UserSummarySchema } from './userSummary.js';
 
 const MergeBodySchema = z.strictObject({
   sourceId: z.uint32(),
@@ -57,22 +27,6 @@ const SearchQuerySchema = z
 // "contains" substring.
 function likeContains(term: string) {
   return `%${term.replace(/[\\%_]/g, '\\$&')}%`;
-}
-
-function summarize(user: UserRow) {
-  return UserSummarySchema.parse({
-    id: user.id,
-    name: user.name,
-    email: user.email,
-    createdAt: user.createdAt,
-    premiumExpiration: user.premiumExpiration,
-    credits: user.credits,
-    isAdmin: user.isAdmin,
-    hasPicture: user.hasPicture,
-    providers: Object.fromEntries(
-      PROVIDER_FIELDS.filter((c) => user[c] != null).map((c) => [c, user[c]]),
-    ),
-  });
 }
 
 export function attachMergeUsersHandler(router: RouterInstance) {

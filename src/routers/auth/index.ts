@@ -1,4 +1,5 @@
 import Router from '@koa/router';
+import { attachAdminPatchUserHandler } from './adminPatchUserHandler.js';
 import { attachAppleCallbackHandler } from './appleCallbackHandler.js';
 import { attachDeleteUserHandler } from './deleteUserHandler.js';
 import { attachDisconnectHandler } from './disconnectHandler.js';
@@ -42,5 +43,6 @@ attachDeleteUserHandler(router);
 attachDisconnectHandler(router);
 attachGetUserPictureHandler(router);
 attachMergeUsersHandler(router);
+attachAdminPatchUserHandler(router);
 
 export const authRouter = router;
