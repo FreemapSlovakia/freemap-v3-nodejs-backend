@@ -5,6 +5,7 @@ import { authenticator } from '../../authenticator.js';
 import { pool } from '../../database.js';
 import { AUTH_REQUIRED, registerPath } from '../../openapi.js';
 import { acceptValidator } from '../../requestValidators.js';
+import { isOwnerOrRole } from '../../roles.js';
 import { zDateToIso, zNullableDateToIso } from '../../types.js';
 
 const TokenDetailSchema = z
@@ -59,7 +60,7 @@ export function attachGetTokenHandler(router: RouterInstance) {
         ctx.throw(404, 'no such tracking access token');
       }
 
-      if (!ctx.state.user?.isAdmin && ctx.state.user?.id !== item.userId) {
+      if (!isOwnerOrRole(ctx.state.user, item.userId, 'trackingManager')) {
         ctx.throw(403);
       }
 

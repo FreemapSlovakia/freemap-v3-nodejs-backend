@@ -10,6 +10,8 @@ import {
 export const UserSummarySchema = z
   .object({
     ...CommonUserSchema,
+    // Derived from `roles` (true when non-empty); kept for backward compatibility.
+    isAdmin: z.boolean(),
     createdAt: zDateToIso,
     premiumExpiration: zNullableDateToIso,
     providers: z.partialRecord(
@@ -22,6 +24,7 @@ export const UserSummarySchema = z
 export function summarize(user: UserRow) {
   return UserSummarySchema.parse({
     ...user,
+    isAdmin: user.roles.length > 0,
     providers: Object.fromEntries(
       PROVIDER_ID_COLUMNS.filter((c) => user[c] != null).map((c) => [
         c,

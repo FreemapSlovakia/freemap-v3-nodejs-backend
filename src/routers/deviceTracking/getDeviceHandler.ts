@@ -5,6 +5,7 @@ import { authenticator } from '../../authenticator.js';
 import { pool } from '../../database.js';
 import { AUTH_REQUIRED, registerPath } from '../../openapi.js';
 import { acceptValidator } from '../../requestValidators.js';
+import { isOwnerOrRole } from '../../roles.js';
 import { TrackingDeviceSchema } from '../../types.js';
 
 export function attachGetDeviceHandler(router: RouterInstance) {
@@ -51,7 +52,7 @@ export function attachGetDeviceHandler(router: RouterInstance) {
         ctx.throw(404, 'no such tracking device');
       }
 
-      if (!ctx.state.user?.isAdmin && ctx.state.user?.id !== item.userId) {
+      if (!isOwnerOrRole(ctx.state.user, item.userId, 'trackingManager')) {
         ctx.throw(403);
       }
 

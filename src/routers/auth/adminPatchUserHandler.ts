@@ -4,6 +4,7 @@ import z from 'zod';
 import { authenticator } from '../../authenticator.js';
 import { pool } from '../../database.js';
 import { AUTH_REQUIRED, registerPath } from '../../openapi.js';
+import { hasRole } from '../../roles.js';
 import {
   CommonUserSchema,
   USER_COLUMNS_SQL,
@@ -19,7 +20,7 @@ const BodySchema = z
     description: true,
     language: true,
     sendGalleryEmails: true,
-    isAdmin: true,
+    roles: true,
     credits: true,
   })
   .extend({ premiumExpiration: z.iso.datetime().nullable() })
@@ -52,7 +53,7 @@ export function attachAdminPatchUserHandler(router: RouterInstance) {
   });
 
   router.patch('/users/:id', authenticator(true), async (ctx) => {
-    if (!ctx.state.user!.isAdmin) {
+    if (!hasRole(ctx.state.user, 'userManager')) {
       return ctx.throw(403);
     }
 
@@ -71,7 +72,9 @@ export function attachAdminPatchUserHandler(router: RouterInstance) {
       .map(([key, value]) =>
         key === 'premiumExpiration'
           ? sql`premiumExpiration = ${value ? new Date(value as string) : null}`
-          : sql`${raw(key)} = ${value}`,
+          : key === 'roles'
+            ? sql`roles = ${JSON.stringify(value)}`
+            : sql`${raw(key)} = ${value}`,
       );
 
     const result = await pool.query<{ affectedRows: number }>(

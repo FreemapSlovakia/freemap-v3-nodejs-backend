@@ -113,13 +113,16 @@ export async function mergeUserAccounts(
     ...target.settings,
   });
 
+  const mergedRoles = JSON.stringify([
+    ...new Set([...target.roles, ...source.roles]),
+  ]);
+
   const {
     id: sourceId,
     email,
     coordinates,
     language,
     createdAt,
-    isAdmin,
     sendGalleryEmails,
     premiumExpiration,
     credits,
@@ -132,7 +135,7 @@ export async function mergeUserAccounts(
       lon = COALESCE(lon, ${coordinates?.lon}),
       language = COALESCE(language, ${language}),
       createdAt = LEAST(createdAt, ${createdAt}),
-      isAdmin = isAdmin OR ${isAdmin},
+      roles = ${mergedRoles},
       ${premiumExpiration ? sql`premiumExpiration = COALESCE(GREATEST(premiumExpiration, ${premiumExpiration}), ${premiumExpiration}),` : empty}
       sendGalleryEmails = sendGalleryEmails OR ${sendGalleryEmails},
       settings = ${mergedSettings},

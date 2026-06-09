@@ -5,6 +5,7 @@ import { authenticator } from '../../authenticator.js';
 import { runInTransaction } from '../../database.js';
 import { AUTH_REQUIRED, registerPath } from '../../openapi.js';
 import { acceptValidator } from '../../requestValidators.js';
+import { isOwnerOrRole } from '../../roles.js';
 
 export function attachDeleteMapHandler(router: RouterInstance) {
   registerPath('/maps/{id}', {
@@ -40,7 +41,7 @@ export function attachDeleteMapHandler(router: RouterInstance) {
           ctx.throw(404, 'no such map');
         }
 
-        if (!ctx.state.user!.isAdmin && item.userId !== ctx.state.user!.id) {
+        if (!isOwnerOrRole(ctx.state.user, item.userId, 'mapModerator')) {
           ctx.throw(403);
         }
 

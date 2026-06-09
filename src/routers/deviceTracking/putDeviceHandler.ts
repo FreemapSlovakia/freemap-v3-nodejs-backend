@@ -7,6 +7,7 @@ import { isSqlDuplicateError, runInTransaction } from '../../database.js';
 import { AUTH_REQUIRED, registerPath } from '../../openapi.js';
 import { nanoid } from '../../randomId.js';
 import { acceptValidator } from '../../requestValidators.js';
+import { isOwnerOrRole } from '../../roles.js';
 import { DeviceBodySchema } from '../../types.js';
 
 const ResponseBodySchema = z.strictObject({ token: z.string() });
@@ -66,7 +67,7 @@ export function attachPutDeviceHandler(router: RouterInstance) {
           ctx.throw(404, 'no such tracking device');
         }
 
-        if (!ctx.state.user!.isAdmin && item.userId !== ctx.state.user!.id) {
+        if (!isOwnerOrRole(ctx.state.user, item.userId, 'trackingManager')) {
           ctx.throw(403);
         }
 

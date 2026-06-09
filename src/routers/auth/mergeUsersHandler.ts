@@ -4,6 +4,7 @@ import z from 'zod';
 import { authenticator } from '../../authenticator.js';
 import { pool, runInTransaction } from '../../database.js';
 import { AUTH_REQUIRED, registerPath } from '../../openapi.js';
+import { hasRole } from '../../roles.js';
 import { USER_COLUMNS_SQL, UserRowSchema } from '../../types.js';
 import { MergeConflictError, mergeUserAccounts } from '../../userMerge.js';
 import { summarize, UserSummarySchema } from './userSummary.js';
@@ -53,7 +54,7 @@ export function attachMergeUsersHandler(router: RouterInstance) {
   });
 
   router.get('/users', authenticator(true), async (ctx) => {
-    if (!ctx.state.user!.isAdmin) {
+    if (!hasRole(ctx.state.user, 'userManager')) {
       return ctx.throw(403);
     }
 
@@ -108,7 +109,7 @@ export function attachMergeUsersHandler(router: RouterInstance) {
   });
 
   router.get('/users/:id', authenticator(true), async (ctx) => {
-    if (!ctx.state.user!.isAdmin) {
+    if (!hasRole(ctx.state.user, 'userManager')) {
       return ctx.throw(403);
     }
 
@@ -153,7 +154,7 @@ export function attachMergeUsersHandler(router: RouterInstance) {
   });
 
   router.post('/users/:targetId/merge', authenticator(true), async (ctx) => {
-    if (!ctx.state.user!.isAdmin) {
+    if (!hasRole(ctx.state.user, 'userManager')) {
       return ctx.throw(403);
     }
 

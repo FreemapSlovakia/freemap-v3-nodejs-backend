@@ -1,5 +1,6 @@
 import 'zod-openapi';
 import z from 'zod';
+import { RoleSchema } from './roles.js';
 
 export const zNullableDateToIso = z
   .date()
@@ -67,7 +68,7 @@ export const CommonUserSchema = {
   name: z.string(),
   email: z.email().nullable(),
   description: z.string().nullable(),
-  isAdmin: z.boolean(),
+  roles: z.array(RoleSchema),
   credits: z.number().nonnegative(),
   language: z.string().nullable(),
   sendGalleryEmails: z.boolean(),
@@ -95,7 +96,7 @@ const USER_COLUMN_NAMES = [
   'name',
   'email',
   'description',
-  'isAdmin',
+  'roles',
   'createdAt',
   'lat',
   'lon',
@@ -121,6 +122,8 @@ export const USER_COLUMNS_SQL_PREFIXED =
 export const UserResponseSchema = z
   .object({
     ...CommonUserSchema,
+    // Derived from `roles` (true when non-empty); kept for backward compatibility.
+    isAdmin: z.boolean(),
     authToken: z.string().nonempty(),
     authProviders: z.array(
       z.enum([

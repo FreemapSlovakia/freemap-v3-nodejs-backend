@@ -5,6 +5,7 @@ import { authenticator } from '../../authenticator.js';
 import { runInTransaction } from '../../database.js';
 import { AUTH_REQUIRED, registerPath } from '../../openapi.js';
 import { acceptValidator } from '../../requestValidators.js';
+import { isOwnerOrRole } from '../../roles.js';
 import { MapMetaSchema, zDateToIso } from '../../types.js';
 
 const BodySchema = z.strictObject({
@@ -95,8 +96,7 @@ export function attachPatchMapHandler(router: RouterInstance) {
         const user = ctx.state.user!;
 
         if (
-          !user.isAdmin &&
-          item.userId !== user.id &&
+          !isOwnerOrRole(user, item.userId, 'mapModerator') &&
           (!curWriters.includes(user.id) ||
             writers !== undefined ||
             pub !== undefined ||

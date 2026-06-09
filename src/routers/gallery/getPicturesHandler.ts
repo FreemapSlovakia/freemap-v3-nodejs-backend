@@ -13,6 +13,7 @@ import { pool } from '../../database.js';
 import { getEnv } from '../../env.js';
 import { AUTH_OPTIONAL, registerPath } from '../../openapi.js';
 import { acceptValidator } from '../../requestValidators.js';
+import { hasRole } from '../../roles.js';
 import { ratingSubquery } from './ratingConstants.js';
 
 const secret = getEnv('PREMIUM_PHOTO_SECRET', '');
@@ -244,7 +245,7 @@ async function byRadius(ctx: ParameterizedContext) {
     ${premium == null ? empty : sql`AND premium = ${premium}`}
     ${userIdArray.length > 0 ? sql`AND userId IN (${join(userIdArray)})` : empty}
     ${
-      ctx.state.user?.isAdmin
+      hasRole(ctx.state.user, 'galleryModerator')
         ? empty
         : sql`AND (picture.id NOT IN (SELECT pictureId FROM pictureTag WHERE name = 'private') OR userId = ${myUserId})`
     }
@@ -344,7 +345,7 @@ async function byBbox(ctx: ParameterizedContext) {
     ${premium == null ? empty : sql`AND premium = ${premium}`}
     ${userIdArray.length > 0 ? sql`AND userId IN (${join(userIdArray)})` : empty}
     ${
-      ctx.state.user?.isAdmin
+      hasRole(ctx.state.user, 'galleryModerator')
         ? empty
         : sql`AND (picture.id NOT IN (SELECT pictureId FROM pictureTag WHERE name = 'private') OR userId = ${myUserId})`
     }
@@ -481,7 +482,7 @@ async function byOrder(ctx: ParameterizedContext) {
 
   const hv: Sql[] = [];
 
-  const wh = ctx.state.user?.isAdmin
+  const wh = hasRole(ctx.state.user, 'galleryModerator')
     ? []
     : [
         sql`(picture.id NOT IN (SELECT pictureId FROM pictureTag WHERE name = 'private') OR userId = ${myUserId})`,

@@ -208,7 +208,6 @@ export async function login(
                 lat: lat ?? null,
                 lon: lon ?? null,
                 sendGalleryEmails: true,
-                isAdmin: false,
                 settings: JSON.stringify(settings),
                 credits: 100,
                 picture: newPicture,

@@ -4,6 +4,7 @@ import z from 'zod';
 import { authenticator } from '../../authenticator.js';
 import { runInTransaction } from '../../database.js';
 import { AUTH_REQUIRED, registerPath } from '../../openapi.js';
+import { isOwnerOrRole } from '../../roles.js';
 
 const BodySchema = z.strictObject({
   position: z.strictObject({
@@ -74,7 +75,7 @@ export function attachPutPictureHandler(router: RouterInstance) {
         ctx.throw(404, 'no such picture');
       }
 
-      if (!ctx.state.user!.isAdmin && rows[0].userId !== ctx.state.user!.id) {
+      if (!isOwnerOrRole(ctx.state.user, rows[0].userId, 'galleryModerator')) {
         ctx.throw(403);
       }
 

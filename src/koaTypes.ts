@@ -6,6 +6,8 @@ import { UserRowSchema } from './types.js';
 export type User = z.infer<typeof UserRowSchema> & {
   authProviders: string[];
   authToken: string;
+  /** Backward-compatible flag: true when the user holds any role. */
+  isAdmin: boolean;
 };
 
 declare module 'koa' {

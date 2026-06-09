@@ -5,6 +5,7 @@ import { authenticator } from '../../authenticator.js';
 import { pool } from '../../database.js';
 import { AUTH_OPTIONAL, registerPath } from '../../openapi.js';
 import { acceptValidator } from '../../requestValidators.js';
+import { isOwnerOrRole } from '../../roles.js';
 import { MapMetaSchema, zDateToIso } from '../../types.js';
 
 const DbRowSchema = z.object({
@@ -70,10 +71,7 @@ export function attachGetMapHandler(router: RouterInstance) {
 
       const { user } = ctx.state;
 
-      if (
-        !item.public &&
-        (!user || (!user.isAdmin && user.id !== item.userId))
-      ) {
+      if (!item.public && !isOwnerOrRole(user, item.userId, 'mapModerator')) {
         ctx.throw(403);
       }
 

@@ -7,6 +7,7 @@ import { pool } from '../../database.js';
 import { AUTH_REQUIRED, registerPath } from '../../openapi.js';
 import { nanoid } from '../../randomId.js';
 import { acceptValidator } from '../../requestValidators.js';
+import { isOwnerOrRole } from '../../roles.js';
 import { TokenBodySchema } from '../../types.js';
 
 const ResponseBodySchema = z.strictObject({
@@ -67,7 +68,7 @@ export function attachPostTokenHandler(router: RouterInstance) {
         ctx.throw(404, 'no such tracking device');
       }
 
-      if (!ctx.state.user!.isAdmin && ctx.state.user!.id !== device.userId) {
+      if (!isOwnerOrRole(ctx.state.user, device.userId, 'trackingManager')) {
         ctx.throw(403);
       }
 

@@ -38,7 +38,7 @@ export async function initDatabase() {
       picture MEDIUMBLOB NULL,
       email VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL,
       description TEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL,
-      isAdmin BIT NOT NULL DEFAULT 0,
+      roles JSON NOT NULL DEFAULT '[]',
       createdAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
       lat FLOAT(8, 6) NULL,
       lon FLOAT(9, 6) NULL,
@@ -256,6 +256,14 @@ export async function initDatabase() {
     'CREATE UNIQUE INDEX user_stravaUserId ON user(stravaUserId)',
     'ALTER TABLE user ADD COLUMN microsoftUserId VARCHAR(64) CHARSET ascii DEFAULT NULL',
     'CREATE UNIQUE INDEX user_microsoftUserId ON user(microsoftUserId)',
+    // Replace the boolean isAdmin flag with a granular roles array. Existing
+    // admins gain all roles so their access is unchanged. Sequenced as one
+    // entry so backfill runs after the column is added and before it is dropped.
+    [
+      "ALTER TABLE user ADD COLUMN roles JSON NOT NULL DEFAULT '[]'",
+      "UPDATE user SET roles = JSON_ARRAY('userManager', 'galleryModerator', 'mapModerator', 'trackingManager', 'layerPreview') WHERE isAdmin = 1",
+      'ALTER TABLE user DROP COLUMN isAdmin',
+    ],
   ];
 
   const db = await pool.getConnection();
