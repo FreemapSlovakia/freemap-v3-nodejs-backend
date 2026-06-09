@@ -54,7 +54,8 @@ export class MergeConflictError extends Error {
  * `target` holds the consolidated row.
  *
  * Throws `MergeConflictError` if both rows have distinct non-null values for
- * the same UNIQUE auth-provider column.
+ * the same UNIQUE auth-provider column, unless `opts.force` is set — in which
+ * case the target's value is kept and the source's is dropped.
  */
 export async function mergeUserAccounts(
   conn: PoolConnection,
@@ -68,11 +69,16 @@ export async function mergeUserAccounts(
     /** A freshly-fetched OAuth picture to use as a higher-priority fallback
      * than the source's stored picture. */
     newPicture?: Buffer | null;
+    /** Skip the conflicting-provider-ID check; keep target's IDs, drop
+     * source's. For deliberate manual merges only. */
+    force?: boolean;
   } = {},
 ): Promise<void> {
-  for (const col of PROVIDER_COLS) {
-    if (target[col] && source[col] && target[col] !== source[col]) {
-      throw new MergeConflictError(col);
+  if (!opts.force) {
+    for (const col of PROVIDER_COLS) {
+      if (target[col] && source[col] && target[col] !== source[col]) {
+        throw new MergeConflictError(col);
+      }
     }
   }
 
