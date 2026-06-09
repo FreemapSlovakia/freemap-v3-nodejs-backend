@@ -1,5 +1,5 @@
 import { RouterInstance } from '@koa/router';
-import sql, { raw } from 'sql-template-tag';
+import sql, { join, raw } from 'sql-template-tag';
 import z from 'zod';
 import { authenticator } from '../../authenticator.js';
 import { pool, runInTransaction } from '../../database.js';
@@ -46,6 +46,22 @@ const MergeBodySchema = z.strictObject({
   force: z.boolean().optional(),
 });
 
+const SearchQuerySchema = z
+  .object({
+    email: z.string().min(1).optional(),
+    name: z.string().min(1).optional(),
+    q: z.string().min(1).optional(),
+  })
+  .refine((d) => d.email || d.name || d.q, {
+    message: 'provide at least one of: email, name, q',
+  });
+
+// Escape LIKE wildcards so a user-supplied term is matched literally as a
+// "contains" substring.
+function likeContains(term: string) {
+  return `%${term.replace(/[\\%_]/g, '\\$&')}%`;
+}
+
 function summarize(user: UserRow) {
   return UserSummarySchema.parse({
     id: user.id,
@@ -63,6 +79,66 @@ function summarize(user: UserRow) {
 }
 
 export function attachMergeUsersHandler(router: RouterInstance) {
+  registerPath('/auth/users', {
+    get: {
+      summary: 'Search users by email and/or name (admin only)',
+      description:
+        'Case-insensitive "contains" match. Provide `email` and/or `name` ' +
+        'to match those fields, or `q` to match either. Returns all matches.',
+      tags: ['auth'],
+      security: AUTH_REQUIRED,
+      requestParams: { query: SearchQuerySchema },
+      responses: {
+        200: {
+          content: {
+            'application/json': { schema: z.array(UserSummarySchema) },
+          },
+        },
+        400: {},
+        401: {},
+        403: {},
+      },
+    },
+  });
+
+  router.get('/users', authenticator(true), async (ctx) => {
+    if (!ctx.state.user!.isAdmin) {
+      return ctx.throw(403);
+    }
+
+    let query;
+
+    try {
+      query = SearchQuerySchema.parse(ctx.query);
+    } catch (err) {
+      return ctx.throw(400, err as Error);
+    }
+
+    const conditions = [];
+
+    if (query.email) {
+      conditions.push(sql`email LIKE ${likeContains(query.email)}`);
+    }
+
+    if (query.name) {
+      conditions.push(sql`name LIKE ${likeContains(query.name)}`);
+    }
+
+    if (query.q) {
+      const like = likeContains(query.q);
+
+      conditions.push(sql`(name LIKE ${like} OR email LIKE ${like})`);
+    }
+
+    const rows = await pool.query<unknown[]>(
+      sql`SELECT ${raw(USER_COLUMNS_SQL)} FROM user
+          WHERE ${join(conditions, ' AND ')}
+          ORDER BY name, id`,
+    );
+
+    ctx.body = rows.map((row) => summarize(UserRowSchema.parse(row)));
+  });
+
   registerPath('/auth/users/{id}', {
     get: {
       summary: 'Get merge-relevant details of a user (admin only)',
