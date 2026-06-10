@@ -33,6 +33,9 @@ export async function initDatabase() {
       garminAccessTokenSecret VARCHAR(255) CHARSET ascii NULL,
       githubUserId VARCHAR(32) CHARSET ascii NULL,
       stravaUserId VARCHAR(32) CHARSET ascii NULL,
+      stravaAccessToken VARCHAR(255) CHARSET ascii NULL,
+      stravaRefreshToken VARCHAR(255) CHARSET ascii NULL,
+      stravaTokenExpiresAt TIMESTAMP NULL,
       microsoftUserId VARCHAR(64) CHARSET ascii NULL,
       name VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
       picture MEDIUMBLOB NULL,
@@ -256,6 +259,9 @@ export async function initDatabase() {
     'CREATE UNIQUE INDEX user_stravaUserId ON user(stravaUserId)',
     'ALTER TABLE user ADD COLUMN microsoftUserId VARCHAR(64) CHARSET ascii DEFAULT NULL',
     'CREATE UNIQUE INDEX user_microsoftUserId ON user(microsoftUserId)',
+    'ALTER TABLE user ADD COLUMN stravaAccessToken VARCHAR(255) CHARSET ascii DEFAULT NULL',
+    'ALTER TABLE user ADD COLUMN stravaRefreshToken VARCHAR(255) CHARSET ascii DEFAULT NULL',
+    'ALTER TABLE user ADD COLUMN stravaTokenExpiresAt TIMESTAMP NULL DEFAULT NULL',
     // Replace the boolean isAdmin flag with a granular roles array. Existing
     // admins gain all roles so their access is unchanged. Sequenced as one
     // entry so backfill runs after the column is added and before it is dropped.

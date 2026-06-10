@@ -13,6 +13,8 @@ export type OAuthProfile = {
   lat?: number;
   lon?: number;
   pictureUrl?: string | null;
+  /** Extra `user` columns to persist (e.g. provider access/refresh tokens). */
+  extraUserFields?: Record<string, unknown>;
 };
 
 const BodySchema = z.strictObject({
@@ -109,7 +111,7 @@ export function makeOAuthLoginHandler(opts: {
           profile.lon,
           language,
           connect,
-          undefined,
+          profile.extraUserFields ?? {},
           undefined,
           profile.pictureUrl ?? null,
         );

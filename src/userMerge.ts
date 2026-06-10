@@ -14,6 +14,9 @@ const SOURCE_AUTH_COLS = [
   'appleUserId',
   'githubUserId',
   'stravaUserId',
+  'stravaAccessToken',
+  'stravaRefreshToken',
+  'stravaTokenExpiresAt',
   'microsoftUserId',
 ] as const;
 
