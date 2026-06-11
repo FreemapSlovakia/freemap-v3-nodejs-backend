@@ -24,6 +24,7 @@ import { geotoolsRouter } from './routers/geotools/index.js';
 import { attachGetUsers } from './routers/getUsersHandler.js';
 import { attachLoggerHandler } from './routers/loggerHandler.js';
 import { mapsRouter } from './routers/maps/index.js';
+import { attachStravaHandlers } from './routers/stravaHandler.js';
 import { tracklogsRouter } from './routers/tracklogs/index.js';
 import { startSocketDeviceTracking } from './socketDeviceTracking.js';
 import { attachWs } from './ws.js';
@@ -181,6 +182,8 @@ attachGeoIp(router);
 
 attachPostGarminCourses(router);
 
+attachStravaHandlers(router);
+
 router.get('/documentation', (ctx) => {
   ctx.body = createDocument({
     openapi: '3.1.1',
@@ -198,6 +201,7 @@ router.get('/documentation', (ctx) => {
       { name: 'tracking', description: 'Device location tracking' },
       { name: 'gallery', description: 'Picture gallery' },
       { name: 'maps', description: 'Map annotations' },
+      { name: 'strava', description: 'Strava activity import' },
     ],
     paths,
   });

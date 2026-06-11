@@ -35,7 +35,12 @@ export function attachDisconnectHandler(router: RouterInstance) {
       google: ['googleUserId'],
       garmin: ['garminUserId', 'garminAccessToken', 'garminAccessTokenSecret'],
       github: ['githubUserId'],
-      strava: ['stravaUserId'],
+      strava: [
+        'stravaUserId',
+        'stravaAccessToken',
+        'stravaRefreshToken',
+        'stravaTokenExpiresAt',
+      ],
       microsoft: ['microsoftUserId'],
     };
 

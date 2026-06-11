@@ -11,6 +11,9 @@ const clientSecret = getEnv('STRAVA_OAUTH2_CLIENT_SECRET');
 // needed. Strava does not expose an email address at all.
 const TokenSchema = z.object({
   access_token: z.string(),
+  refresh_token: z.string(),
+  // Epoch seconds when `access_token` expires (tokens live ~6 hours).
+  expires_at: z.number(),
   athlete: z.object({
     id: z.number(),
     firstname: z.string().nullish(),
@@ -25,18 +28,19 @@ export const attachLoginWithStravaHandler = makeOAuthLoginHandler({
   summary: 'Complete Strava OAuth login',
   clientId,
   async resolveProfile({ code }) {
-    const { athlete } = TokenSchema.parse(
-      await got
-        .post('https://www.strava.com/oauth/token', {
-          form: {
-            client_id: clientId,
-            client_secret: clientSecret,
-            code,
-            grant_type: 'authorization_code',
-          },
-        })
-        .json(),
-    );
+    const { athlete, access_token, refresh_token, expires_at } =
+      TokenSchema.parse(
+        await got
+          .post('https://www.strava.com/oauth/token', {
+            form: {
+              client_id: clientId,
+              client_secret: clientSecret,
+              code,
+              grant_type: 'authorization_code',
+            },
+          })
+          .json(),
+      );
 
     const name = [athlete.firstname, athlete.lastname]
       .filter(Boolean)
@@ -48,6 +52,12 @@ export const attachLoginWithStravaHandler = makeOAuthLoginHandler({
       email: null,
       // `profile` is a URL, or a relative placeholder for the default avatar.
       pictureUrl: athlete.profile?.startsWith('http') ? athlete.profile : null,
+      // Persist the tokens so the API can call Strava on the user's behalf.
+      extraUserFields: {
+        stravaAccessToken: access_token,
+        stravaRefreshToken: refresh_token,
+        stravaTokenExpiresAt: new Date(expires_at * 1000),
+      },
     };
   },
 });
