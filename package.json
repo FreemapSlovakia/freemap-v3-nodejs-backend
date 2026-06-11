@@ -26,10 +26,10 @@
     ]
   },
   "scripts": {
-    "start": "node --enable-source-maps build/index.js",
+    "start": "node --enable-source-maps --import ./build/instrument.js build/index.js",
     "copy:proto": "cp src/routers/gallery/pictures.proto build/routers/gallery/pictures.proto",
     "build": "tsc && pnpm run copy:proto",
-    "dev:serve": "pnpm run copy:proto && dotenvx run --overload -- sh -c 'node --enable-source-maps build/index.js | pino-pretty -S -t -i hostname,pid'",
+    "dev:serve": "pnpm run copy:proto && dotenvx run --overload -- sh -c 'node --enable-source-maps --import ./build/instrument.js build/index.js | pino-pretty -S -t -i hostname,pid'",
     "dev": "tsc-watch --onSuccess \"pnpm run dev:serve\"",
     "precommit": "lint-staged",
     "lint": "biome check",
@@ -38,6 +38,7 @@
   "dependencies": {
     "@koa/router": "^15.6.0",
     "@mapbox/tilebelt": "^2.0.3",
+    "@sentry/node": "^10.57.0",
     "@turf/bbox": "^7.3.5",
     "@turf/boolean-intersects": "^7.3.5",
     "@turf/center": "^7.3.5",

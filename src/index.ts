@@ -8,6 +8,7 @@ import Koa from 'koa';
 import koaBody from 'koa-body';
 import koaPinoLogger from 'koa-pino-logger';
 import websockify from 'koa-websocket';
+import { Sentry } from './instrument.js';
 import 'source-map-support/register.js';
 import { createDocument } from 'zod-openapi';
 import { initDatabase } from './database.js';
@@ -34,6 +35,10 @@ await initDatabase();
 const logger = appLogger.child({ module: 'app' });
 
 const app = new Koa();
+
+// Forwards errors emitted by Koa (rethrown by koa-pino-logger after logging)
+// to Sentry. No-op when SENTRY_DSN is unset. 4xx are filtered in beforeSend.
+Sentry.setupKoaErrorHandler(app);
 
 const wsApp = websockify(app);
 
