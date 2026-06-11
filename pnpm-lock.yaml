@@ -4,6 +4,9 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
+patchedDependencies:
+  sharp@0.35.0: a371a1eb92d41ebcb4b5cb81014969b1a144717923a146dbd680371f083ca04a
+
 importers:
 
   .:
@@ -79,7 +82,7 @@ importers:
         version: 8.6.3
       sharp:
         specifier: 0.35.0
-        version: 0.35.0
+        version: 0.35.0(patch_hash=a371a1eb92d41ebcb4b5cb81014969b1a144717923a146dbd680371f083ca04a)
       short-uuid:
         specifier: ^6.0.3
         version: 6.0.3
@@ -2957,7 +2960,7 @@ snapshots:
 
   setprototypeof@1.2.0: {}
 
-  sharp@0.35.0:
+  sharp@0.35.0(patch_hash=a371a1eb92d41ebcb4b5cb81014969b1a144717923a146dbd680371f083ca04a):
     dependencies:
       '@img/colour': 1.1.0
       detect-libc: 2.1.2
