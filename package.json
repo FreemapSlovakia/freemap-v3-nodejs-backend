@@ -38,6 +38,7 @@
   "dependencies": {
     "@koa/router": "^15.6.0",
     "@mapbox/tilebelt": "^2.0.3",
+    "@polar-sh/sdk": "^0.48.1",
     "@turf/bbox": "^7.3.5",
     "@turf/boolean-intersects": "^7.3.5",
     "@turf/center": "^7.3.5",

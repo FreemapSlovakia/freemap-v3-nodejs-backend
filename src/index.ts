@@ -125,6 +125,9 @@ app.use(
     jsonLimit: '16mb',
     multipart: true,
     jsonTypes: ['application/json', 'application/geo+json'],
+    // Preserve the raw request body (at `ctx.request.rawBody`) so the Polar
+    // webhook handler can verify the Standard Webhooks signature.
+    includeUnparsed: true,
   }),
 );
 

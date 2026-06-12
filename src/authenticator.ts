@@ -2,6 +2,7 @@ import { Middleware } from 'koa';
 import sql, { raw } from 'sql-template-tag';
 import { pool } from './database.js';
 import { User } from './koaTypes.js';
+import { isPolarEnabled } from './polar.js';
 import { USER_COLUMNS_SQL_PREFIXED, UserRow, UserRowSchema } from './types.js';
 
 export const authProviderToColumn = {
@@ -83,5 +84,6 @@ export function rowToUser(row: UserRow, authToken: string): User {
       .map(([column]) => columnToAuthProvider[column]),
     authToken,
     isAdmin: row.roles.length > 0,
+    polarEnabled: isPolarEnabled(row.id),
   };
 }

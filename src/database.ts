@@ -49,7 +49,9 @@ export async function initDatabase() {
       sendGalleryEmails BIT NOT NULL DEFAULT true,
       premiumExpiration TIMESTAMP NULL,
       credits FLOAT NOT NULL DEFAULT 0,
-      language CHAR(2) NULL
+      language CHAR(2) NULL,
+      polarCustomerId VARCHAR(64) CHARSET ascii NULL,
+      polarSubscriptionId VARCHAR(64) CHARSET ascii NULL
     ) ENGINE=InnoDB`,
 
     sql`CREATE TABLE IF NOT EXISTS blockedCredit (
@@ -102,6 +104,7 @@ export async function initDatabase() {
       item JSON NOT NULL,
       createdAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
       note VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL,
+      polarOrderId VARCHAR(64) CHARSET ascii NULL UNIQUE,
       FOREIGN KEY (userId) REFERENCES user (id) ON DELETE CASCADE
     ) ENGINE=InnoDB`,
 
@@ -270,6 +273,11 @@ export async function initDatabase() {
       "UPDATE user SET roles = JSON_ARRAY('userManager', 'galleryModerator', 'mapModerator', 'trackingManager', 'layerPreview') WHERE isAdmin = 1",
       'ALTER TABLE user DROP COLUMN isAdmin',
     ],
+    // Polar billing (parallel to the legacy Rovas flow).
+    'ALTER TABLE user ADD COLUMN polarCustomerId VARCHAR(64) CHARSET ascii DEFAULT NULL',
+    'ALTER TABLE user ADD COLUMN polarSubscriptionId VARCHAR(64) CHARSET ascii DEFAULT NULL',
+    'ALTER TABLE purchase ADD COLUMN polarOrderId VARCHAR(64) CHARSET ascii DEFAULT NULL',
+    'CREATE UNIQUE INDEX purchase_polarOrderId ON purchase(polarOrderId)',
   ];
 
   const db = await pool.getConnection();
