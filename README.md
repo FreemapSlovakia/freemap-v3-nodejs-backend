@@ -7,7 +7,8 @@ Backend API server for the [Freemap](https://www.freemap.sk) web map application
 - Node 22+
 - pnpm
 - MariaDB Database Server
-- exiftran (for uploaded images processing)
+- exiftran (for lossless rotation of uploaded JPEGs)
+- ImageMagick with HEIF support (for converting uploaded HEIF/HEIC photos to JPEG)
 
 ## Database setup
 

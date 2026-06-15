@@ -1,5 +1,7 @@
 import got from 'got';
+import heicConvert from 'heic-convert';
 import sharp from 'sharp';
+import { isHeif } from './heif.js';
 import { appLogger } from './logger.js';
 
 const logger = appLogger.child({ module: 'profilePicture' });
@@ -15,7 +17,13 @@ export async function processProfilePicture(
     throw new Error('profile picture too large');
   }
 
-  return await sharp(input)
+  // sharp can't decode HEVC-coded HEIC, so transcode it to JPEG first; sharp
+  // then re-encodes to WebP like any other input.
+  const decoded = isHeif(input)
+    ? await heicConvert({ buffer: input, format: 'JPEG', quality: 1 })
+    : input;
+
+  return await sharp(decoded)
     .rotate()
     .resize(SIZE, SIZE, { fit: 'cover' })
     .webp({ quality: 85 })
