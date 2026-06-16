@@ -8,6 +8,7 @@ import z from 'zod';
 import { authenticator } from '../../authenticator.js';
 import { contentTypeMiddleware } from '../../contentTypeMiddleware.js';
 import { pool, runInTransaction } from '../../database.js';
+import { isHeifFile } from '../../heif.js';
 import { AUTH_REQUIRED, registerPath } from '../../openapi.js';
 import { acceptValidator } from '../../requestValidators.js';
 import { picturesDir } from '../../routers/gallery/constants.js';
@@ -143,15 +144,28 @@ export function attachPostPictureHandler(router: RouterInstance) {
 
           const name = shortUuid.generate();
 
+          const outPath = `${picturesDir}/${name}.jpeg`;
+
+          // HEIF can't be processed by exiftran, so re-encode it to JPEG with
+          // ImageMagick (applying the EXIF orientation); JPEG is rotated
+          // losslessly by exiftran.
           const [exif] = await Promise.all([
             ExifReader.load(image.filepath),
 
-            await execFileAsync('exiftran', [
-              '-a',
-              image.filepath,
-              '-o',
-              `${picturesDir}/${name}.jpeg`,
-            ]),
+            (await isHeifFile(image.filepath))
+              ? execFileAsync('convert', [
+                  image.filepath,
+                  '-auto-orient',
+                  '-quality',
+                  '85',
+                  outPath,
+                ])
+              : execFileAsync('exiftran', [
+                  '-a',
+                  image.filepath,
+                  '-o',
+                  outPath,
+                ]),
           ]);
 
           const pano = exif['UsePanoramaViewer']?.value === 'True';

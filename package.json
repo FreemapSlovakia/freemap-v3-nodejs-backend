@@ -20,16 +20,13 @@
     "url": "https://github.com/FreemapSlovakia/freemap-v3-nodejs-backend/issues"
   },
   "lint-staged": {
-    "*.{js,ts}": [
-      "biome check",
-      "git add"
-    ]
+    "*.{js,ts}": ["biome check", "git add"]
   },
   "scripts": {
-    "start": "node --enable-source-maps build/index.js",
+    "start": "node --enable-source-maps --import ./build/instrument.js build/index.js",
     "copy:proto": "cp src/routers/gallery/pictures.proto build/routers/gallery/pictures.proto",
     "build": "tsc && pnpm run copy:proto",
-    "dev:serve": "pnpm run copy:proto && dotenvx run --overload -- sh -c 'node --enable-source-maps build/index.js | pino-pretty -S -t -i hostname,pid'",
+    "dev:serve": "pnpm run copy:proto && dotenvx run --overload -- sh -c 'node --enable-source-maps --import ./build/instrument.js build/index.js | pino-pretty -S -t -i hostname,pid'",
     "dev": "tsc-watch --onSuccess \"pnpm run dev:serve\"",
     "precommit": "lint-staged",
     "lint": "biome check",
@@ -39,6 +36,7 @@
     "@koa/router": "^15.6.0",
     "@mapbox/tilebelt": "^2.0.3",
     "@polar-sh/sdk": "^0.48.1",
+    "@sentry/node": "^10.57.0",
     "@turf/bbox": "^7.3.5",
     "@turf/boolean-intersects": "^7.3.5",
     "@turf/center": "^7.3.5",
@@ -48,6 +46,7 @@
     "exifreader": "^4.41.0",
     "gdal-async": "^3.12.3",
     "got": "^15.0.5",
+    "heic-convert": "^2.1.0",
     "kcors": "^2.2.2",
     "koa": "^3.2.1",
     "koa-body": "^8.0.0",
@@ -75,6 +74,7 @@
     "@types/better-sqlite3": "^7.6.13",
     "@types/etag": "^1.8.4",
     "@types/geojson": "^7946.0.16",
+    "@types/heic-convert": "^2.1.1",
     "@types/kcors": "^2.2.9",
     "@types/koa": "^3.0.3",
     "@types/koa-websocket": "^5.0.11",
