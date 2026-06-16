@@ -127,8 +127,6 @@ export const UserResponseSchema = z
     ...CommonUserSchema,
     // Derived from `roles` (true when non-empty); kept for backward compatibility.
     isAdmin: z.boolean(),
-    // Whether the new Polar payment flow is enabled for this user.
-    polarEnabled: z.boolean(),
     authToken: z.string().nonempty(),
     authProviders: z.array(
       z.enum([

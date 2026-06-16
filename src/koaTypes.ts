@@ -8,8 +8,6 @@ export type User = z.infer<typeof UserRowSchema> & {
   authToken: string;
   /** Backward-compatible flag: true when the user holds any role. */
   isAdmin: boolean;
-  /** Whether the new Polar payment flow is enabled for this user. */
-  polarEnabled: boolean;
 };
 
 declare module 'koa' {

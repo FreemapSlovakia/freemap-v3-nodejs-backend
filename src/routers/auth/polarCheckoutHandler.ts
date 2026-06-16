@@ -3,7 +3,7 @@ import z from 'zod';
 import { authenticator } from '../../authenticator.js';
 import { getEnv } from '../../env.js';
 import { AUTH_REQUIRED, registerPath } from '../../openapi.js';
-import { getPolar, isPolarEnabled } from '../../polar.js';
+import { getPolar } from '../../polar.js';
 
 // 1 credit = €0.01, so the chosen credit count equals the amount in euro cents.
 const MIN_CREDITS = 500;
@@ -46,10 +46,6 @@ export function attachPolarCheckoutHandler(router: RouterInstance) {
 
   router.post('/polar/checkout', authenticator(true), async (ctx) => {
     const user = ctx.state.user!;
-
-    if (!isPolarEnabled(user.id)) {
-      return ctx.throw(403, 'Polar payments are not enabled for this account');
-    }
 
     let body;
 
