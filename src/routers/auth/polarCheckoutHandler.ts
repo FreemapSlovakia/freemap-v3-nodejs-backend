@@ -14,11 +14,14 @@ const BodySchema = z.union([
     successUrl: z.url(),
     // true = auto-renewing yearly subscription; false = one-time year.
     recurring: z.boolean(),
+    // Optional UI language for the checkout (e.g. 'sk', 'en').
+    lang: z.string().max(10).optional(),
   }),
   z.strictObject({
     type: z.literal('credits'),
     successUrl: z.url(),
     credits: z.int().min(MIN_CREDITS),
+    lang: z.string().max(10).optional(),
   }),
 ]);
 
@@ -72,10 +75,17 @@ export function attachPolarCheckoutHandler(router: RouterInstance) {
     };
 
     let productId: string;
-    // Amount override in euro cents. Only set for credits, where the count is
-    // chosen in our modal. Premium is left as pay-what-you-want so Polar's
-    // checkout collects the amount (preset/min €8) and the user can give more.
-    let amount: number | undefined;
+
+    // For credits, the exact count is chosen in our modal, so we pin it with an
+    // ad-hoc *fixed* price — this removes the editable amount field on the Polar
+    // checkout. Premium keeps its catalog pay-what-you-want price (preset/min
+    // €8) so the user can choose to give more.
+    let prices:
+      | Record<
+          string,
+          { amountType: 'fixed'; priceAmount: number; priceCurrency: 'eur' }[]
+        >
+      | undefined;
 
     if (body.type === 'premium') {
       productId = body.recurring
@@ -87,7 +97,15 @@ export function attachPolarCheckoutHandler(router: RouterInstance) {
       productId = getEnv('POLAR_CREDITS_PRODUCT_ID');
 
       // 1 credit = 1 euro cent.
-      amount = body.credits;
+      prices = {
+        [productId]: [
+          {
+            amountType: 'fixed',
+            priceAmount: body.credits,
+            priceCurrency: 'eur',
+          },
+        ],
+      };
 
       metadata.credits = String(body.credits);
     }
@@ -98,12 +116,17 @@ export function attachPolarCheckoutHandler(router: RouterInstance) {
       checkout = await getPolar().checkouts.create({
         products: [productId],
         externalCustomerId: String(user.id),
+        // Pre-fill the checkout with what we know (email is optional in our app).
         customerEmail: user.email ?? undefined,
+        customerName: user.name,
         successUrl,
         // Allow the frontend to embed the checkout in an iframe (overlay).
         embedOrigin: new URL(body.successUrl).origin,
+        // Hide the "add discount code" field.
+        allowDiscountCodes: false,
+        ...(body.lang ? { locale: body.lang } : {}),
         metadata,
-        ...(amount === undefined ? {} : { amount }),
+        ...(prices === undefined ? {} : { prices }),
       });
     } catch (err) {
       ctx.log.error({ err }, 'Polar checkout creation failed');

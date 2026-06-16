@@ -175,7 +175,8 @@ export function attachPolarWebhookHandler(router: RouterInstance) {
                 ${sub.currentPeriodEnd}
               ),
               polarSubscriptionId = ${sub.id},
-              polarCustomerId = ${sub.customerId}
+              polarCustomerId = ${sub.customerId},
+              email = COALESCE(email, ${sub.customer.email})
               WHERE id = ${userId}`,
         );
 
