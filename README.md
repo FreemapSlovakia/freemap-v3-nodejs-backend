@@ -120,6 +120,33 @@ pnpm start | pnpm exec pino-pretty
 - `PREMIUM_PHOTO_SECRET` — HMAC secret used to sign access URLs for premium
   (paid) photos.
 
+### Purchases (Polar)
+
+Polar ([polar.sh](https://polar.sh)) runs in parallel with the legacy Rovas
+flow during migration. Premium is pay-what-you-want (minimum €8) and the user
+chooses a one-time year or an auto-renewing yearly subscription; credits are
+one-time custom-amount top-ups (1 credit = €0.01, minimum 500). The new flow is
+limited to an allowlist of users until the migration is complete.
+
+- `POLAR_ACCESS_TOKEN` — Polar Organization Access Token (`polar_oat_…`).
+- `POLAR_SERVER` — `sandbox` or `production` (default `sandbox`).
+- `POLAR_PREMIUM_RECURRING_PRODUCT_ID` — product ID of the auto-renewing yearly
+  premium subscription (custom amount, min €8).
+- `POLAR_PREMIUM_ONETIME_PRODUCT_ID` — product ID of the one-time one-year
+  premium (custom amount, min €8).
+- `POLAR_CREDITS_PRODUCT_ID` — Polar product ID of the custom-amount credits
+  product.
+- `POLAR_WEBHOOK_SECRET` — secret of the Polar webhook endpoint (Standard
+  Webhooks signature). Set on the endpoint that points at `/auth/polar/webhook`.
+- `POLAR_ENABLED_USER_IDS` — comma-separated list of user IDs allowed to use the
+  Polar flow. Others get `403` from `/auth/polar/checkout` and keep using Rovas.
+
+Endpoints: `POST /auth/polar/checkout` (auth required, allowlisted) returns a
+hosted `checkoutUrl` to redirect the user to; `POST /auth/polar/webhook`
+provisions `premiumExpiration` (from subscription events) and `credits` (from
+`order.paid`). The webhook needs the raw request body, which is why `koa-body`
+is configured with `includeUnparsed`.
+
 ### Tracking
 
 - `TRACKING_SOCKET_PORT` — TCP port for the raw GPS tracker socket; set to `0`

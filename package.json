@@ -20,10 +20,7 @@
     "url": "https://github.com/FreemapSlovakia/freemap-v3-nodejs-backend/issues"
   },
   "lint-staged": {
-    "*.{js,ts}": [
-      "biome check",
-      "git add"
-    ]
+    "*.{js,ts}": ["biome check", "git add"]
   },
   "scripts": {
     "start": "node --enable-source-maps --import ./build/instrument.js build/index.js",
@@ -38,6 +35,7 @@
   "dependencies": {
     "@koa/router": "^15.6.0",
     "@mapbox/tilebelt": "^2.0.3",
+    "@polar-sh/sdk": "^0.48.1",
     "@sentry/node": "^10.57.0",
     "@turf/bbox": "^7.3.5",
     "@turf/boolean-intersects": "^7.3.5",
