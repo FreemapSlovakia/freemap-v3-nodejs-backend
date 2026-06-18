@@ -40,5 +40,3 @@ onlyBuiltDependencies:
   - exifreader
   - gdal-async
   - sharp
-patchedDependencies:
-  sharp@0.35.0: patches/sharp@0.35.0.patch

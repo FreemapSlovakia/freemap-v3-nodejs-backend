@@ -7,7 +7,7 @@ import { ParameterizedContext } from 'koa';
 import protobuf from 'protobufjs';
 import sql, { empty, join, raw, Sql } from 'sql-template-tag';
 import z from 'zod';
-import { createSchema } from 'zod-openapi';
+import { createSchema, oas31 } from 'zod-openapi';
 import { authenticator } from '../../authenticator.js';
 import { pool } from '../../database.js';
 import { getEnv } from '../../env.js';
@@ -142,13 +142,13 @@ export function attachGetPicturesHandler(router: RouterInstance) {
           required: true,
           schema: {
             discriminator: { propertyName: 'by' },
-            ...createSchema(
+            ...(createSchema(
               z.discriminatedUnion('by', [
                 RadiusQuerySchema,
                 BBoxQuerySchema,
                 OrderByQuerySchema,
               ]),
-            ).schema,
+            ).schema as oas31.SchemaObject),
           },
         },
       ],
