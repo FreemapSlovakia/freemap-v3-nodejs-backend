@@ -354,7 +354,7 @@ async function byBbox(ctx: ParameterizedContext) {
     ${
       ratingTo == null
         ? empty
-        : `${raw(ratingTo ? 'AND' : 'HAVING')} rating <= ${ratingTo}`
+        : sql`${raw(ratingFrom == null ? 'HAVING' : 'AND')} rating <= ${ratingTo}`
     }
     ORDER BY lat, lon
   `;
