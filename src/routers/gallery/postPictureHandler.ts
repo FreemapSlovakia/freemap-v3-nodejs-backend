@@ -149,24 +149,32 @@ export function attachPostPictureHandler(router: RouterInstance) {
           // HEIF can't be processed by exiftran, so re-encode it to JPEG with
           // ImageMagick (applying the EXIF orientation); JPEG is rotated
           // losslessly by exiftran.
-          const [exif] = await Promise.all([
-            ExifReader.load(image.filepath),
+          let exif;
 
-            (await isHeifFile(image.filepath))
-              ? execFileAsync('convert', [
-                  image.filepath,
-                  '-auto-orient',
-                  '-quality',
-                  '85',
-                  outPath,
-                ])
-              : execFileAsync('exiftran', [
-                  '-a',
-                  image.filepath,
-                  '-o',
-                  outPath,
-                ]),
-          ]);
+          try {
+            [exif] = await Promise.all([
+              ExifReader.load(image.filepath),
+
+              (await isHeifFile(image.filepath))
+                ? execFileAsync('convert', [
+                    image.filepath,
+                    '-auto-orient',
+                    '-quality',
+                    '85',
+                    outPath,
+                  ])
+                : execFileAsync('exiftran', [
+                    '-a',
+                    image.filepath,
+                    '-o',
+                    outPath,
+                  ]),
+            ]);
+          } catch {
+            // A malformed or unsupported upload (e.g. not a valid JPEG/HEIF)
+            // makes exiftran/convert fail; that's a client error, not a 500.
+            return ctx.throw(400, 'invalid or unsupported image file');
+          }
 
           const pano = exif['UsePanoramaViewer']?.value === 'True';
 
