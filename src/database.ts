@@ -219,6 +219,16 @@ export async function initDatabase() {
       CONSTRAINT mwaMapFk FOREIGN KEY (mapId) REFERENCES map (id) ON DELETE CASCADE
     ) ENGINE=InnoDB`,
 
+    sql`CREATE TABLE IF NOT EXISTS tracklog (
+      id VARCHAR(32) CHARSET ascii PRIMARY KEY,
+      createdAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      lastReadAt TIMESTAMP NULL,
+      userId INT UNSIGNED NULL,
+      data MEDIUMBLOB NOT NULL,
+      CONSTRAINT tracklogUserFk FOREIGN KEY (userId) REFERENCES user (id) ON DELETE SET NULL,
+      INDEX tracklogCreatedAtIdx (createdAt)
+    ) ENGINE=InnoDB`,
+
     sql`CREATE TRIGGER IF NOT EXISTS picture_country_bu
       BEFORE UPDATE ON picture
       FOR EACH ROW
