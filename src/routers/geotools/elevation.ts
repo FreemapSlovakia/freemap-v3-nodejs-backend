@@ -6,11 +6,16 @@ import { RouterInstance } from '@koa/router';
 import gdal from 'gdal-async';
 import { ParameterizedContext } from 'koa';
 import z from 'zod';
+import { authenticator } from '../../authenticator.js';
 import { getEnv } from '../../env.js';
-import { registerPath } from '../../openapi.js';
+import { AUTH_OPTIONAL, registerPath } from '../../openapi.js';
 import { acceptValidator } from '../../requestValidators.js';
 
 const elevationDataDir = getEnv('ELEVATION_DATA_DIRECTORY');
+
+// Reading the SRS of some GeoTIFFs (e.g. EPSG:8353 / S-JTSK [JTSK03]) throws
+// unless we tell GDAL to trust the EPSG registry over the embedded GeoTIFF keys.
+gdal.config.set('GTIFF_SRS_SOURCE', 'EPSG');
 
 const fetching = new Map<string, Promise<void>>();
 
@@ -20,7 +25,104 @@ type DatasetInfo = {
   geoTransform: number[];
   width: number;
   height: number;
+  // transform from WGS84 lon/lat into the dataset CRS; null when the dataset is
+  // already geographic lon/lat (SRTM).
+  ct: gdal.CoordinateTransformation | null;
 };
+
+// WGS84 built from proj4 to force traditional lon/lat axis order (GDAL 3 would
+// otherwise use lat/lon for EPSG:4326).
+const wgs84 = gdal.SpatialReference.fromProj4(
+  '+proj=longlat +datum=WGS84 +no_defs',
+);
+
+type Bbox = [minLon: number, minLat: number, maxLon: number, maxLat: number];
+
+type LocalSource = {
+  path: string;
+  bbox: Bbox;
+  info?: DatasetInfo;
+};
+
+// Higher-precision, non-tiled sources, in priority order (first wins). Format:
+//   ELEVATION_SOURCES=/path/a.tif:minLon,minLat,maxLon,maxLat;/path/b.tif:...
+// A point is sampled from the first source whose bbox contains it and that
+// returns real data; otherwise it falls back to the next source, then SRTM.
+const localSources: LocalSource[] = getEnv('ELEVATION_SOURCES', '')
+  .split(';')
+  .map((entry) => entry.trim())
+  .filter(Boolean)
+  .map((entry) => {
+    const sep = entry.lastIndexOf(':');
+
+    if (sep < 0) {
+      throw new Error(`Invalid ELEVATION_SOURCES entry: ${entry}`);
+    }
+
+    const path = entry.slice(0, sep);
+
+    const bbox = entry
+      .slice(sep + 1)
+      .split(',')
+      .map(Number);
+
+    if (bbox.length !== 4 || bbox.some(Number.isNaN)) {
+      throw new Error(`Invalid bbox in ELEVATION_SOURCES entry: ${entry}`);
+    }
+
+    return { path, bbox: bbox as Bbox };
+  });
+
+function inBbox(
+  [minLon, minLat, maxLon, maxLat]: Bbox,
+  lat: number,
+  lon: number,
+) {
+  return lon >= minLon && lon <= maxLon && lat >= minLat && lat <= maxLat;
+}
+
+// Local sources are opened lazily and kept open for the process lifetime.
+function openLocalSource(src: LocalSource): DatasetInfo {
+  if (src.info) {
+    return src.info;
+  }
+
+  const dataset = gdal.open(src.path);
+
+  const geoTransform = dataset.geoTransform;
+
+  if (!geoTransform) {
+    throw new Error(`Invalid geotransform for ${src.path}`);
+  }
+
+  src.info = {
+    dataset,
+    band: dataset.bands.get(1),
+    geoTransform,
+    width: dataset.rasterSize.x,
+    height: dataset.rasterSize.y,
+    ct: dataset.srs
+      ? new gdal.CoordinateTransformation(wgs84, dataset.srs)
+      : null,
+  };
+
+  return src.info;
+}
+
+function srtmKey(lat: number, lon: number) {
+  const alat = Math.abs(lat);
+
+  const alon = Math.abs(lon);
+
+  return (
+    `${lat >= 0 ? 'N' : 'S'}${Math.floor(alat + (lat < 0 ? 1 : 0))
+      .toString()
+      .padStart(2, '0')}` +
+    `${lon >= 0 ? 'E' : 'W'}${Math.floor(alon + (lon < 0 ? 1 : 0))
+      .toString()
+      .padStart(3, '0')}`
+  );
+}
 
 const CoordSchema = z.tuple([
   z.number().min(-90).max(90).meta({ description: 'latitude' }),
@@ -47,7 +149,11 @@ export function attachElevationHandler(router: RouterInstance) {
   registerPath('/geotools/elevation', {
     get: {
       summary: 'Get elevation for coordinates (query params)',
+      description:
+        'Premium users get higher-precision data where available; ' +
+        'others get the global fallback dataset.',
       tags: ['geotools'],
+      security: AUTH_OPTIONAL,
       requestParams: {
         query: z.object({
           coordinates: CoordsSchemaC,
@@ -61,7 +167,11 @@ export function attachElevationHandler(router: RouterInstance) {
     },
     post: {
       summary: 'Get elevation for a list of coordinates',
+      description:
+        'Premium users get higher-precision data where available; ' +
+        'others get the global fallback dataset.',
       tags: ['geotools'],
+      security: AUTH_OPTIONAL,
       requestBody: {
         content: { 'application/json': { schema: CoordsSchema } },
       },
@@ -74,9 +184,14 @@ export function attachElevationHandler(router: RouterInstance) {
     },
   });
 
-  router.get('/elevation', compute);
+  router.get('/elevation', authenticator(false), compute);
 
-  router.post('/elevation', acceptValidator('application/json'), compute);
+  router.post(
+    '/elevation',
+    acceptValidator('application/json'),
+    authenticator(false),
+    compute,
+  );
 }
 
 async function compute(ctx: ParameterizedContext) {
@@ -93,80 +208,127 @@ async function compute(ctx: ParameterizedContext) {
     return ctx.throw(400, err as Error);
   }
 
+  const results: (number | null)[] = new Array(cs.length).fill(null);
+
+  // High-precision local sources are a premium-only feature; everyone else gets
+  // the global SRTM fallback.
+  const premiumExpiration = ctx.state.user?.premiumExpiration;
+
+  const sources =
+    premiumExpiration && premiumExpiration > new Date() ? localSources : [];
+
+  // Try the high-precision local sources first (priority order). Anything not
+  // covered (outside every bbox, or only nodata there) falls back to SRTM.
+  const srtmNeeded: number[] = [];
+
+  for (let i = 0; i < cs.length; i++) {
+    const [lat, lon] = cs[i];
+
+    let resolved = false;
+
+    for (const src of sources) {
+      if (!inBbox(src.bbox, lat, lon)) {
+        continue;
+      }
+
+      let v: number | null;
+
+      try {
+        v = await computeElevation(lat, lon, openLocalSource(src));
+      } catch (err) {
+        // a broken/unavailable local source (e.g. unmounted drive) must not
+        // fail the request — fall back to the next source, then SRTM
+        ctx.log.warn(
+          { err, path: src.path },
+          'elevation local source failed; falling back',
+        );
+
+        continue;
+      }
+
+      if (v != null) {
+        results[i] = v;
+        resolved = true;
+        break;
+      }
+    }
+
+    if (!resolved) {
+      srtmNeeded.push(i);
+    }
+  }
+
+  if (srtmNeeded.length === 0) {
+    ctx.response.body = ElevationResponseSchema.parse(results);
+
+    return;
+  }
+
   const allocated = new Set<string>();
 
   const dsMap = new Map<string, DatasetInfo>();
 
   try {
-    const items = await Promise.all(
-      cs.map(async ([lat, lon]) => {
-        const alat = Math.abs(lat);
+    await Promise.all(
+      srtmNeeded.map(async (i) => {
+        const [lat, lon] = cs[i];
 
-        const alon = Math.abs(lon);
+        const key = srtmKey(lat, lon);
 
-        const key =
-          `${lat >= 0 ? 'N' : 'E'}${Math.floor(alat + (lat < 0 ? 1 : 0))
-            .toString()
-            .padStart(2, '0')}` +
-          `${lon >= 0 ? 'E' : 'W'}${Math.floor(alon + (lon < 0 ? 1 : 0))
-            .toString()
-            .padStart(3, '0')}`;
+        if (allocated.has(key)) {
+          return;
+        }
 
-        if (!allocated.has(key)) {
-          allocated.add(key);
+        allocated.add(key);
 
-          const tifPath = `${elevationDataDir}/${key}.tif`;
+        const tifPath = `${elevationDataDir}/${key}.tif`;
 
-          let dataset: gdal.Dataset | undefined;
+        let dataset: gdal.Dataset | undefined;
+
+        try {
+          dataset = gdal.open(tifPath);
+        } catch {
+          await downloadDataSafeSafe(key);
 
           try {
             dataset = gdal.open(tifPath);
-          } catch {
-            await downloadDataSafeSafe(key);
+          } catch (err) {
+            const s = await stat(tifPath).catch(() => undefined);
 
-            try {
-              dataset = gdal.open(tifPath);
-            } catch (err) {
-              const s = await stat(tifPath).catch(() => undefined);
-
-              if (!s || s.size > 0) {
-                throw err;
-              }
+            if (!s || s.size > 0) {
+              throw err;
             }
-          }
-
-          if (dataset) {
-            const geoTransform = dataset?.geoTransform;
-
-            if (!geoTransform) {
-              throw new Error(`Invalid geotransform for ${key}`);
-            }
-
-            dsMap.set(key, {
-              dataset,
-              band: dataset?.bands.get(1),
-              geoTransform,
-              width: dataset?.rasterSize.x,
-              height: dataset?.rasterSize.y,
-            });
           }
         }
 
-        return [lat, lon, key] as const;
+        if (dataset) {
+          const geoTransform = dataset.geoTransform;
+
+          if (!geoTransform) {
+            throw new Error(`Invalid geotransform for ${key}`);
+          }
+
+          dsMap.set(key, {
+            dataset,
+            band: dataset.bands.get(1),
+            geoTransform,
+            width: dataset.rasterSize.x,
+            height: dataset.rasterSize.y,
+            ct: null,
+          });
+        }
       }),
     );
 
-    type Tuple = [number, number, DatasetInfo] | null;
+    for (const i of srtmNeeded) {
+      const [lat, lon] = cs[i];
 
-    const params = items.map((item) => {
-      const ds = dsMap.get(item[2]);
+      const ds = dsMap.get(srtmKey(lat, lon));
 
-      return ds ? ([item[0], item[1], ds] as Tuple) : null;
-    });
+      results[i] = ds ? await computeElevation(lat, lon, ds) : null;
+    }
 
-    ctx.response.body = ElevationResponseSchema.parse(
-      await Promise.all(params.map((t) => t && computeElevation(t))),
-    );
+    ctx.response.body = ElevationResponseSchema.parse(results);
   } finally {
     for (const { dataset } of dsMap.values()) {
       dataset?.close();
@@ -219,54 +381,68 @@ async function downloadData(key: string) {
   }
 }
 
-async function computeElevation([
-  lat,
-  lon,
-  { band, geoTransform, width, height },
-]: [number, number, DatasetInfo]) {
+async function computeElevation(
+  lat: number,
+  lon: number,
+  { band, geoTransform, width, height, ct }: DatasetInfo,
+) {
   const [gt0, gt1, gt2, gt3, gt4, gt5] = geoTransform;
 
   if (gt2 !== 0 || gt4 !== 0) {
     throw new Error('Rotated geotransforms are not supported');
   }
 
-  const px = (lon - gt0) / gt1;
-  const py = (lat - gt3) / gt5;
+  // map lon/lat into the dataset CRS (identity for geographic SRTM)
+  const { x, y } = ct ? ct.transformPoint(lon, lat) : { x: lon, y: lat };
+
+  const px = (x - gt0) / gt1;
+  const py = (y - gt3) / gt5;
+
+  // a point outside the projection's valid domain can transform to a non-finite
+  // value, which would slip past the bounds check below (NaN comparisons are
+  // all false) and corrupt the pixel read
+  if (!Number.isFinite(px) || !Number.isFinite(py)) {
+    return null;
+  }
 
   const x0 = Math.floor(px);
   const y0 = Math.floor(py);
-  const x1 = Math.min(x0 + 1, width - 1);
-  const y1 = Math.min(y0 + 1, height - 1);
 
   if (x0 < 0 || y0 < 0 || x0 >= width || y0 >= height) {
     return null;
   }
 
-  const dx = px - x0;
-  const dy = py - y0;
-  const wx0 = 1 - dx;
-  const wy0 = 1 - dy;
-  const wx1 = dx;
-  const wy1 = dy;
+  const x1 = Math.min(x0 + 1, width - 1);
+  const y1 = Math.min(y0 + 1, height - 1);
+
+  // Read the 2x2 (or smaller, at the raster edge) neighbourhood in a single
+  // async call so the disk I/O runs on GDAL's thread pool instead of blocking
+  // the event loop.
+  const cols = x1 > x0 ? 2 : 1;
+  const rows = y1 > y0 ? 2 : 1;
+
+  const data = await band.pixels.readAsync(x0, y0, cols, rows);
+
+  const ix1 = cols - 1; // column offset of x1 within the window (0 or 1)
+  const iy1 = rows - 1; // row offset of y1 within the window (0 or 1)
 
   const nodata = band.noDataValue;
 
-  const sample = (x: number, y: number) => {
-    const val = band.pixels.get(x, y);
+  const norm = (val: number) => (nodata != null && val === nodata ? null : val);
 
-    return nodata != null && val === nodata ? null : val;
-  };
+  const v00 = norm(data[0]);
+  const v10 = norm(data[ix1]);
+  const v01 = norm(data[iy1 * cols]);
+  const v11 = norm(data[iy1 * cols + ix1]);
 
-  const v00 = sample(x0, y0);
-  const v01 = sample(x0, y1);
-  const v10 = sample(x1, y0);
-  const v11 = sample(x1, y1);
+  const dx = px - x0;
+  const dy = py - y0;
 
   const weighted = [
-    [v00, wx0 * wy0],
-    [v01, wx0 * wy1],
-    [v10, wx1 * wy0],
-    [v11, wx1 * wy1],
+    [v00, (1 - dx) * (1 - dy)],
+    [v01, (1 - dx) * dy],
+    [v10, dx * (1 - dy)],
+    [v11, dx * dy],
   ].filter((entry): entry is [number, number] => entry[0] !== null);
 
   return weighted.length
