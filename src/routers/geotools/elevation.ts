@@ -10,6 +10,12 @@ import { authenticator } from '../../authenticator.js';
 import { getEnv } from '../../env.js';
 import { AUTH_OPTIONAL, registerPath } from '../../openapi.js';
 import { acceptValidator } from '../../requestValidators.js';
+import {
+  inBbox,
+  type ParsedSource,
+  parseElevationSources,
+  srtmKey,
+} from './elevationHelpers.js';
 
 const elevationDataDir = getEnv('ELEVATION_DATA_DIRECTORY');
 
@@ -36,50 +42,16 @@ const wgs84 = gdal.SpatialReference.fromProj4(
   '+proj=longlat +datum=WGS84 +no_defs',
 );
 
-type Bbox = [minLon: number, minLat: number, maxLon: number, maxLat: number];
-
-type LocalSource = {
-  path: string;
-  bbox: Bbox;
+type LocalSource = ParsedSource & {
   info?: DatasetInfo;
 };
 
-// Higher-precision, non-tiled sources, in priority order (first wins). Format:
-//   ELEVATION_SOURCES=/path/a.tif:minLon,minLat,maxLon,maxLat;/path/b.tif:...
-// A point is sampled from the first source whose bbox contains it and that
-// returns real data; otherwise it falls back to the next source, then SRTM.
-const localSources: LocalSource[] = getEnv('ELEVATION_SOURCES', '')
-  .split(';')
-  .map((entry) => entry.trim())
-  .filter(Boolean)
-  .map((entry) => {
-    const sep = entry.lastIndexOf(':');
-
-    if (sep < 0) {
-      throw new Error(`Invalid ELEVATION_SOURCES entry: ${entry}`);
-    }
-
-    const path = entry.slice(0, sep);
-
-    const bbox = entry
-      .slice(sep + 1)
-      .split(',')
-      .map(Number);
-
-    if (bbox.length !== 4 || bbox.some(Number.isNaN)) {
-      throw new Error(`Invalid bbox in ELEVATION_SOURCES entry: ${entry}`);
-    }
-
-    return { path, bbox: bbox as Bbox };
-  });
-
-function inBbox(
-  [minLon, minLat, maxLon, maxLat]: Bbox,
-  lat: number,
-  lon: number,
-) {
-  return lon >= minLon && lon <= maxLon && lat >= minLat && lat <= maxLat;
-}
+// Higher-precision, non-tiled sources, in priority order (first wins). A point
+// is sampled from the first source whose bbox contains it and that returns real
+// data; otherwise it falls back to the next source, then SRTM.
+const localSources: LocalSource[] = parseElevationSources(
+  getEnv('ELEVATION_SOURCES', ''),
+);
 
 // Local sources are opened lazily and kept open for the process lifetime.
 function openLocalSource(src: LocalSource): DatasetInfo {
@@ -107,21 +79,6 @@ function openLocalSource(src: LocalSource): DatasetInfo {
   };
 
   return src.info;
-}
-
-function srtmKey(lat: number, lon: number) {
-  const alat = Math.abs(lat);
-
-  const alon = Math.abs(lon);
-
-  return (
-    `${lat >= 0 ? 'N' : 'S'}${Math.floor(alat + (lat < 0 ? 1 : 0))
-      .toString()
-      .padStart(2, '0')}` +
-    `${lon >= 0 ? 'E' : 'W'}${Math.floor(alon + (lon < 0 ? 1 : 0))
-      .toString()
-      .padStart(3, '0')}`
-  );
 }
 
 const CoordSchema = z.tuple([
