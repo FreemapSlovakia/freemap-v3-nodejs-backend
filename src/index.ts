@@ -133,6 +133,17 @@ app.use(
     // Preserve the raw request body (at `ctx.request.rawBody`) so the Polar
     // webhook handler can verify the Standard Webhooks signature.
     includeUnparsed: true,
+    // A malformed/truncated multipart body or an empty-file upload makes
+    // formidable (and the JSON parser) throw while parsing the request body.
+    // These are client errors — bots probing /cgi-bin/... paths, truncated
+    // uploads — not server faults, so surface the parser's own httpCode
+    // (400 for these) instead of letting them bubble up as unhandled 500s
+    // that flood Sentry (4xx are filtered in beforeSend).
+    onError(err, ctx) {
+      const httpCode = (err as { httpCode?: number }).httpCode;
+
+      ctx.throw(typeof httpCode === 'number' ? httpCode : 400, err.message);
+    },
   }),
 );
 
