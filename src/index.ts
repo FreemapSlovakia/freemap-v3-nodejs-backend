@@ -18,6 +18,7 @@ import { paths } from './openapi.js';
 import { authRouter } from './routers/auth/index.js';
 import { trackingRouter } from './routers/deviceTracking/index.js';
 import { attachDownloadMapHandler } from './routers/downloadMapHandler.js';
+import { eventsRouter } from './routers/events/index.js';
 import { galleryRouter } from './routers/gallery/index.js';
 import { attachPostGarminCourses } from './routers/garminCoursesHandler.js';
 import { attachGeoIp } from './routers/geoip.js';
@@ -180,6 +181,8 @@ router.use(
 
 router.use('/maps', mapsRouter.routes(), mapsRouter.allowedMethods());
 
+router.use('/events', eventsRouter.routes(), eventsRouter.allowedMethods());
+
 attachDownloadMapHandler(router);
 
 attachLoggerHandler(router);
@@ -209,6 +212,7 @@ router.get('/documentation', (ctx) => {
       { name: 'tracking', description: 'Device location tracking' },
       { name: 'gallery', description: 'Picture gallery' },
       { name: 'maps', description: 'Map annotations' },
+      { name: 'events', description: 'Social shared-trip events' },
       { name: 'strava', description: 'Strava activity import' },
     ],
     paths,
