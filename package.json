@@ -29,7 +29,7 @@
     "test": "tsc && node --test 'build/**/*.test.js'",
     "dev:serve": "pnpm run copy:proto && dotenvx run --overload -- sh -c 'node --enable-source-maps --import ./build/instrument.js build/index.js | pino-pretty -S -t -i hostname,pid'",
     "dev": "tsc-watch --onSuccess \"pnpm run dev:serve\"",
-    "deploy": "ssh ${DEPLOY_SSH_HOST:-fm6} 'bash /home/freemap/freemap-v3-nodejs-backend/scripts/remote-deploy.sh'",
+    "deploy": "ssh ${DEPLOY_SSH_HOST:-freemap-fm6} 'bash /home/freemap/freemap-v3-nodejs-backend/scripts/remote-deploy.sh'",
     "precommit": "lint-staged",
     "lint": "biome check",
     "lint:fix": "biome check --write"

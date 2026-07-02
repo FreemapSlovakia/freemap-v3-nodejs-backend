@@ -10,6 +10,12 @@
 # Invoked by `pnpm deploy` (over SSH) and by .github/workflows/deploy.yml.
 set -euo pipefail
 
+# Load fnm (provides node/pnpm). Non-interactive SSH and CI shells don't source
+# ~/.bashrc where fnm is normally set up, so do it explicitly here.
+export PATH="$HOME/.local/share/fnm:$PATH"
+eval "$(fnm env --shell bash)"
+fnm use default
+
 cd "${DEPLOY_DIR:-/home/freemap/freemap-v3-nodejs-backend}"
 
 git pull --ff-only
