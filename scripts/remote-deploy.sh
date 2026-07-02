@@ -1,13 +1,14 @@
 #!/usr/bin/env bash
 #
-# Runs ON the fm3 server as the `freemap` user. Pulls the latest `main`,
-# installs deps, rebuilds (native modules build against the server's libs),
-# and restarts the systemd service.
+# Runs ON the fm6 server as the `freemap` user: installs deps, rebuilds (native
+# modules build against the server's libs), and restarts the systemd service.
+#
+# The caller is responsible for `git pull` BEFORE invoking this script, so the
+# script is never rewritten by git mid-run (which would shift the file under
+# bash and corrupt execution). See `pnpm deploy` and .github/workflows/deploy.yml.
 #
 # The restart needs this sudoers rule (as root, in /etc/sudoers.d/freemap-deploy):
 #   freemap ALL=(root) NOPASSWD: /usr/bin/systemctl restart freemap
-#
-# Invoked by `pnpm deploy` (over SSH) and by .github/workflows/deploy.yml.
 set -euo pipefail
 
 # Load fnm (provides node/pnpm). Non-interactive SSH and CI shells don't source
@@ -18,7 +19,6 @@ fnm use default
 
 cd "${DEPLOY_DIR:-/home/freemap/freemap-v3-nodejs-backend}"
 
-git pull --ff-only
 pnpm install --frozen-lockfile
 pnpm build
 sudo systemctl restart freemap

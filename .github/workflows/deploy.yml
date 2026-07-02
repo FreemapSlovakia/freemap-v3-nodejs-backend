@@ -21,4 +21,7 @@ jobs:
           port: ${{ vars.DEPLOY_PORT }} # optional; defaults to 22
           username: freemap
           key: ${{ secrets.DEPLOY_SSH_KEY }}
-          script: bash /home/freemap/freemap-v3-nodejs-backend/scripts/remote-deploy.sh
+          script: |
+            cd /home/freemap/freemap-v3-nodejs-backend
+            git pull --ff-only
+            bash scripts/remote-deploy.sh
