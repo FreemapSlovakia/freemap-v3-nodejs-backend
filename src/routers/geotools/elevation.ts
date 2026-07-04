@@ -17,7 +17,9 @@ import {
   srtmKey,
 } from './elevationHelpers.js';
 
-const elevationDataDir = getEnv('ELEVATION_DATA_DIRECTORY');
+// Optional: when unset, the global SRTM fallback is disabled and points not
+// covered by a local source return null.
+const elevationDataDir = getEnv('ELEVATION_DATA_DIRECTORY', '');
 
 // Reading the SRS of some GeoTIFFs (e.g. EPSG:8353 / S-JTSK [JTSK03]) throws
 // unless we tell GDAL to trust the EPSG registry over the embedded GeoTIFF keys.
@@ -224,7 +226,7 @@ async function compute(ctx: ParameterizedContext) {
     }
   }
 
-  if (srtmNeeded.length === 0) {
+  if (srtmNeeded.length === 0 || !elevationDataDir) {
     ctx.response.body = ElevationResponseSchema.parse(results);
 
     return;
