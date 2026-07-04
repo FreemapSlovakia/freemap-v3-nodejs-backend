@@ -20,6 +20,14 @@ fnm use default
 cd "${DEPLOY_DIR:-/home/freemap/freemap-v3-nodejs-backend}"
 
 pnpm install --frozen-lockfile
+
+# gdal-async's prebuilt binary bundles a GDAL whose libtiff lacks the ZSTD
+# codec, so it can't read our ZSTD-compressed DTM tiles. Rebuild just that
+# module from source against the system GDAL (which has ZSTD). Requires
+# libgdal-dev (gdal-config) + a C++ toolchain on the server.
+npm_config_build_from_source=true npm_config_shared_gdal=true \
+  pnpm rebuild gdal-async
+
 pnpm build
 sudo systemctl restart freemap
 
