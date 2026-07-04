@@ -73,8 +73,17 @@ function openLocalSource(src: LocalSource): DatasetInfo {
     geoTransform,
     width: dataset.rasterSize.x,
     height: dataset.rasterSize.y,
+    // Build the target from proj4 rather than using dataset.srs directly: this
+    // forces traditional easting/northing (x,y) axis order and drops the 3D
+    // vertical of compound CRSs. Some CRSs (e.g. SWEREF99 TM / EPSG:5845)
+    // declare northing-first axis order, which would otherwise make
+    // transformPoint return swapped coordinates (gdal-async 3.12 has no
+    // setAxisMappingStrategy to override it).
     ct: dataset.srs
-      ? new gdal.CoordinateTransformation(wgs84, dataset.srs)
+      ? new gdal.CoordinateTransformation(
+          wgs84,
+          gdal.SpatialReference.fromProj4(dataset.srs.toProj4()),
+        )
       : null,
   };
 
