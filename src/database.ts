@@ -219,7 +219,12 @@ export async function initDatabase() {
       CONSTRAINT mwaMapFk FOREIGN KEY (mapId) REFERENCES map (id) ON DELETE CASCADE
     ) ENGINE=InnoDB`,
 
-    sql`CREATE TRIGGER IF NOT EXISTS picture_country_bu
+    // CREATE OR REPLACE (not IF NOT EXISTS) so the trigger is recreated on every
+    // startup, resetting its DEFINER to the app's current connection user. This
+    // self-heals a stale DEFINER (e.g. after restoring the DB onto a new host
+    // where the original definer user no longer exists), which otherwise makes
+    // every INSERT/UPDATE on `picture` fail with error 1449.
+    sql`CREATE OR REPLACE TRIGGER picture_country_bu
       BEFORE UPDATE ON picture
       FOR EACH ROW
       BEGIN
@@ -234,7 +239,7 @@ export async function initDatabase() {
         END IF;
       END`,
 
-    sql`CREATE TRIGGER IF NOT EXISTS picture_country_bi
+    sql`CREATE OR REPLACE TRIGGER picture_country_bi
         BEFORE INSERT ON picture
         FOR EACH ROW
         BEGIN
