@@ -1,4 +1,4 @@
-import { RouterInstance } from '@koa/router';
+import type { RouterInstance } from '@koa/router';
 import sql from 'sql-template-tag';
 import { authenticator } from '../../authenticator.js';
 import { pool } from '../../database.js';

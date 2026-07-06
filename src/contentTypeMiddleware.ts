@@ -1,4 +1,4 @@
-import { RouterMiddleware } from '@koa/router';
+import type { RouterMiddleware } from '@koa/router';
 
 export function contentTypeMiddleware(
   map: Record<string, RouterMiddleware[]>,

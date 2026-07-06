@@ -2,7 +2,7 @@ import { createWriteStream } from 'node:fs';
 import { rename, stat, unlink, writeFile } from 'node:fs/promises';
 import { Readable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
-import { RouterInstance } from '@koa/router';
+import type { RouterInstance } from '@koa/router';
 import gdal from 'gdal-async';
 import type { ParameterizedContext } from 'koa';
 import type { Logger } from 'pino';

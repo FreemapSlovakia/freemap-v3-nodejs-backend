@@ -1,5 +1,5 @@
 import { createHmac, randomBytes } from 'node:crypto';
-import { RouterInstance } from '@koa/router';
+import type { RouterInstance } from '@koa/router';
 import sql from 'sql-template-tag';
 import z from 'zod';
 import { authenticator } from '../../authenticator.js';

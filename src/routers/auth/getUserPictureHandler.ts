@@ -1,4 +1,4 @@
-import { RouterInstance } from '@koa/router';
+import type { RouterInstance } from '@koa/router';
 import calculate from 'etag';
 import sql from 'sql-template-tag';
 import z from 'zod';

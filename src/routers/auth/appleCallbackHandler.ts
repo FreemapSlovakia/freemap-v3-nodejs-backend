@@ -1,4 +1,4 @@
-import { RouterInstance } from '@koa/router';
+import type { RouterInstance } from '@koa/router';
 import { AUTH_OPTIONAL, registerPath } from '../../openapi.js';
 
 export function attachAppleCallbackHandler(router: RouterInstance) {

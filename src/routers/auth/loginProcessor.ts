@@ -1,6 +1,6 @@
 import { randomBytes } from 'node:crypto';
-import { ParameterizedContext } from 'koa';
-import sql, { join, RawValue, raw } from 'sql-template-tag';
+import type { ParameterizedContext } from 'koa';
+import sql, { join, type RawValue, raw } from 'sql-template-tag';
 import z from 'zod';
 import { authProviderToColumn, rowToUser } from '../../authenticator.js';
 import { pool, runInTransaction } from '../../database.js';

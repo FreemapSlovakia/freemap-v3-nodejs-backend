@@ -1,4 +1,4 @@
-import { PoolConnection } from 'mariadb';
+import type { PoolConnection } from 'mariadb';
 import sql from 'sql-template-tag';
 import { trackRegister } from './trackRegister.js';
 

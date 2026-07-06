@@ -1,4 +1,4 @@
-import { RouterInstance } from '@koa/router';
+import type { RouterInstance } from '@koa/router';
 import z from 'zod';
 import { garminOauth } from '../../garminOauth.js';
 import { registerPath } from '../../openapi.js';

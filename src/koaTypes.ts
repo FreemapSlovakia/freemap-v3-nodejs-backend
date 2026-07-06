@@ -1,7 +1,7 @@
-import { Socket } from 'net';
-import { Logger } from 'pino';
-import z from 'zod';
-import { UserRowSchema } from './types.js';
+import type { Socket } from 'net';
+import type { Logger } from 'pino';
+import type z from 'zod';
+import type { UserRowSchema } from './types.js';
 
 export type User = z.infer<typeof UserRowSchema> & {
   authProviders: string[];

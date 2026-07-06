@@ -1,5 +1,5 @@
 import { promisify } from 'node:util';
-import { RouterInstance } from '@koa/router';
+import type { RouterInstance } from '@koa/router';
 import { execFile } from 'child_process';
 import ExifReader from 'exifreader';
 import shortUuid from 'short-uuid';

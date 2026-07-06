@@ -4,7 +4,7 @@
 // 'x-geoip-latitude': '48.30970',
 // 'x-geoip-longitude': '18.09050',
 
-import { RouterInstance } from '@koa/router';
+import type { RouterInstance } from '@koa/router';
 import z from 'zod';
 import { registerPath } from '../openapi.js';
 import { acceptValidator } from '../requestValidators.js';

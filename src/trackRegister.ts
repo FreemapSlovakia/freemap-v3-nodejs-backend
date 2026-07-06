@@ -1,3 +1,3 @@
-import WebSocket from 'ws';
+import type WebSocket from 'ws';
 
 export const trackRegister = new Map<number | string, Set<WebSocket>>();

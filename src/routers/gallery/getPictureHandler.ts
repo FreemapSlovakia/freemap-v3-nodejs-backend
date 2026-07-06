@@ -2,7 +2,7 @@ import { createHmac } from 'node:crypto';
 import { stat } from 'node:fs/promises';
 import { type } from 'node:os';
 import path from 'node:path';
-import { RouterInstance } from '@koa/router';
+import type { RouterInstance } from '@koa/router';
 import sql, { empty, raw } from 'sql-template-tag';
 import z from 'zod';
 import { authenticator } from '../../authenticator.js';

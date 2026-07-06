@@ -56,7 +56,8 @@
         "noCommonJs": "error",
         "noNamespace": "error",
         "useArrayLiterals": "error",
-        "useAsConstAssertion": "error"
+        "useAsConstAssertion": "error",
+        "useImportType": "error"
       },
       "suspicious": {
         "noAsyncPromiseExecutor": "error",

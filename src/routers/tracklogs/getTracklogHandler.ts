@@ -1,5 +1,5 @@
 import { readFile, stat } from 'node:fs/promises';
-import { RouterInstance } from '@koa/router';
+import type { RouterInstance } from '@koa/router';
 import z from 'zod';
 import { registerPath } from '../../openapi.js';
 import { tracklogsDir } from '../tracklogs/constants.js';
