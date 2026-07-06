@@ -192,7 +192,7 @@ export function attachPostGarminCourses(router: RouterInstance) {
           ctx.throw(400, responseJson.message);
         }
 
-        throw new Error('Error sending course: ' + responseText);
+        throw new Error(`Error sending course: ${responseText}`);
       }
 
       ctx.status = 204;

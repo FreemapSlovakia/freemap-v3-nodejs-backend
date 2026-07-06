@@ -354,7 +354,7 @@ async function downloadData(key: string) {
     }
 
     if (!res.ok || !res.body) {
-      throw new Error('Bad response: ' + res.status + ' ' + (await res.text()));
+      throw new Error(`Bad response: ${res.status} ${await res.text()}`);
     }
 
     await pipeline(Readable.fromWeb(res.body), createWriteStream(tempTif));

@@ -1,6 +1,6 @@
+import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import type { RouterInstance } from '@koa/router';
-import { execFile } from 'child_process';
 import ExifReader from 'exifreader';
 import shortUuid from 'short-uuid';
 import sql, { bulk } from 'sql-template-tag';
@@ -86,7 +86,7 @@ export function attachPostPictureHandler(router: RouterInstance) {
         async (ctx, next) => {
           const { files } = ctx.request;
 
-          if (!files || !files.image) {
+          if (!files?.image) {
             return ctx.throw(400, 'missing image file');
           }
 
@@ -176,12 +176,12 @@ export function attachPostPictureHandler(router: RouterInstance) {
             return ctx.throw(400, 'invalid or unsupported image file');
           }
 
-          const pano = exif['UsePanoramaViewer']?.value === 'True';
+          const pano = exif.UsePanoramaViewer?.value === 'True';
 
           const id = await runInTransaction(async (conn) => {
             const { insertId } = await conn.query<{ insertId: number }>(sql`
               INSERT INTO picture SET
-                pathname = ${name + '.jpeg'},
+                pathname = ${`${name}.jpeg`},
                 userId = ${ctx.state.user!.id},
                 title = ${title},
                 description = ${description},

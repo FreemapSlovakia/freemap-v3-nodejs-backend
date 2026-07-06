@@ -1,6 +1,6 @@
 import { unlink } from 'node:fs/promises';
 import { type ClientHttp2Session, connect } from 'node:http2';
-import Router, { type RouterInstance } from '@koa/router';
+import type { RouterInstance } from '@koa/router';
 import { pointToTile, type Tile, tileToGeoJSON } from '@mapbox/tilebelt';
 import { bbox } from '@turf/bbox';
 import booleanIntersects from '@turf/boolean-intersects';
@@ -306,9 +306,9 @@ async function download(
     .replace(/[^ \p{L}\p{N}._-]+/gu, '_')
     .replace(/^[. ]+|[. ]+$/g, '');
 
-  const dbName = safeName ? safeName + '-' + timestamp : timestamp;
+  const dbName = safeName ? `${safeName}-${timestamp}` : timestamp;
 
-  const filename = getEnv('MBTILES_DIR') + `/${dbName}.${format}`;
+  const filename = `${getEnv('MBTILES_DIR')}/${dbName}.${format}`;
 
   const db = new Database(filename);
 
@@ -371,7 +371,7 @@ async function download(
 
     db.prepare(combo.sql).run(...combo.values);
   } else {
-    throw new Error('Unsupported format: ' + format);
+    throw new Error(`Unsupported format: ${format}`);
   }
 
   const stmt = db.prepare(
@@ -457,7 +457,7 @@ async function download(
         ) {
           logger.warn(
             { code: err.code },
-            err.code + `; retrying download (${i + 1}/5)`,
+            `${err.code}; retrying download (${i + 1}/5)`,
           );
 
           await new Promise((resolve) => setTimeout(resolve, i * 100));

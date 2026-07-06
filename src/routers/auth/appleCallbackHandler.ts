@@ -25,7 +25,7 @@ export function attachAppleCallbackHandler(router: RouterInstance) {
       body as Record<string, string>,
     ).toString();
 
-    const intentUrl = 'signinwithapple://callback?' + searchParams;
+    const intentUrl = `signinwithapple://callback?${searchParams}`;
 
     ctx.log.info(
       { intentUrl, isAndroid, userAgent },

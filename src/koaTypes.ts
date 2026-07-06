@@ -1,4 +1,4 @@
-import type { Socket } from 'net';
+import type { Socket } from 'node:net';
 import type { Logger } from 'pino';
 import type z from 'zod';
 import type { UserRowSchema } from './types.js';

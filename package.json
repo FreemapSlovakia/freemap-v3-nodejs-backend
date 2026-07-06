@@ -20,7 +20,7 @@
     "url": "https://github.com/FreemapSlovakia/freemap-v3-nodejs-backend/issues"
   },
   "lint-staged": {
-    "*.{js,ts}": ["biome check", "git add"]
+    "*.{js,ts}": ["biome check --error-on-warnings", "git add"]
   },
   "scripts": {
     "start": "node --enable-source-maps --import ./build/instrument.js build/index.js",
@@ -31,8 +31,8 @@
     "dev": "tsc-watch --onSuccess \"pnpm run dev:serve\"",
     "deploy": "ssh ${DEPLOY_SSH_HOST:-freemap-fm6} 'cd /home/freemap/freemap-v3-nodejs-backend && git pull --ff-only && bash scripts/remote-deploy.sh'",
     "precommit": "lint-staged",
-    "lint": "biome check",
-    "lint:fix": "biome check --write"
+    "lint": "biome check --error-on-warnings",
+    "lint:fix": "biome check --write --error-on-warnings"
   },
   "dependencies": {
     "@koa/router": "^15.6.0",

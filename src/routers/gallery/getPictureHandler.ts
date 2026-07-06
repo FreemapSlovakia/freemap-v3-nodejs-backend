@@ -1,6 +1,5 @@
 import { createHmac } from 'node:crypto';
 import { stat } from 'node:fs/promises';
-import { type } from 'node:os';
 import path from 'node:path';
 import type { RouterInstance } from '@koa/router';
 import sql, { empty, raw } from 'sql-template-tag';
@@ -10,7 +9,7 @@ import { pool } from '../../database.js';
 import { getEnv } from '../../env.js';
 import { AUTH_OPTIONAL, registerPath } from '../../openapi.js';
 import { acceptValidator } from '../../requestValidators.js';
-import { UserRowSchema, zDateToIso, zNullableDateToIso } from '../../types.js';
+import { zDateToIso, zNullableDateToIso } from '../../types.js';
 import { picturesDir } from './constants.js';
 import { ratingSubquery } from './ratingConstants.js';
 

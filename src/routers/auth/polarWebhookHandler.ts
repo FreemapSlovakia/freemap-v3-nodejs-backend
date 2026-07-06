@@ -114,7 +114,7 @@ export function attachPolarWebhookHandler(router: RouterInstance) {
                   : { type: 'premium' },
               )},
               createdAt = NOW(),
-              note = ${'polar:' + order.billingReason},
+              note = ${`polar:${order.billingReason}`},
               polarOrderId = ${order.id}`,
           );
 

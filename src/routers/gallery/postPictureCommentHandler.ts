@@ -148,7 +148,7 @@ export function attachPostPictureCommentHandler(router: RouterInstance) {
         const picTitle =
           'title' in picInfo && picInfo.title ? `"${picInfo.title} "` : '';
 
-        const picUrl = webBaseUrl + '/?image=' + ctx.params.id;
+        const picUrl = `${webBaseUrl}/?image=${ctx.params.id}`;
 
         const unsubscribeUrl = webBaseUrl;
 
@@ -195,8 +195,7 @@ export function attachPostPictureCommentHandler(router: RouterInstance) {
 
       const promises: Promise<void>[] = [];
       if (
-        picInfo &&
-        picInfo.email &&
+        picInfo?.email &&
         (!('userId' in picInfo) || picInfo.userId !== user.id)
       ) {
         promises.push(

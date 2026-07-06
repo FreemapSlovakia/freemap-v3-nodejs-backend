@@ -227,7 +227,7 @@ export function attachPurchaseValidateHandler(router: RouterInstance) {
 
           default:
             ctx.throw(
-              new Error('invalid item type in purchase intent: ' + item.type),
+              new Error(`invalid item type in purchase intent: ${item.type}`),
             );
         }
 
@@ -322,7 +322,7 @@ export function attachPurchaseValidateHandler(router: RouterInstance) {
 
         default:
           ctx.throw(
-            new Error('invalid item type in purchase token: ' + item.type),
+            new Error(`invalid item type in purchase token: ${item.type}`),
           );
       }
 

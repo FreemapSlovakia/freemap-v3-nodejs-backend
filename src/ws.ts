@@ -34,7 +34,7 @@ export function attachWs(app: KoaWebsocket.App) {
         }, 30000);
 
     ws.on('message', (message) => {
-      let id: number | string | null | undefined = undefined;
+      let id: number | string | null | undefined;
 
       function respondError(code: number, message: string, data?: unknown) {
         if (ws.readyState === 1) {

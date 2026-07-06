@@ -104,7 +104,7 @@ export async function login(
       }
     }
 
-    userId = (currentUser ?? user ?? {}).id;
+    userId = (currentUser ?? user)?.id;
 
     const now = new Date();
 

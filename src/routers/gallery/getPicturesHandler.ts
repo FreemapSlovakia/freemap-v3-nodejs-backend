@@ -171,7 +171,7 @@ export function attachGetPicturesHandler(router: RouterInstance) {
       const method = methods[ctx.query.by as string];
 
       if (!method) {
-        ctx.throw(400, 'by must be one of ' + Object.keys(methods).join(', '));
+        ctx.throw(400, `by must be one of ${Object.keys(methods).join(', ')}`);
       }
 
       const acceptedType = ctx.accepts(
@@ -530,7 +530,7 @@ async function byOrder(ctx: ParameterizedContext) {
 
   const query = sql`SELECT picture.id ${
     ratingFrom !== undefined || ratingTo !== undefined || orderBy === 'rating'
-      ? raw(', ' + ratingSubquery)
+      ? raw(`, ${ratingSubquery}`)
       : empty
   }
     FROM picture

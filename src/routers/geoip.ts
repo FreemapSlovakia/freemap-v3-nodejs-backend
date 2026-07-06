@@ -38,7 +38,7 @@ export function attachGeoIp(router: RouterInstance) {
       'latitude',
       'longitude',
     ]) {
-      const value = ctx.req.headers['x-geoip-' + name];
+      const value = ctx.req.headers[`x-geoip-${name}`];
 
       if (typeof value === 'string') {
         body[name === 'country-code' ? 'countryCode' : name] = Buffer.from(

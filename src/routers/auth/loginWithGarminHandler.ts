@@ -59,7 +59,7 @@ export function attachLoginWithGarminHandler(router: RouterInstance) {
       });
 
       if (!response.ok) {
-        throw new Error('Authorization error: ' + (await response.text()));
+        throw new Error(`Authorization error: ${await response.text()}`);
       }
 
       const sp = new URLSearchParams(await response.text());
