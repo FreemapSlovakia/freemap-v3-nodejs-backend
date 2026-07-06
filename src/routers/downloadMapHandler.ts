@@ -122,6 +122,19 @@ const translations: Record<string, Translation> = {
         'Bitte versuchen Sie es später erneut oder wenden Sie sich an den Support, falls das Problem weiterhin besteht.',
     },
   },
+  sl: {
+    success: {
+      subject: 'Prenos zemljevida Freemap',
+      body: 'Vaš zemljevid je pripravljen za prenos na {URL} 24 ur.',
+    },
+    error: {
+      subject: 'Napaka pri prenosu zemljevida Freemap',
+      body:
+        'Pri prenosu vašega zemljevida je prišlo do napake. ' +
+        'Vaši krediti so bili vrnjeni. ' +
+        'Poskusite znova pozneje ali se obrnite na podporo, če se težava ponavlja.',
+    },
+  },
 };
 
 const PositionSchema = z.tuple([

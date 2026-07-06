@@ -88,6 +88,16 @@ const translations: Record<string, Translation> = {
       description: 'Zakup {} kredytów Freemap.sk',
     },
   },
+  sl: {
+    premium: {
+      title: 'Freemap.sk premium dostop',
+      description: 'Premium dostop do Freemap.sk za 1 leto',
+    },
+    credits: {
+      title: 'Freemap.sk krediti',
+      description: 'Nakup {} kreditov Freemap.sk',
+    },
+  },
 };
 
 const BodySchema = z.union([

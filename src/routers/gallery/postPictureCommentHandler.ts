@@ -136,7 +136,7 @@ export function attachPostPictureCommentHandler(router: RouterInstance) {
         reqId: ctx.reqId,
       });
 
-      type Lang = 'sk' | 'cs' | 'en' | 'hu' | 'it' | 'de' | 'pl';
+      type Lang = 'sk' | 'cs' | 'en' | 'hu' | 'it' | 'de' | 'pl' | 'sl';
 
       async function sendCommentMail(
         to: string,
@@ -160,6 +160,7 @@ export function attachPostPictureCommentHandler(router: RouterInstance) {
           it: `Commento alla foto su ${webUrl}`,
           de: `Kommentar zu einem Foto auf ${webUrl}`,
           pl: `Komentarz do zdjęcia na ${webUrl}`,
+          sl: `Komentar k fotografiji na ${webUrl}`,
         };
 
         const messages: Record<Lang, string> = {
@@ -170,6 +171,7 @@ export function attachPostPictureCommentHandler(router: RouterInstance) {
           it: `L'utente ${user!.name} ha commentato ${own ? 'la tua' : 'una'} foto ${picTitle}su ${picUrl}:`,
           de: `Benutzer ${user!.name} hat ${own ? 'dein' : 'ein'} Foto kommentiert: ${picTitle}${picUrl}:`,
           pl: `Użytkownik ${user!.name} dodał komentarz do ${own ? 'twojego' : 'zdjęcia'} ${picTitle} na ${picUrl}:`,
+          sl: `Uporabnik ${user!.name} je dodal komentar k ${own ? 'vaši ' : ''}fotografiji ${picTitle}na ${picUrl}:`,
         };
 
         const footers: Record<Lang, string> = {
@@ -180,6 +182,7 @@ export function attachPostPictureCommentHandler(router: RouterInstance) {
           it: `Se non desideri più ricevere notifiche sui commenti alle foto, disattiva l'opzione nel menu Foto: ${unsubscribeUrl}.`,
           de: `Wenn du keine Benachrichtigungen über Fotokommentare mehr erhalten möchtest, deaktiviere dies im Menü „Fotos“ unter ${unsubscribeUrl}.`,
           pl: `Jeśli nie chcesz otrzymywać powiadomień o komentarzach do zdjęć, odznacz to w menu Zdjęcia pod adresem ${unsubscribeUrl}.`,
+          sl: `Če ne želite več prejemati obvestil o komentarjih k fotografijam, to odznačite na ${unsubscribeUrl} v meniju Fotografije.`,
         };
 
         await sendMail(
@@ -190,8 +193,16 @@ export function attachPostPictureCommentHandler(router: RouterInstance) {
       }
 
       const acceptLang =
-        ctx.acceptsLanguages(['en', 'sk', 'cs', 'hu', 'it', 'de', 'pl']) ||
-        'en';
+        ctx.acceptsLanguages([
+          'en',
+          'sk',
+          'cs',
+          'hu',
+          'it',
+          'de',
+          'pl',
+          'sl',
+        ]) || 'en';
 
       const promises: Promise<void>[] = [];
       if (
