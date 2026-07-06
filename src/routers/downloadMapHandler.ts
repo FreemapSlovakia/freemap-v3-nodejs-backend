@@ -135,6 +135,19 @@ const translations: Record<string, Translation> = {
         'Poskusite znova pozneje ali se obrnite na podporo, če se težava ponavlja.',
     },
   },
+  fr: {
+    success: {
+      subject: 'Téléchargement de la carte Freemap',
+      body: 'Votre carte est prête à être téléchargée sur {URL} pendant 24 heures.',
+    },
+    error: {
+      subject: 'Erreur lors du téléchargement de la carte Freemap',
+      body:
+        'Une erreur est survenue lors du téléchargement de votre carte. ' +
+        'Vos crédits ont été remboursés. ' +
+        'Veuillez réessayer plus tard ou contacter l’assistance si le problème persiste.',
+    },
+  },
 };
 
 const PositionSchema = z.tuple([

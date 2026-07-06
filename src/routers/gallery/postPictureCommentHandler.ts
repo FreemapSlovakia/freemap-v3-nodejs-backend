@@ -136,7 +136,7 @@ export function attachPostPictureCommentHandler(router: RouterInstance) {
         reqId: ctx.reqId,
       });
 
-      type Lang = 'sk' | 'cs' | 'en' | 'hu' | 'it' | 'de' | 'pl' | 'sl';
+      type Lang = 'sk' | 'cs' | 'en' | 'hu' | 'it' | 'de' | 'pl' | 'sl' | 'fr';
 
       async function sendCommentMail(
         to: string,
@@ -161,6 +161,7 @@ export function attachPostPictureCommentHandler(router: RouterInstance) {
           de: `Kommentar zu einem Foto auf ${webUrl}`,
           pl: `Komentarz do zdjęcia na ${webUrl}`,
           sl: `Komentar k fotografiji na ${webUrl}`,
+          fr: `Commentaire sur une photo sur ${webUrl}`,
         };
 
         const messages: Record<Lang, string> = {
@@ -172,6 +173,7 @@ export function attachPostPictureCommentHandler(router: RouterInstance) {
           de: `Benutzer ${user!.name} hat ${own ? 'dein' : 'ein'} Foto kommentiert: ${picTitle}${picUrl}:`,
           pl: `Użytkownik ${user!.name} dodał komentarz do ${own ? 'twojego' : 'zdjęcia'} ${picTitle} na ${picUrl}:`,
           sl: `Uporabnik ${user!.name} je dodal komentar k ${own ? 'vaši ' : ''}fotografiji ${picTitle}na ${picUrl}:`,
+          fr: `L'utilisateur ${user!.name} a commenté ${own ? 'votre' : 'une'} photo ${picTitle}sur ${picUrl} :`,
         };
 
         const footers: Record<Lang, string> = {
@@ -183,6 +185,7 @@ export function attachPostPictureCommentHandler(router: RouterInstance) {
           de: `Wenn du keine Benachrichtigungen über Fotokommentare mehr erhalten möchtest, deaktiviere dies im Menü „Fotos“ unter ${unsubscribeUrl}.`,
           pl: `Jeśli nie chcesz otrzymywać powiadomień o komentarzach do zdjęć, odznacz to w menu Zdjęcia pod adresem ${unsubscribeUrl}.`,
           sl: `Če ne želite več prejemati obvestil o komentarjih k fotografijam, to odznačite na ${unsubscribeUrl} v meniju Fotografije.`,
+          fr: `Si vous ne souhaitez plus recevoir de notifications sur les commentaires des photos, décochez cette option dans le menu Photos sur ${unsubscribeUrl}.`,
         };
 
         await sendMail(
@@ -202,6 +205,7 @@ export function attachPostPictureCommentHandler(router: RouterInstance) {
           'de',
           'pl',
           'sl',
+          'fr',
         ]) || 'en';
 
       const promises: Promise<void>[] = [];
