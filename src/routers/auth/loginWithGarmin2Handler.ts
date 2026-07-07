@@ -1,5 +1,6 @@
 import type { RouterInstance } from '@koa/router';
-import got from 'got';
+import got, { HTTPError } from 'got';
+import type { ParameterizedContext } from 'koa';
 import z from 'zod';
 import { authenticator } from '../../authenticator.js';
 import { garminOauth } from '../../garminOauth.js';
@@ -16,6 +17,25 @@ const BodySchema = z.strictObject({
 });
 
 const GarminUserSchema = z.object({ userId: z.string() });
+
+// Map a non-2xx Garmin response to the right outcome. A 4xx means the OAuth
+// session is invalid/expired or the user lacks a required permission — a client
+// problem, so surface it as a 4xx (filtered out of Sentry in instrument.ts). A
+// 5xx is a Garmin-side outage; rethrow it as a 500 so it stays visible in
+// Sentry rather than being masked as a client error.
+function throwGarminError(
+  ctx: ParameterizedContext,
+  status: number,
+  detail: string,
+): never {
+  if (status >= 400 && status < 500) {
+    ctx.log.warn({ status, detail }, 'garmin request rejected');
+
+    ctx.throw(status === 403 ? 403 : 401, 'Garmin authorization failed');
+  }
+
+  throw new Error(`garmin request failed (${status}): ${detail}`);
+}
 
 export function attachLoginWithGarmin2Handler(router: RouterInstance) {
   registerPath('/auth/login-garmin-2', {
@@ -78,7 +98,7 @@ export function attachLoginWithGarmin2Handler(router: RouterInstance) {
       });
 
       if (!response.ok) {
-        throw new Error(`Authorization error:${await response.text()}`);
+        throwGarminError(ctx, response.status, await response.text());
       }
 
       const sp = new URLSearchParams(await response.text());
@@ -97,8 +117,10 @@ export function attachLoginWithGarmin2Handler(router: RouterInstance) {
 
       const url2 = 'https://apis.garmin.com/wellness-api/rest/user/id';
 
-      const body2 = GarminUserSchema.parse(
-        await got
+      let userResponse;
+
+      try {
+        userResponse = await got
           .get(url2, {
             headers: {
               ...garminOauth.toHeader(
@@ -115,8 +137,24 @@ export function attachLoginWithGarmin2Handler(router: RouterInstance) {
               ),
             },
           })
-          .json(),
-      );
+          .json();
+      } catch (err) {
+        // A Garmin 4xx here (401 revoked/expired token, 403 missing permission)
+        // is a client problem; let throwGarminError surface it as a 4xx. Any
+        // other error (5xx, parse, network) bubbles up as a 500 so genuine
+        // failures stay visible in Sentry.
+        if (err instanceof HTTPError) {
+          throwGarminError(
+            ctx,
+            err.response.statusCode,
+            String(err.response.body),
+          );
+        }
+
+        throw err;
+      }
+
+      const body2 = GarminUserSchema.parse(userResponse);
 
       await login(
         ctx,
