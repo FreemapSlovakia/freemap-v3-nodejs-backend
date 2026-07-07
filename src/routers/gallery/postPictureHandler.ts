@@ -1,4 +1,6 @@
 import { execFile } from 'node:child_process';
+import { mkdir } from 'node:fs/promises';
+import { dirname } from 'node:path';
 import { promisify } from 'node:util';
 import type { RouterInstance } from '@koa/router';
 import ExifReader from 'exifreader';
@@ -144,7 +146,13 @@ export function attachPostPictureHandler(router: RouterInstance) {
 
           const name = shortUuid.generate();
 
-          const outPath = `${picturesDir}/${name}.jpeg`;
+          // Shard by the first two characters of the filename to avoid one huge
+          // directory; the same rule is applied by the DB migration.
+          const relPath = `${name.slice(0, 2)}/${name}.jpeg`;
+
+          const outPath = `${picturesDir}/${relPath}`;
+
+          await mkdir(dirname(outPath), { recursive: true });
 
           // HEIF can't be processed by exiftran, so re-encode it to JPEG with
           // ImageMagick (applying the EXIF orientation); JPEG is rotated
@@ -181,7 +189,7 @@ export function attachPostPictureHandler(router: RouterInstance) {
           const id = await runInTransaction(async (conn) => {
             const { insertId } = await conn.query<{ insertId: number }>(sql`
               INSERT INTO picture SET
-                pathname = ${`${name}.jpeg`},
+                pathname = ${relPath},
                 userId = ${ctx.state.user!.id},
                 title = ${title},
                 description = ${description},
