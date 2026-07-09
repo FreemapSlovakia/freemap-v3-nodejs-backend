@@ -14,13 +14,22 @@ import { isHeifFile } from '../../heif.js';
 import { AUTH_REQUIRED, registerPath } from '../../openapi.js';
 import { acceptValidator } from '../../requestValidators.js';
 import { picturesDir } from '../../routers/gallery/constants.js';
+import { DEFAULT_PHOTO_LICENSE, LicenseSchema } from './licenses.js';
 
 const execFileAsync = promisify(execFile);
 
-const SetAllPremiumBodySchema = z.strictObject({
-  type: z.literal('setAllPremiumOrFree').optional(),
-  payload: z.enum(['premium', 'free']).optional(),
-});
+// The bulk action posted as JSON, discriminated on `action` so each action's
+// payload is validated together with it.
+const SetAllBodySchema = z.discriminatedUnion('action', [
+  z.object({
+    action: z.literal('setAllPremiumOrFree'),
+    payload: z.enum(['premium', 'free']),
+  }),
+  z.object({
+    action: z.literal('setAllLicense'),
+    payload: LicenseSchema,
+  }),
+]);
 
 const MetaSchema = z.strictObject({
   position: z.strictObject({
@@ -33,6 +42,7 @@ const MetaSchema = z.strictObject({
   tags: z.array(z.string()).nullish(),
   premium: z.boolean().optional(),
   azimuth: z.number().min(0).lt(360).nullish(),
+  license: LicenseSchema.default(DEFAULT_PHOTO_LICENSE),
 });
 
 const MultipartBodySchema = z.object({ meta: z.unknown() });
@@ -70,15 +80,43 @@ export function attachPostPictureHandler(router: RouterInstance) {
           let body;
 
           try {
-            body = SetAllPremiumBodySchema.parse(ctx.request.body);
+            body = SetAllBodySchema.parse(ctx.request.body);
           } catch (err) {
             return ctx.throw(400, err as Error);
+          }
+
+          const userId = ctx.state.user!.id;
+
+          if (body.action === 'setAllLicense') {
+            const { payload: license } = body;
+
+            await runInTransaction(async (conn) => {
+              const changed = await conn.query<{ id: number }[]>(
+                sql`SELECT id FROM picture WHERE userId = ${userId} AND license <> ${license} FOR UPDATE`,
+              );
+
+              if (changed.length) {
+                await conn.query<unknown>(
+                  sql`UPDATE picture SET license = ${license} WHERE userId = ${userId} AND license <> ${license}`,
+                );
+
+                await conn.query<unknown>(
+                  sql`INSERT INTO pictureLicenseHistory (pictureId, license) VALUES ${bulk(
+                    changed.map((row) => [row.id, license]),
+                  )}`,
+                );
+              }
+            });
+
+            ctx.status = 204;
+
+            return;
           }
 
           const premium = body.payload === 'premium';
 
           await pool.query<unknown>(
-            sql`UPDATE picture SET premium = ${premium} WHERE userId = ${ctx.state.user!.id}`,
+            sql`UPDATE picture SET premium = ${premium} WHERE userId = ${userId}`,
           );
 
           ctx.status = 204;
@@ -142,6 +180,7 @@ export function attachPostPictureHandler(router: RouterInstance) {
             azimuth,
             tags = [],
             premium,
+            license,
           } = meta;
 
           const name = shortUuid.generate();
@@ -186,6 +225,8 @@ export function attachPostPictureHandler(router: RouterInstance) {
 
           const pano = exif.UsePanoramaViewer?.value === 'True';
 
+          const createdAt = new Date();
+
           const id = await runInTransaction(async (conn) => {
             const { insertId } = await conn.query<{ insertId: number }>(sql`
               INSERT INTO picture SET
@@ -193,13 +234,18 @@ export function attachPostPictureHandler(router: RouterInstance) {
                 userId = ${ctx.state.user!.id},
                 title = ${title},
                 description = ${description},
-                createdAt = ${new Date()},
+                createdAt = ${createdAt},
                 takenAt = ${takenAt ? new Date(takenAt) : null},
                 location = POINT(${lon}, ${lat}),
                 azimuth = ${azimuth},
                 pano = ${pano},
-                premium = ${premium}
+                premium = ${premium},
+                license = ${license}
             `);
+
+            await conn.query<unknown>(
+              sql`INSERT INTO pictureLicenseHistory (pictureId, license, changedAt) VALUES (${insertId}, ${license}, ${createdAt})`,
+            );
 
             if (tags?.length) {
               await conn.query<unknown>(

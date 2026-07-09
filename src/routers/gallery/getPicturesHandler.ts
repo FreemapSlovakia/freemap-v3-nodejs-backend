@@ -14,6 +14,7 @@ import { getEnv } from '../../env.js';
 import { AUTH_OPTIONAL, registerPath } from '../../openapi.js';
 import { acceptValidator } from '../../requestValidators.js';
 import { hasRole } from '../../roles.js';
+import { LicenseSchema } from './licenses.js';
 import { ratingSubquery } from './ratingConstants.js';
 
 const secret = getEnv('PREMIUM_PHOTO_SECRET', '');
@@ -48,6 +49,10 @@ const CommonQuerySchema = z.object({
   tagMode: z.enum(['any', 'all']).default('any'),
   pano: booleanParam,
   premium: booleanParam,
+  license: z.preprocess(
+    (v) => (Array.isArray(v) ? v : v ? [v] : undefined),
+    z.array(LicenseSchema).optional(),
+  ),
 });
 
 const RadiusQuerySchema = CommonQuerySchema.extend({
@@ -71,6 +76,7 @@ const fieldValues = [
   'premium',
   'azimuth',
   'hmac',
+  'license',
   'lastCommentedAt',
 ] as const;
 
@@ -108,6 +114,7 @@ const BboxRowSchema = z.array(
     pano: z.boolean().nullish(),
     premium: z.boolean().nullish(),
     azimuth: z.number().nullish(),
+    license: z.string().nullish(),
     rating: z.number().nullish(),
     tags: z
       .string()
@@ -209,6 +216,7 @@ async function byRadius(ctx: ParameterizedContext) {
     createdAtTo,
     pano,
     premium,
+    license,
     lat,
     lon,
     distance,
@@ -217,6 +225,7 @@ async function byRadius(ctx: ParameterizedContext) {
   const myUserId = ctx.state.user?.id ?? -1;
   const userIdArray = userId || [];
   const tagArray = tag || [];
+  const licenseArray = license || [];
 
   // cca 1 degree
   const minLat = lat - distance / 43;
@@ -244,6 +253,7 @@ async function byRadius(ctx: ParameterizedContext) {
     ${pano == null ? empty : sql`AND pano = ${pano}`}
     ${premium == null ? empty : sql`AND premium = ${premium}`}
     ${userIdArray.length > 0 ? sql`AND userId IN (${join(userIdArray)})` : empty}
+    ${licenseArray.length > 0 ? sql`AND license IN (${join(licenseArray)})` : empty}
     ${
       hasRole(ctx.state.user, 'galleryModerator')
         ? empty
@@ -283,12 +293,14 @@ async function byBbox(ctx: ParameterizedContext) {
     createdAtTo,
     pano,
     premium,
+    license,
     fields,
   } = bboxQuery;
 
   const myUserId = ctx.state.user?.id ?? -1;
   const userIdArray = userId || [];
   const tagArray = tag || [];
+  const licenseArray = license || [];
 
   const sqlFields: string[] = (fields ?? []).filter(
     (f) =>
@@ -344,6 +356,7 @@ async function byBbox(ctx: ParameterizedContext) {
     ${pano == null ? empty : sql`AND pano = ${pano}`}
     ${premium == null ? empty : sql`AND premium = ${premium}`}
     ${userIdArray.length > 0 ? sql`AND userId IN (${join(userIdArray)})` : empty}
+    ${licenseArray.length > 0 ? sql`AND license IN (${join(licenseArray)})` : empty}
     ${
       hasRole(ctx.state.user, 'galleryModerator')
         ? empty
@@ -474,11 +487,13 @@ async function byOrder(ctx: ParameterizedContext) {
     direction,
     pano,
     premium,
+    license,
   } = orderByQuery;
 
   const myUserId = ctx.state.user?.id ?? -1;
   const userIdArray = userId || [];
   const tagArray = tag || [];
+  const licenseArray = license || [];
 
   const hv: Sql[] = [];
 
@@ -522,6 +537,10 @@ async function byOrder(ctx: ParameterizedContext) {
 
   if (userIdArray.length > 0) {
     wh.push(sql`userId IN (${join(userIdArray)})`);
+  }
+
+  if (licenseArray.length > 0) {
+    wh.push(sql`license IN (${join(licenseArray)})`);
   }
 
   if (tagArray.length === 0 && tag !== undefined) {

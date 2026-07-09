@@ -31,6 +31,8 @@ const PictureDbRowSchema = z.object({
   hasPicture: z.coerce.boolean(),
   userPremium: z.coerce.boolean(),
   premium: z.boolean(),
+  license: z.string(),
+  licenseSince: zNullableDateToIso,
   tags: z
     .string()
     .nullable()
@@ -125,6 +127,8 @@ export function attachGetPictureHandler(router: RouterInstance) {
               azimuth,
               pano,
               premium,
+              license,
+              (SELECT MAX(changedAt) FROM pictureLicenseHistory WHERE pictureId = picture.id) AS licenseSince,
               user.id as userId,
               user.name,
               user.picture IS NOT NULL AS hasPicture,
@@ -191,6 +195,8 @@ export function attachGetPictureHandler(router: RouterInstance) {
         myStars,
         pano,
         premium,
+        license,
+        licenseSince,
         pathname,
       } = row;
 
@@ -225,6 +231,8 @@ export function attachGetPictureHandler(router: RouterInstance) {
         myStars,
         pano,
         premium,
+        license,
+        licenseSince,
         hmac:
           premium && secret
             ? createHmac('sha256', secret)
