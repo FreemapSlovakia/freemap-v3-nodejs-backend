@@ -1,4 +1,4 @@
-import { RouterInstance } from '@koa/router';
+import type { RouterInstance } from '@koa/router';
 import z from 'zod';
 import { garminOauth } from '../../garminOauth.js';
 import { registerPath } from '../../openapi.js';
@@ -59,7 +59,7 @@ export function attachLoginWithGarminHandler(router: RouterInstance) {
       });
 
       if (!response.ok) {
-        throw new Error('Authorization error: ' + (await response.text()));
+        throw new Error(`Authorization error: ${await response.text()}`);
       }
 
       const sp = new URLSearchParams(await response.text());

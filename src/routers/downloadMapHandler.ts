@@ -1,18 +1,18 @@
 import { unlink } from 'node:fs/promises';
-import { ClientHttp2Session, connect } from 'node:http2';
-import Router, { RouterInstance } from '@koa/router';
-import { pointToTile, Tile, tileToGeoJSON } from '@mapbox/tilebelt';
+import { type ClientHttp2Session, connect } from 'node:http2';
+import type { RouterInstance } from '@koa/router';
+import { pointToTile, type Tile, tileToGeoJSON } from '@mapbox/tilebelt';
 import { bbox } from '@turf/bbox';
 import booleanIntersects from '@turf/boolean-intersects';
 import center from '@turf/center';
 import Database from 'better-sqlite3';
 import type { Feature, MultiPolygon, Polygon } from 'geojson';
-import { Logger } from 'pino';
+import type { Logger } from 'pino';
 import sql from 'sql-template-tag';
 import z from 'zod';
 import { authenticator } from '../authenticator.js';
 import { runInTransaction } from '../database.js';
-import { DownloadableMap, downloadableMaps } from '../downloadableMaps.js';
+import { type DownloadableMap, downloadableMaps } from '../downloadableMaps.js';
 import { getEnv } from '../env.js';
 import { appLogger } from '../logger.js';
 import { sendMail } from '../mailer.js';
@@ -120,6 +120,32 @@ const translations: Record<string, Translation> = {
         'Beim Download Ihrer Karte ist ein Fehler aufgetreten. ' +
         'Ihre Guthaben wurden zurückerstattet. ' +
         'Bitte versuchen Sie es später erneut oder wenden Sie sich an den Support, falls das Problem weiterhin besteht.',
+    },
+  },
+  sl: {
+    success: {
+      subject: 'Prenos zemljevida Freemap',
+      body: 'Vaš zemljevid je pripravljen za prenos na {URL} 24 ur.',
+    },
+    error: {
+      subject: 'Napaka pri prenosu zemljevida Freemap',
+      body:
+        'Pri prenosu vašega zemljevida je prišlo do napake. ' +
+        'Vaši krediti so bili vrnjeni. ' +
+        'Poskusite znova pozneje ali se obrnite na podporo, če se težava ponavlja.',
+    },
+  },
+  fr: {
+    success: {
+      subject: 'Téléchargement de la carte Freemap',
+      body: 'Votre carte est prête à être téléchargée sur {URL} pendant 24 heures.',
+    },
+    error: {
+      subject: 'Erreur lors du téléchargement de la carte Freemap',
+      body:
+        'Une erreur est survenue lors du téléchargement de votre carte. ' +
+        'Vos crédits ont été remboursés. ' +
+        'Veuillez réessayer plus tard ou contacter l’assistance si le problème persiste.',
     },
   },
 };
@@ -306,9 +332,9 @@ async function download(
     .replace(/[^ \p{L}\p{N}._-]+/gu, '_')
     .replace(/^[. ]+|[. ]+$/g, '');
 
-  const dbName = safeName ? safeName + '-' + timestamp : timestamp;
+  const dbName = safeName ? `${safeName}-${timestamp}` : timestamp;
 
-  const filename = getEnv('MBTILES_DIR') + `/${dbName}.${format}`;
+  const filename = `${getEnv('MBTILES_DIR')}/${dbName}.${format}`;
 
   const db = new Database(filename);
 
@@ -371,7 +397,7 @@ async function download(
 
     db.prepare(combo.sql).run(...combo.values);
   } else {
-    throw new Error('Unsupported format: ' + format);
+    throw new Error(`Unsupported format: ${format}`);
   }
 
   const stmt = db.prepare(
@@ -457,7 +483,7 @@ async function download(
         ) {
           logger.warn(
             { code: err.code },
-            err.code + `; retrying download (${i + 1}/5)`,
+            `${err.code}; retrying download (${i + 1}/5)`,
           );
 
           await new Promise((resolve) => setTimeout(resolve, i * 100));

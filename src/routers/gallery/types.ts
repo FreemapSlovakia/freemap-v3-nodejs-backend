@@ -11,4 +11,5 @@ export type PictureRow = {
   pano: boolean;
   premium: boolean;
   azimuth: number | null;
+  license: string;
 };

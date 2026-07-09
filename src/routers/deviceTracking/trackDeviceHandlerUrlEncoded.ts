@@ -1,5 +1,5 @@
-import { RouterInstance } from '@koa/router';
-import { ParameterizedContext } from 'koa';
+import type { RouterInstance } from '@koa/router';
+import type { ParameterizedContext } from 'koa';
 import sql from 'sql-template-tag';
 import z from 'zod';
 import { runInTransaction } from '../../database.js';

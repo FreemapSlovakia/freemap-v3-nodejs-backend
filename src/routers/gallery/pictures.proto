@@ -17,6 +17,7 @@ message Picture {
   optional string description = 14;
   optional string user = 15;
   optional int64 last_commented_at = 16;
+  optional string license = 17;
 }
 
 message PicturesResponse {

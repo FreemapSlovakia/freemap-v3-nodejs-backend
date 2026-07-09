@@ -2,7 +2,7 @@ import z from 'zod';
 import {
   CommonUserSchema,
   PROVIDER_ID_COLUMNS,
-  UserRow,
+  type UserRow,
   zDateToIso,
   zNullableDateToIso,
 } from '../../types.js';

@@ -1,10 +1,10 @@
 import sql, { empty } from 'sql-template-tag';
 
-import WebSocket from 'ws';
+import type WebSocket from 'ws';
 import z from 'zod';
 import { pool } from '../database.js';
 import { isOwnerOrRole } from '../roles.js';
-import { RpcContext } from '../rpcHandlerTypes.js';
+import type { RpcContext } from '../rpcHandlerTypes.js';
 import { trackRegister } from '../trackRegister.js';
 
 export const SubscribeParamsSchema = z.intersection(

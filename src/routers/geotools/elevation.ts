@@ -2,9 +2,10 @@ import { createWriteStream } from 'node:fs';
 import { rename, stat, unlink, writeFile } from 'node:fs/promises';
 import { Readable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
-import { RouterInstance } from '@koa/router';
+import type { RouterInstance } from '@koa/router';
 import gdal from 'gdal-async';
-import { ParameterizedContext } from 'koa';
+import type { ParameterizedContext } from 'koa';
+import type { Logger } from 'pino';
 import z from 'zod';
 import { authenticator } from '../../authenticator.js';
 import { getEnv } from '../../env.js';
@@ -17,7 +18,9 @@ import {
   srtmKey,
 } from './elevationHelpers.js';
 
-const elevationDataDir = getEnv('ELEVATION_DATA_DIRECTORY');
+// Optional: when unset, the global SRTM fallback is disabled and points not
+// covered by a local source return null.
+const elevationDataDir = getEnv('ELEVATION_DATA_DIRECTORY', '');
 
 // Reading the SRS of some GeoTIFFs (e.g. EPSG:8353 / S-JTSK [JTSK03]) throws
 // unless we tell GDAL to trust the EPSG registry over the embedded GeoTIFF keys.
@@ -73,8 +76,17 @@ function openLocalSource(src: LocalSource): DatasetInfo {
     geoTransform,
     width: dataset.rasterSize.x,
     height: dataset.rasterSize.y,
+    // Build the target from proj4 rather than using dataset.srs directly: this
+    // forces traditional easting/northing (x,y) axis order and drops the 3D
+    // vertical of compound CRSs. Some CRSs (e.g. SWEREF99 TM / EPSG:5845)
+    // declare northing-first axis order, which would otherwise make
+    // transformPoint return swapped coordinates (gdal-async 3.12 has no
+    // setAxisMappingStrategy to override it).
     ct: dataset.srs
-      ? new gdal.CoordinateTransformation(wgs84, dataset.srs)
+      ? new gdal.CoordinateTransformation(
+          wgs84,
+          gdal.SpatialReference.fromProj4(dataset.srs.toProj4()),
+        )
       : null,
   };
 
@@ -165,14 +177,31 @@ async function compute(ctx: ParameterizedContext) {
     return ctx.throw(400, err as Error);
   }
 
-  const results: (number | null)[] = new Array(cs.length).fill(null);
-
   // High-precision local sources are a premium-only feature; everyone else gets
   // the global SRTM fallback.
   const premiumExpiration = ctx.state.user?.premiumExpiration;
 
-  const sources =
-    premiumExpiration && premiumExpiration > new Date() ? localSources : [];
+  const premium = Boolean(premiumExpiration && premiumExpiration > new Date());
+
+  ctx.response.body = ElevationResponseSchema.parse(
+    await resolveElevations(cs, premium, ctx.log),
+  );
+}
+
+/**
+ * Resolve the elevation (metres a.s.l.) for each `[lat, lon]` coordinate, or
+ * `null` where no source covers the point. Premium callers get the
+ * high-precision local sources first (priority order), with the global SRTM
+ * dataset as the fallback for everyone.
+ */
+export async function resolveElevations(
+  cs: [number, number][],
+  premium: boolean,
+  log: Pick<Logger, 'warn'>,
+): Promise<(number | null)[]> {
+  const results: (number | null)[] = new Array(cs.length).fill(null);
+
+  const sources = premium ? localSources : [];
 
   // Try the high-precision local sources first (priority order). Anything not
   // covered (outside every bbox, or only nodata there) falls back to SRTM.
@@ -195,7 +224,7 @@ async function compute(ctx: ParameterizedContext) {
       } catch (err) {
         // a broken/unavailable local source (e.g. unmounted drive) must not
         // fail the request — fall back to the next source, then SRTM
-        ctx.log.warn(
+        log.warn(
           { err, path: src.path },
           'elevation local source failed; falling back',
         );
@@ -215,10 +244,8 @@ async function compute(ctx: ParameterizedContext) {
     }
   }
 
-  if (srtmNeeded.length === 0) {
-    ctx.response.body = ElevationResponseSchema.parse(results);
-
-    return;
+  if (srtmNeeded.length === 0 || !elevationDataDir) {
+    return results;
   }
 
   const allocated = new Set<string>();
@@ -285,7 +312,7 @@ async function compute(ctx: ParameterizedContext) {
       results[i] = ds ? await computeElevation(lat, lon, ds) : null;
     }
 
-    ctx.response.body = ElevationResponseSchema.parse(results);
+    return results;
   } finally {
     for (const { dataset } of dsMap.values()) {
       dataset?.close();
@@ -327,7 +354,7 @@ async function downloadData(key: string) {
     }
 
     if (!res.ok || !res.body) {
-      throw new Error('Bad response: ' + res.status + ' ' + (await res.text()));
+      throw new Error(`Bad response: ${res.status} ${await res.text()}`);
     }
 
     await pipeline(Readable.fromWeb(res.body), createWriteStream(tempTif));

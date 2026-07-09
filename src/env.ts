@@ -40,7 +40,7 @@ export function getEnvInteger(
   if (variable in process.env) {
     const value = parseInt(process.env[variable] ?? '', 10);
 
-    if (isNaN(value)) {
+    if (Number.isNaN(value)) {
       throw new Error(`env variable ${variable} is not a valid integer`);
     }
 

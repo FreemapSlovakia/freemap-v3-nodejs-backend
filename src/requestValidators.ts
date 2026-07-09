@@ -1,4 +1,4 @@
-import { Middleware } from 'koa';
+import type { Middleware } from 'koa';
 
 export function acceptValidator(...type: string[]): Middleware {
   return async (ctx, next) => {

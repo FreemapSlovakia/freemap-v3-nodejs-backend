@@ -1,4 +1,4 @@
-import { ZodOpenApiPathItemObject } from 'zod-openapi';
+import type { ZodOpenApiPathItemObject } from 'zod-openapi';
 
 export const paths: Record<string, ZodOpenApiPathItemObject> = {};
 

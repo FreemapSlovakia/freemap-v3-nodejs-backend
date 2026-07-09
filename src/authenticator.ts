@@ -1,8 +1,12 @@
-import { Middleware } from 'koa';
+import type { Middleware } from 'koa';
 import sql, { raw } from 'sql-template-tag';
 import { pool } from './database.js';
-import { User } from './koaTypes.js';
-import { USER_COLUMNS_SQL_PREFIXED, UserRow, UserRowSchema } from './types.js';
+import type { User } from './koaTypes.js';
+import {
+  USER_COLUMNS_SQL_PREFIXED,
+  type UserRow,
+  UserRowSchema,
+} from './types.js';
 
 export const authProviderToColumn = {
   facebook: 'facebookUserId',

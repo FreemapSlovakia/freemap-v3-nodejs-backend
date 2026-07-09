@@ -1,5 +1,5 @@
 import Router from '@koa/router';
-import KoaWebsocket from 'koa-websocket';
+import type KoaWebsocket from 'koa-websocket';
 import type WebSocket from 'ws';
 import z from 'zod';
 import { authenticator } from './authenticator.js';
@@ -12,7 +12,7 @@ import {
   trackingUnsubscribeHandler,
   UnsubscribeParamsSchema,
 } from './rpcHandlers/trackingUnsubscribeHandler.js';
-import { RpcContext } from './rpcHandlerTypes.js';
+import type { RpcContext } from './rpcHandlerTypes.js';
 import { trackRegister } from './trackRegister.js';
 
 export function attachWs(app: KoaWebsocket.App) {
@@ -34,7 +34,7 @@ export function attachWs(app: KoaWebsocket.App) {
         }, 30000);
 
     ws.on('message', (message) => {
-      let id: number | string | null | undefined = undefined;
+      let id: number | string | null | undefined;
 
       function respondError(code: number, message: string, data?: unknown) {
         if (ws.readyState === 1) {

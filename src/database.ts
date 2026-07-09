@@ -121,6 +121,7 @@ export async function initDatabase() {
       pano BIT NOT NULL,
       premium BIT NOT NULL DEFAULT FALSE,
       azimuth FLOAT DEFAULT NULL,
+      license VARCHAR(32) CHARSET ascii NOT NULL DEFAULT 'CC-BY-SA-4.0',
       FOREIGN KEY (userId) REFERENCES user (id) ON DELETE CASCADE,
       INDEX picPano (pano),
       INDEX picPremium (premium),
@@ -155,6 +156,18 @@ export async function initDatabase() {
       PRIMARY KEY (pictureId, userId),
       FOREIGN KEY (pictureId) REFERENCES picture (id) ON DELETE CASCADE,
       FOREIGN KEY (userId) REFERENCES user (id) ON DELETE CASCADE
+    ) ENGINE=InnoDB`,
+
+    // Append-only log of each picture's license over time, so we can prove
+    // which license applied when — the latest row is the current license and
+    // its changedAt is the "licensed since" shown in the viewer.
+    sql`CREATE TABLE IF NOT EXISTS pictureLicenseHistory (
+      id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+      pictureId INT UNSIGNED NOT NULL,
+      license VARCHAR(32) CHARSET ascii NOT NULL,
+      changedAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (pictureId) REFERENCES picture (id) ON DELETE CASCADE,
+      INDEX plhPictureIdx (pictureId, changedAt)
     ) ENGINE=InnoDB`,
 
     sql`CREATE TABLE IF NOT EXISTS trackingDevice (
@@ -251,7 +264,12 @@ export async function initDatabase() {
       INDEX eventFilterLocIdx (filterLat, filterLon)
     ) ENGINE=InnoDB`,
 
-    sql`CREATE TRIGGER IF NOT EXISTS picture_country_bu
+    // CREATE OR REPLACE (not IF NOT EXISTS) so the trigger is recreated on every
+    // startup, resetting its DEFINER to the app's current connection user. This
+    // self-heals a stale DEFINER (e.g. after restoring the DB onto a new host
+    // where the original definer user no longer exists), which otherwise makes
+    // every INSERT/UPDATE on `picture` fail with error 1449.
+    sql`CREATE OR REPLACE TRIGGER picture_country_bu
       BEFORE UPDATE ON picture
       FOR EACH ROW
       BEGIN
@@ -266,7 +284,7 @@ export async function initDatabase() {
         END IF;
       END`,
 
-    sql`CREATE TRIGGER IF NOT EXISTS picture_country_bi
+    sql`CREATE OR REPLACE TRIGGER picture_country_bi
         BEFORE INSERT ON picture
         FOR EACH ROW
         BEGIN
@@ -310,6 +328,12 @@ export async function initDatabase() {
     'ALTER TABLE user ADD COLUMN polarSubscriptionId VARCHAR(64) CHARSET ascii DEFAULT NULL',
     'ALTER TABLE purchase ADD COLUMN polarOrderId VARCHAR(64) CHARSET ascii DEFAULT NULL',
     'CREATE UNIQUE INDEX purchase_polarOrderId ON purchase(polarOrderId)',
+    // Per-photo license (default backfills every existing row to CC BY-SA 4.0).
+    "ALTER TABLE picture ADD COLUMN license VARCHAR(32) CHARSET ascii NOT NULL DEFAULT 'CC-BY-SA-4.0'",
+    // Seed the license history for pictures that predate the history table (or
+    // the column). Guarded so it only ever inserts the missing rows; retries
+    // harmlessly on later boots if the column was not yet present.
+    'INSERT INTO pictureLicenseHistory (pictureId, license, changedAt) SELECT id, license, createdAt FROM picture WHERE id NOT IN (SELECT pictureId FROM pictureLicenseHistory)',
   ];
 
   const db = await pool.getConnection();

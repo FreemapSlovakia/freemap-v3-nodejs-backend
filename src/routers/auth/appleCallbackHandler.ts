@@ -1,4 +1,4 @@
-import { RouterInstance } from '@koa/router';
+import type { RouterInstance } from '@koa/router';
 import { AUTH_OPTIONAL, registerPath } from '../../openapi.js';
 
 export function attachAppleCallbackHandler(router: RouterInstance) {
@@ -25,7 +25,7 @@ export function attachAppleCallbackHandler(router: RouterInstance) {
       body as Record<string, string>,
     ).toString();
 
-    const intentUrl = 'signinwithapple://callback?' + searchParams;
+    const intentUrl = `signinwithapple://callback?${searchParams}`;
 
     ctx.log.info(
       { intentUrl, isAndroid, userAgent },

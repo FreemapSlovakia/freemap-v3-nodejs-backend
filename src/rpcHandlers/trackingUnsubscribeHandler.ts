@@ -1,5 +1,5 @@
 import z from 'zod';
-import { RpcContext } from '../rpcHandlerTypes.js';
+import type { RpcContext } from '../rpcHandlerTypes.js';
 import { trackRegister } from '../trackRegister.js';
 
 export const UnsubscribeParamsSchema = z.union([

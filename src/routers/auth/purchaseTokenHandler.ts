@@ -1,5 +1,5 @@
 import { createHmac, randomBytes } from 'node:crypto';
-import { RouterInstance } from '@koa/router';
+import type { RouterInstance } from '@koa/router';
 import sql from 'sql-template-tag';
 import z from 'zod';
 import { authenticator } from '../../authenticator.js';
@@ -86,6 +86,26 @@ const translations: Record<string, Translation> = {
     credits: {
       title: 'Kredyty Freemap.sk',
       description: 'Zakup {} kredytów Freemap.sk',
+    },
+  },
+  sl: {
+    premium: {
+      title: 'Freemap.sk premium dostop',
+      description: 'Premium dostop do Freemap.sk za 1 leto',
+    },
+    credits: {
+      title: 'Freemap.sk krediti',
+      description: 'Nakup {} kreditov Freemap.sk',
+    },
+  },
+  fr: {
+    premium: {
+      title: 'Accès premium à Freemap.sk',
+      description: 'Accès premium à Freemap.sk pour 1 an',
+    },
+    credits: {
+      title: 'Crédits Freemap.sk',
+      description: 'Achat de {} crédits Freemap.sk',
     },
   },
 };

@@ -1,5 +1,5 @@
 import { writeFile } from 'node:fs/promises';
-import { RouterInstance } from '@koa/router';
+import type { RouterInstance } from '@koa/router';
 import shortUuid from 'short-uuid';
 import z from 'zod';
 import { registerPath } from '../../openapi.js';

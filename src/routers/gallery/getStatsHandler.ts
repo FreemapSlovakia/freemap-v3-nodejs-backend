@@ -1,4 +1,4 @@
-import { RouterInstance } from '@koa/router';
+import type { RouterInstance } from '@koa/router';
 import sql, { empty } from 'sql-template-tag';
 import z from 'zod';
 import { authenticator } from '../../authenticator.js';
@@ -108,9 +108,9 @@ export async function attachGetStatsHandler(router: RouterInstance) {
     authenticator(false),
     acceptValidator('application/json'),
     async (ctx) => {
-      const period = ctx.query['period'];
+      const period = ctx.query.period;
 
-      const days = isNaN(Number(period || 'x'))
+      const days = Number.isNaN(Number(period || 'x'))
         ? empty
         : sql` AND picture.createdAt > DATE_SUB(NOW(), INTERVAL ${Number(period)} DAY)`;
 
@@ -263,7 +263,9 @@ export async function attachGetStatsHandler(router: RouterInstance) {
         userPremium,
         pictureCount,
       } of usersPerCountry) {
-        (perUserPerCountry[country] ??= []).push({
+        perUserPerCountry[country] ??= [];
+
+        perUserPerCountry[country].push({
           user: {
             id: userId,
             name: userName,

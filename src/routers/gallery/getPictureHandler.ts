@@ -1,8 +1,7 @@
 import { createHmac } from 'node:crypto';
 import { stat } from 'node:fs/promises';
-import { type } from 'node:os';
 import path from 'node:path';
-import { RouterInstance } from '@koa/router';
+import type { RouterInstance } from '@koa/router';
 import sql, { empty, raw } from 'sql-template-tag';
 import z from 'zod';
 import { authenticator } from '../../authenticator.js';
@@ -10,7 +9,7 @@ import { pool } from '../../database.js';
 import { getEnv } from '../../env.js';
 import { AUTH_OPTIONAL, registerPath } from '../../openapi.js';
 import { acceptValidator } from '../../requestValidators.js';
-import { UserRowSchema, zDateToIso, zNullableDateToIso } from '../../types.js';
+import { zDateToIso, zNullableDateToIso } from '../../types.js';
 import { picturesDir } from './constants.js';
 import { ratingSubquery } from './ratingConstants.js';
 
@@ -32,6 +31,8 @@ const PictureDbRowSchema = z.object({
   hasPicture: z.coerce.boolean(),
   userPremium: z.coerce.boolean(),
   premium: z.boolean(),
+  license: z.string(),
+  licenseSince: zNullableDateToIso,
   tags: z
     .string()
     .nullable()
@@ -126,6 +127,8 @@ export function attachGetPictureHandler(router: RouterInstance) {
               azimuth,
               pano,
               premium,
+              license,
+              (SELECT MAX(changedAt) FROM pictureLicenseHistory WHERE pictureId = picture.id) AS licenseSince,
               user.id as userId,
               user.name,
               user.picture IS NOT NULL AS hasPicture,
@@ -192,6 +195,8 @@ export function attachGetPictureHandler(router: RouterInstance) {
         myStars,
         pano,
         premium,
+        license,
+        licenseSince,
         pathname,
       } = row;
 
@@ -226,6 +231,8 @@ export function attachGetPictureHandler(router: RouterInstance) {
         myStars,
         pano,
         premium,
+        license,
+        licenseSince,
         hmac:
           premium && secret
             ? createHmac('sha256', secret)

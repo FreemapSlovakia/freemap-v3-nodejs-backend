@@ -1,4 +1,4 @@
-import { RouterInstance } from '@koa/router';
+import type { RouterInstance } from '@koa/router';
 import z from 'zod';
 import { authenticator } from '../../authenticator.js';
 import { getEnv } from '../../env.js';

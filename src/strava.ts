@@ -3,7 +3,7 @@ import sql from 'sql-template-tag';
 import z from 'zod';
 import { pool } from './database.js';
 import { getEnv } from './env.js';
-import { User } from './koaTypes.js';
+import type { User } from './koaTypes.js';
 
 const clientId = getEnv('STRAVA_OAUTH2_CLIENT_ID');
 

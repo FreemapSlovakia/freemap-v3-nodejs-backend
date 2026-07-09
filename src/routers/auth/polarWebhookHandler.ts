@@ -1,4 +1,4 @@
-import { RouterInstance } from '@koa/router';
+import type { RouterInstance } from '@koa/router';
 import {
   validateEvent,
   WebhookVerificationError,
@@ -114,7 +114,7 @@ export function attachPolarWebhookHandler(router: RouterInstance) {
                   : { type: 'premium' },
               )},
               createdAt = NOW(),
-              note = ${'polar:' + order.billingReason},
+              note = ${`polar:${order.billingReason}`},
               polarOrderId = ${order.id}`,
           );
 

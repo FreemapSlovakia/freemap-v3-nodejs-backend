@@ -1,6 +1,9 @@
-import { RouterInstance } from '@koa/router';
+import type { RouterInstance } from '@koa/router';
 import z from 'zod';
-import { authenticator, authProviderToColumn } from '../../authenticator.js';
+import {
+  authenticator,
+  type authProviderToColumn,
+} from '../../authenticator.js';
 import { AUTH_OPTIONAL, registerPath } from '../../openapi.js';
 import { acceptValidator } from '../../requestValidators.js';
 import { LoginResponseSchema } from '../../types.js';

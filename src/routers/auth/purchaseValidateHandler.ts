@@ -1,5 +1,5 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
-import { RouterInstance } from '@koa/router';
+import type { RouterInstance } from '@koa/router';
 import sql from 'sql-template-tag';
 import z from 'zod';
 import { runInTransaction } from '../../database.js';
@@ -227,7 +227,7 @@ export function attachPurchaseValidateHandler(router: RouterInstance) {
 
           default:
             ctx.throw(
-              new Error('invalid item type in purchase intent: ' + item.type),
+              new Error(`invalid item type in purchase intent: ${item.type}`),
             );
         }
 
@@ -322,7 +322,7 @@ export function attachPurchaseValidateHandler(router: RouterInstance) {
 
         default:
           ctx.throw(
-            new Error('invalid item type in purchase token: ' + item.type),
+            new Error(`invalid item type in purchase token: ${item.type}`),
           );
       }
 

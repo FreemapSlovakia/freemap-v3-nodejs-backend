@@ -1,10 +1,11 @@
-import { RouterInstance } from '@koa/router';
+import type { RouterInstance } from '@koa/router';
 import sql, { bulk, empty, join } from 'sql-template-tag';
 import z from 'zod';
 import { authenticator } from '../../authenticator.js';
 import { runInTransaction } from '../../database.js';
 import { AUTH_REQUIRED, registerPath } from '../../openapi.js';
 import { isOwnerOrRole } from '../../roles.js';
+import { LicenseSchema } from './licenses.js';
 
 const BodySchema = z.strictObject({
   position: z.strictObject({
@@ -17,6 +18,7 @@ const BodySchema = z.strictObject({
   takenAt: z.iso.datetime().nullish(),
   tags: z.array(z.string()).nullish(),
   premium: z.boolean().optional(),
+  license: LicenseSchema.optional(),
 });
 
 export function attachPutPictureHandler(router: RouterInstance) {
@@ -64,11 +66,12 @@ export function attachPutPictureHandler(router: RouterInstance) {
       tags = [],
       azimuth,
       premium,
+      license,
     } = body;
 
     await runInTransaction(async (conn) => {
-      const rows = await conn.query<{ userId: number }[]>(
-        sql`SELECT userId FROM picture WHERE id = ${ctx.params.id} FOR UPDATE`,
+      const rows = await conn.query<{ userId: number; license: string }[]>(
+        sql`SELECT userId, license FROM picture WHERE id = ${ctx.params.id} FOR UPDATE`,
       );
 
       if (rows.length === 0) {
@@ -79,6 +82,9 @@ export function attachPutPictureHandler(router: RouterInstance) {
         ctx.throw(403);
       }
 
+      const licenseChanged =
+        license !== undefined && license !== rows[0].license;
+
       const queries = [
         conn.query<unknown>(sql`
           UPDATE picture SET
@@ -86,8 +92,9 @@ export function attachPutPictureHandler(router: RouterInstance) {
             description = ${description},
             takenAt = ${takenAt ? new Date(takenAt) : null},
             location = POINT(${lon}, ${lat}),
-            azimuth = ${azimuth},
-            premium = ${premium}
+            azimuth = ${azimuth}
+            ${premium === undefined ? empty : sql`, premium = ${premium}`}
+            ${license === undefined ? empty : sql`, license = ${license}`}
             WHERE id = ${ctx.params.id}
         `),
 
@@ -97,6 +104,14 @@ export function attachPutPictureHandler(router: RouterInstance) {
             ${tags?.length ? ` AND name NOT IN (${join(tags)})` : empty}`,
         ),
       ];
+
+      if (licenseChanged) {
+        queries.push(
+          conn.query<unknown>(
+            sql`INSERT INTO pictureLicenseHistory (pictureId, license) VALUES (${ctx.params.id}, ${license})`,
+          ),
+        );
+      }
 
       if (tags?.length) {
         queries.push(

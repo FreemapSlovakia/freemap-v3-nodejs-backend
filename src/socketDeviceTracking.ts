@@ -1,4 +1,4 @@
-import net from 'net';
+import net from 'node:net';
 import sql, { empty } from 'sql-template-tag';
 import { runInTransaction } from './database.js';
 import { storeTrackPoint } from './deviceTracking.js';

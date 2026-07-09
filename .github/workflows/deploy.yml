@@ -1,0 +1,27 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch: {}
+
+# Never let two deploys overlap.
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy over SSH
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ vars.DEPLOY_HOST }}
+          port: ${{ vars.DEPLOY_PORT }} # optional; defaults to 22
+          username: freemap
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          script: |
+            cd /home/freemap/freemap-v3-nodejs-backend
+            git pull --ff-only
+            bash scripts/remote-deploy.sh

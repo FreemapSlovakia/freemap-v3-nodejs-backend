@@ -1,4 +1,4 @@
-import { RouterInstance } from '@koa/router';
+import type { RouterInstance } from '@koa/router';
 import got from 'got';
 import z from 'zod';
 import { authenticator } from '../../authenticator.js';
@@ -94,12 +94,12 @@ export function attachLoginWithOsmHandler(router: RouterInstance) {
         grant_type: 'authorization_code',
         code,
         redirect_uri:
-          redirectUri + (connect === undefined ? '' : '?connect=' + connect),
+          redirectUri + (connect === undefined ? '' : `?connect=${connect}`),
       });
 
       const body = OsmTokenSchema.parse(
         await got
-          .post('https://www.openstreetmap.org/oauth2/token?' + sp.toString(), {
+          .post(`https://www.openstreetmap.org/oauth2/token?${sp.toString()}`, {
             headers: {
               'content-type': 'application/x-www-form-urlencoded', // otherwise server returns 415
             },
@@ -111,7 +111,7 @@ export function attachLoginWithOsmHandler(router: RouterInstance) {
         await got
           .get('https://api.openstreetmap.org/api/0.6/user/details', {
             headers: {
-              authorization: 'Bearer ' + body.access_token,
+              authorization: `Bearer ${body.access_token}`,
             },
           })
           .json(),

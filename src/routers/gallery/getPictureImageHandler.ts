@@ -1,7 +1,7 @@
 import { createHmac } from 'node:crypto';
 import { createReadStream } from 'node:fs';
 import { stat } from 'node:fs/promises';
-import { RouterInstance } from '@koa/router';
+import type { RouterInstance } from '@koa/router';
 import calculate from 'etag';
 import sharp from 'sharp';
 import sql from 'sql-template-tag';
