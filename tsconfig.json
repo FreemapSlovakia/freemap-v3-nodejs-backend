@@ -11,5 +11,7 @@
     "strict": true,
     "lib": ["ES2024"],
     "strictNullChecks": true
-  }
+  },
+  "include": ["src/**/*"],
+  "exclude": ["build", "node_modules"]
 }
