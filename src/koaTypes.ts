@@ -13,10 +13,7 @@ export type User = z.infer<typeof UserRowSchema> & {
 declare module 'koa' {
   interface DefaultState {
     user?: User;
-    [key: `${string}`]: never;
   }
-
-  type PropertyKey = never;
 
   interface ExtendableContext {
     log: Logger;
