@@ -182,6 +182,16 @@ export async function initDatabase() {
       SPATIAL INDEX wikimediaPicture_location_spx (location)
     ) ENGINE=InnoDB`,
 
+    // Geotagged Wikimedia Commons photos, rebuilt monthly by the importer (which
+    // atomically swaps in a fresh copy). Created here too so a fresh deploy has
+    // the table before the first import runs — otherwise the gallery's Wikimedia
+    // arm errors on the missing table.
+    sql`CREATE TABLE IF NOT EXISTS wikimediaPicture (
+      pageId INT UNSIGNED NOT NULL PRIMARY KEY,
+      location POINT NOT NULL,
+      SPATIAL KEY wikimediaPicture_location_spx (location)
+    ) ENGINE=InnoDB`,
+
     // Ratings for Wikimedia photos. Keyed on the stable Commons pageId and kept
     // deliberately independent of `wikimediaPicture` (no FK) so the monthly
     // table swap never disturbs them; ratings whose photo later disappears from
