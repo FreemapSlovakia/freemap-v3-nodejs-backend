@@ -5,9 +5,10 @@ import { authenticator } from '../../authenticator.js';
 import { runInTransaction } from '../../database.js';
 import { getEnv, getEnvBoolean } from '../../env.js';
 import { appLogger } from '../../logger.js';
-import { sendMail } from '../../mailer.js';
 import { AUTH_REQUIRED, registerPath } from '../../openapi.js';
 import { acceptValidator } from '../../requestValidators.js';
+import { COMMENT_MAIL_LANGS, sendCommentMail } from './commentMail.js';
+import { parsePictureId } from './pictureId.js';
 
 const webBaseUrls = getEnv('WEB_BASE_URL').split(',').filter(Boolean);
 
@@ -45,6 +46,12 @@ export function attachPostPictureCommentHandler(router: RouterInstance) {
     authenticator(true),
     acceptValidator('application/json'),
     async (ctx) => {
+      const ref = parsePictureId(ctx.params.id);
+
+      if (!ref) {
+        return ctx.throw(404, 'no such picture');
+      }
+
       let body;
 
       try {
@@ -67,16 +74,91 @@ export function attachPostPictureCommentHandler(router: RouterInstance) {
         webBaseUrl = webBaseUrls[0];
       }
 
-      const webUrl = webBaseUrl.replace(/^https?:\/\//, '');
-
       const user = ctx.state.user!;
+
+      const mailEnabled = getEnvBoolean('MAILGUN_ENABLE', false);
+
+      const acceptLang = ctx.acceptsLanguages([...COMMENT_MAIL_LANGS]) || 'en';
+
+      const picUrl = `${webBaseUrl}/?image=${ctx.params.id}`;
+
+      const logger = appLogger.child({
+        module: 'postPictureComment',
+        reqId: ctx.reqId,
+      });
+
+      // Wikimedia photos have no local uploader, so notifications go only to
+      // prior commenters.
+      if (ref.source === 'wikimedia') {
+        const { insertId, recipients } = await runInTransaction(
+          async (conn) => {
+            const [row] = await conn.query<{ pageId: number }[]>(
+              sql`SELECT pageId FROM wikimediaPicture WHERE pageId = ${ref.pageId} FOR UPDATE`,
+            );
+
+            if (!row) {
+              ctx.throw(404, 'no such picture');
+            }
+
+            const proms = [
+              conn.query<{ insertId: number }>(sql`
+              INSERT INTO wikimediaComment SET
+                pageId = ${ref.pageId},
+                userId = ${user.id},
+                comment = ${comment},
+                createdAt = ${new Date()}
+            `),
+              ...(mailEnabled
+                ? [
+                    conn.query<
+                      { email: string; language: string | null }[]
+                    >(sql`
+                    SELECT DISTINCT email, sendGalleryEmails, language
+                      FROM user
+                      JOIN wikimediaComment ON userId = user.id
+                      WHERE sendGalleryEmails AND pageId = ${ref.pageId} AND userId <> ${user.id} AND email IS NOT NULL
+                  `),
+                  ]
+                : ([undefined] as const)),
+            ] as const;
+
+            const [{ insertId }, recipients = []] = await Promise.all(proms);
+
+            return { insertId, recipients };
+          },
+        );
+
+        await Promise.all(
+          recipients.map((recipient) => {
+            logger.info(
+              { to: recipient.email, lang: recipient.language, own: false },
+              'Sending picture comment mail.',
+            );
+
+            return sendCommentMail({
+              to: recipient.email,
+              own: false,
+              lang: recipient.language || acceptLang,
+              commenterName: user.name,
+              comment,
+              webBaseUrl,
+              picUrl,
+              picTitle: '',
+            });
+          }),
+        );
+
+        ctx.body = ResponseSchema.parse({ id: insertId });
+
+        return;
+      }
 
       const { insertId, picInfo, recipients } = await runInTransaction(
         async (conn) => {
           const [row] = await conn.query<
             { userId: number; premium: boolean }[]
           >(
-            sql`SELECT userId, premium FROM picture WHERE id = ${ctx.params.id} FOR UPDATE`,
+            sql`SELECT userId, premium FROM picture WHERE id = ${ref.id} FOR UPDATE`,
           );
 
           if (!row) {
@@ -94,12 +176,12 @@ export function attachPostPictureCommentHandler(router: RouterInstance) {
           const proms = [
             conn.query<{ insertId: number }>(sql`
               INSERT INTO pictureComment SET
-                pictureId = ${ctx.params.id},
-                userId = ${user!.id},
+                pictureId = ${ref.id},
+                userId = ${user.id},
                 comment = ${comment},
                 createdAt = ${new Date()}
             `),
-            ...(getEnvBoolean('MAILGUN_ENABLE', false)
+            ...(mailEnabled
               ? [
                   conn.query<
                     {
@@ -112,13 +194,13 @@ export function attachPostPictureCommentHandler(router: RouterInstance) {
                     SELECT IF(sendGalleryEmails, email, NULL) AS email, language, title, userId
                       FROM user
                       JOIN picture ON userId = user.id
-                      WHERE picture.id = ${ctx.params.id}
+                      WHERE picture.id = ${ref.id}
                   `),
                   conn.query<{ email: string; language: string | null }[]>(sql`
                     SELECT DISTINCT email, sendGalleryEmails, language
                       FROM user
                       JOIN pictureComment ON userId = user.id
-                      WHERE sendGalleryEmails AND pictureId = ${ctx.params.id} AND userId <> ${user!.id} AND email IS NOT NULL
+                      WHERE sendGalleryEmails AND pictureId = ${ref.id} AND userId <> ${user.id} AND email IS NOT NULL
                   `),
                 ]
               : ([undefined, undefined] as const)),
@@ -131,101 +213,54 @@ export function attachPostPictureCommentHandler(router: RouterInstance) {
         },
       );
 
-      const logger = appLogger.child({
-        module: 'postPictureComment',
-        reqId: ctx.reqId,
-      });
-
-      type Lang = 'sk' | 'cs' | 'en' | 'hu' | 'it' | 'de' | 'pl' | 'sl' | 'fr';
-
-      async function sendCommentMail(
-        to: string,
-        own: boolean,
-        lang: Lang | string,
-      ) {
-        logger.info({ to, lang, own }, 'Sending picture comment mail.');
-
-        const picTitle =
-          'title' in picInfo && picInfo.title ? `"${picInfo.title} "` : '';
-
-        const picUrl = `${webBaseUrl}/?image=${ctx.params.id}`;
-
-        const unsubscribeUrl = webBaseUrl;
-
-        const subjects: Record<Lang, string> = {
-          sk: `Komentár k fotke na ${webUrl}`,
-          cs: `Komentář k fotce na ${webUrl}`,
-          en: `Photo comment at ${webUrl}`,
-          hu: `Hozzászólás a fotóhoz a következőn: ${webUrl}`,
-          it: `Commento alla foto su ${webUrl}`,
-          de: `Kommentar zu einem Foto auf ${webUrl}`,
-          pl: `Komentarz do zdjęcia na ${webUrl}`,
-          sl: `Komentar k fotografiji na ${webUrl}`,
-          fr: `Commentaire sur une photo sur ${webUrl}`,
-        };
-
-        const messages: Record<Lang, string> = {
-          sk: `Používateľ ${user!.name} pridal komentár k ${own ? 'vašej ' : ''}fotke ${picTitle}na ${picUrl}:`,
-          cs: `Uživatel ${user!.name} přidal komentář k ${own ? 'vaší ' : ''}fotce ${picTitle}na ${picUrl}:`,
-          en: `User ${user!.name} commented ${own ? 'your' : 'a'} photo ${picTitle}at ${picUrl}:`,
-          hu: `A felhasználó ${user!.name} hozzászólt ${own ? 'az ön' : 'egy'} fotójához: ${picTitle}${picUrl}:`,
-          it: `L'utente ${user!.name} ha commentato ${own ? 'la tua' : 'una'} foto ${picTitle}su ${picUrl}:`,
-          de: `Benutzer ${user!.name} hat ${own ? 'dein' : 'ein'} Foto kommentiert: ${picTitle}${picUrl}:`,
-          pl: `Użytkownik ${user!.name} dodał komentarz do ${own ? 'twojego' : 'zdjęcia'} ${picTitle} na ${picUrl}:`,
-          sl: `Uporabnik ${user!.name} je dodal komentar k ${own ? 'vaši ' : ''}fotografiji ${picTitle}na ${picUrl}:`,
-          fr: `L'utilisateur ${user!.name} a commenté ${own ? 'votre' : 'une'} photo ${picTitle}sur ${picUrl} :`,
-        };
-
-        const footers: Record<Lang, string> = {
-          sk: `Ak si už neprajete dostávať upozornenia na komentáre k fotkám, odškrtnite si to na ${unsubscribeUrl} v menu Fotografie.`,
-          cs: `Pokud si již nepřejete dostávat upozornění na komentáře k fotkám, odškrtnite si to na ${unsubscribeUrl} v menu Fotografie.`,
-          en: `If you no longer wish to be notified about photo comments, uncheck it at ${unsubscribeUrl} in the Photos menu.`,
-          hu: `Ha nem szeretne több értesítést kapni a fotókhoz fűzött hozzászólásokról, kapcsolja ki a beállítást a Fotók menüben: ${unsubscribeUrl}.`,
-          it: `Se non desideri più ricevere notifiche sui commenti alle foto, disattiva l'opzione nel menu Foto: ${unsubscribeUrl}.`,
-          de: `Wenn du keine Benachrichtigungen über Fotokommentare mehr erhalten möchtest, deaktiviere dies im Menü „Fotos“ unter ${unsubscribeUrl}.`,
-          pl: `Jeśli nie chcesz otrzymywać powiadomień o komentarzach do zdjęć, odznacz to w menu Zdjęcia pod adresem ${unsubscribeUrl}.`,
-          sl: `Če ne želite več prejemati obvestil o komentarjih k fotografijam, to odznačite na ${unsubscribeUrl} v meniju Fotografije.`,
-          fr: `Si vous ne souhaitez plus recevoir de notifications sur les commentaires des photos, décochez cette option dans le menu Photos sur ${unsubscribeUrl}.`,
-        };
-
-        await sendMail(
-          to,
-          subjects[lang as Lang] ?? subjects.en,
-          `${messages[lang as Lang] ?? messages.en}\n\n${comment}\n\n${footers[lang as Lang] ?? footers.en}`,
-        );
-      }
-
-      const acceptLang =
-        ctx.acceptsLanguages([
-          'en',
-          'sk',
-          'cs',
-          'hu',
-          'it',
-          'de',
-          'pl',
-          'sl',
-          'fr',
-        ]) || 'en';
+      const picTitle =
+        picInfo && 'title' in picInfo && picInfo.title
+          ? `"${picInfo.title}" `
+          : '';
 
       const promises: Promise<void>[] = [];
+
       if (
         picInfo?.email &&
         (!('userId' in picInfo) || picInfo.userId !== user.id)
       ) {
+        logger.info(
+          { to: picInfo.email, lang: picInfo.language, own: true },
+          'Sending picture comment mail.',
+        );
+
         promises.push(
-          sendCommentMail(picInfo.email, true, picInfo.language || acceptLang),
+          sendCommentMail({
+            to: picInfo.email,
+            own: true,
+            lang: picInfo.language || acceptLang,
+            commenterName: user.name,
+            comment,
+            webBaseUrl,
+            picUrl,
+            picTitle,
+          }),
         );
       }
 
       promises.push(
-        ...recipients.map((recipient) =>
-          sendCommentMail(
-            recipient.email!,
-            false,
-            recipient.language || picInfo.language || acceptLang,
-          ),
-        ),
+        ...recipients.map((recipient) => {
+          logger.info(
+            { to: recipient.email, lang: recipient.language, own: false },
+            'Sending picture comment mail.',
+          );
+
+          return sendCommentMail({
+            to: recipient.email!,
+            own: false,
+            lang: recipient.language || picInfo?.language || acceptLang,
+            commenterName: user.name,
+            comment,
+            webBaseUrl,
+            picUrl,
+            picTitle,
+          });
+        }),
       );
 
       await Promise.all(promises);

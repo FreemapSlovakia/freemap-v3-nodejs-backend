@@ -170,6 +170,43 @@ export async function initDatabase() {
       INDEX plhPictureIdx (pictureId, changedAt)
     ) ENGINE=InnoDB`,
 
+    // Geotagged Wikimedia Commons photos, bulk-imported from the monthly
+    // Commons `geo_tags` dump (filtered to gt_type='camera'). The whole table is
+    // atomically replaced on each import (see src/wikimedia/importWikimedia.ts),
+    // so it carries no foreign keys and nothing references it. Only coordinates
+    // are stored — the file title, image URL and CC attribution are fetched by
+    // the client straight from the Commons API by pageId when a photo is opened.
+    sql`CREATE TABLE IF NOT EXISTS wikimediaPicture (
+      pageId INT UNSIGNED NOT NULL PRIMARY KEY,
+      location POINT NOT NULL,
+      SPATIAL INDEX wikimediaPicture_location_spx (location)
+    ) ENGINE=InnoDB`,
+
+    // Ratings for Wikimedia photos. Keyed on the stable Commons pageId and kept
+    // deliberately independent of `wikimediaPicture` (no FK) so the monthly
+    // table swap never disturbs them; ratings whose photo later disappears from
+    // Commons simply stop rendering.
+    sql`CREATE TABLE IF NOT EXISTS wikimediaRating (
+      pageId INT UNSIGNED NOT NULL,
+      userId INT UNSIGNED NOT NULL,
+      stars TINYINT UNSIGNED NOT NULL,
+      ratedAt TIMESTAMP NOT NULL,
+      PRIMARY KEY (pageId, userId),
+      FOREIGN KEY (userId) REFERENCES user (id) ON DELETE CASCADE
+    ) ENGINE=InnoDB`,
+
+    // Comments on Wikimedia photos. Also keyed on the stable Commons pageId and
+    // independent of `wikimediaPicture` (see wikimediaRating).
+    sql`CREATE TABLE IF NOT EXISTS wikimediaComment (
+      id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+      pageId INT UNSIGNED NOT NULL,
+      userId INT UNSIGNED NOT NULL,
+      createdAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      comment VARCHAR(4096) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+      FOREIGN KEY (userId) REFERENCES user (id) ON DELETE CASCADE,
+      INDEX wcPageIdIdx (pageId, createdAt)
+    ) ENGINE=InnoDB`,
+
     sql`CREATE TABLE IF NOT EXISTS trackingDevice (
       id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
       userId INT UNSIGNED NOT NULL,

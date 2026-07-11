@@ -2,6 +2,7 @@ import { createHmac } from 'node:crypto';
 import { stat } from 'node:fs/promises';
 import path from 'node:path';
 import type { RouterInstance } from '@koa/router';
+import type { ParameterizedContext } from 'koa';
 import sql, { empty, raw } from 'sql-template-tag';
 import z from 'zod';
 import { authenticator } from '../../authenticator.js';
@@ -11,7 +12,8 @@ import { AUTH_OPTIONAL, registerPath } from '../../openapi.js';
 import { acceptValidator } from '../../requestValidators.js';
 import { zDateToIso, zNullableDateToIso } from '../../types.js';
 import { picturesDir } from './constants.js';
-import { ratingSubquery } from './ratingConstants.js';
+import { parsePictureId } from './pictureId.js';
+import { ratingExp, ratingSubquery } from './ratingConstants.js';
 
 const secret = getEnv('PREMIUM_PHOTO_SECRET', '');
 
@@ -68,6 +70,7 @@ const ResponseBodySchema = PictureDbRowSchema.omit({
   userPremium: true,
 }).extend({
   id: z.uint32(),
+  source: z.literal('gallery'),
   user: UserSchema.nullable(),
   comments: CommentDbRowSchema.omit({
     userId: true,
@@ -111,6 +114,18 @@ export function attachGetPictureHandler(router: RouterInstance) {
     acceptValidator('application/json'),
     authenticator(false),
     async (ctx) => {
+      const ref = parsePictureId(ctx.params.id);
+
+      if (!ref) {
+        return ctx.throw(404, 'no such picture');
+      }
+
+      if (ref.source === 'wikimedia') {
+        await respondWikimedia(ctx, ref.pageId);
+
+        return;
+      }
+
       const [row] = PictureDbRowSchema.array()
         .max(1)
         .parse(
@@ -209,6 +224,7 @@ export function attachGetPictureHandler(router: RouterInstance) {
 
       ctx.body = {
         id: pictureId,
+        source: 'gallery',
         createdAt,
         title,
         description,
@@ -243,4 +259,77 @@ export function attachGetPictureHandler(router: RouterInstance) {
       } satisfies ResponseBody;
     },
   );
+}
+
+const WikimediaRowSchema = z.object({
+  lat: z.number(),
+  lon: z.number(),
+  rating: z.number(),
+  myStars: z.number().nullish(),
+});
+
+/**
+ * Detail for a Wikimedia Commons photo. Only what the server actually owns is
+ * returned — position and the gallery-native rating/comments. The title, image
+ * URL, author, license and description are fetched by the client straight from
+ * the Commons API by pageId.
+ */
+async function respondWikimedia(
+  ctx: ParameterizedContext,
+  pageId: number,
+): Promise<void> {
+  const [row] = WikimediaRowSchema.array()
+    .max(1)
+    .parse(
+      await pool.query<unknown>(sql`
+        SELECT
+          ST_X(location) AS lon,
+          ST_Y(location) AS lat,
+          (SELECT ${raw(ratingExp)} FROM wikimediaRating WHERE pageId = ${pageId}) AS rating
+          ${
+            ctx.state.user
+              ? sql`, (SELECT stars FROM wikimediaRating WHERE pageId = ${pageId} AND userId = ${ctx.state.user.id}) AS myStars`
+              : empty
+          }
+        FROM wikimediaPicture
+        WHERE pageId = ${pageId}`),
+    );
+
+  if (!row) {
+    ctx.throw(404, 'no such picture');
+  }
+
+  const commentRows = CommentDbRowSchema.array().parse(
+    await pool.query<unknown>(sql`
+      SELECT
+        wikimediaComment.id,
+        wikimediaComment.createdAt,
+        comment,
+        user.name,
+        userId,
+        user.picture IS NOT NULL AS hasPicture,
+        (user.premiumExpiration IS NOT NULL AND user.premiumExpiration > NOW()) AS premium
+      FROM wikimediaComment JOIN user ON (userId = user.id)
+      WHERE pageId = ${pageId}
+      ORDER BY wikimediaComment.createdAt`),
+  );
+
+  ctx.body = {
+    id: pageId,
+    source: 'wikimedia',
+    title: null,
+    lat: row.lat,
+    lon: row.lon,
+    tags: [],
+    comments: commentRows.map(
+      ({ id, createdAt, comment, userId, name, hasPicture, premium }) => ({
+        id,
+        createdAt,
+        comment,
+        user: { id: userId, name, hasPicture, premium },
+      }),
+    ),
+    rating: row.rating,
+    myStars: row.myStars ?? null,
+  };
 }
