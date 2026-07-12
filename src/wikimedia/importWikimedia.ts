@@ -148,8 +148,11 @@ async function* pageKeepRows(
   }
 }
 
+// img_metadata is JSON (`"DateTimeOriginal":"…"`) in current dumps, but older
+// rows may be PHP-serialized (`"DateTimeOriginal";s:19:"…"`); the `(?::|;s:\d+:)`
+// bridge between the key and value quote matches either.
 const DATE_TIME_ORIGINAL_RE =
-  /"DateTimeOriginal":"(\d{4}):(\d{2}):(\d{2}) (\d{2}):(\d{2}):(\d{2})"/;
+  /"DateTimeOriginal"(?::|;s:\d+:)"(\d{4}):(\d{2}):(\d{2}) (\d{2}):(\d{2}):(\d{2})"/;
 
 const IMG_TIMESTAMP_RE = /^(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})$/;
 
@@ -187,7 +190,7 @@ function toSqlDateTime(
   return `${y}-${mo}-${d} ${h}:${mi}:${s}`;
 }
 
-/** Capture date from the EXIF `DateTimeOriginal` in the JSON `img_metadata`. */
+/** Capture date from the EXIF `DateTimeOriginal` in `img_metadata`. */
 function extractCapturedAt(metadata: SqlValue): string | null {
   if (typeof metadata !== 'string') {
     return null;
@@ -209,7 +212,7 @@ function parseUploadedAt(ts: SqlValue): string | null {
   return m ? toSqlDateTime(m[1], m[2], m[3], m[4], m[5], m[6]) : null;
 }
 
-const GPS_IMG_DIRECTION_RE = /"GPSImgDirection":"(\d+)\/(\d+)"/;
+const GPS_IMG_DIRECTION_RE = /"GPSImgDirection"(?::|;s:\d+:)"(\d+)\/(\d+)"/;
 
 /**
  * Camera azimuth (integer degrees, 0–359) from the EXIF `GPSImgDirection` in

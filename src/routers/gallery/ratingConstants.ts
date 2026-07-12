@@ -1,6 +1,8 @@
 const bayesC = 2; // # ratings...
 
-const bayesM = 3; // ...of ranking #
+// The prior mean rating: the effective rating of an unrated photo collapses to
+// this (COUNT(stars)=0 → bayesM*bayesC / bayesC = bayesM).
+export const bayesM = 3; // ...of ranking #
 
 export const ratingExp = `(COALESCE(SUM(stars), 0) + ${bayesM} * ${bayesC}) / (COUNT(stars) + ${bayesC})`;
 

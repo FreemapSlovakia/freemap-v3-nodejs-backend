@@ -16,6 +16,7 @@ import { acceptValidator } from '../../requestValidators.js';
 import { hasRole } from '../../roles.js';
 import { LicenseSchema } from './licenses.js';
 import {
+  bayesM,
   ratingExp,
   ratingSubquery,
   wikimediaRatingSubquery,
@@ -214,6 +215,35 @@ function ratingRangeConds(ratingFrom?: number, ratingTo?: number): Sql[] {
   return c;
 }
 
+/** Serialize a DATE column for the wire: epoch seconds for protobuf, ISO string
+ *  for JSON, preserving null/undefined either way. */
+function toWireDate(
+  v: Date | null | undefined,
+  isProtobuf: boolean,
+): number | string | null | undefined {
+  return v == null ? v : isProtobuf ? v.getTime() / 1000 : v.toISOString();
+}
+
+// Whether the active filters exclude Wikimedia photos entirely. They carry
+// date/rating and are trivially non-pano/non-premium, so those filters just
+// narrow them; tag/author/license (and pano=true/premium=true, which no
+// Wikimedia photo matches) have no equivalent and drop them.
+function wikimediaExcludedByFilter(f: {
+  tag?: string[];
+  userId?: number[];
+  license?: unknown[];
+  pano?: boolean;
+  premium?: boolean;
+}): boolean {
+  return (
+    f.tag !== undefined ||
+    (f.userId?.length ?? 0) > 0 ||
+    (f.license?.length ?? 0) > 0 ||
+    f.pano === true ||
+    f.premium === true
+  );
+}
+
 const methods: {
   [name: string]: (ctx: ParameterizedContext) => Promise<void>;
 } = {
@@ -316,20 +346,11 @@ async function byRadius(ctx: ParameterizedContext) {
   const tagArray = tag || [];
   const licenseArray = license || [];
 
-  // Wikimedia photos carry date/rating and are trivially non-pano/non-premium,
-  // so those filters narrow them; tag/author/license (and pano=true/premium=true,
-  // which no Wikimedia photo matches) have no equivalent and exclude them.
-  const wikimediaExcluded =
-    tag !== undefined ||
-    userIdArray.length > 0 ||
-    licenseArray.length > 0 ||
-    pano === true ||
-    premium === true;
-
   const includeGallery = !sources || sources.includes('gallery');
 
   const includeWikimedia =
-    (!sources || sources.includes('wikimedia')) && !wikimediaExcluded;
+    (!sources || sources.includes('wikimedia')) &&
+    !wikimediaExcludedByFilter(radiusQuery);
 
   const wmDateConds = wikimediaDateConds(radiusQuery);
 
@@ -436,20 +457,11 @@ async function byBbox(ctx: ParameterizedContext) {
   const tagArray = tag || [];
   const licenseArray = license || [];
 
-  // Wikimedia photos carry date/rating and are trivially non-pano/non-premium,
-  // so those filters narrow them; tag/author/license (and pano=true/premium=true)
-  // have no equivalent and exclude them.
-  const wikimediaExcluded =
-    tag !== undefined ||
-    userIdArray.length > 0 ||
-    licenseArray.length > 0 ||
-    pano === true ||
-    premium === true;
-
   const includeGallery = !sources || sources.includes('gallery');
 
   const includeWikimedia =
-    (!sources || sources.includes('wikimedia')) && !wikimediaExcluded;
+    (!sources || sources.includes('wikimedia')) &&
+    !wikimediaExcludedByFilter(bboxQuery);
 
   const sqlFields: string[] = (fields ?? []).filter(
     (f) =>
@@ -537,21 +549,9 @@ async function byBbox(ctx: ParameterizedContext) {
     Object.assign({}, row, {
       source: 0,
       rating: getRating ? row.rating : undefined,
-      takenAt: isProtobuf
-        ? row.takenAt == null
-          ? row.takenAt
-          : row.takenAt.getTime() / 1000
-        : (row.takenAt?.toISOString() ?? row.takenAt),
-      createdAt: isProtobuf
-        ? row.createdAt == null
-          ? row.createdAt
-          : row.createdAt.getTime() / 1000
-        : (row.createdAt?.toISOString() ?? row.createdAt),
-      lastCommentedAt: isProtobuf
-        ? row.lastCommentedAt == null
-          ? row.lastCommentedAt
-          : row.lastCommentedAt.getTime() / 1000
-        : (row.lastCommentedAt?.toISOString() ?? row.lastCommentedAt),
+      takenAt: toWireDate(row.takenAt, isProtobuf),
+      createdAt: toWireDate(row.createdAt, isProtobuf),
+      lastCommentedAt: toWireDate(row.lastCommentedAt, isProtobuf),
       pano: row.pano,
       premium: row.premium,
       azimuth: row.azimuth,
@@ -614,16 +614,8 @@ async function byBbox(ctx: ParameterizedContext) {
     source: 1,
     title: undefined,
     description: undefined,
-    takenAt: isProtobuf
-      ? row.takenAt == null
-        ? row.takenAt
-        : row.takenAt.getTime() / 1000
-      : (row.takenAt?.toISOString() ?? row.takenAt),
-    createdAt: isProtobuf
-      ? row.createdAt == null
-        ? row.createdAt
-        : row.createdAt.getTime() / 1000
-      : (row.createdAt?.toISOString() ?? row.createdAt),
+    takenAt: toWireDate(row.takenAt, isProtobuf),
+    createdAt: toWireDate(row.createdAt, isProtobuf),
     lastCommentedAt: undefined,
     userId: row.userId ?? undefined,
     pano: undefined,
@@ -732,21 +724,11 @@ async function byOrder(ctx: ParameterizedContext) {
   const tagArray = tag || [];
   const licenseArray = license || [];
 
-  // Wikimedia photos carry a rating/comments (on our platform) and an imported
-  // capturedAt/uploadedAt, so they join every ordering and honour the date and
-  // rating filters (and, trivially, pano=false / premium=false). tag/author/
-  // license (and pano=true / premium=true) have no equivalent and exclude them.
-  const wikimediaExcluded =
-    tag !== undefined ||
-    userIdArray.length > 0 ||
-    licenseArray.length > 0 ||
-    pano === true ||
-    premium === true;
-
   const includeGallery = !sources || sources.includes('gallery');
 
   const includeWikimedia =
-    (!sources || sources.includes('wikimedia')) && !wikimediaExcluded;
+    (!sources || sources.includes('wikimedia')) &&
+    !wikimediaExcludedByFilter(orderByQuery);
 
   const hv: Sql[] = [];
 
@@ -875,14 +857,40 @@ async function byOrder(ctx: ParameterizedContext) {
     // dump); an index on each keeps this LIMIT 1000 fast over the whole table.
     const col = orderBy === 'takenAt' ? 'capturedAt' : 'uploadedAt';
 
-    const wmWhere = [sql`${raw(col)} IS NOT NULL`, ...wmDateConds];
+    const ratingExcludesUnrated =
+      (ratingFrom != null && ratingFrom > bayesM) ||
+      (ratingTo != null && ratingTo < bayesM);
 
-    wmArm = sql`SELECT -CAST(pageId AS SIGNED) AS id, ${raw(col)} AS ord
-        ${needRating ? raw(`, ${wikimediaRatingSubquery}`) : empty}
-        FROM wikimediaPicture
-        WHERE ${join(wmWhere, ' AND ')}
-        ${needRating ? sql`HAVING ${join(hv, ' AND ')}` : empty}
-        ORDER BY ord ${raw(direction)}, id ${raw(direction)} LIMIT 1000`;
+    if (!needRating) {
+      wmArm = sql`SELECT -CAST(pageId AS SIGNED) AS id, ${raw(col)} AS ord
+          FROM wikimediaPicture
+          WHERE ${join([sql`${raw(col)} IS NOT NULL`, ...wmDateConds], ' AND ')}
+          ORDER BY ord ${raw(direction)}, id ${raw(direction)} LIMIT 1000`;
+    } else if (ratingExcludesUnrated) {
+      // The rating range excludes the unrated prior mean (bayesM), so only
+      // *rated* photos can qualify — drive the arm off the small wikimediaRating
+      // table and join back for the date, instead of a per-row rating subquery
+      // over the whole picture table.
+      wmArm = sql`SELECT -CAST(wp.pageId AS SIGNED) AS id, wp.${raw(col)} AS ord,
+            ${raw(ratingExp)} AS rating
+          FROM wikimediaRating w
+          JOIN wikimediaPicture wp ON wp.pageId = w.pageId
+          WHERE ${join([sql`wp.${raw(col)} IS NOT NULL`, ...wmDateConds], ' AND ')}
+          GROUP BY wp.pageId
+          HAVING ${join(hv, ' AND ')}
+          ORDER BY ord ${raw(direction)}, id ${raw(direction)} LIMIT 1000`;
+    } else {
+      // The range includes the prior mean, so unrated photos (rating = bayesM)
+      // pass; scanning the date index, the leading rows mostly satisfy HAVING,
+      // so the correlated rating subquery is evaluated for only a short prefix
+      // before LIMIT.
+      wmArm = sql`SELECT -CAST(pageId AS SIGNED) AS id, ${raw(col)} AS ord,
+            ${raw(wikimediaRatingSubquery)}
+          FROM wikimediaPicture
+          WHERE ${join([sql`${raw(col)} IS NOT NULL`, ...wmDateConds], ' AND ')}
+          HAVING ${join(hv, ' AND ')}
+          ORDER BY ord ${raw(direction)}, id ${raw(direction)} LIMIT 1000`;
+    }
   }
 
   const arms: Sql[] = [];
