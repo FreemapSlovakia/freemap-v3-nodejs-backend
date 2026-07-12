@@ -113,6 +113,15 @@ const WikimediaBboxRowSchema = z.array(
     lat: z.number(),
     lon: z.number(),
     rating: z.number().nullish(),
+    takenAt: z.date().nullish(),
+    createdAt: z.date().nullish(),
+    azimuth: z.number().nullish(),
+    // Numeric Commons actor id; kept as a plain number (actor ids fit well
+    // within 2^53) so colorize-by-author can bucket by it like our own userId.
+    userId: z.preprocess(
+      (v) => (v == null ? v : Number(v)),
+      z.number().int().nonnegative().nullish(),
+    ),
   }),
 );
 
@@ -502,11 +511,36 @@ async function byBbox(ctx: ParameterizedContext) {
     }),
   );
 
+  // Wikimedia photos carry capturedAt/uploadedAt/authorId (imported from the
+  // Commons image dump), surfaced under the same field names as our own photos
+  // so the client's date/season/author colorizing works uniformly.
+  const wmExtra: string[] = [];
+
+  if (fields?.includes('takenAt')) {
+    wmExtra.push('capturedAt AS takenAt');
+  }
+
+  if (fields?.includes('createdAt')) {
+    wmExtra.push('uploadedAt AS createdAt');
+  }
+
+  if (fields?.includes('userId')) {
+    wmExtra.push('authorId AS userId');
+  }
+
+  if (fields?.includes('azimuth')) {
+    wmExtra.push('azimuth');
+  }
+
+  if (getRating) {
+    wmExtra.push(wikimediaRatingSubquery);
+  }
+
   const wikimediaRows = includeWikimedia
     ? WikimediaBboxRowSchema.parse(
         await pool.query<unknown>(sql`
           SELECT pageId AS id, ST_X(location) AS lon, ST_Y(location) AS lat
-          ${getRating ? raw(`, ${wikimediaRatingSubquery}`) : empty}
+          ${wmExtra.length ? raw(`, ${wmExtra.join(', ')}`) : empty}
           FROM wikimediaPicture
           WHERE MBRContains(ST_GeomFromText(${`LINESTRING(${minLon} ${minLat}, ${maxLon} ${maxLat})`}, 4326), location)
           LIMIT ${WIKIMEDIA_BBOX_LIMIT}`),
@@ -520,13 +554,21 @@ async function byBbox(ctx: ParameterizedContext) {
     source: 1,
     title: undefined,
     description: undefined,
-    takenAt: undefined,
-    createdAt: undefined,
+    takenAt: isProtobuf
+      ? row.takenAt == null
+        ? row.takenAt
+        : row.takenAt.getTime() / 1000
+      : (row.takenAt?.toISOString() ?? row.takenAt),
+    createdAt: isProtobuf
+      ? row.createdAt == null
+        ? row.createdAt
+        : row.createdAt.getTime() / 1000
+      : (row.createdAt?.toISOString() ?? row.createdAt),
     lastCommentedAt: undefined,
-    userId: undefined,
+    userId: row.userId ?? undefined,
     pano: undefined,
     premium: undefined,
-    azimuth: undefined,
+    azimuth: row.azimuth ?? undefined,
     license: undefined,
     rating: getRating ? row.rating : undefined,
     tags: undefined,

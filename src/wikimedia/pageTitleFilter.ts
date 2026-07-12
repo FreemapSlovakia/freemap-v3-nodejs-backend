@@ -61,3 +61,40 @@ export function makeBitset(capacity = 1 << 29) {
     },
   };
 }
+
+/**
+ * Probabilistic membership set for page titles, backed by a hashed bit array (a
+ * single-hash Bloom filter). It pre-filters the huge `image` dump down to the
+ * kept titles before the authoritative SQL join on title — a false positive
+ * just stages one extra row that later fails the join, so the only cost is a
+ * little wasted work, never a wrong result. `bitCount` must be a power of two;
+ * 1&lt;&lt;30 bits ≈ 128 MB gives a ~3% false-positive rate at ~31.5M titles.
+ */
+export function makeStringBitset(bitCount = 1 << 30) {
+  const bits = new Uint8Array(bitCount >> 3);
+  const mask = bitCount - 1;
+
+  // FNV-1a over the UTF-16 code units. Both sides hash the identical decoded
+  // title string (underscore form), so the exact byte encoding doesn't matter.
+  function hash(s: string): number {
+    let h = 0x811c9dc5;
+
+    for (let i = 0; i < s.length; i++) {
+      h ^= s.charCodeAt(i);
+      h = Math.imul(h, 0x01000193);
+    }
+
+    return (h >>> 0) & mask;
+  }
+
+  return {
+    set(s: string): void {
+      const i = hash(s);
+      bits[i >> 3] |= 1 << (i & 7);
+    },
+    has(s: string): boolean {
+      const i = hash(s);
+      return (bits[i >> 3] & (1 << (i & 7))) !== 0;
+    },
+  };
+}

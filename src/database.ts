@@ -170,25 +170,24 @@ export async function initDatabase() {
       INDEX plhPictureIdx (pictureId, changedAt)
     ) ENGINE=InnoDB`,
 
-    // Geotagged Wikimedia Commons photos, bulk-imported from the monthly
-    // Commons `geo_tags` dump (filtered to gt_type='camera'). The whole table is
-    // atomically replaced on each import (see src/wikimedia/importWikimedia.ts),
-    // so it carries no foreign keys and nothing references it. Only coordinates
-    // are stored — the file title, image URL and CC attribution are fetched by
-    // the client straight from the Commons API by pageId when a photo is opened.
+    // Geotagged Wikimedia Commons photos, bulk-imported monthly from the Commons
+    // `geo_tags` + `page` + `image` dumps (see src/wikimedia/importWikimedia.ts),
+    // which atomically swaps in a fresh copy. Created here too so a fresh deploy
+    // has the table before the first import runs — otherwise the gallery's
+    // Wikimedia arm errors on the missing table. Carries no foreign keys and
+    // nothing references it. capturedAt (EXIF DateTimeOriginal), uploadedAt
+    // (upload time), authorId (numeric Commons actor id — the name isn't in any
+    // public dump) and azimuth (EXIF GPSImgDirection) back the gallery's
+    // date/season/author colorizing and the direction markers; the file title,
+    // image URL and CC attribution are still fetched by the client straight from
+    // the Commons API by pageId when a photo is opened.
     sql`CREATE TABLE IF NOT EXISTS wikimediaPicture (
       pageId INT UNSIGNED NOT NULL PRIMARY KEY,
       location POINT NOT NULL,
-      SPATIAL INDEX wikimediaPicture_location_spx (location)
-    ) ENGINE=InnoDB`,
-
-    // Geotagged Wikimedia Commons photos, rebuilt monthly by the importer (which
-    // atomically swaps in a fresh copy). Created here too so a fresh deploy has
-    // the table before the first import runs — otherwise the gallery's Wikimedia
-    // arm errors on the missing table.
-    sql`CREATE TABLE IF NOT EXISTS wikimediaPicture (
-      pageId INT UNSIGNED NOT NULL PRIMARY KEY,
-      location POINT NOT NULL,
+      capturedAt DATETIME NULL,
+      uploadedAt DATETIME NULL,
+      authorId BIGINT UNSIGNED NULL,
+      azimuth SMALLINT UNSIGNED NULL,
       SPATIAL KEY wikimediaPicture_location_spx (location)
     ) ENGINE=InnoDB`,
 
