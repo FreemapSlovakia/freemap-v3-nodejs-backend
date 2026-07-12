@@ -223,7 +223,18 @@ export function attachPostPictureHandler(router: RouterInstance) {
             return ctx.throw(400, 'invalid or unsupported image file');
           }
 
-          const pano = exif.UsePanoramaViewer?.value === 'True';
+          // The client's pannellum viewer only renders equirectangular
+          // panoramas. A cylindrical GPano pano (Hugin) has no pannellum
+          // projection and gets stretched into a fake full sphere, so leave it
+          // (and any other explicit non-equirectangular projection) as a
+          // regular image. A missing ProjectionType is treated as
+          // equirectangular — the GPano default, and what pannellum assumes.
+          const projectionType = exif.ProjectionType?.value;
+
+          const pano =
+            exif.UsePanoramaViewer?.value === 'True' &&
+            (projectionType === undefined ||
+              projectionType === 'equirectangular');
 
           const createdAt = new Date();
 
