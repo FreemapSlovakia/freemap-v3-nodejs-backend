@@ -188,7 +188,9 @@ export async function initDatabase() {
       uploadedAt DATETIME NULL,
       authorId BIGINT UNSIGNED NULL,
       azimuth SMALLINT UNSIGNED NULL,
-      SPATIAL KEY wikimediaPicture_location_spx (location)
+      SPATIAL KEY wikimediaPicture_location_spx (location),
+      KEY wikimediaPicture_capturedAt (capturedAt),
+      KEY wikimediaPicture_uploadedAt (uploadedAt)
     ) ENGINE=InnoDB`,
 
     // Ratings for Wikimedia photos. Keyed on the stable Commons pageId and kept

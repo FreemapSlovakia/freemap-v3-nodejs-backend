@@ -163,6 +163,57 @@ const BboxRowSchema = z.array(
   }),
 );
 
+type WikimediaFilter = {
+  takenAtFrom?: string;
+  takenAtTo?: string;
+  createdAtFrom?: string;
+  createdAtTo?: string;
+  ratingFrom?: number;
+  ratingTo?: number;
+};
+
+// Date-range conditions for the Wikimedia arm, against the imported
+// `capturedAt` / `uploadedAt` columns. Rows with a NULL date drop out of a
+// range automatically, which is what we want (a photo with no such date can't
+// match a range on it).
+function wikimediaDateConds(f: WikimediaFilter): Sql[] {
+  const c: Sql[] = [];
+
+  if (f.takenAtFrom) {
+    c.push(sql`capturedAt >= ${new Date(f.takenAtFrom)}`);
+  }
+
+  if (f.takenAtTo) {
+    c.push(sql`capturedAt <= ${new Date(f.takenAtTo)}`);
+  }
+
+  if (f.createdAtFrom) {
+    c.push(sql`uploadedAt >= ${new Date(f.createdAtFrom)}`);
+  }
+
+  if (f.createdAtTo) {
+    c.push(sql`uploadedAt <= ${new Date(f.createdAtTo)}`);
+  }
+
+  return c;
+}
+
+// Rating-range conditions against the effective Bayesian `rating` alias (which
+// callers must SELECT via `wikimediaRatingSubquery`), applied in HAVING.
+function ratingRangeConds(ratingFrom?: number, ratingTo?: number): Sql[] {
+  const c: Sql[] = [];
+
+  if (ratingFrom != null) {
+    c.push(sql`rating >= ${ratingFrom}`);
+  }
+
+  if (ratingTo != null) {
+    c.push(sql`rating <= ${ratingTo}`);
+  }
+
+  return c;
+}
+
 const methods: {
   [name: string]: (ctx: ParameterizedContext) => Promise<void>;
 } = {
@@ -265,23 +316,24 @@ async function byRadius(ctx: ParameterizedContext) {
   const tagArray = tag || [];
   const licenseArray = license || [];
 
-  const galleryOnlyFilter =
-    userIdArray.length > 0 ||
+  // Wikimedia photos carry date/rating and are trivially non-pano/non-premium,
+  // so those filters narrow them; tag/author/license (and pano=true/premium=true,
+  // which no Wikimedia photo matches) have no equivalent and exclude them.
+  const wikimediaExcluded =
     tag !== undefined ||
-    ratingFrom != null ||
-    ratingTo != null ||
-    takenAtFrom != null ||
-    takenAtTo != null ||
-    createdAtFrom != null ||
-    createdAtTo != null ||
-    pano != null ||
-    premium != null ||
-    licenseArray.length > 0;
+    userIdArray.length > 0 ||
+    licenseArray.length > 0 ||
+    pano === true ||
+    premium === true;
 
   const includeGallery = !sources || sources.includes('gallery');
 
   const includeWikimedia =
-    (!sources || sources.includes('wikimedia')) && !galleryOnlyFilter;
+    (!sources || sources.includes('wikimedia')) && !wikimediaExcluded;
+
+  const wmDateConds = wikimediaDateConds(radiusQuery);
+
+  const wmRatingConds = ratingRangeConds(ratingFrom, ratingTo);
 
   // cca 1 degree
   const minLat = lat - distance / 43;
@@ -335,9 +387,12 @@ async function byRadius(ctx: ParameterizedContext) {
         await pool.query<unknown>(sql`
           SELECT pageId AS id,
             ST_Distance_Sphere(location, POINT(${lon}, ${lat})) / 1000 AS distance
+            ${wmRatingConds.length ? raw(`, ${wikimediaRatingSubquery}`) : empty}
           FROM wikimediaPicture
           WHERE MBRContains(ST_GeomFromText(${`LINESTRING(${minLon} ${minLat}, ${maxLon} ${maxLat})`}, 4326), location)
+          ${wmDateConds.length ? sql`AND ${join(wmDateConds, ' AND ')}` : empty}
           HAVING distance <= ${distance}
+          ${wmRatingConds.length ? sql`AND ${join(wmRatingConds, ' AND ')}` : empty}
           ORDER BY distance
           LIMIT 1000`),
       ).map((row) => ({ id: row.id, distance: row.distance, source: 1 }))
@@ -381,23 +436,20 @@ async function byBbox(ctx: ParameterizedContext) {
   const tagArray = tag || [];
   const licenseArray = license || [];
 
-  const galleryOnlyFilter =
-    userIdArray.length > 0 ||
+  // Wikimedia photos carry date/rating and are trivially non-pano/non-premium,
+  // so those filters narrow them; tag/author/license (and pano=true/premium=true)
+  // have no equivalent and exclude them.
+  const wikimediaExcluded =
     tag !== undefined ||
-    ratingFrom != null ||
-    ratingTo != null ||
-    takenAtFrom != null ||
-    takenAtTo != null ||
-    createdAtFrom != null ||
-    createdAtTo != null ||
-    pano != null ||
-    premium != null ||
-    licenseArray.length > 0;
+    userIdArray.length > 0 ||
+    licenseArray.length > 0 ||
+    pano === true ||
+    premium === true;
 
   const includeGallery = !sources || sources.includes('gallery');
 
   const includeWikimedia =
-    (!sources || sources.includes('wikimedia')) && !galleryOnlyFilter;
+    (!sources || sources.includes('wikimedia')) && !wikimediaExcluded;
 
   const sqlFields: string[] = (fields ?? []).filter(
     (f) =>
@@ -532,7 +584,13 @@ async function byBbox(ctx: ParameterizedContext) {
     wmExtra.push('azimuth');
   }
 
-  if (getRating) {
+  const wmDateConds = wikimediaDateConds(bboxQuery);
+
+  const wmRatingConds = ratingRangeConds(ratingFrom, ratingTo);
+
+  // The effective rating is needed for output (getRating) and/or to filter by
+  // the rating range.
+  if (getRating || wmRatingConds.length) {
     wmExtra.push(wikimediaRatingSubquery);
   }
 
@@ -543,6 +601,8 @@ async function byBbox(ctx: ParameterizedContext) {
           ${wmExtra.length ? raw(`, ${wmExtra.join(', ')}`) : empty}
           FROM wikimediaPicture
           WHERE MBRContains(ST_GeomFromText(${`LINESTRING(${minLon} ${minLat}, ${maxLon} ${maxLat})`}, 4326), location)
+          ${wmDateConds.length ? sql`AND ${join(wmDateConds, ' AND ')}` : empty}
+          ${wmRatingConds.length ? sql`HAVING ${join(wmRatingConds, ' AND ')}` : empty}
           LIMIT ${WIKIMEDIA_BBOX_LIMIT}`),
       )
     : [];
@@ -672,28 +732,21 @@ async function byOrder(ctx: ParameterizedContext) {
   const tagArray = tag || [];
   const licenseArray = license || [];
 
-  // Wikimedia photos are rated and commented on our platform but carry none of
-  // the other attributes, so they join the rating / last-comment orderings only
-  // when no gallery-only filter narrows the results.
-  const galleryOnlyFilter =
-    userIdArray.length > 0 ||
+  // Wikimedia photos carry a rating/comments (on our platform) and an imported
+  // capturedAt/uploadedAt, so they join every ordering and honour the date and
+  // rating filters (and, trivially, pano=false / premium=false). tag/author/
+  // license (and pano=true / premium=true) have no equivalent and exclude them.
+  const wikimediaExcluded =
     tag !== undefined ||
-    ratingFrom !== undefined ||
-    ratingTo !== undefined ||
-    takenAtFrom != null ||
-    takenAtTo != null ||
-    createdAtFrom != null ||
-    createdAtTo != null ||
-    pano != null ||
-    premium != null ||
-    licenseArray.length > 0;
+    userIdArray.length > 0 ||
+    licenseArray.length > 0 ||
+    pano === true ||
+    premium === true;
 
   const includeGallery = !sources || sources.includes('gallery');
 
   const includeWikimedia =
-    (!sources || sources.includes('wikimedia')) &&
-    (orderBy === 'rating' || orderBy === 'lastCommentedAt') &&
-    !galleryOnlyFilter;
+    (!sources || sources.includes('wikimedia')) && !wikimediaExcluded;
 
   const hv: Sql[] = [];
 
@@ -784,36 +837,73 @@ async function byOrder(ctx: ParameterizedContext) {
     return;
   }
 
-  // Rating / last-comment orderings also cover the (rated / commented) Commons
-  // photos. Both arms expose the order key as `ord`; a UNION lets the DB do the
-  // final merge-sort. No gallery-only filter is active here (see
-  // includeWikimedia), so the own arm needs only the private-photo guard.
-  const isRating = orderBy === 'rating';
+  // Every ordering also covers the Commons photos, honouring the same date and
+  // rating filters as own photos: rating from wikimediaRating, last-comment from
+  // wikimediaComment, taken/upload date from wikimediaPicture (skipping rows with
+  // no date). Both arms expose the order key as `ord` — and, when a rating range
+  // is set, `rating` (so the UNION arms stay column-compatible) — and a UNION
+  // lets the DB do the final merge-sort. `wh` already carries the date/pano/
+  // premium/private conditions and `hv` the rating range (built above); the
+  // Wikimedia arm re-derives the same against its own columns.
+  const needRating = hv.length > 0; // hv holds only the rating-range conditions
 
-  const wmArm = isRating
-    ? sql`SELECT -CAST(pageId AS SIGNED) AS id, ${raw(ratingExp)} AS ord
-        FROM wikimediaRating GROUP BY pageId
-        ORDER BY ord ${raw(direction)}, id ${raw(direction)} LIMIT 1000`
-    : sql`SELECT -CAST(pageId AS SIGNED) AS id, MAX(createdAt) AS ord
-        FROM wikimediaComment GROUP BY pageId
+  const wmDateConds = wikimediaDateConds(orderByQuery);
+
+  const wmDateJoin = wmDateConds.length
+    ? sql`JOIN wikimediaPicture wp ON wp.pageId = w.pageId WHERE ${join(wmDateConds, ' AND ')}`
+    : empty;
+
+  let wmArm: Sql;
+
+  if (orderBy === 'rating') {
+    // ord is the rating aggregate itself, so the rating range is a plain HAVING.
+    wmArm = sql`SELECT -CAST(w.pageId AS SIGNED) AS id, ${raw(ratingExp)} AS ord
+        ${needRating ? sql`, ${raw(ratingExp)} AS rating` : empty}
+        FROM wikimediaRating w ${wmDateJoin}
+        GROUP BY w.pageId
+        ${needRating ? sql`HAVING ${join(hv, ' AND ')}` : empty}
         ORDER BY ord ${raw(direction)}, id ${raw(direction)} LIMIT 1000`;
+  } else if (orderBy === 'lastCommentedAt') {
+    wmArm = sql`SELECT -CAST(w.pageId AS SIGNED) AS id, MAX(w.createdAt) AS ord
+        ${needRating ? raw(`, (SELECT ${ratingExp} FROM wikimediaRating WHERE pageId = w.pageId) AS rating`) : empty}
+        FROM wikimediaComment w ${wmDateJoin}
+        GROUP BY w.pageId
+        ${needRating ? sql`HAVING ${join(hv, ' AND ')}` : empty}
+        ORDER BY ord ${raw(direction)}, id ${raw(direction)} LIMIT 1000`;
+  } else {
+    // createdAt → uploadedAt, takenAt → capturedAt (from the Commons image
+    // dump); an index on each keeps this LIMIT 1000 fast over the whole table.
+    const col = orderBy === 'takenAt' ? 'capturedAt' : 'uploadedAt';
+
+    const wmWhere = [sql`${raw(col)} IS NOT NULL`, ...wmDateConds];
+
+    wmArm = sql`SELECT -CAST(pageId AS SIGNED) AS id, ${raw(col)} AS ord
+        ${needRating ? raw(`, ${wikimediaRatingSubquery}`) : empty}
+        FROM wikimediaPicture
+        WHERE ${join(wmWhere, ' AND ')}
+        ${needRating ? sql`HAVING ${join(hv, ' AND ')}` : empty}
+        ORDER BY ord ${raw(direction)}, id ${raw(direction)} LIMIT 1000`;
+  }
 
   const arms: Sql[] = [];
 
   if (includeGallery) {
-    const ownOrd = isRating
-      ? raw(
-          `(SELECT ${ratingExp} FROM pictureRating WHERE pictureId = picture.id)`,
-        )
-      : sql`(SELECT MAX(createdAt) FROM pictureComment WHERE pictureId = picture.id)`;
+    const ownOrd =
+      orderBy === 'rating'
+        ? raw(
+            `(SELECT ${ratingExp} FROM pictureRating WHERE pictureId = picture.id)`,
+          )
+        : orderBy === 'lastCommentedAt'
+          ? sql`(SELECT MAX(createdAt) FROM pictureComment WHERE pictureId = picture.id)`
+          : raw(orderBy);
 
+    // Same filters as the non-UNION query: `wh` (private guard + date/pano/
+    // premium) and `hv` (rating range, needing the rating subquery selected).
     arms.push(sql`SELECT picture.id AS id, ${ownOrd} AS ord
+      ${needRating ? raw(`, ${ratingSubquery}`) : empty}
       FROM picture
-      ${
-        hasRole(ctx.state.user, 'galleryModerator')
-          ? empty
-          : sql`WHERE (picture.id NOT IN (SELECT pictureId FROM pictureTag WHERE name = 'private') OR userId = ${myUserId})`
-      }
+      ${wh.length ? sql`WHERE ${join(wh, ' AND ')}` : empty}
+      ${hv.length ? sql`HAVING ${join(hv, ' AND ')}` : empty}
       ORDER BY ord ${raw(direction)}, id ${raw(direction)}
       LIMIT 1000`);
   }

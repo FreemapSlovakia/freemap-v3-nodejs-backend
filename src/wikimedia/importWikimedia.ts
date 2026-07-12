@@ -497,10 +497,15 @@ export async function importWikimedia(): Promise<void> {
   // keeps peak disk usage down on a nearly-full volume.
   await pool.query(sql`DROP TABLE wm_stage, wm_keep, wm_img`);
 
-  logger.info('Building spatial index…');
+  logger.info('Building indexes…');
 
+  // One ALTER (a single rebuild) for all indexes: the spatial index for the map
+  // bbox, and the date indexes so the gallery's taken/upload-date orderings stay
+  // fast (LIMIT 1000 over the whole table).
   await pool.query(sql`ALTER TABLE wikimediaPicture_new
-    ADD SPATIAL INDEX wikimediaPicture_location_spx (location)`);
+    ADD SPATIAL INDEX wikimediaPicture_location_spx (location),
+    ADD INDEX wikimediaPicture_capturedAt (capturedAt),
+    ADD INDEX wikimediaPicture_uploadedAt (uploadedAt)`);
 
   // Atomically swap the freshly built table in.
   await pool.query(sql`CREATE TABLE IF NOT EXISTS wikimediaPicture (
@@ -510,7 +515,9 @@ export async function importWikimedia(): Promise<void> {
     uploadedAt DATETIME NULL,
     authorId BIGINT UNSIGNED NULL,
     azimuth SMALLINT UNSIGNED NULL,
-    SPATIAL INDEX wikimediaPicture_location_spx (location)
+    SPATIAL INDEX wikimediaPicture_location_spx (location),
+    INDEX wikimediaPicture_capturedAt (capturedAt),
+    INDEX wikimediaPicture_uploadedAt (uploadedAt)
   ) ENGINE=InnoDB`);
 
   await pool.query(sql`DROP TABLE IF EXISTS wikimediaPicture_old`);
