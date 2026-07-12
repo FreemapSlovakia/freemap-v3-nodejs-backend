@@ -21,6 +21,7 @@ import {
   ratingSubquery,
   wikimediaRatingSubquery,
 } from './ratingConstants.js';
+import { LICENSE_Q_MAP } from './wikimediaLicense.js';
 
 const secret = getEnv('PREMIUM_PHOTO_SECRET', '');
 const gzipAsync = promisify(gzip);
@@ -117,6 +118,7 @@ const WikimediaBboxRowSchema = z.array(
     takenAt: z.date().nullish(),
     createdAt: z.date().nullish(),
     azimuth: z.number().nullish(),
+    licenseId: z.number().nullish(),
     // Numeric Commons actor id; kept as a plain number (actor ids fit well
     // within 2^53) so colorize-by-author can bucket by it like our own userId.
     userId: z.preprocess(
@@ -584,6 +586,10 @@ async function byBbox(ctx: ParameterizedContext) {
     wmExtra.push('azimuth');
   }
 
+  if (fields?.includes('license')) {
+    wmExtra.push('licenseId');
+  }
+
   const wmDateConds = wikimediaDateConds(bboxQuery);
 
   const wmRatingConds = ratingRangeConds(ratingFrom, ratingTo);
@@ -621,7 +627,8 @@ async function byBbox(ctx: ParameterizedContext) {
     pano: undefined,
     premium: undefined,
     azimuth: row.azimuth ?? undefined,
-    license: undefined,
+    // Map the raw Wikidata license id to a family the client colorizes by.
+    license: row.licenseId == null ? undefined : LICENSE_Q_MAP[row.licenseId],
     rating: getRating ? row.rating : undefined,
     tags: undefined,
     user: undefined,

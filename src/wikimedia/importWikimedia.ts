@@ -1,3 +1,4 @@
+import { createInterface } from 'node:readline';
 import { createGunzip } from 'node:zlib';
 import got from 'got';
 import sql, { raw } from 'sql-template-tag';
@@ -27,6 +28,13 @@ const PAGE_URL = getEnv(
 const IMAGE_URL = getEnv(
   'WIKIMEDIA_IMAGE_DUMP_URL',
   'https://dumps.wikimedia.org/commonswiki/latest/commonswiki-latest-image.sql.gz',
+);
+
+// Structured Data on Commons (Wikibase mediainfo). Its P571 (inception) recovers
+// capture dates the image dump externalizes, and P275 gives the license.
+const MEDIAINFO_URL = getEnv(
+  'WIKIMEDIA_MEDIAINFO_DUMP_URL',
+  'https://dumps.wikimedia.org/other/wikibase/commonswiki/latest-mediainfo.json.gz',
 );
 
 // Rows per multi-row INSERT.
@@ -113,6 +121,7 @@ async function* geoTagRows(seen: Bitset): AsyncGenerator<SqlValue[]> {
 async function* pageKeepRows(
   seen: Bitset,
   titleBits: StringBitset,
+  keptBits: Bitset,
 ): AsyncGenerator<SqlValue[]> {
   let idx: Record<string, number> | null = null;
 
@@ -143,6 +152,7 @@ async function* pageKeepRows(
     }
 
     titleBits.set(title);
+    keptBits.set(Number(pageId));
 
     yield [pageId, title];
   }
@@ -286,6 +296,130 @@ async function* imageMetaRows(
   }
 }
 
+/** The `value` of a Wikibase statement's main snak (or undefined). */
+function claimValue(c: unknown): unknown {
+  return (c as { mainsnak?: { datavalue?: { value?: unknown } } } | null)
+    ?.mainsnak?.datavalue?.value;
+}
+
+const INCEPTION_TIME_RE = /^\+(\d{4})-(\d{2})-(\d{2})T/;
+
+/**
+ * Capture date from an SDC `P571` (inception) statement — a Wikibase time value
+ * `+YYYY-MM-DD…`. Year/month-precision dates carry `00` for the unknown parts,
+ * normalized to `01` (so they land on Jan 1 / the 1st of the month).
+ */
+function extractInception(statements: Record<string, unknown>): string | null {
+  const claims = statements['P571'];
+
+  if (!Array.isArray(claims)) {
+    return null;
+  }
+
+  for (const c of claims) {
+    const time = (claimValue(c) as { time?: unknown } | null)?.time;
+
+    if (typeof time !== 'string') {
+      continue;
+    }
+
+    const m = INCEPTION_TIME_RE.exec(time);
+
+    if (!m) {
+      continue;
+    }
+
+    const dt = toSqlDateTime(
+      m[1],
+      m[2] === '00' ? '01' : m[2],
+      m[3] === '00' ? '01' : m[3],
+      '00',
+      '00',
+      '00',
+    );
+
+    if (dt) {
+      return dt;
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Raw Wikidata license item id from an SDC `P275` (license) statement — stored
+ * as-is (lossless); the query side maps it to a license family (see
+ * routers/gallery/wikimediaLicense.ts), so the mapping can change without a
+ * re-import.
+ */
+function extractLicenseId(statements: Record<string, unknown>): number | null {
+  const claims = statements['P275'];
+
+  if (!Array.isArray(claims)) {
+    return null;
+  }
+
+  for (const c of claims) {
+    const nid = (claimValue(c) as { 'numeric-id'?: unknown } | null)?.[
+      'numeric-id'
+    ];
+
+    if (typeof nid === 'number') {
+      return nid;
+    }
+  }
+
+  return null;
+}
+
+const MEDIAINFO_ID_RE = /^\{"type":"mediainfo","id":"M(\d+)"/;
+
+/**
+ * Kept photos' SDC entities → `[pageId, capturedAt, licenseId]`. The mediainfo
+ * dump is a JSON array with one entity per line (`{"type":"mediainfo",
+ * "id":"M<pageId>",…},`), so we cheap-match the pageId at the line start and
+ * only JSON-parse the kept subset — skipping the ~99% we don't want. Rows with
+ * neither a usable date nor a license are dropped.
+ */
+async function* mediaInfoRows(keptBits: Bitset): AsyncGenerator<SqlValue[]> {
+  const rl = createInterface({
+    input: dumpStream(MEDIAINFO_URL),
+    crlfDelay: Number.POSITIVE_INFINITY,
+  });
+
+  for await (const line of rl) {
+    const m = MEDIAINFO_ID_RE.exec(line);
+
+    if (!m) {
+      continue; // the opening '[' / closing ']', or a non-entity line
+    }
+
+    const pageId = Number(m[1]);
+
+    if (!keptBits.has(pageId)) {
+      continue;
+    }
+
+    let entity: { statements?: Record<string, unknown> };
+
+    try {
+      entity = JSON.parse(line.endsWith(',') ? line.slice(0, -1) : line);
+    } catch {
+      continue;
+    }
+
+    const statements = entity.statements ?? {};
+    const capturedAt = extractInception(statements);
+    const licenseId = extractLicenseId(statements);
+
+    if (capturedAt === null && licenseId === null) {
+      continue;
+    }
+
+    yield [pageId, capturedAt, licenseId];
+  }
+}
+
 /**
  * Drain `source` into a single connection using multi-row inserts wrapped in
  * large transactions (committed every COMMIT_ROWS rows). Sequential on purpose:
@@ -404,6 +538,7 @@ export async function importWikimedia(): Promise<void> {
   await pool.query(sql`DROP TABLE IF EXISTS wm_stage`);
   await pool.query(sql`DROP TABLE IF EXISTS wm_keep`);
   await pool.query(sql`DROP TABLE IF EXISTS wm_img`);
+  await pool.query(sql`DROP TABLE IF EXISTS wm_sdc`);
   await pool.query(sql`DROP TABLE IF EXISTS wikimediaPicture_new`);
 
   // Heap staging table — no primary key so the (page-id-random) geo_tags rows
@@ -431,11 +566,21 @@ export async function importWikimedia(): Promise<void> {
     azimuth SMALLINT UNSIGNED NULL
   ) ENGINE=InnoDB`);
 
+  // Per-pageId structured data from the Commons SDC (mediainfo) dump.
+  await pool.query(sql`CREATE TABLE wm_sdc (
+    pageId INT UNSIGNED NOT NULL PRIMARY KEY,
+    capturedAt DATETIME NULL,
+    licenseId INT UNSIGNED NULL
+  ) ENGINE=InnoDB`);
+
   // Bit-set of geotagged pageIds so the page pass only considers relevant rows.
   const seen = makeBitset();
 
   // Bit-set of kept titles so the image pass only stages the photos we keep.
   const titleBits = makeStringBitset();
+
+  // Bit-set of kept pageIds so the SDC pass only stages the photos we keep.
+  const keptBits = makeBitset();
 
   logger.info('Streaming geo_tags dump…');
 
@@ -452,7 +597,7 @@ export async function importWikimedia(): Promise<void> {
   const keepCount = await loadPass(
     'wm_keep',
     'INSERT IGNORE INTO wm_keep (pageId, title) VALUES (?, ?)',
-    () => pageKeepRows(seen, titleBits),
+    () => pageKeepRows(seen, titleBits, keptBits),
   );
 
   logger.info(
@@ -465,7 +610,17 @@ export async function importWikimedia(): Promise<void> {
     () => imageMetaRows(titleBits),
   );
 
-  logger.info(`Staged metadata for ${imgCount} files. Building final table…`);
+  logger.info(
+    `Staged metadata for ${imgCount} files. Streaming SDC (mediainfo) dump for capture dates + licenses…`,
+  );
+
+  const sdcCount = await loadPass(
+    'wm_sdc',
+    'INSERT IGNORE INTO wm_sdc (pageId, capturedAt, licenseId) VALUES (?, ?, ?)',
+    () => mediaInfoRows(keptBits),
+  );
+
+  logger.info(`Staged SDC for ${sdcCount} files. Building final table…`);
 
   // One sorted index build each — cheap versus maintaining them during the load.
   await pool.query(
@@ -474,31 +629,36 @@ export async function importWikimedia(): Promise<void> {
 
   await pool.query(sql`ALTER TABLE wm_img ADD INDEX wm_img_title (title)`);
 
-  // Final table: inner-join keeps only photo pageIds, the LEFT JOIN attaches
-  // metadata (NULL when the image dump had no match), INSERT IGNORE dedups on
-  // the pageId PK, ORDER BY pageId keeps that insert sequential. Spatial index
-  // is added once afterwards.
+  // Final table: inner-join keeps only photo pageIds, the LEFT JOINs attach the
+  // image-dump and SDC metadata (NULL when unmatched), INSERT IGNORE dedups on
+  // the pageId PK, ORDER BY pageId keeps that insert sequential. capturedAt
+  // prefers the precise EXIF value, falling back to the SDC inception date
+  // (which covers the files whose EXIF the image dump externalized). Spatial
+  // index is added once afterwards.
   await pool.query(sql`CREATE TABLE wikimediaPicture_new (
     pageId INT UNSIGNED NOT NULL PRIMARY KEY,
     location POINT NOT NULL,
     capturedAt DATETIME NULL,
     uploadedAt DATETIME NULL,
     authorId BIGINT UNSIGNED NULL,
-    azimuth SMALLINT UNSIGNED NULL
+    azimuth SMALLINT UNSIGNED NULL,
+    licenseId INT UNSIGNED NULL
   ) ENGINE=InnoDB`);
 
   await pool.query(sql`INSERT IGNORE INTO wikimediaPicture_new
-      (pageId, location, capturedAt, uploadedAt, authorId, azimuth)
+      (pageId, location, capturedAt, uploadedAt, authorId, azimuth, licenseId)
     SELECT s.pageId, POINT(s.lon, s.lat),
-      i.capturedAt, i.uploadedAt, i.authorId, i.azimuth
+      COALESCE(i.capturedAt, sdc.capturedAt), i.uploadedAt, i.authorId,
+      i.azimuth, sdc.licenseId
     FROM wm_stage s
     JOIN wm_keep k ON k.pageId = s.pageId
     LEFT JOIN wm_img i ON i.title = k.title
+    LEFT JOIN wm_sdc sdc ON sdc.pageId = s.pageId
     ORDER BY s.pageId`);
 
   // Free the staging tables before the (temp-space-hungry) spatial index build —
   // keeps peak disk usage down on a nearly-full volume.
-  await pool.query(sql`DROP TABLE wm_stage, wm_keep, wm_img`);
+  await pool.query(sql`DROP TABLE wm_stage, wm_keep, wm_img, wm_sdc`);
 
   logger.info('Building indexes…');
 
@@ -518,6 +678,7 @@ export async function importWikimedia(): Promise<void> {
     uploadedAt DATETIME NULL,
     authorId BIGINT UNSIGNED NULL,
     azimuth SMALLINT UNSIGNED NULL,
+    licenseId INT UNSIGNED NULL,
     SPATIAL INDEX wikimediaPicture_location_spx (location),
     INDEX wikimediaPicture_capturedAt (capturedAt),
     INDEX wikimediaPicture_uploadedAt (uploadedAt)
