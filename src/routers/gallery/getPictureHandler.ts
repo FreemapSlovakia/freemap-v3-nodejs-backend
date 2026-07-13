@@ -264,6 +264,7 @@ export function attachGetPictureHandler(router: RouterInstance) {
 const WikimediaRowSchema = z.object({
   lat: z.number(),
   lon: z.number(),
+  uploadedAt: zNullableDateToIso,
   rating: z.number(),
   myStars: z.number().nullish(),
 });
@@ -285,6 +286,7 @@ async function respondWikimedia(
         SELECT
           ST_X(location) AS lon,
           ST_Y(location) AS lat,
+          uploadedAt,
           (SELECT ${raw(ratingExp)} FROM wikimediaRating WHERE pageId = ${pageId}) AS rating
           ${
             ctx.state.user
@@ -320,6 +322,7 @@ async function respondWikimedia(
     title: null,
     lat: row.lat,
     lon: row.lon,
+    createdAt: row.uploadedAt,
     tags: [],
     comments: commentRows.map(
       ({ id, createdAt, comment, userId, name, hasPicture, premium }) => ({
