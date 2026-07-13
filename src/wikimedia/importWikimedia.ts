@@ -45,6 +45,12 @@ const BATCH_SIZE = getEnvInteger('WIKIMEDIA_IMPORT_BATCH_SIZE', 5000);
 // in large chunks — rather than per batch — cuts the number of fsyncs ~100×.
 const COMMIT_ROWS = getEnvInteger('WIKIMEDIA_IMPORT_COMMIT_ROWS', 200_000);
 
+// pageId span per batch when building the final table. The insert is split into
+// ranges so no single transaction locks all ~31M rows at once (InnoDB error
+// 1206). Small enough that even a dense pageId range stays well under the lock
+// table limit; sparse ranges just insert fewer (or zero) rows.
+const PAGEID_BATCH = getEnvInteger('WIKIMEDIA_IMPORT_PAGEID_BATCH', 1_000_000);
+
 const FILE_NAMESPACE = 6;
 
 /** Decompressed byte stream of a `.sql.gz` dump, with download errors forwarded. */
@@ -622,12 +628,29 @@ export async function importWikimedia(): Promise<void> {
 
   logger.info(`Staged SDC for ${sdcCount} files. Building final table…`);
 
+  await buildFinalTable(started);
+}
+
+/**
+ * Builds `wikimediaPicture` from the already-populated `wm_stage`/`wm_keep`/
+ * `wm_img`/`wm_sdc` staging tables: batched insert (see {@link PAGEID_BATCH}),
+ * index build, and atomic table swap. Split out from the streaming passes so a
+ * crashed run's final phase can be re-run against the surviving staging tables
+ * without re-downloading the dumps. Idempotent: safe whether or not the staging
+ * indexes or a partial `wikimediaPicture_new` from an earlier attempt exist.
+ */
+export async function buildFinalTable(started: number): Promise<void> {
   // One sorted index build each — cheap versus maintaining them during the load.
   await pool.query(
-    sql`ALTER TABLE wm_stage ADD INDEX wm_stage_pageId (pageId)`,
+    sql`ALTER TABLE wm_stage ADD INDEX IF NOT EXISTS wm_stage_pageId (pageId)`,
   );
 
-  await pool.query(sql`ALTER TABLE wm_img ADD INDEX wm_img_title (title)`);
+  await pool.query(
+    sql`ALTER TABLE wm_img ADD INDEX IF NOT EXISTS wm_img_title (title)`,
+  );
+
+  // Drop a partial table a previous crashed insert may have left behind.
+  await pool.query(sql`DROP TABLE IF EXISTS wikimediaPicture_new`);
 
   // Final table: inner-join keeps only photo pageIds, the LEFT JOINs attach the
   // image-dump and SDC metadata (NULL when unmatched), INSERT IGNORE dedups on
@@ -645,16 +668,37 @@ export async function importWikimedia(): Promise<void> {
     licenseId INT UNSIGNED NULL
   ) ENGINE=InnoDB`);
 
-  await pool.query(sql`INSERT IGNORE INTO wikimediaPicture_new
-      (pageId, location, capturedAt, uploadedAt, authorId, azimuth, licenseId)
-    SELECT s.pageId, POINT(s.lon, s.lat),
-      COALESCE(i.capturedAt, sdc.capturedAt), i.uploadedAt, i.authorId,
-      i.azimuth, sdc.licenseId
-    FROM wm_stage s
-    JOIN wm_keep k ON k.pageId = s.pageId
-    LEFT JOIN wm_img i ON i.title = k.title
-    LEFT JOIN wm_sdc sdc ON sdc.pageId = s.pageId
-    ORDER BY s.pageId`);
+  // Insert in pageId ranges, one transaction per batch: a single INSERT…SELECT
+  // of all ~31M rows overflows InnoDB's lock table (error 1206, "total number
+  // of locks exceeds the lock table size"). Every row for a given pageId falls
+  // in exactly one range, so INSERT IGNORE still dedups on the pageId PK, and
+  // ascending ranges keep the PK insert sequential.
+  const [{ minId, maxId }] = z
+    .array(
+      z.object({
+        minId: z.number().nullable(),
+        maxId: z.number().nullable(),
+      }),
+    )
+    .parse(
+      await pool.query(
+        sql`SELECT MIN(pageId) AS minId, MAX(pageId) AS maxId FROM wm_stage`,
+      ),
+    );
+
+  for (let lo = minId ?? 0; lo <= (maxId ?? -1); lo += PAGEID_BATCH) {
+    await pool.query(sql`INSERT IGNORE INTO wikimediaPicture_new
+        (pageId, location, capturedAt, uploadedAt, authorId, azimuth, licenseId)
+      SELECT s.pageId, POINT(s.lon, s.lat),
+        COALESCE(i.capturedAt, sdc.capturedAt), i.uploadedAt, i.authorId,
+        i.azimuth, sdc.licenseId
+      FROM wm_stage s
+      JOIN wm_keep k ON k.pageId = s.pageId
+      LEFT JOIN wm_img i ON i.title = k.title
+      LEFT JOIN wm_sdc sdc ON sdc.pageId = s.pageId
+      WHERE s.pageId >= ${lo} AND s.pageId < ${lo + PAGEID_BATCH}
+      ORDER BY s.pageId`);
+  }
 
   // Free the staging tables before the (temp-space-hungry) spatial index build —
   // keeps peak disk usage down on a nearly-full volume.
