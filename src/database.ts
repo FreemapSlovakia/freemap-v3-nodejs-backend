@@ -170,6 +170,57 @@ export async function initDatabase() {
       INDEX plhPictureIdx (pictureId, changedAt)
     ) ENGINE=InnoDB`,
 
+    // Geotagged Wikimedia Commons photos, bulk-imported monthly from the Commons
+    // `geo_tags` + `page` + `image` + SDC mediainfo dumps (see
+    // src/wikimedia/importWikimedia.ts), which atomically swaps in a fresh copy.
+    // Created here too so a fresh deploy has the table before the first import
+    // runs — otherwise the gallery's Wikimedia arm errors on the missing table.
+    // Carries no foreign keys and nothing references it. capturedAt (EXIF
+    // DateTimeOriginal, falling back to the SDC P571 inception date), uploadedAt
+    // (upload time), authorId (numeric Commons actor id — the name isn't in any
+    // public dump), azimuth (EXIF GPSImgDirection) and licenseId (raw Wikidata
+    // license item from SDC P275, mapped to a family at query time) back the
+    // gallery's date/season/author/license colorizing and the direction markers;
+    // the file title, image URL and CC attribution are still fetched by the
+    // client straight from the Commons API by pageId when a photo is opened.
+    sql`CREATE TABLE IF NOT EXISTS wikimediaPicture (
+      pageId INT UNSIGNED NOT NULL PRIMARY KEY,
+      location POINT NOT NULL,
+      capturedAt DATETIME NULL,
+      uploadedAt DATETIME NULL,
+      authorId BIGINT UNSIGNED NULL,
+      azimuth SMALLINT UNSIGNED NULL,
+      licenseId INT UNSIGNED NULL,
+      SPATIAL KEY wikimediaPicture_location_spx (location),
+      KEY wikimediaPicture_capturedAt (capturedAt),
+      KEY wikimediaPicture_uploadedAt (uploadedAt)
+    ) ENGINE=InnoDB`,
+
+    // Ratings for Wikimedia photos. Keyed on the stable Commons pageId and kept
+    // deliberately independent of `wikimediaPicture` (no FK) so the monthly
+    // table swap never disturbs them; ratings whose photo later disappears from
+    // Commons simply stop rendering.
+    sql`CREATE TABLE IF NOT EXISTS wikimediaRating (
+      pageId INT UNSIGNED NOT NULL,
+      userId INT UNSIGNED NOT NULL,
+      stars TINYINT UNSIGNED NOT NULL,
+      ratedAt TIMESTAMP NOT NULL,
+      PRIMARY KEY (pageId, userId),
+      FOREIGN KEY (userId) REFERENCES user (id) ON DELETE CASCADE
+    ) ENGINE=InnoDB`,
+
+    // Comments on Wikimedia photos. Also keyed on the stable Commons pageId and
+    // independent of `wikimediaPicture` (see wikimediaRating).
+    sql`CREATE TABLE IF NOT EXISTS wikimediaComment (
+      id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+      pageId INT UNSIGNED NOT NULL,
+      userId INT UNSIGNED NOT NULL,
+      createdAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      comment VARCHAR(4096) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+      FOREIGN KEY (userId) REFERENCES user (id) ON DELETE CASCADE,
+      INDEX wcPageIdIdx (pageId, createdAt)
+    ) ENGINE=InnoDB`,
+
     sql`CREATE TABLE IF NOT EXISTS trackingDevice (
       id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
       userId INT UNSIGNED NOT NULL,

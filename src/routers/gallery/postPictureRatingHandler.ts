@@ -4,6 +4,7 @@ import z from 'zod';
 import { authenticator } from '../../authenticator.js';
 import { runInTransaction } from '../../database.js';
 import { AUTH_REQUIRED, registerPath } from '../../openapi.js';
+import { parsePictureId } from './pictureId.js';
 
 const BodySchema = z.strictObject({ stars: z.uint32().min(1).max(5) });
 
@@ -35,12 +36,46 @@ export function attachPostPictureRatingHandler(router: RouterInstance) {
   });
 
   router.post('/pictures/:id/rating', authenticator(true), async (ctx) => {
+    const ref = parsePictureId(ctx.params.id);
+
+    if (!ref) {
+      return ctx.throw(404, 'no such picture');
+    }
+
     let body;
 
     try {
       body = BodySchema.parse(ctx.request.body);
     } catch (err) {
       return ctx.throw(400, err as Error);
+    }
+
+    if (ref.source === 'wikimedia') {
+      const { stars } = body;
+      const user = ctx.state.user!;
+
+      await runInTransaction(async (conn) => {
+        const [row] = await conn.query<{ pageId: number }[]>(
+          sql`SELECT pageId FROM wikimediaPicture WHERE pageId = ${ref.pageId}`,
+        );
+
+        if (!row) {
+          ctx.throw(404, 'no such picture');
+        }
+
+        await conn.query<unknown>(sql`
+          INSERT INTO wikimediaRating SET
+              pageId = ${ref.pageId},
+              userId = ${user.id},
+              stars = ${stars},
+              ratedAt = ${new Date()}
+            ON DUPLICATE KEY UPDATE stars = ${stars}, ratedAt = ${new Date()}
+        `);
+      });
+
+      ctx.status = 204;
+
+      return;
     }
 
     await runInTransaction(async (conn) => {

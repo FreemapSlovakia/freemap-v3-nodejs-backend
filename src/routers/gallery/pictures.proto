@@ -18,6 +18,8 @@ message Picture {
   optional string user = 15;
   optional int64 last_commented_at = 16;
   optional string license = 17;
+  // 0 = own gallery photo (default, omitted on the wire), 1 = Wikimedia Commons.
+  uint32 source = 18;
 }
 
 message PicturesResponse {

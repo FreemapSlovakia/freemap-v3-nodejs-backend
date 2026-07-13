@@ -15,7 +15,13 @@ import { AUTH_OPTIONAL, registerPath } from '../../openapi.js';
 import { acceptValidator } from '../../requestValidators.js';
 import { hasRole } from '../../roles.js';
 import { LicenseSchema } from './licenses.js';
-import { ratingSubquery } from './ratingConstants.js';
+import {
+  bayesM,
+  ratingExp,
+  ratingSubquery,
+  wikimediaRatingSubquery,
+} from './ratingConstants.js';
+import { LICENSE_Q_MAP, licenseQIds } from './wikimediaLicense.js';
 
 const secret = getEnv('PREMIUM_PHOTO_SECRET', '');
 const gzipAsync = promisify(gzip);
@@ -52,6 +58,13 @@ const CommonQuerySchema = z.object({
   license: z.preprocess(
     (v) => (Array.isArray(v) ? v : v ? [v] : undefined),
     z.array(LicenseSchema).optional(),
+  ),
+  // Which photo sources to include; defaults to both. Any gallery-only filter
+  // (userId, tag, rating, date, pano, premium, license) implicitly drops the
+  // wikimedia source since those attributes do not exist for it.
+  sources: z.preprocess(
+    (v) => (Array.isArray(v) ? v : v ? [v] : undefined),
+    z.array(z.enum(['gallery', 'wikimedia'])).optional(),
   ),
 });
 
@@ -92,6 +105,29 @@ const BBoxQuerySchema = CommonQuerySchema.extend({
   ),
 }).meta({ title: 'bbox' });
 
+// Safety cap for the wikimedia arm in dense areas; the client also gates it by
+// zoom before ever requesting it.
+const WIKIMEDIA_BBOX_LIMIT = 5000;
+
+const WikimediaBboxRowSchema = z.array(
+  z.object({
+    id: z.uint32(),
+    lat: z.number(),
+    lon: z.number(),
+    rating: z.number().nullish(),
+    takenAt: z.date().nullish(),
+    createdAt: z.date().nullish(),
+    azimuth: z.number().nullish(),
+    licenseId: z.number().nullish(),
+    // Numeric Commons actor id; kept as a plain number (actor ids fit well
+    // within 2^53) so colorize-by-author can bucket by it like our own userId.
+    userId: z.preprocess(
+      (v) => (v == null ? v : Number(v)),
+      z.number().int().nonnegative().nullish(),
+    ),
+  }),
+);
+
 const OrderByQuerySchema = CommonQuerySchema.extend({
   by: z.literal('order'),
   orderBy: z.enum(['createdAt', 'takenAt', 'rating', 'lastCommentedAt']),
@@ -99,6 +135,10 @@ const OrderByQuerySchema = CommonQuerySchema.extend({
 }).meta({ title: 'order' });
 
 const IdRowSchema = z.array(z.object({ id: z.number() }));
+
+const RadiusRowSchema = z.array(
+  z.object({ id: z.uint32(), distance: z.number() }),
+);
 
 const BboxRowSchema = z.array(
   z.object({
@@ -125,6 +165,92 @@ const BboxRowSchema = z.array(
     user: z.string().nullish(),
   }),
 );
+
+type WikimediaFilter = {
+  takenAtFrom?: string;
+  takenAtTo?: string;
+  createdAtFrom?: string;
+  createdAtTo?: string;
+  ratingFrom?: number;
+  ratingTo?: number;
+  license?: string[];
+};
+
+// Conditions on `wikimediaPicture` columns for the Wikimedia arm: the
+// `capturedAt` / `uploadedAt` date ranges (a NULL date drops out of a range
+// automatically, which is what we want) and the license filter, mapped from our
+// license families to the raw Wikidata ids stored in `licenseId`.
+function wikimediaColumnConds(f: WikimediaFilter): Sql[] {
+  const c: Sql[] = [];
+
+  if (f.takenAtFrom) {
+    c.push(sql`capturedAt >= ${new Date(f.takenAtFrom)}`);
+  }
+
+  if (f.takenAtTo) {
+    c.push(sql`capturedAt <= ${new Date(f.takenAtTo)}`);
+  }
+
+  if (f.createdAtFrom) {
+    c.push(sql`uploadedAt >= ${new Date(f.createdAtFrom)}`);
+  }
+
+  if (f.createdAtTo) {
+    c.push(sql`uploadedAt <= ${new Date(f.createdAtTo)}`);
+  }
+
+  if (f.license?.length) {
+    const qids = licenseQIds(f.license);
+
+    // No mapped id (a family with no Commons Q-id) → match nothing.
+    c.push(qids.length ? sql`licenseId IN (${join(qids)})` : sql`FALSE`);
+  }
+
+  return c;
+}
+
+// Rating-range conditions against the effective Bayesian `rating` alias (which
+// callers must SELECT via `wikimediaRatingSubquery`), applied in HAVING.
+function ratingRangeConds(ratingFrom?: number, ratingTo?: number): Sql[] {
+  const c: Sql[] = [];
+
+  if (ratingFrom != null) {
+    c.push(sql`rating >= ${ratingFrom}`);
+  }
+
+  if (ratingTo != null) {
+    c.push(sql`rating <= ${ratingTo}`);
+  }
+
+  return c;
+}
+
+/** Serialize a DATE column for the wire: epoch seconds for protobuf, ISO string
+ *  for JSON, preserving null/undefined either way. */
+function toWireDate(
+  v: Date | null | undefined,
+  isProtobuf: boolean,
+): number | string | null | undefined {
+  return v == null ? v : isProtobuf ? v.getTime() / 1000 : v.toISOString();
+}
+
+// Whether the active filters exclude Wikimedia photos entirely. They carry
+// date/rating/license, so those filters just narrow them; tag/author (and
+// pano=true/premium=true, which no Wikimedia photo matches) have no equivalent
+// and drop them.
+function wikimediaExcludedByFilter(f: {
+  tag?: string[];
+  userId?: number[];
+  pano?: boolean;
+  premium?: boolean;
+}): boolean {
+  return (
+    f.tag !== undefined ||
+    (f.userId?.length ?? 0) > 0 ||
+    f.pano === true ||
+    f.premium === true
+  );
+}
 
 const methods: {
   [name: string]: (ctx: ParameterizedContext) => Promise<void>;
@@ -217,6 +343,7 @@ async function byRadius(ctx: ParameterizedContext) {
     pano,
     premium,
     license,
+    sources,
     lat,
     lon,
     distance,
@@ -226,6 +353,16 @@ async function byRadius(ctx: ParameterizedContext) {
   const userIdArray = userId || [];
   const tagArray = tag || [];
   const licenseArray = license || [];
+
+  const includeGallery = !sources || sources.includes('gallery');
+
+  const includeWikimedia =
+    (!sources || sources.includes('wikimedia')) &&
+    !wikimediaExcludedByFilter(radiusQuery);
+
+  const wmConds = wikimediaColumnConds(radiusQuery);
+
+  const wmRatingConds = ratingRangeConds(ratingFrom, ratingTo);
 
   // cca 1 degree
   const minLat = lat - distance / 43;
@@ -266,9 +403,34 @@ async function byRadius(ctx: ParameterizedContext) {
     ORDER BY distance
     LIMIT 1000`;
 
-  const rows = IdRowSchema.parse(await pool.query<unknown>(query));
+  const galleryRows = includeGallery
+    ? RadiusRowSchema.parse(await pool.query<unknown>(query)).map((row) => ({
+        id: row.id,
+        distance: row.distance,
+        source: 0,
+      }))
+    : [];
 
-  ctx.body = rows.map((row) => ({ id: row.id }));
+  const wikimediaRows = includeWikimedia
+    ? RadiusRowSchema.parse(
+        await pool.query<unknown>(sql`
+          SELECT pageId AS id,
+            ST_Distance_Sphere(location, POINT(${lon}, ${lat})) / 1000 AS distance
+            ${wmRatingConds.length ? raw(`, ${wikimediaRatingSubquery}`) : empty}
+          FROM wikimediaPicture
+          WHERE MBRContains(ST_GeomFromText(${`LINESTRING(${minLon} ${minLat}, ${maxLon} ${maxLat})`}, 4326), location)
+          ${wmConds.length ? sql`AND ${join(wmConds, ' AND ')}` : empty}
+          HAVING distance <= ${distance}
+          ${wmRatingConds.length ? sql`AND ${join(wmRatingConds, ' AND ')}` : empty}
+          ORDER BY distance
+          LIMIT 1000`),
+      ).map((row) => ({ id: row.id, distance: row.distance, source: 1 }))
+    : [];
+
+  ctx.body = [...galleryRows, ...wikimediaRows]
+    .sort((a, b) => a.distance - b.distance)
+    .slice(0, 1000)
+    .map((row) => ({ id: row.id, source: row.source }));
 }
 
 async function byBbox(ctx: ParameterizedContext) {
@@ -295,12 +457,19 @@ async function byBbox(ctx: ParameterizedContext) {
     premium,
     license,
     fields,
+    sources,
   } = bboxQuery;
 
   const myUserId = ctx.state.user?.id ?? -1;
   const userIdArray = userId || [];
   const tagArray = tag || [];
   const licenseArray = license || [];
+
+  const includeGallery = !sources || sources.includes('gallery');
+
+  const includeWikimedia =
+    (!sources || sources.includes('wikimedia')) &&
+    !wikimediaExcludedByFilter(bboxQuery);
 
   const sqlFields: string[] = (fields ?? []).filter(
     (f) =>
@@ -317,7 +486,7 @@ async function byBbox(ctx: ParameterizedContext) {
     sqlFields.push('premium');
   }
 
-  if (ratingFrom || ratingTo || fields?.includes('rating')) {
+  if (ratingFrom != null || ratingTo != null || fields?.includes('rating')) {
     sqlFields.push(ratingSubquery);
   }
 
@@ -372,7 +541,9 @@ async function byBbox(ctx: ParameterizedContext) {
     ORDER BY lat, lon
   `;
 
-  const rows = BboxRowSchema.parse(await pool.query<unknown>(query));
+  const rows = includeGallery
+    ? BboxRowSchema.parse(await pool.query<unknown>(query))
+    : [];
 
   const getRating = fields?.includes('rating');
 
@@ -382,24 +553,13 @@ async function byBbox(ctx: ParameterizedContext) {
     ctx.accepts('application/json', 'application/x-protobuf') ===
     'application/x-protobuf';
 
-  const pictures = rows.map((row) =>
+  const galleryPictures = rows.map((row) =>
     Object.assign({}, row, {
+      source: 0,
       rating: getRating ? row.rating : undefined,
-      takenAt: isProtobuf
-        ? row.takenAt == null
-          ? row.takenAt
-          : row.takenAt.getTime() / 1000
-        : (row.takenAt?.toISOString() ?? row.takenAt),
-      createdAt: isProtobuf
-        ? row.createdAt == null
-          ? row.createdAt
-          : row.createdAt.getTime() / 1000
-        : (row.createdAt?.toISOString() ?? row.createdAt),
-      lastCommentedAt: isProtobuf
-        ? row.lastCommentedAt == null
-          ? row.lastCommentedAt
-          : row.lastCommentedAt.getTime() / 1000
-        : (row.lastCommentedAt?.toISOString() ?? row.lastCommentedAt),
+      takenAt: toWireDate(row.takenAt, isProtobuf),
+      createdAt: toWireDate(row.createdAt, isProtobuf),
+      lastCommentedAt: toWireDate(row.lastCommentedAt, isProtobuf),
       pano: row.pano,
       premium: row.premium,
       azimuth: row.azimuth,
@@ -410,6 +570,87 @@ async function byBbox(ctx: ParameterizedContext) {
           : undefined,
     }),
   );
+
+  // Wikimedia photos carry capturedAt/uploadedAt/authorId (imported from the
+  // Commons image dump), surfaced under the same field names as our own photos
+  // so the client's date/season/author colorizing works uniformly.
+  const wmExtra: string[] = [];
+
+  if (fields?.includes('takenAt')) {
+    wmExtra.push('capturedAt AS takenAt');
+  }
+
+  if (fields?.includes('createdAt')) {
+    wmExtra.push('uploadedAt AS createdAt');
+  }
+
+  if (fields?.includes('userId')) {
+    wmExtra.push('authorId AS userId');
+  }
+
+  if (fields?.includes('azimuth')) {
+    wmExtra.push('azimuth');
+  }
+
+  if (fields?.includes('license')) {
+    wmExtra.push('licenseId');
+  }
+
+  const wmConds = wikimediaColumnConds(bboxQuery);
+
+  const wmRatingConds = ratingRangeConds(ratingFrom, ratingTo);
+
+  // The effective rating is needed for output (getRating) and/or to filter by
+  // the rating range.
+  if (getRating || wmRatingConds.length) {
+    wmExtra.push(wikimediaRatingSubquery);
+  }
+
+  const wikimediaRows = includeWikimedia
+    ? WikimediaBboxRowSchema.parse(
+        await pool.query<unknown>(sql`
+          SELECT pageId AS id, ST_X(location) AS lon, ST_Y(location) AS lat
+          ${wmExtra.length ? raw(`, ${wmExtra.join(', ')}`) : empty}
+          FROM wikimediaPicture
+          WHERE MBRContains(ST_GeomFromText(${`LINESTRING(${minLon} ${minLat}, ${maxLon} ${maxLat})`}, 4326), location)
+          ${wmConds.length ? sql`AND ${join(wmConds, ' AND ')}` : empty}
+          ${wmRatingConds.length ? sql`HAVING ${join(wmRatingConds, ' AND ')}` : empty}
+          LIMIT ${WIKIMEDIA_BBOX_LIMIT}`),
+      )
+    : [];
+
+  const wikimediaPictures = wikimediaRows.map((row) => ({
+    id: row.id,
+    lat: row.lat,
+    lon: row.lon,
+    source: 1,
+    title: undefined,
+    description: undefined,
+    takenAt: toWireDate(row.takenAt, isProtobuf),
+    createdAt: toWireDate(row.createdAt, isProtobuf),
+    lastCommentedAt: undefined,
+    userId: row.userId ?? undefined,
+    pano: undefined,
+    premium: undefined,
+    azimuth: row.azimuth ?? undefined,
+    // Map the raw Wikidata license id to a family the client colorizes by.
+    license: row.licenseId == null ? undefined : LICENSE_Q_MAP[row.licenseId],
+    rating: getRating ? row.rating : undefined,
+    tags: undefined,
+    user: undefined,
+    hmac: undefined,
+  }));
+
+  const pictures: (
+    | (typeof galleryPictures)[number]
+    | (typeof wikimediaPictures)[number]
+  )[] = [...galleryPictures, ...wikimediaPictures];
+
+  // Keep the merged stream ordered so protobuf delta-encoding stays compact
+  // (the gallery arm is already ORDER BY lat, lon; re-sort once merged).
+  if (wikimediaPictures.length > 0) {
+    pictures.sort((a, b) => a.lat - b.lat || a.lon - b.lon);
+  }
 
   if (!isProtobuf) {
     ctx.body = pictures;
@@ -488,12 +729,19 @@ async function byOrder(ctx: ParameterizedContext) {
     pano,
     premium,
     license,
+    sources,
   } = orderByQuery;
 
   const myUserId = ctx.state.user?.id ?? -1;
   const userIdArray = userId || [];
   const tagArray = tag || [];
   const licenseArray = license || [];
+
+  const includeGallery = !sources || sources.includes('gallery');
+
+  const includeWikimedia =
+    (!sources || sources.includes('wikimedia')) &&
+    !wikimediaExcludedByFilter(orderByQuery);
 
   const hv: Sql[] = [];
 
@@ -570,7 +818,134 @@ async function byOrder(ctx: ParameterizedContext) {
     LIMIT 1000
   `;
 
-  const rows = IdRowSchema.parse(await pool.query<unknown>(query));
+  if (!includeWikimedia) {
+    if (!includeGallery) {
+      ctx.body = [];
+
+      return;
+    }
+
+    const rows = IdRowSchema.parse(await pool.query<unknown>(query));
+
+    ctx.body = rows.map((row) => ({ id: row.id }));
+
+    return;
+  }
+
+  // Every ordering also covers the Commons photos, honouring the same date and
+  // rating filters as own photos: rating from wikimediaRating, last-comment from
+  // wikimediaComment, taken/upload date from wikimediaPicture (skipping rows with
+  // no date). Both arms expose the order key as `ord` — and, when a rating range
+  // is set, `rating` (so the UNION arms stay column-compatible) — and a UNION
+  // lets the DB do the final merge-sort. `wh` already carries the date/pano/
+  // premium/private conditions and `hv` the rating range (built above); the
+  // Wikimedia arm re-derives the same against its own columns.
+  const needRating = hv.length > 0; // hv holds only the rating-range conditions
+
+  const wmConds = wikimediaColumnConds(orderByQuery);
+
+  const wmJoin = wmConds.length
+    ? sql`JOIN wikimediaPicture wp ON wp.pageId = w.pageId WHERE ${join(wmConds, ' AND ')}`
+    : empty;
+
+  let wmArm: Sql;
+
+  if (orderBy === 'rating') {
+    // ord is the rating aggregate itself, so the rating range is a plain HAVING.
+    wmArm = sql`SELECT -CAST(w.pageId AS SIGNED) AS id, ${raw(ratingExp)} AS ord
+        ${needRating ? sql`, ${raw(ratingExp)} AS rating` : empty}
+        FROM wikimediaRating w ${wmJoin}
+        GROUP BY w.pageId
+        ${needRating ? sql`HAVING ${join(hv, ' AND ')}` : empty}
+        ORDER BY ord ${raw(direction)}, id ${raw(direction)} LIMIT 1000`;
+  } else if (orderBy === 'lastCommentedAt') {
+    wmArm = sql`SELECT -CAST(w.pageId AS SIGNED) AS id, MAX(w.createdAt) AS ord
+        ${needRating ? raw(`, (SELECT ${ratingExp} FROM wikimediaRating WHERE pageId = w.pageId) AS rating`) : empty}
+        FROM wikimediaComment w ${wmJoin}
+        GROUP BY w.pageId
+        ${needRating ? sql`HAVING ${join(hv, ' AND ')}` : empty}
+        ORDER BY ord ${raw(direction)}, id ${raw(direction)} LIMIT 1000`;
+  } else {
+    // createdAt → uploadedAt, takenAt → capturedAt (from the Commons image
+    // dump); an index on each keeps this LIMIT 1000 fast over the whole table.
+    // Tie-break on the signed `id` (= -pageId), matching the outer UNION's
+    // `ORDER BY ord, id` and the other arms: each arm's LIMIT 1000 must keep
+    // exactly the rows the merged ordering selects at a shared boundary `ord`,
+    // and dates tie in bulk once year-precision inceptions normalize to Jan 1.
+    const col = orderBy === 'takenAt' ? 'capturedAt' : 'uploadedAt';
+
+    const ratingExcludesUnrated =
+      (ratingFrom != null && ratingFrom > bayesM) ||
+      (ratingTo != null && ratingTo < bayesM);
+
+    if (!needRating) {
+      wmArm = sql`SELECT -CAST(pageId AS SIGNED) AS id, ${raw(col)} AS ord
+          FROM wikimediaPicture
+          WHERE ${join([sql`${raw(col)} IS NOT NULL`, ...wmConds], ' AND ')}
+          ORDER BY ord ${raw(direction)}, id ${raw(direction)} LIMIT 1000`;
+    } else if (ratingExcludesUnrated) {
+      // The rating range excludes the unrated prior mean (bayesM), so only
+      // *rated* photos can qualify — drive the arm off the small wikimediaRating
+      // table and join back for the date, instead of a per-row rating subquery
+      // over the whole picture table.
+      wmArm = sql`SELECT -CAST(wp.pageId AS SIGNED) AS id, wp.${raw(col)} AS ord,
+            ${raw(ratingExp)} AS rating
+          FROM wikimediaRating w
+          JOIN wikimediaPicture wp ON wp.pageId = w.pageId
+          WHERE ${join([sql`wp.${raw(col)} IS NOT NULL`, ...wmConds], ' AND ')}
+          GROUP BY wp.pageId
+          HAVING ${join(hv, ' AND ')}
+          ORDER BY ord ${raw(direction)}, id ${raw(direction)} LIMIT 1000`;
+    } else {
+      // The range includes the prior mean, so unrated photos (rating = bayesM)
+      // pass; scanning the date index, the leading rows mostly satisfy HAVING,
+      // so the correlated rating subquery is evaluated for only a short prefix
+      // before LIMIT.
+      wmArm = sql`SELECT -CAST(pageId AS SIGNED) AS id, ${raw(col)} AS ord,
+            ${raw(wikimediaRatingSubquery)}
+          FROM wikimediaPicture
+          WHERE ${join([sql`${raw(col)} IS NOT NULL`, ...wmConds], ' AND ')}
+          HAVING ${join(hv, ' AND ')}
+          ORDER BY ord ${raw(direction)}, id ${raw(direction)} LIMIT 1000`;
+    }
+  }
+
+  const arms: Sql[] = [];
+
+  if (includeGallery) {
+    const ownOrd =
+      orderBy === 'rating'
+        ? raw(
+            `(SELECT ${ratingExp} FROM pictureRating WHERE pictureId = picture.id)`,
+          )
+        : orderBy === 'lastCommentedAt'
+          ? sql`(SELECT MAX(createdAt) FROM pictureComment WHERE pictureId = picture.id)`
+          : raw(orderBy);
+
+    // Same filters as the non-UNION query: `wh` (private guard + date/pano/
+    // premium) and `hv` (rating range, needing the rating subquery selected).
+    arms.push(sql`SELECT picture.id AS id, ${ownOrd} AS ord
+      ${needRating ? raw(`, ${ratingSubquery}`) : empty}
+      FROM picture
+      ${wh.length ? sql`WHERE ${join(wh, ' AND ')}` : empty}
+      ${hv.length ? sql`HAVING ${join(hv, ' AND ')}` : empty}
+      ORDER BY ord ${raw(direction)}, id ${raw(direction)}
+      LIMIT 1000`);
+  }
+
+  arms.push(wmArm);
+
+  const rows = IdRowSchema.parse(
+    await pool.query<unknown>(sql`
+      SELECT id FROM (
+        ${join(
+          arms.map((arm) => sql`(${arm})`),
+          ' UNION ALL ',
+        )}
+      ) AS t
+      ORDER BY ord ${raw(direction)}, id ${raw(direction)}
+      LIMIT 1000`),
+  );
 
   ctx.body = rows.map((row) => ({ id: row.id }));
 }

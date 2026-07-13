@@ -20,10 +20,7 @@
     "url": "https://github.com/FreemapSlovakia/freemap-v3-nodejs-backend/issues"
   },
   "lint-staged": {
-    "*.{js,ts}": [
-      "biome check --error-on-warnings",
-      "git add"
-    ]
+    "*.{js,ts}": ["biome check --error-on-warnings", "git add"]
   },
   "scripts": {
     "start": "node --enable-source-maps --import ./build/instrument.js build/index.js",
@@ -32,6 +29,7 @@
     "test": "tsc && node --test 'build/**/*.test.js'",
     "dev:serve": "pnpm run copy:proto && dotenvx run --overload -- sh -c 'node --enable-source-maps --import ./build/instrument.js build/index.js | pino-pretty -S -t -i hostname,pid'",
     "dev": "tsc-watch --onSuccess \"pnpm run dev:serve\"",
+    "import:wikimedia": "dotenvx run --overload -- node --enable-source-maps build/wikimedia/importWikimedia.js",
     "deploy": "ssh ${DEPLOY_SSH_HOST:-freemap-fm6} 'cd /home/freemap/freemap-v3-nodejs-backend && git pull --ff-only && bash scripts/remote-deploy.sh'",
     "precommit": "lint-staged",
     "lint": "biome check --error-on-warnings",
