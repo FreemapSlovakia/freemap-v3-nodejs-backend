@@ -378,13 +378,21 @@ function extractLicenseId(statements: Record<string, unknown>): number | null {
     }
   }
 
-  // Many files are multi-licensed (typically GFDL + CC-BY-SA). Prefer a CC
-  // license: it's what Commons displays and reusers rely on, so the colorize
-  // family matches the license shown in the viewer. Fall back to the first id.
+  // Many files are multi-licensed (typically GFDL + CC-BY-SA, occasionally a
+  // free CC alongside a more restrictive NC one). Prefer a *free* CC license
+  // (CC0 / CC-BY / CC-BY-SA): it's what Commons displays and reusers rely on, so
+  // the colorize family matches the least-restrictive license actually offered —
+  // never let a NonCommercial (or GFDL/PD) statement win over a free CC one.
+  // Fall back to the first id when no free CC license is present.
   const cc = ids.find((id) => {
     const family = LICENSE_Q_MAP[id];
 
-    return family !== undefined && family !== 'GFDL' && family !== 'PD';
+    return (
+      family !== undefined &&
+      family !== 'GFDL' &&
+      family !== 'PD' &&
+      !family.includes('NC')
+    );
   });
 
   return cc ?? ids[0] ?? null;

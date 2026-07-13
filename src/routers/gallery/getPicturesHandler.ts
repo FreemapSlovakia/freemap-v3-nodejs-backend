@@ -868,12 +868,10 @@ async function byOrder(ctx: ParameterizedContext) {
   } else {
     // createdAt → uploadedAt, takenAt → capturedAt (from the Commons image
     // dump); an index on each keeps this LIMIT 1000 fast over the whole table.
-    // Tie-break on the raw `pageId` in the SAME direction as `ord` so the
-    // (date, pageId) index serves the ORDER BY directly — using the `-pageId`
-    // `id` alias instead flips the tie-break direction and forces a filesort
-    // over the whole table. The outer UNION re-sorts by the signed `id`, so the
-    // returned order is unaffected (only which rows tie at an identical
-    // second's boundary, which is immaterial).
+    // Tie-break on the signed `id` (= -pageId), matching the outer UNION's
+    // `ORDER BY ord, id` and the other arms: each arm's LIMIT 1000 must keep
+    // exactly the rows the merged ordering selects at a shared boundary `ord`,
+    // and dates tie in bulk once year-precision inceptions normalize to Jan 1.
     const col = orderBy === 'takenAt' ? 'capturedAt' : 'uploadedAt';
 
     const ratingExcludesUnrated =
@@ -884,7 +882,7 @@ async function byOrder(ctx: ParameterizedContext) {
       wmArm = sql`SELECT -CAST(pageId AS SIGNED) AS id, ${raw(col)} AS ord
           FROM wikimediaPicture
           WHERE ${join([sql`${raw(col)} IS NOT NULL`, ...wmConds], ' AND ')}
-          ORDER BY ord ${raw(direction)}, pageId ${raw(direction)} LIMIT 1000`;
+          ORDER BY ord ${raw(direction)}, id ${raw(direction)} LIMIT 1000`;
     } else if (ratingExcludesUnrated) {
       // The rating range excludes the unrated prior mean (bayesM), so only
       // *rated* photos can qualify — drive the arm off the small wikimediaRating
@@ -908,7 +906,7 @@ async function byOrder(ctx: ParameterizedContext) {
           FROM wikimediaPicture
           WHERE ${join([sql`${raw(col)} IS NOT NULL`, ...wmConds], ' AND ')}
           HAVING ${join(hv, ' AND ')}
-          ORDER BY ord ${raw(direction)}, pageId ${raw(direction)} LIMIT 1000`;
+          ORDER BY ord ${raw(direction)}, id ${raw(direction)} LIMIT 1000`;
     }
   }
 
