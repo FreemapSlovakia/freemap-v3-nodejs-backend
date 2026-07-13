@@ -51,3 +51,18 @@ export const LICENSE_Q_MAP: Record<number, WikimediaLicense> = {
   98592850: 'PD', // released into the public domain by the copyright holder
   19652: 'PD', // public domain
 };
+
+/**
+ * The Wikidata license ids whose family is one of `families` — the reverse of
+ * {@link LICENSE_Q_MAP}, for filtering `wikimediaPicture.licenseId` by our
+ * license families. Returns `[]` when nothing maps (e.g. a family we have no
+ * Commons Q-id for, like CC-BY-NC-SA), so the caller renders a match-nothing
+ * condition rather than an empty `IN ()`.
+ */
+export function licenseQIds(families: readonly string[]): number[] {
+  const wanted = new Set(families);
+
+  return Object.entries(LICENSE_Q_MAP)
+    .filter(([, family]) => wanted.has(family))
+    .map(([qid]) => Number(qid));
+}

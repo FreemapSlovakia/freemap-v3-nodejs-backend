@@ -21,7 +21,7 @@ import {
   ratingSubquery,
   wikimediaRatingSubquery,
 } from './ratingConstants.js';
-import { LICENSE_Q_MAP } from './wikimediaLicense.js';
+import { LICENSE_Q_MAP, licenseQIds } from './wikimediaLicense.js';
 
 const secret = getEnv('PREMIUM_PHOTO_SECRET', '');
 const gzipAsync = promisify(gzip);
@@ -173,13 +173,14 @@ type WikimediaFilter = {
   createdAtTo?: string;
   ratingFrom?: number;
   ratingTo?: number;
+  license?: string[];
 };
 
-// Date-range conditions for the Wikimedia arm, against the imported
-// `capturedAt` / `uploadedAt` columns. Rows with a NULL date drop out of a
-// range automatically, which is what we want (a photo with no such date can't
-// match a range on it).
-function wikimediaDateConds(f: WikimediaFilter): Sql[] {
+// Conditions on `wikimediaPicture` columns for the Wikimedia arm: the
+// `capturedAt` / `uploadedAt` date ranges (a NULL date drops out of a range
+// automatically, which is what we want) and the license filter, mapped from our
+// license families to the raw Wikidata ids stored in `licenseId`.
+function wikimediaColumnConds(f: WikimediaFilter): Sql[] {
   const c: Sql[] = [];
 
   if (f.takenAtFrom) {
@@ -196,6 +197,13 @@ function wikimediaDateConds(f: WikimediaFilter): Sql[] {
 
   if (f.createdAtTo) {
     c.push(sql`uploadedAt <= ${new Date(f.createdAtTo)}`);
+  }
+
+  if (f.license?.length) {
+    const qids = licenseQIds(f.license);
+
+    // No mapped id (a family with no Commons Q-id) → match nothing.
+    c.push(qids.length ? sql`licenseId IN (${join(qids)})` : sql`FALSE`);
   }
 
   return c;
@@ -227,20 +235,18 @@ function toWireDate(
 }
 
 // Whether the active filters exclude Wikimedia photos entirely. They carry
-// date/rating and are trivially non-pano/non-premium, so those filters just
-// narrow them; tag/author/license (and pano=true/premium=true, which no
-// Wikimedia photo matches) have no equivalent and drop them.
+// date/rating/license, so those filters just narrow them; tag/author (and
+// pano=true/premium=true, which no Wikimedia photo matches) have no equivalent
+// and drop them.
 function wikimediaExcludedByFilter(f: {
   tag?: string[];
   userId?: number[];
-  license?: unknown[];
   pano?: boolean;
   premium?: boolean;
 }): boolean {
   return (
     f.tag !== undefined ||
     (f.userId?.length ?? 0) > 0 ||
-    (f.license?.length ?? 0) > 0 ||
     f.pano === true ||
     f.premium === true
   );
@@ -354,7 +360,7 @@ async function byRadius(ctx: ParameterizedContext) {
     (!sources || sources.includes('wikimedia')) &&
     !wikimediaExcludedByFilter(radiusQuery);
 
-  const wmDateConds = wikimediaDateConds(radiusQuery);
+  const wmConds = wikimediaColumnConds(radiusQuery);
 
   const wmRatingConds = ratingRangeConds(ratingFrom, ratingTo);
 
@@ -413,7 +419,7 @@ async function byRadius(ctx: ParameterizedContext) {
             ${wmRatingConds.length ? raw(`, ${wikimediaRatingSubquery}`) : empty}
           FROM wikimediaPicture
           WHERE MBRContains(ST_GeomFromText(${`LINESTRING(${minLon} ${minLat}, ${maxLon} ${maxLat})`}, 4326), location)
-          ${wmDateConds.length ? sql`AND ${join(wmDateConds, ' AND ')}` : empty}
+          ${wmConds.length ? sql`AND ${join(wmConds, ' AND ')}` : empty}
           HAVING distance <= ${distance}
           ${wmRatingConds.length ? sql`AND ${join(wmRatingConds, ' AND ')}` : empty}
           ORDER BY distance
@@ -590,7 +596,7 @@ async function byBbox(ctx: ParameterizedContext) {
     wmExtra.push('licenseId');
   }
 
-  const wmDateConds = wikimediaDateConds(bboxQuery);
+  const wmConds = wikimediaColumnConds(bboxQuery);
 
   const wmRatingConds = ratingRangeConds(ratingFrom, ratingTo);
 
@@ -607,7 +613,7 @@ async function byBbox(ctx: ParameterizedContext) {
           ${wmExtra.length ? raw(`, ${wmExtra.join(', ')}`) : empty}
           FROM wikimediaPicture
           WHERE MBRContains(ST_GeomFromText(${`LINESTRING(${minLon} ${minLat}, ${maxLon} ${maxLat})`}, 4326), location)
-          ${wmDateConds.length ? sql`AND ${join(wmDateConds, ' AND ')}` : empty}
+          ${wmConds.length ? sql`AND ${join(wmConds, ' AND ')}` : empty}
           ${wmRatingConds.length ? sql`HAVING ${join(wmRatingConds, ' AND ')}` : empty}
           LIMIT ${WIKIMEDIA_BBOX_LIMIT}`),
       )
@@ -836,10 +842,10 @@ async function byOrder(ctx: ParameterizedContext) {
   // Wikimedia arm re-derives the same against its own columns.
   const needRating = hv.length > 0; // hv holds only the rating-range conditions
 
-  const wmDateConds = wikimediaDateConds(orderByQuery);
+  const wmConds = wikimediaColumnConds(orderByQuery);
 
-  const wmDateJoin = wmDateConds.length
-    ? sql`JOIN wikimediaPicture wp ON wp.pageId = w.pageId WHERE ${join(wmDateConds, ' AND ')}`
+  const wmJoin = wmConds.length
+    ? sql`JOIN wikimediaPicture wp ON wp.pageId = w.pageId WHERE ${join(wmConds, ' AND ')}`
     : empty;
 
   let wmArm: Sql;
@@ -848,14 +854,14 @@ async function byOrder(ctx: ParameterizedContext) {
     // ord is the rating aggregate itself, so the rating range is a plain HAVING.
     wmArm = sql`SELECT -CAST(w.pageId AS SIGNED) AS id, ${raw(ratingExp)} AS ord
         ${needRating ? sql`, ${raw(ratingExp)} AS rating` : empty}
-        FROM wikimediaRating w ${wmDateJoin}
+        FROM wikimediaRating w ${wmJoin}
         GROUP BY w.pageId
         ${needRating ? sql`HAVING ${join(hv, ' AND ')}` : empty}
         ORDER BY ord ${raw(direction)}, id ${raw(direction)} LIMIT 1000`;
   } else if (orderBy === 'lastCommentedAt') {
     wmArm = sql`SELECT -CAST(w.pageId AS SIGNED) AS id, MAX(w.createdAt) AS ord
         ${needRating ? raw(`, (SELECT ${ratingExp} FROM wikimediaRating WHERE pageId = w.pageId) AS rating`) : empty}
-        FROM wikimediaComment w ${wmDateJoin}
+        FROM wikimediaComment w ${wmJoin}
         GROUP BY w.pageId
         ${needRating ? sql`HAVING ${join(hv, ' AND ')}` : empty}
         ORDER BY ord ${raw(direction)}, id ${raw(direction)} LIMIT 1000`;
@@ -877,7 +883,7 @@ async function byOrder(ctx: ParameterizedContext) {
     if (!needRating) {
       wmArm = sql`SELECT -CAST(pageId AS SIGNED) AS id, ${raw(col)} AS ord
           FROM wikimediaPicture
-          WHERE ${join([sql`${raw(col)} IS NOT NULL`, ...wmDateConds], ' AND ')}
+          WHERE ${join([sql`${raw(col)} IS NOT NULL`, ...wmConds], ' AND ')}
           ORDER BY ord ${raw(direction)}, pageId ${raw(direction)} LIMIT 1000`;
     } else if (ratingExcludesUnrated) {
       // The rating range excludes the unrated prior mean (bayesM), so only
@@ -888,7 +894,7 @@ async function byOrder(ctx: ParameterizedContext) {
             ${raw(ratingExp)} AS rating
           FROM wikimediaRating w
           JOIN wikimediaPicture wp ON wp.pageId = w.pageId
-          WHERE ${join([sql`wp.${raw(col)} IS NOT NULL`, ...wmDateConds], ' AND ')}
+          WHERE ${join([sql`wp.${raw(col)} IS NOT NULL`, ...wmConds], ' AND ')}
           GROUP BY wp.pageId
           HAVING ${join(hv, ' AND ')}
           ORDER BY ord ${raw(direction)}, id ${raw(direction)} LIMIT 1000`;
@@ -900,7 +906,7 @@ async function byOrder(ctx: ParameterizedContext) {
       wmArm = sql`SELECT -CAST(pageId AS SIGNED) AS id, ${raw(col)} AS ord,
             ${raw(wikimediaRatingSubquery)}
           FROM wikimediaPicture
-          WHERE ${join([sql`${raw(col)} IS NOT NULL`, ...wmDateConds], ' AND ')}
+          WHERE ${join([sql`${raw(col)} IS NOT NULL`, ...wmConds], ' AND ')}
           HAVING ${join(hv, ' AND ')}
           ORDER BY ord ${raw(direction)}, pageId ${raw(direction)} LIMIT 1000`;
     }
