@@ -23,9 +23,12 @@ export const SPACE_PHOTO =
  * (so the extension check can't catch them) — chiefly national orthophoto
  * surveys, which tile whole regions into a grid. Matched by the keywords their
  * titles always carry: `orthophoto`/`orthofoto`/`ortofoto`, and the German `DOP`
- * (Digitales Orthophoto, e.g. "DOP20") tile designator.
+ * (Digitales Orthophoto, e.g. "DOP20") tile designator. The `DOP` boundaries
+ * use alphanumeric lookarounds, not `\b`: page-dump titles space-as-underscore,
+ * and `_` is a word char, so `\bDOP` would miss `..._DOP_...`.
  */
-export const NON_PHOTO_TITLE = /ortho(photo|foto)|ortofoto|\bDOP\d*\b/i;
+export const NON_PHOTO_TITLE =
+  /ortho(photo|foto)|ortofoto|(?<![a-z0-9])DOP\d*(?![a-z0-9])/i;
 
 /**
  * A geotagged file we want on the photo layer: a real photograph — not shot
