@@ -6,6 +6,7 @@ import z from 'zod';
 import { pool } from '../database.js';
 import { getEnv, getEnvInteger } from '../env.js';
 import { appLogger } from '../logger.js';
+import { LICENSE_Q_MAP } from '../routers/gallery/wikimediaLicense.js';
 import {
   isPhotoTitle,
   makeBitset,
@@ -365,17 +366,28 @@ function extractLicenseId(statements: Record<string, unknown>): number | null {
     return null;
   }
 
+  const ids: number[] = [];
+
   for (const c of claims) {
     const nid = (claimValue(c) as { 'numeric-id'?: unknown } | null)?.[
       'numeric-id'
     ];
 
     if (typeof nid === 'number') {
-      return nid;
+      ids.push(nid);
     }
   }
 
-  return null;
+  // Many files are multi-licensed (typically GFDL + CC-BY-SA). Prefer a CC
+  // license: it's what Commons displays and reusers rely on, so the colorize
+  // family matches the license shown in the viewer. Fall back to the first id.
+  const cc = ids.find((id) => {
+    const family = LICENSE_Q_MAP[id];
+
+    return family !== undefined && family !== 'GFDL' && family !== 'PD';
+  });
+
+  return cc ?? ids[0] ?? null;
 }
 
 const MEDIAINFO_ID_RE = /^\{"type":"mediainfo","id":"M(\d+)"/;
@@ -607,39 +619,43 @@ export async function importWikimedia(): Promise<void> {
   );
 
   logger.info(
-    `${keepCount} geotagged files are photos (of ${geoCount}). Streaming image dump for metadata…`,
+    `${keepCount} geotagged files are photos (of ${geoCount}). Streaming image + SDC dumps concurrently…`,
   );
 
-  const imgCount = await loadPass(
-    'wm_img',
-    'INSERT INTO wm_img (title, capturedAt, uploadedAt, authorId, azimuth) VALUES (?, ?, ?, ?, ?)',
-    () => imageMetaRows(titleBits),
-  );
+  // The image and SDC passes are independent (image keyed by title, SDC by
+  // pageId — both filter sets already built by the page pass) and complementary:
+  // the 75 GB SDC dump is network-bound on Wikimedia's ~4.5 MB/s per-connection
+  // limit with the CPU near-idle, while the image pass runs below that limit,
+  // bound by mysqldump parsing + inserts. Running them together overlaps the SDC
+  // download wait with the image parsing instead of summing the two phases.
+  const [imgCount, sdcCount] = await Promise.all([
+    loadPass(
+      'wm_img',
+      'INSERT INTO wm_img (title, capturedAt, uploadedAt, authorId, azimuth) VALUES (?, ?, ?, ?, ?)',
+      () => imageMetaRows(titleBits),
+    ),
+    loadPass(
+      'wm_sdc',
+      'INSERT IGNORE INTO wm_sdc (pageId, capturedAt, licenseId) VALUES (?, ?, ?)',
+      () => mediaInfoRows(keptBits),
+    ),
+  ]);
 
   logger.info(
-    `Staged metadata for ${imgCount} files. Streaming SDC (mediainfo) dump for capture dates + licenses…`,
+    `Staged metadata for ${imgCount} files and SDC for ${sdcCount} files. Building final table…`,
   );
-
-  const sdcCount = await loadPass(
-    'wm_sdc',
-    'INSERT IGNORE INTO wm_sdc (pageId, capturedAt, licenseId) VALUES (?, ?, ?)',
-    () => mediaInfoRows(keptBits),
-  );
-
-  logger.info(`Staged SDC for ${sdcCount} files. Building final table…`);
 
   await buildFinalTable(started);
 }
 
 /**
- * Builds `wikimediaPicture` from the already-populated `wm_stage`/`wm_keep`/
- * `wm_img`/`wm_sdc` staging tables: batched insert (see {@link PAGEID_BATCH}),
- * index build, and atomic table swap. Split out from the streaming passes so a
- * crashed run's final phase can be re-run against the surviving staging tables
- * without re-downloading the dumps. Idempotent: safe whether or not the staging
- * indexes or a partial `wikimediaPicture_new` from an earlier attempt exist.
+ * Builds `wikimediaPicture` from the populated `wm_stage`/`wm_keep`/`wm_img`/
+ * `wm_sdc` staging tables: batched insert (see {@link PAGEID_BATCH}), index
+ * build, and atomic table swap. Idempotent (ADD INDEX IF NOT EXISTS, drops any
+ * partial `wikimediaPicture_new` first), so it can be invoked on its own against
+ * the staging tables a crashed run leaves behind.
  */
-export async function buildFinalTable(started: number): Promise<void> {
+async function buildFinalTable(started: number): Promise<void> {
   // One sorted index build each — cheap versus maintaining them during the load.
   await pool.query(
     sql`ALTER TABLE wm_stage ADD INDEX IF NOT EXISTS wm_stage_pageId (pageId)`,
