@@ -38,6 +38,8 @@ minimumReleaseAgeExclude:
   - '@dotenvx/dotenvx@2.3.3'
   - '@dotenvx/primitives@1.7.2'
   - '@dotenvx/tooling@0.2.0'
+  - '@dotenvx/dotenvx@2.7.3'
+  - protobufjs@8.7.1
 onlyBuiltDependencies:
   - better-sqlite3
   - exifreader
