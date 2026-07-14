@@ -867,11 +867,14 @@ async function byOrder(ctx: ParameterizedContext) {
         ORDER BY ord ${raw(direction)}, id ${raw(direction)} LIMIT 1000`;
   } else {
     // createdAt → uploadedAt, takenAt → capturedAt (from the Commons image
-    // dump); an index on each keeps this LIMIT 1000 fast over the whole table.
-    // Tie-break on the signed `id` (= -pageId), matching the outer UNION's
-    // `ORDER BY ord, id` and the other arms: each arm's LIMIT 1000 must keep
-    // exactly the rows the merged ordering selects at a shared boundary `ord`,
-    // and dates tie in bulk once year-precision inceptions normalize to Jan 1.
+    // dump). Tie-break on the raw `pageId` column in scan direction — NOT the
+    // `-pageId` signed `id` alias. `pageId` is the PK, so it is implicitly
+    // appended to the secondary date index; ordering by `(col, pageId)` in one
+    // direction is then a plain index range scan that stops at LIMIT 1000.
+    // Ordering by the `id` expression instead can't be served by the index and
+    // forces a filesort over the whole 31M-row table (~12s). The signed-id order
+    // the outer UNION uses only decides which rows survive within an exact-`ord`
+    // tie at the 1000-row boundary — cosmetic for this un-paginated top-1000.
     const col = orderBy === 'takenAt' ? 'capturedAt' : 'uploadedAt';
 
     const ratingExcludesUnrated =
@@ -882,7 +885,7 @@ async function byOrder(ctx: ParameterizedContext) {
       wmArm = sql`SELECT -CAST(pageId AS SIGNED) AS id, ${raw(col)} AS ord
           FROM wikimediaPicture
           WHERE ${join([sql`${raw(col)} IS NOT NULL`, ...wmConds], ' AND ')}
-          ORDER BY ord ${raw(direction)}, id ${raw(direction)} LIMIT 1000`;
+          ORDER BY ${raw(col)} ${raw(direction)}, pageId ${raw(direction)} LIMIT 1000`;
     } else if (ratingExcludesUnrated) {
       // The rating range excludes the unrated prior mean (bayesM), so only
       // *rated* photos can qualify — drive the arm off the small wikimediaRating
@@ -906,7 +909,7 @@ async function byOrder(ctx: ParameterizedContext) {
           FROM wikimediaPicture
           WHERE ${join([sql`${raw(col)} IS NOT NULL`, ...wmConds], ' AND ')}
           HAVING ${join(hv, ' AND ')}
-          ORDER BY ord ${raw(direction)}, id ${raw(direction)} LIMIT 1000`;
+          ORDER BY ${raw(col)} ${raw(direction)}, pageId ${raw(direction)} LIMIT 1000`;
     }
   }
 
