@@ -857,14 +857,14 @@ async function byOrder(ctx: ParameterizedContext) {
         FROM wikimediaRating w ${wmJoin}
         GROUP BY w.pageId
         ${needRating ? sql`HAVING ${join(hv, ' AND ')}` : empty}
-        ORDER BY ord ${raw(direction)}, id ${raw(direction)} LIMIT 1000`;
+        ORDER BY ord ${raw(direction)}, w.pageId ${raw(direction)} LIMIT 1000`;
   } else if (orderBy === 'lastCommentedAt') {
     wmArm = sql`SELECT -CAST(w.pageId AS SIGNED) AS id, MAX(w.createdAt) AS ord
         ${needRating ? raw(`, (SELECT ${ratingExp} FROM wikimediaRating WHERE pageId = w.pageId) AS rating`) : empty}
         FROM wikimediaComment w ${wmJoin}
         GROUP BY w.pageId
         ${needRating ? sql`HAVING ${join(hv, ' AND ')}` : empty}
-        ORDER BY ord ${raw(direction)}, id ${raw(direction)} LIMIT 1000`;
+        ORDER BY ord ${raw(direction)}, w.pageId ${raw(direction)} LIMIT 1000`;
   } else {
     // createdAt → uploadedAt, takenAt → capturedAt (from the Commons image
     // dump). Tie-break on the raw `pageId` column in scan direction — NOT the
@@ -872,9 +872,9 @@ async function byOrder(ctx: ParameterizedContext) {
     // appended to the secondary date index; ordering by `(col, pageId)` in one
     // direction is then a plain index range scan that stops at LIMIT 1000.
     // Ordering by the `id` expression instead can't be served by the index and
-    // forces a filesort over the whole 31M-row table (~12s). The signed-id order
-    // the outer UNION uses only decides which rows survive within an exact-`ord`
-    // tie at the 1000-row boundary — cosmetic for this un-paginated top-1000.
+    // forces a filesort over the whole 31M-row table (~12s). The outer UNION
+    // tie-breaks on ABS(id) so this pageId order still matches the merge (see
+    // there); every Wikimedia arm tie-breaks by its `pageId` for the same reason.
     const col = orderBy === 'takenAt' ? 'capturedAt' : 'uploadedAt';
 
     const ratingExcludesUnrated =
@@ -898,7 +898,7 @@ async function byOrder(ctx: ParameterizedContext) {
           WHERE ${join([sql`wp.${raw(col)} IS NOT NULL`, ...wmConds], ' AND ')}
           GROUP BY wp.pageId
           HAVING ${join(hv, ' AND ')}
-          ORDER BY ord ${raw(direction)}, id ${raw(direction)} LIMIT 1000`;
+          ORDER BY ord ${raw(direction)}, wp.pageId ${raw(direction)} LIMIT 1000`;
     } else {
       // The range includes the prior mean, so unrated photos (rating = bayesM)
       // pass; scanning the date index, the leading rows mostly satisfy HAVING,
@@ -938,6 +938,13 @@ async function byOrder(ctx: ParameterizedContext) {
 
   arms.push(wmArm);
 
+  // Tie-break the merge on ABS(id), not the signed id: each arm orders its own
+  // ties by its natural PK in scan direction (Wikimedia pageId, gallery picture
+  // id), and ABS(id) reproduces exactly that order (= pageId for the negated
+  // Wikimedia ids, = id for the positive gallery ids). So every arm's LIMIT 1000
+  // keeps precisely the rows this merged top-1000 selects at a shared `ord` —
+  // whereas ordering by the signed id would rank Wikimedia ties in the opposite
+  // direction to how each arm truncated them.
   const rows = IdRowSchema.parse(
     await pool.query<unknown>(sql`
       SELECT id FROM (
@@ -946,7 +953,7 @@ async function byOrder(ctx: ParameterizedContext) {
           ' UNION ALL ',
         )}
       ) AS t
-      ORDER BY ord ${raw(direction)}, id ${raw(direction)}
+      ORDER BY ord ${raw(direction)}, ABS(id) ${raw(direction)}
       LIMIT 1000`),
   );
 
