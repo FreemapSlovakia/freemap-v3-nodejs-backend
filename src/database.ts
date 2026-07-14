@@ -319,41 +319,7 @@ export async function initDatabase() {
         END`,
   ];
 
-  const updates: (string | string[])[] = [
-    'ALTER TABLE user ADD COLUMN description TEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL',
-    'ALTER TABLE user ADD COLUMN appleUserId VARCHAR(255) DEFAULT NULL',
-    'CREATE UNIQUE INDEX user_appleUserId ON user(appleUserId)',
-    'ALTER TABLE user ADD COLUMN picture MEDIUMBLOB NULL',
-    "ALTER TABLE user MODIFY COLUMN settings JSON NOT NULL DEFAULT '{}'",
-    'ALTER TABLE user ADD COLUMN githubUserId VARCHAR(32) CHARSET ascii DEFAULT NULL',
-    'CREATE UNIQUE INDEX user_githubUserId ON user(githubUserId)',
-    'ALTER TABLE user ADD COLUMN stravaUserId VARCHAR(32) CHARSET ascii DEFAULT NULL',
-    'CREATE UNIQUE INDEX user_stravaUserId ON user(stravaUserId)',
-    'ALTER TABLE user ADD COLUMN microsoftUserId VARCHAR(64) CHARSET ascii DEFAULT NULL',
-    'CREATE UNIQUE INDEX user_microsoftUserId ON user(microsoftUserId)',
-    'ALTER TABLE user ADD COLUMN stravaAccessToken VARCHAR(255) CHARSET ascii DEFAULT NULL',
-    'ALTER TABLE user ADD COLUMN stravaRefreshToken VARCHAR(255) CHARSET ascii DEFAULT NULL',
-    'ALTER TABLE user ADD COLUMN stravaTokenExpiresAt TIMESTAMP NULL DEFAULT NULL',
-    // Replace the boolean isAdmin flag with a granular roles array. Existing
-    // admins gain all roles so their access is unchanged. Sequenced as one
-    // entry so backfill runs after the column is added and before it is dropped.
-    [
-      "ALTER TABLE user ADD COLUMN roles JSON NOT NULL DEFAULT '[]'",
-      "UPDATE user SET roles = JSON_ARRAY('userManager', 'galleryModerator', 'mapModerator', 'trackingManager', 'layerPreview') WHERE isAdmin = 1",
-      'ALTER TABLE user DROP COLUMN isAdmin',
-    ],
-    // Polar billing (parallel to the legacy Rovas flow).
-    'ALTER TABLE user ADD COLUMN polarCustomerId VARCHAR(64) CHARSET ascii DEFAULT NULL',
-    'ALTER TABLE user ADD COLUMN polarSubscriptionId VARCHAR(64) CHARSET ascii DEFAULT NULL',
-    'ALTER TABLE purchase ADD COLUMN polarOrderId VARCHAR(64) CHARSET ascii DEFAULT NULL',
-    'CREATE UNIQUE INDEX purchase_polarOrderId ON purchase(polarOrderId)',
-    // Per-photo license (default backfills every existing row to CC BY-SA 4.0).
-    "ALTER TABLE picture ADD COLUMN license VARCHAR(32) CHARSET ascii NOT NULL DEFAULT 'CC-BY-SA-4.0'",
-    // Seed the license history for pictures that predate the history table (or
-    // the column). Guarded so it only ever inserts the missing rows; retries
-    // harmlessly on later boots if the column was not yet present.
-    'INSERT INTO pictureLicenseHistory (pictureId, license, changedAt) SELECT id, license, createdAt FROM picture WHERE id NOT IN (SELECT pictureId FROM pictureLicenseHistory)',
-  ];
+  const updates: (string | string[])[] = [];
 
   const db = await pool.getConnection();
 
