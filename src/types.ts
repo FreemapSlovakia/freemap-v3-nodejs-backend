@@ -143,10 +143,7 @@ export const UserResponseSchema = z
     coordinates: z
       .strictObject({ lat: z.number(), lon: z.number() })
       .nullable(),
-    premiumExpiration: z
-      .date()
-      .nullable()
-      .transform((d) => (d === null ? null : d.toISOString())),
+    premiumExpiration: zNullableDateToIso,
     settings: z.record(z.string(), z.unknown()).nullable(),
   })
   .meta({ id: 'UserResponse' });
