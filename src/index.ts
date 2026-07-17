@@ -226,6 +226,14 @@ router.get('/documentation', (ctx) => {
   });
 });
 
+// The API host exposes only JSON/RPC endpoints — nothing meant for search
+// indexing — so disallow all crawlers to keep them from spending crawl budget
+// here.
+router.get('/robots.txt', (ctx) => {
+  ctx.type = 'text/plain';
+  ctx.body = 'User-agent: *\nDisallow: /\n';
+});
+
 router.get('/scalar', (ctx) => {
   ctx.type = 'text/html';
   ctx.body = `
