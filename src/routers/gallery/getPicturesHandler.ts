@@ -59,12 +59,14 @@ const CommonQuerySchema = z.object({
     (v) => (Array.isArray(v) ? v : v ? [v] : undefined),
     z.array(LicenseSchema).optional(),
   ),
-  // Which photo sources to include; defaults to both. Any gallery-only filter
+  // Which photo sources to include; defaults to gallery only (for backward
+  // compatibility with the mobile app, which never sends this param). Wikimedia
+  // is opt-in via an explicit `sources=wikimedia`. Any gallery-only filter
   // (userId, tag, rating, date, pano, premium, license) implicitly drops the
   // wikimedia source since those attributes do not exist for it.
   sources: z.preprocess(
     (v) => (Array.isArray(v) ? v : v ? [v] : undefined),
-    z.array(z.enum(['gallery', 'wikimedia'])).optional(),
+    z.array(z.enum(['gallery', 'wikimedia'])).default(['gallery']),
   ),
 });
 
@@ -354,11 +356,10 @@ async function byRadius(ctx: ParameterizedContext) {
   const tagArray = tag || [];
   const licenseArray = license || [];
 
-  const includeGallery = !sources || sources.includes('gallery');
+  const includeGallery = sources.includes('gallery');
 
   const includeWikimedia =
-    (!sources || sources.includes('wikimedia')) &&
-    !wikimediaExcludedByFilter(radiusQuery);
+    sources.includes('wikimedia') && !wikimediaExcludedByFilter(radiusQuery);
 
   const wmConds = wikimediaColumnConds(radiusQuery);
 
@@ -465,11 +466,10 @@ async function byBbox(ctx: ParameterizedContext) {
   const tagArray = tag || [];
   const licenseArray = license || [];
 
-  const includeGallery = !sources || sources.includes('gallery');
+  const includeGallery = sources.includes('gallery');
 
   const includeWikimedia =
-    (!sources || sources.includes('wikimedia')) &&
-    !wikimediaExcludedByFilter(bboxQuery);
+    sources.includes('wikimedia') && !wikimediaExcludedByFilter(bboxQuery);
 
   const sqlFields: string[] = (fields ?? []).filter(
     (f) =>
@@ -737,11 +737,10 @@ async function byOrder(ctx: ParameterizedContext) {
   const tagArray = tag || [];
   const licenseArray = license || [];
 
-  const includeGallery = !sources || sources.includes('gallery');
+  const includeGallery = sources.includes('gallery');
 
   const includeWikimedia =
-    (!sources || sources.includes('wikimedia')) &&
-    !wikimediaExcludedByFilter(orderByQuery);
+    sources.includes('wikimedia') && !wikimediaExcludedByFilter(orderByQuery);
 
   const hv: Sql[] = [];
 
