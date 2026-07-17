@@ -6,40 +6,8 @@ allowBuilds:
 ignoredBuiltDependencies:
   - protobufjs
 minimumReleaseAgeExclude:
-  - exifreader@4.40.5
-  - '@img/sharp-darwin-arm64@0.35.0'
-  - '@img/sharp-darwin-x64@0.35.0'
-  - '@img/sharp-freebsd-wasm32@0.35.0'
-  - '@img/sharp-libvips-darwin-arm64@1.3.0'
-  - '@img/sharp-libvips-darwin-x64@1.3.0'
-  - '@img/sharp-libvips-linux-arm64@1.3.0'
-  - '@img/sharp-libvips-linux-arm@1.3.0'
-  - '@img/sharp-libvips-linux-ppc64@1.3.0'
-  - '@img/sharp-libvips-linux-riscv64@1.3.0'
-  - '@img/sharp-libvips-linux-s390x@1.3.0'
-  - '@img/sharp-libvips-linux-x64@1.3.0'
-  - '@img/sharp-libvips-linuxmusl-arm64@1.3.0'
-  - '@img/sharp-libvips-linuxmusl-x64@1.3.0'
-  - '@img/sharp-linux-arm64@0.35.0'
-  - '@img/sharp-linux-arm@0.35.0'
-  - '@img/sharp-linux-ppc64@0.35.0'
-  - '@img/sharp-linux-riscv64@0.35.0'
-  - '@img/sharp-linux-s390x@0.35.0'
-  - '@img/sharp-linux-x64@0.35.0'
-  - '@img/sharp-linuxmusl-arm64@0.35.0'
-  - '@img/sharp-linuxmusl-x64@0.35.0'
-  - '@img/sharp-wasm32@0.35.0'
-  - '@img/sharp-webcontainers-wasm32@0.35.0'
-  - '@img/sharp-win32-arm64@0.35.0'
-  - '@img/sharp-win32-ia32@0.35.0'
-  - '@img/sharp-win32-x64@0.35.0'
-  - protobufjs@8.6.3
-  - sharp@0.35.0
-  - '@dotenvx/dotenvx@2.3.3'
-  - '@dotenvx/primitives@1.7.2'
-  - '@dotenvx/tooling@0.2.0'
-  - '@dotenvx/dotenvx@2.7.3'
-  - protobufjs@8.7.1
+  - '@dotenvx/dotenvx@2.14.0'
+  - '@dotenvx/primitives@2.1.0'
 onlyBuiltDependencies:
   - better-sqlite3
   - exifreader
