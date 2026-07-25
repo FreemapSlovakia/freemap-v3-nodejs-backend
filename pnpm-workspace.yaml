@@ -8,6 +8,7 @@ ignoredBuiltDependencies:
 minimumReleaseAgeExclude:
   - '@dotenvx/dotenvx@2.14.0'
   - '@dotenvx/primitives@2.1.0'
+  - '@dotenvx/dotenvx@2.18.0'
 onlyBuiltDependencies:
   - better-sqlite3
   - exifreader
