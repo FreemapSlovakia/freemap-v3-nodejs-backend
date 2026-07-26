@@ -29,6 +29,7 @@ export async function initDatabase() {
       facebookUserId VARCHAR(32) CHARSET ascii NULL UNIQUE,
       googleUserId VARCHAR(32) CHARSET ascii NULL UNIQUE,
       garminUserId VARCHAR(60) CHARSET ascii NULL UNIQUE,
+      appleUserId VARCHAR(255) CHARSET ascii NULL UNIQUE,
       garminAccessToken VARCHAR(255) CHARSET ascii NULL,
       garminAccessTokenSecret VARCHAR(255) CHARSET ascii NULL,
       githubUserId VARCHAR(32) CHARSET ascii NULL,
