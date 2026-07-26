@@ -25,10 +25,11 @@ GRANT ALL PRIVILEGES ON freemap.* TO 'freemap'@'localhost';
 FLUSH PRIVILEGES;
 ```
 
-The `picture` table has triggers that look up a country code from a `country`
-table (populated externally from OSM administrative boundaries). The table is
-optional for local development: the triggers set `country = NULL` when it is
-missing, and `POST /geotools/covered-countries` then returns an empty list.
+A `country` table (`alpha2` plus a `geom` polygon, populated externally from
+OSM administrative boundaries) is required — it is not created by
+`initDatabase()`. The `picture` triggers look up each photo's country code in
+it, and `POST /geotools/covered-countries` queries it directly; without the
+table both fail with `Table 'country' doesn't exist`.
 
 Connection settings are read from the `MARIADB_*` environment variables (see
 below).
