@@ -26,9 +26,9 @@ FLUSH PRIVILEGES;
 ```
 
 The `picture` table has triggers that look up a country code from a `country`
-table (populated externally from OSM administrative boundaries). The triggers
-silently set `country = NULL` if the table is missing, so it is optional for
-local development.
+table (populated externally from OSM administrative boundaries). The table is
+optional for local development: the triggers set `country = NULL` when it is
+missing, and `POST /geotools/covered-countries` then returns an empty list.
 
 Connection settings are read from the `MARIADB_*` environment variables (see
 below).

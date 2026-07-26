@@ -289,10 +289,15 @@ export async function initDatabase() {
     // self-heals a stale DEFINER (e.g. after restoring the DB onto a new host
     // where the original definer user no longer exists), which otherwise makes
     // every INSERT/UPDATE on `picture` fail with error 1449.
+    //
+    // The `country` table is populated externally and may be absent; the
+    // handler for error 1146 (unknown table) then leaves the country
+    // unresolved instead of failing the whole INSERT/UPDATE.
     sql`CREATE OR REPLACE TRIGGER picture_country_bu
       BEFORE UPDATE ON picture
       FOR EACH ROW
       BEGIN
+        DECLARE CONTINUE HANDLER FOR 1146 SET NEW.country = NULL;
         IF NOT ST_Equals(NEW.location, OLD.location) THEN
           SET NEW.country = (
             SELECT c.alpha2
@@ -308,6 +313,7 @@ export async function initDatabase() {
         BEFORE INSERT ON picture
         FOR EACH ROW
         BEGIN
+          DECLARE CONTINUE HANDLER FOR 1146 SET NEW.country = NULL;
           IF NEW.location IS NOT NULL THEN
             SET NEW.country = (
               SELECT c.alpha2
@@ -415,6 +421,11 @@ function withJitter(ms: number) {
 
 export function isSqlDuplicateError(err: unknown): boolean {
   return z.object({ errno: z.literal(1062) }).safeParse(err).success;
+}
+
+/** True for error 1146, raised when a query references a nonexistent table. */
+export function isSqlMissingTableError(err: unknown): boolean {
+  return z.object({ errno: z.literal(1146) }).safeParse(err).success;
 }
 
 function isRetryableTxError(err: unknown): boolean {
