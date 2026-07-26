@@ -44,13 +44,13 @@ export async function initDatabase() {
       description TEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL,
       roles JSON NOT NULL DEFAULT '[]',
       createdAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      lat FLOAT(8, 6) NULL,
-      lon FLOAT(9, 6) NULL,
+      lat DECIMAL(8, 6) NULL,
+      lon DECIMAL(9, 6) NULL,
       settings JSON NOT NULL DEFAULT '{}',
       sendGalleryEmails BIT NOT NULL DEFAULT true,
       premiumExpiration TIMESTAMP NULL,
       credits FLOAT NOT NULL DEFAULT 0,
-      language CHAR(2) NULL,
+      language CHAR(2) CHARSET ascii NULL,
       polarCustomerId VARCHAR(64) CHARSET ascii NULL,
       polarSubscriptionId VARCHAR(64) CHARSET ascii NULL
     ) ENGINE=InnoDB`,
@@ -67,7 +67,6 @@ export async function initDatabase() {
       authToken VARCHAR(255) CHARSET ascii PRIMARY KEY,
       userId INT UNSIGNED NOT NULL,
       createdAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      INDEX authTokenIdx (authToken),
       FOREIGN KEY (userId) REFERENCES user (id) ON DELETE CASCADE
     ) ENGINE=InnoDB`,
 
@@ -87,7 +86,7 @@ export async function initDatabase() {
       updatedAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
       expireAt TIMESTAMP NOT NULL,
       item JSON NOT NULL,
-      status ENUM('created','awaiting_payment','confirmed','rejected') NOT NULL DEFAULT 'created',
+      status ENUM('created','awaiting_payment','confirmed','rejected') CHARSET ascii NOT NULL DEFAULT 'created',
       lastEvent VARCHAR(32) CHARSET ascii NULL,
       lastOccurredAt INT UNSIGNED NULL,
       amountPaid INT UNSIGNED NULL,
@@ -101,6 +100,7 @@ export async function initDatabase() {
     ) ENGINE=InnoDB`,
 
     sql`CREATE TABLE IF NOT EXISTS purchase (
+      id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
       userId INT UNSIGNED NOT NULL,
       item JSON NOT NULL,
       createdAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -111,7 +111,7 @@ export async function initDatabase() {
 
     sql`CREATE TABLE IF NOT EXISTS picture (
       id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-      pathname VARCHAR(255) CHARSET utf8 COLLATE utf8_bin NOT NULL UNIQUE,
+      pathname VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL UNIQUE,
       userId INT UNSIGNED NOT NULL,
       title VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL,
       description VARCHAR(4096) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL,
@@ -237,8 +237,8 @@ export async function initDatabase() {
       id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
       deviceId INT UNSIGNED NOT NULL,
       createdAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      lat FLOAT(8, 6) NOT NULL,
-      lon FLOAT(9, 6) NOT NULL,
+      lat DECIMAL(8, 6) NOT NULL,
+      lon DECIMAL(9, 6) NOT NULL,
       altitude FLOAT NULL,
       speed FLOAT NULL,
       accuracy FLOAT NULL,
@@ -265,19 +265,19 @@ export async function initDatabase() {
     ) ENGINE=InnoDB`,
 
     sql`CREATE TABLE IF NOT EXISTS map (
-      id CHAR(8) PRIMARY KEY,
+      id CHAR(8) CHARSET ascii PRIMARY KEY,
       createdAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
       modifiedAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
       name VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL,
       userId INT UNSIGNED NOT NULL,
       public BIT NOT NULL DEFAULT false,
-      data MEDIUMTEXT CHARSET utf8 COLLATE utf8_bin NOT NULL DEFAULT '{}',
+      data MEDIUMTEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL DEFAULT '{}',
       CONSTRAINT umUserFk FOREIGN KEY (userId) REFERENCES user (id) ON DELETE CASCADE,
       INDEX umCreatedAtIdx (createdAt)
     ) ENGINE=InnoDB`,
 
     sql`CREATE TABLE IF NOT EXISTS mapWriteAccess (
-      mapId CHAR(8) NOT NULL,
+      mapId CHAR(8) CHARSET ascii NOT NULL,
       userId INT UNSIGNED NOT NULL,
       PRIMARY KEY (mapId, userId),
       CONSTRAINT mwaUserFk FOREIGN KEY (userId) REFERENCES user (id) ON DELETE CASCADE,
@@ -326,7 +326,43 @@ export async function initDatabase() {
         END`,
   ];
 
-  const updates: (string | string[])[] = [];
+  // Schema changes for databases created before the CREATE TABLEs above were
+  // last changed. Failures are logged and ignored, so an already applied step
+  // is harmless — but note that MODIFY COLUMN rebuilds the whole table every
+  // time it runs, so drop these entries once they have been applied everywhere
+  // (as commit 6d2fe75 did with the previous batch).
+  const updates: (string | string[])[] = [
+    // Redundant: authToken is already the PRIMARY KEY.
+    'ALTER TABLE auth DROP INDEX IF EXISTS authTokenIdx',
+
+    // The table had no PRIMARY KEY at all.
+    'ALTER TABLE purchase ADD COLUMN IF NOT EXISTS id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY FIRST',
+
+    // utf8 is utf8mb3, so saving a map containing an emoji failed with
+    // "Incorrect string value" under STRICT_TRANS_TABLES.
+    "ALTER TABLE map MODIFY COLUMN data MEDIUMTEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL DEFAULT '{}'",
+    'ALTER TABLE picture MODIFY COLUMN pathname VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL',
+
+    // FLOAT is single precision and cannot hold the 8 significant digits a
+    // coordinate needs; 48.123456 came back as 48.123455 (~11 cm off).
+    'ALTER TABLE user MODIFY COLUMN lat DECIMAL(8, 6) NULL, MODIFY COLUMN lon DECIMAL(9, 6) NULL',
+    'ALTER TABLE trackingPoint MODIFY COLUMN lat DECIMAL(8, 6) NOT NULL, MODIFY COLUMN lon DECIMAL(9, 6) NOT NULL',
+
+    // Pin the charset of the columns that used to inherit the server default,
+    // so every database ends up with the same schema.
+    'ALTER TABLE user MODIFY COLUMN language CHAR(2) CHARSET ascii NULL',
+    "ALTER TABLE purchaseIntent MODIFY COLUMN status ENUM('created','awaiting_payment','confirmed','rejected') CHARSET ascii NOT NULL DEFAULT 'created'",
+
+    // map.id and mapWriteAccess.mapId are a foreign key pair and must keep
+    // matching charsets, so the constraint has to go first. That also stops the
+    // sequence from re-running once applied, since the DROP then fails.
+    [
+      'ALTER TABLE mapWriteAccess DROP FOREIGN KEY mwaMapFk',
+      'ALTER TABLE map MODIFY COLUMN id CHAR(8) CHARSET ascii NOT NULL',
+      'ALTER TABLE mapWriteAccess MODIFY COLUMN mapId CHAR(8) CHARSET ascii NOT NULL',
+      'ALTER TABLE mapWriteAccess ADD CONSTRAINT mwaMapFk FOREIGN KEY (mapId) REFERENCES map (id) ON DELETE CASCADE',
+    ],
+  ];
 
   const db = await pool.getConnection();
 
