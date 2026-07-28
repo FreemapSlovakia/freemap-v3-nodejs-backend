@@ -51,6 +51,25 @@ test('parseElevationSources: single and multiple entries in order', () => {
   );
 });
 
+test('parseElevationSources: newlines separate entries too', () => {
+  const expected = [
+    { name: 'a', path: '/data/a.tif', bbox: [1, 2, 3, 4] },
+    { name: 'b', path: '/data/b.tif', bbox: [5, 6, 7, 8] },
+  ];
+
+  // one source per line, no semicolons
+  assert.deepEqual(
+    parseElevationSources('a:/data/a.tif:1,2,3,4\nb:/data/b.tif:5,6,7,8\n'),
+    expected,
+  );
+
+  // semicolon-terminated lines, which is what the old parser accepted
+  assert.deepEqual(
+    parseElevationSources('a:/data/a.tif:1,2,3,4;\nb:/data/b.tif:5,6,7,8;\n'),
+    expected,
+  );
+});
+
 test('parseElevationSources: rejects entry missing the name or the bbox', () => {
   assert.throws(
     () => parseElevationSources('/data/a.tif'),

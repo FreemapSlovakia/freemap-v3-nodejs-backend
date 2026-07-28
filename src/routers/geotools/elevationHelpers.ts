@@ -19,10 +19,12 @@ export const SRTM_SOURCE_NAME = 'srtm';
 
 // Parse the ELEVATION_SOURCES config, in priority order (first wins). Format:
 //   name:/path/a.tif:minLon,minLat,maxLon,maxLat;other:/path/b.tif:...
-// Paths must not contain colons.
+// Paths must not contain colons. Entries may be separated by a newline instead
+// of a semicolon, so the (long) value stays readable one source per line where
+// the environment can carry a multi-line value.
 export function parseElevationSources(raw: string): ParsedSource[] {
   return raw
-    .split(';')
+    .split(/[;\n]/)
     .map((entry) => entry.trim())
     .filter(Boolean)
     .map((entry) => {

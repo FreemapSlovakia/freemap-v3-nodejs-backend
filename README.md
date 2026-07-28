@@ -87,9 +87,17 @@ pnpm start | pnpm exec pino-pretty
   the elevation/profile endpoints.
 - `ELEVATION_SOURCES` — optional, premium-only high-precision elevation rasters
   tried before the global fallback, in priority order (first match wins).
-  Semicolon-separated list of `name:path:minLon,minLat,maxLon,maxLat`, e.g.
+  Semicolon- or newline-separated list of
+  `name:path:minLon,minLat,maxLon,maxLat`, e.g.
   `sk:/data/dmr5.tif:16.8,47.7,22.6,49.7`. Paths must not contain colons, and
-  the bbox is WGS84 lon/lat regardless of the raster's own CRS.
+  the bbox is WGS84 lon/lat regardless of the raster's own CRS — derive it by
+  reprojecting the raster's *densified* outline, since for anything but a plain
+  Mercator the edges bow and the four corners alone under-cover it.
+
+  Newlines let a long list stay readable one source per line. systemd's
+  `EnvironmentFile=` carries them if the value is double-quoted (it also joins
+  lines ending in a backslash, which inserts no separator — so keep the `;`
+  there).
 
   `name` is reported by `/geotools/elevation?sources=1` and the frontend
   resolves it to a data attribution, so it is an API contract, not a label:
