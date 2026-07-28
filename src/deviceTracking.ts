@@ -28,6 +28,7 @@ export async function storeTrackPoint(
     Number.isNaN(lon) ||
     lon < -180 ||
     lon > 180 ||
+    Number.isNaN(altitude) ||
     Number.isNaN(battery) ||
     (battery !== undefined && (battery < 0 || battery > 100)) ||
     Number.isNaN(gsmSignal) ||
