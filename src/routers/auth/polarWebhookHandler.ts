@@ -178,10 +178,15 @@ export function attachPolarWebhookHandler(router: RouterInstance) {
 
         const isOneTimePremium = isPremium && !isSubscriptionOrder;
 
-        // For credits, the chosen count equals the net (pre-tax) amount in euro
-        // cents; prefer the explicit metadata value when present.
+        // For credits, the chosen count is what the buyer was charged in euro
+        // cents, which is `subtotalAmount`: our prices are tax-inclusive, so a
+        // 500-credit order reads subtotal 500, tax 93, net 407. Using the net
+        // here would short-change the buyer by the tax. Metadata is set by our
+        // own checkout and wins; this only covers orders made elsewhere.
         const credits = isCredits
-          ? Number(metaString(order.metadata, 'credits') ?? order.netAmount)
+          ? Number(
+              metaString(order.metadata, 'credits') ?? order.subtotalAmount,
+            )
           : null;
 
         await runInTransaction(async (conn) => {
