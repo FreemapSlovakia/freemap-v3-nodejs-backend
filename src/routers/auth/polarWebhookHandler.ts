@@ -10,6 +10,33 @@ import { registerPath } from '../../openapi.js';
 import { isPremiumProduct, isWinbackProduct } from '../../premiumPricing.js';
 import { markWinbackRedeemed } from '../../premiumWinback.js';
 
+/**
+ * Subscription statuses that provision nothing, because the period they carry
+ * hasn't been paid for.
+ *
+ * Polar advances `currentPeriodEnd` at the cycle boundary, *before* the renewal
+ * payment settles, and always emits a `subscription.updated` alongside the
+ * status change. So a `past_due` subscription arrives holding a period end a
+ * year ahead that nobody has paid — and since `subscription.revoked`
+ * deliberately never shortens `premiumExpiration`, granting it would mean a
+ * free year for anyone whose card fails. `incomplete*` is the same story for a
+ * first payment; trials are `trialing`, not `incomplete`, so they're unaffected.
+ *
+ * It also keeps the single-use win-back offer from being burned by a
+ * subscription that was never paid for, which would leave the user unable to
+ * take the offer again.
+ *
+ * Nothing is lost by waiting: a late payment re-activates the subscription,
+ * which provisions the period then. The cost is that access lapses during
+ * Polar's grace window instead of being carried through it.
+ */
+const UNPAID_STATUSES = new Set([
+  'incomplete',
+  'incomplete_expired',
+  'past_due',
+  'unpaid',
+]);
+
 type MetaValue = string | number | boolean;
 
 function metaString(
@@ -215,15 +242,7 @@ export function attachPolarWebhookHandler(router: RouterInstance) {
         // to `currentPeriodEnd`.
         const sub = event.data;
 
-        // A subscription whose first payment hasn't gone through grants
-        // nothing. It may never become active, `subscription.revoked`
-        // deliberately doesn't shorten `premiumExpiration`, and burning the
-        // win-back offer here would leave a failed payment permanently
-        // ineligible for it. Trials are `trialing`, not `incomplete`.
-        if (
-          sub.status === 'incomplete' ||
-          sub.status === 'incomplete_expired'
-        ) {
+        if (UNPAID_STATUSES.has(sub.status)) {
           break;
         }
 
@@ -242,6 +261,12 @@ export function attachPolarWebhookHandler(router: RouterInstance) {
         // Polar also sends an `updated` for the status change around revocation
         // and delivery isn't ordered, so a late one would leave the user marked
         // as subscribed. Let the end win.
+        //
+        // `endedAt` is the right test, not `canceled`/`endsAt`: Polar sets it
+        // only when access is actually over — an immediate revoke, or the cycle
+        // that finds `cancel_at_period_end` set — and clears it on reactivation.
+        // Cancelling with time left on the period leaves it null, so this does
+        // not cut anyone's premium short.
         //
         // code-review: accepted trade-off — this only catches snapshots that
         // already know they ended. A snapshot taken *before* revocation and
