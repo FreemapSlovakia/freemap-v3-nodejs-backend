@@ -88,9 +88,17 @@ pnpm start | pnpm exec pino-pretty
 - `ELEVATION_SOURCES` — optional, premium-only high-precision elevation rasters
   tried before the global fallback, in priority order (first match wins).
   Semicolon-separated list of `name:path:minLon,minLat,maxLon,maxLat`, e.g.
-  `dmr5:/data/dmr5.tif:16.8,47.7,22.6,49.7`. `name` is the public identifier
-  reported by `/geotools/elevation?sources=1`, so keep it stable across file
-  renames or re-projections.
+  `sk:/data/dmr5.tif:16.8,47.7,22.6,49.7`. Paths must not contain colons, and
+  the bbox is WGS84 lon/lat regardless of the raster's own CRS.
+
+  `name` is reported by `/geotools/elevation?sources=1` and the frontend
+  resolves it to a data attribution, so it is an API contract, not a label:
+  use the lowercase ISO 3166-1 alpha-2 code of the country the model covers
+  (`sk`, `at`, …), or the model's own id for one that isn't country-scoped
+  (`gedtm30`). Several entries may share a name — the reported list is
+  deduplicated. An unrecognised name is still credited, but only under the
+  bare token, so keep names stable across file renames or re-projections. See
+  `elevationSourcesFromTokens` in the frontend for the resolution rules.
 
 ### Map tiles
 

@@ -120,7 +120,9 @@ const ElevationWithSourcesResponseSchema = z.object({
   elevations: ElevationResponseSchema,
   sources: z.array(z.string()).meta({
     description:
-      'names of the elevation datasets actually used, in the order first used',
+      'names of the elevation datasets that answered, deduplicated; ' +
+      'local sources first, then the global fallback. The order carries no ' +
+      'meaning beyond that — do not rely on it',
   }),
 });
 
@@ -237,7 +239,9 @@ async function compute(ctx: ParameterizedContext) {
  * dataset as the fallback for everyone.
  *
  * When `usedSources` is given, the name of every source that actually yielded a
- * value is added to it, in the order first used.
+ * value is added to it. The local sources are all resolved before the SRTM
+ * fallback pass runs, so SRTM always lands last regardless of which point it
+ * answered first — the set is a membership report, not an ordering.
  */
 export async function resolveElevations(
   cs: [number, number][],
