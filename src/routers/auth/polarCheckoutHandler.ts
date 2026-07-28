@@ -12,8 +12,12 @@ import { liveSubscriptionSql } from '../../types.js';
 // 1 credit = €0.01, so the chosen credit count equals the amount in euro cents.
 const MIN_CREDITS = 500;
 
-/** Longest trial we ask Polar for; see where it's clamped. */
-const MAX_TRIAL_DAYS = 730;
+/**
+ * Longest trial Polar accepts: `trial_interval_count` is validated as
+ * `<= 1000` (a larger value fails the whole checkout with a 422), so this is
+ * the ceiling, not a guess. See where it's clamped.
+ */
+const MAX_TRIAL_DAYS = 1000;
 
 const BodySchema = z.union([
   z.strictObject({
@@ -143,8 +147,10 @@ export function attachPolarCheckoutHandler(router: RouterInstance) {
         );
 
         // One-time years stack and admins can set `premiumExpiration` freely,
-        // so this is not bounded by anything we sell. Keep it in a range Polar
-        // will accept — a rejected value would fail the whole checkout.
+        // so this is not bounded by anything we sell. Keep it within what Polar
+        // accepts — a rejected value would fail the whole checkout. The app
+        // doesn't offer the switch past this, so the clamp only catches what
+        // reaches the endpoint another way.
         trialDays = Math.min(wantedTrialDays, MAX_TRIAL_DAYS);
 
         if (trialDays < wantedTrialDays) {
