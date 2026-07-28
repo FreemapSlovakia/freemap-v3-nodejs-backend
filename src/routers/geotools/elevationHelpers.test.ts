@@ -36,42 +36,58 @@ test('parseElevationSources: empty config yields no sources', () => {
 });
 
 test('parseElevationSources: single and multiple entries in order', () => {
-  assert.deepEqual(parseElevationSources('/data/a.tif:16.8,47.7,22.6,49.7'), [
-    { path: '/data/a.tif', bbox: [16.8, 47.7, 22.6, 49.7] },
+  assert.deepEqual(parseElevationSources('a:/data/a.tif:16.8,47.7,22.6,49.7'), [
+    { name: 'a', path: '/data/a.tif', bbox: [16.8, 47.7, 22.6, 49.7] },
   ]);
 
   assert.deepEqual(
     parseElevationSources(
-      '/data/a.tif:16.8,47.7,22.6,49.7;/data/b.tif:0,0,1,1',
+      'a:/data/a.tif:16.8,47.7,22.6,49.7;b:/data/b.tif:0,0,1,1',
     ),
     [
-      { path: '/data/a.tif', bbox: [16.8, 47.7, 22.6, 49.7] },
-      { path: '/data/b.tif', bbox: [0, 0, 1, 1] },
+      { name: 'a', path: '/data/a.tif', bbox: [16.8, 47.7, 22.6, 49.7] },
+      { name: 'b', path: '/data/b.tif', bbox: [0, 0, 1, 1] },
     ],
   );
 });
 
-test('parseElevationSources: path may contain colons', () => {
-  assert.deepEqual(parseElevationSources('C:/maps/a.tif:1,2,3,4'), [
-    { path: 'C:/maps/a.tif', bbox: [1, 2, 3, 4] },
-  ]);
-});
-
-test('parseElevationSources: rejects entry without bbox separator', () => {
+test('parseElevationSources: rejects entry missing the name or the bbox', () => {
   assert.throws(
     () => parseElevationSources('/data/a.tif'),
+    /Invalid ELEVATION_SOURCES entry/,
+  );
+
+  // no name — the old two-field format is not accepted
+  assert.throws(
+    () => parseElevationSources('/data/a.tif:1,2,3,4'),
+    /Invalid ELEVATION_SOURCES entry/,
+  );
+
+  assert.throws(
+    () => parseElevationSources(':/data/a.tif:1,2,3,4'),
+    /Invalid ELEVATION_SOURCES entry/,
+  );
+
+  assert.throws(
+    () => parseElevationSources('a::1,2,3,4'),
+    /Invalid ELEVATION_SOURCES entry/,
+  );
+
+  // paths must not contain colons
+  assert.throws(
+    () => parseElevationSources('a:C:/maps/a.tif:1,2,3,4'),
     /Invalid ELEVATION_SOURCES entry/,
   );
 });
 
 test('parseElevationSources: rejects malformed bbox', () => {
   assert.throws(
-    () => parseElevationSources('/data/a.tif:1,2,3'),
+    () => parseElevationSources('a:/data/a.tif:1,2,3'),
     /Invalid bbox/,
   );
 
   assert.throws(
-    () => parseElevationSources('/data/a.tif:1,2,3,x'),
+    () => parseElevationSources('a:/data/a.tif:1,2,3,x'),
     /Invalid bbox/,
   );
 });

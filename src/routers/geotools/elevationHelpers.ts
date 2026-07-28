@@ -6,37 +6,39 @@ export type Bbox = [
 ];
 
 export type ParsedSource = {
+  // stable public identifier of the source, reported by the API; kept separate
+  // from `path` so that neither the filesystem layout nor a file rename leaks
+  // into the API contract
+  name: string;
   path: string;
   bbox: Bbox;
 };
 
+// Name reported for the global SRTM fallback dataset.
+export const SRTM_SOURCE_NAME = 'srtm';
+
 // Parse the ELEVATION_SOURCES config, in priority order (first wins). Format:
-//   /path/a.tif:minLon,minLat,maxLon,maxLat;/path/b.tif:...
+//   name:/path/a.tif:minLon,minLat,maxLon,maxLat;other:/path/b.tif:...
+// Paths must not contain colons.
 export function parseElevationSources(raw: string): ParsedSource[] {
   return raw
     .split(';')
     .map((entry) => entry.trim())
     .filter(Boolean)
     .map((entry) => {
-      // split on the last colon so paths may themselves contain colons
-      const sep = entry.lastIndexOf(':');
+      const [name, path, rawBbox, ...rest] = entry.split(':');
 
-      if (sep < 0) {
+      if (!name || !path || !rawBbox || rest.length) {
         throw new Error(`Invalid ELEVATION_SOURCES entry: ${entry}`);
       }
 
-      const path = entry.slice(0, sep);
-
-      const bbox = entry
-        .slice(sep + 1)
-        .split(',')
-        .map(Number);
+      const bbox = rawBbox.split(',').map(Number);
 
       if (bbox.length !== 4 || bbox.some(Number.isNaN)) {
         throw new Error(`Invalid bbox in ELEVATION_SOURCES entry: ${entry}`);
       }
 
-      return { path, bbox: bbox as Bbox };
+      return { name, path, bbox: bbox as Bbox };
     });
 }
 

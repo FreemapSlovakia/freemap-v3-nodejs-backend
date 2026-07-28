@@ -15,6 +15,7 @@ import {
   inBbox,
   type ParsedSource,
   parseElevationSources,
+  SRTM_SOURCE_NAME,
   srtmKey,
 } from './elevationHelpers.js';
 
@@ -114,6 +115,20 @@ const ElevationResponseSchema = z.array(
     .meta({ description: 'elevation in meters above sea level' }),
 );
 
+// Returned instead of the bare array when `sources=1` is in the query string.
+const ElevationWithSourcesResponseSchema = z.object({
+  elevations: ElevationResponseSchema,
+  sources: z.array(z.string()).meta({
+    description:
+      'names of the elevation datasets actually used, in the order first used',
+  }),
+});
+
+const SourcesSchema = z
+  .literal('1')
+  .optional()
+  .meta({ description: 'set to 1 to also report the datasets used' });
+
 export function attachElevationHandler(router: RouterInstance) {
   registerPath('/geotools/elevation', {
     get: {
@@ -126,11 +141,19 @@ export function attachElevationHandler(router: RouterInstance) {
       requestParams: {
         query: z.object({
           coordinates: CoordsSchemaC,
+          sources: SourcesSchema,
         }),
       },
       responses: {
         200: {
-          content: { 'application/json': { schema: ElevationResponseSchema } },
+          content: {
+            'application/json': {
+              schema: z.union([
+                ElevationResponseSchema,
+                ElevationWithSourcesResponseSchema,
+              ]),
+            },
+          },
         },
       },
     },
@@ -141,12 +164,24 @@ export function attachElevationHandler(router: RouterInstance) {
         'others get the global fallback dataset.',
       tags: ['geotools'],
       security: AUTH_OPTIONAL,
+      requestParams: {
+        query: z.object({
+          sources: SourcesSchema,
+        }),
+      },
       requestBody: {
         content: { 'application/json': { schema: CoordsSchema } },
       },
       responses: {
         200: {
-          content: { 'application/json': { schema: ElevationResponseSchema } },
+          content: {
+            'application/json': {
+              schema: z.union([
+                ElevationResponseSchema,
+                ElevationWithSourcesResponseSchema,
+              ]),
+            },
+          },
         },
         400: {},
       },
@@ -183,9 +218,16 @@ async function compute(ctx: ParameterizedContext) {
 
   const premium = Boolean(premiumExpiration && premiumExpiration > new Date());
 
-  ctx.response.body = ElevationResponseSchema.parse(
-    await resolveElevations(cs, premium, ctx.log),
-  );
+  const usedSources = ctx.query.sources === '1' ? new Set<string>() : undefined;
+
+  const elevations = await resolveElevations(cs, premium, ctx.log, usedSources);
+
+  ctx.response.body = usedSources
+    ? ElevationWithSourcesResponseSchema.parse({
+        elevations,
+        sources: [...usedSources],
+      })
+    : ElevationResponseSchema.parse(elevations);
 }
 
 /**
@@ -193,11 +235,15 @@ async function compute(ctx: ParameterizedContext) {
  * `null` where no source covers the point. Premium callers get the
  * high-precision local sources first (priority order), with the global SRTM
  * dataset as the fallback for everyone.
+ *
+ * When `usedSources` is given, the name of every source that actually yielded a
+ * value is added to it, in the order first used.
  */
 export async function resolveElevations(
   cs: [number, number][],
   premium: boolean,
   log: Pick<Logger, 'warn'>,
+  usedSources?: Set<string>,
 ): Promise<(number | null)[]> {
   const results: (number | null)[] = new Array(cs.length).fill(null);
 
@@ -235,6 +281,7 @@ export async function resolveElevations(
       if (v != null) {
         results[i] = v;
         resolved = true;
+        usedSources?.add(src.name);
         break;
       }
     }
@@ -310,6 +357,10 @@ export async function resolveElevations(
       const ds = dsMap.get(srtmKey(lat, lon));
 
       results[i] = ds ? await computeElevation(lat, lon, ds) : null;
+
+      if (results[i] != null) {
+        usedSources?.add(SRTM_SOURCE_NAME);
+      }
     }
 
     return results;

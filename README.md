@@ -85,6 +85,12 @@ pnpm start | pnpm exec pino-pretty
 - `TRACKLOGS_DIRECTORY` — directory where uploaded GPX track logs are stored.
 - `ELEVATION_DATA_DIRECTORY` — directory containing HGT elevation tiles used by
   the elevation/profile endpoints.
+- `ELEVATION_SOURCES` — optional, premium-only high-precision elevation rasters
+  tried before the global fallback, in priority order (first match wins).
+  Semicolon-separated list of `name:path:minLon,minLat,maxLon,maxLat`, e.g.
+  `dmr5:/data/dmr5.tif:16.8,47.7,22.6,49.7`. `name` is the public identifier
+  reported by `/geotools/elevation?sources=1`, so keep it stable across file
+  renames or re-projections.
 
 ### Map tiles
 
