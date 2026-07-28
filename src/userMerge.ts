@@ -1,6 +1,11 @@
 import type { PoolConnection } from 'mariadb';
 import sql, { empty, join, raw } from 'sql-template-tag';
-import { PROVIDER_ID_COLUMNS, type UserRow } from './types.js';
+import { appLogger } from './logger.js';
+import {
+  liveSubscriptionSql,
+  PROVIDER_ID_COLUMNS,
+  type UserRow,
+} from './types.js';
 
 const PROVIDER_COLS = PROVIDER_ID_COLUMNS;
 
@@ -102,6 +107,61 @@ export async function mergeUserAccounts(
     );
   }
 
+  // A live Polar subscription must survive the merge, otherwise the merged user
+  // looks unsubscribed (and win-back eligible) while Polar keeps charging them.
+  // Liveness comes from the shared predicate, not from the ID being present: a
+  // dead ID left behind by a lost `subscription.revoked` must not be treated as
+  // a subscription, or the merge would hand the survivor a 409 on every premium
+  // checkout for the rest of its premium period.
+  const polarRows = await conn.query<
+    {
+      id: number;
+      polarCustomerId: string | null;
+      polarSubscriptionId: string | null;
+      live: number | null;
+    }[]
+  >(
+    sql`SELECT id, polarCustomerId, polarSubscriptionId,
+               ${raw(liveSubscriptionSql())} AS live
+        FROM user WHERE id IN (${target.id}, ${source.id})`,
+  );
+
+  const targetPolar = polarRows.find((row) => row.id === target.id);
+
+  const sourcePolar = polarRows.find((row) => row.id === source.id);
+
+  const targetSubscribed = Boolean(targetPolar?.live);
+
+  const sourceSubscribed = Boolean(sourcePolar?.live);
+
+  // Only one identity can be kept, and the customer ID has to travel with the
+  // subscription: the webhook falls back to `polarCustomerId` to find the user
+  // after a merge, and a mismatched pair would make renewals unroutable.
+  const polarFields =
+    sourcePolar && sourceSubscribed && !targetSubscribed
+      ? sql`polarCustomerId = ${sourcePolar.polarCustomerId},
+            polarSubscriptionId = ${sourcePolar.polarSubscriptionId},`
+      : sql`polarCustomerId = COALESCE(polarCustomerId, ${sourcePolar?.polarCustomerId ?? null}),`;
+
+  // If both sides subscribe, the source's has to be cancelled by hand in
+  // Polar — nothing here can do it, so make it loud.
+  if (targetPolar && sourcePolar && targetSubscribed && sourceSubscribed) {
+    appLogger.warn(
+      {
+        targetId: target.id,
+        sourceId: source.id,
+        keptSubscriptionId: targetPolar.polarSubscriptionId,
+        orphanedSubscriptionId: sourcePolar.polarSubscriptionId,
+      },
+      'merged accounts both have a Polar subscription; cancel the orphaned one manually',
+    );
+  }
+
+  // code-review: accepted trade-off — `premiumWinback` is deliberately not
+  // merged, so merging an account that already took the offer can re-open it
+  // for the surviving one. The offer is temporary and worth €8/year, and the
+  // source's row is cascade-deleted with the user. Don't report it.
+
   // Free source's UNIQUE auth-provider IDs before the consolidating UPDATE,
   // otherwise transferring them to target would briefly duplicate the value
   // and trip the UNIQUE constraint. Values are already captured in authData.
@@ -143,6 +203,7 @@ export async function mergeUserAccounts(
       sendGalleryEmails = sendGalleryEmails OR ${sendGalleryEmails},
       settings = ${mergedSettings},
       credits = credits + ${credits},
+      ${polarFields}
       picture = COALESCE(picture, ${opts.newPicture ?? null}, (SELECT picture FROM (SELECT picture FROM user WHERE id = ${sourceId}) t)),
       ${join(
         Object.entries(authData).map(
