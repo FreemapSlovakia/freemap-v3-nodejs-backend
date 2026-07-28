@@ -74,6 +74,10 @@ export const CommonUserSchema = {
   sendGalleryEmails: z.boolean(),
   hasPicture: z.coerce.boolean(),
   premium: z.coerce.boolean(),
+  // Premium comes from a live auto-renewing subscription rather than from a
+  // one-time purchase; such a subscription keeps the price it was created with.
+  // See `liveSubscriptionSql`.
+  premiumSubscription: z.coerce.boolean(),
 };
 
 /** UNIQUE auth-provider ID columns on the user table. */
@@ -110,17 +114,31 @@ const USER_COLUMN_NAMES = [
   'language',
 ] as const;
 
+/**
+ * SQL predicate for a Polar subscription that still grants access. A stored
+ * subscription ID on its own isn't proof of one: a lost or out-of-order
+ * `subscription.*` webhook can leave a dead ID behind. Every consumer — this
+ * flag, the checkout's already-subscribed guard and the win-back lookup — must
+ * agree on what "subscribed" means, or the client and the server end up
+ * believing different things.
+ */
+export function liveSubscriptionSql(prefix = ''): string {
+  return `(${prefix}polarSubscriptionId IS NOT NULL AND ${prefix}premiumExpiration > NOW())`;
+}
+
 /** SQL column list for SELECTing user rows without loading the picture bytes. */
 export const USER_COLUMNS_SQL =
   USER_COLUMN_NAMES.join(', ') +
   ', picture IS NOT NULL AS hasPicture' +
-  ', (premiumExpiration IS NOT NULL AND premiumExpiration > NOW()) AS premium';
+  ', (premiumExpiration IS NOT NULL AND premiumExpiration > NOW()) AS premium' +
+  `, ${liveSubscriptionSql()} AS premiumSubscription`;
 
 /** Same, with each column qualified by `user.` (for joins). */
 export const USER_COLUMNS_SQL_PREFIXED =
   USER_COLUMN_NAMES.map((c) => `user.${c}`).join(', ') +
   ', user.picture IS NOT NULL AS hasPicture' +
-  ', (user.premiumExpiration IS NOT NULL AND user.premiumExpiration > NOW()) AS premium';
+  ', (user.premiumExpiration IS NOT NULL AND user.premiumExpiration > NOW()) AS premium' +
+  `, ${liveSubscriptionSql('user.')} AS premiumSubscription`;
 
 export const UserResponseSchema = z
   .object({

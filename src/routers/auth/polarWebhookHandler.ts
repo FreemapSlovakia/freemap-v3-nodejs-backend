@@ -7,6 +7,8 @@ import sql from 'sql-template-tag';
 import { pool, runInTransaction } from '../../database.js';
 import { getEnv } from '../../env.js';
 import { registerPath } from '../../openapi.js';
+import { isPremiumProduct, isWinbackProduct } from '../../premiumPricing.js';
+import { markWinbackRedeemed } from '../../premiumWinback.js';
 
 type MetaValue = string | number | boolean;
 
@@ -19,20 +21,50 @@ function metaString(
   return value === undefined ? undefined : String(value);
 }
 
-/** Resolve our user ID from event metadata, falling back to the customer's external ID. */
-function resolveUserId(
+/**
+ * Resolve our user ID from event metadata, falling back to the customer's
+ * external ID and finally to the stored `polarCustomerId`. That last step
+ * matters after an account merge: metadata and external ID still name the
+ * account that was merged away, and without it renewals for the surviving user
+ * would silently provision nothing.
+ */
+async function resolveUserId(
   metadata: Record<string, MetaValue> | undefined | null,
-  externalId: string | null | undefined,
-): number | undefined {
-  const raw = metaString(metadata, 'userId') ?? externalId ?? undefined;
+  customer: { id: string; externalId?: string | null },
+): Promise<number | undefined> {
+  const raw =
+    metaString(metadata, 'userId') ?? customer.externalId ?? undefined;
 
-  if (raw === undefined) {
-    return undefined;
+  if (raw !== undefined) {
+    const id = Number(raw);
+
+    if (Number.isInteger(id) && id > 0) {
+      const rows = await pool.query<{ id: number }[]>(
+        sql`SELECT id FROM user WHERE id = ${id}`,
+      );
+
+      if (rows.length > 0) {
+        return id;
+      }
+    }
   }
 
-  const id = Number(raw);
+  const rows = await pool.query<{ id: number }[]>(
+    sql`SELECT id FROM user WHERE polarCustomerId = ${customer.id} LIMIT 1`,
+  );
 
-  return Number.isInteger(id) && id > 0 ? id : undefined;
+  return rows[0]?.id;
+}
+
+/** Detaches a finished subscription, unless a newer one took its place. */
+async function clearSubscription(
+  userId: number,
+  subscriptionId: string,
+): Promise<void> {
+  await pool.query<unknown>(
+    sql`UPDATE user SET polarSubscriptionId = NULL
+        WHERE id = ${userId} AND polarSubscriptionId = ${subscriptionId}`,
+  );
 }
 
 export function attachPolarWebhookHandler(router: RouterInstance) {
@@ -73,7 +105,7 @@ export function attachPolarWebhookHandler(router: RouterInstance) {
       case 'order.paid': {
         const order = event.data;
 
-        const userId = resolveUserId(order.metadata, order.customer.externalId);
+        const userId = await resolveUserId(order.metadata, order.customer);
 
         if (userId === undefined) {
           ctx.log.warn(
@@ -84,17 +116,40 @@ export function attachPolarWebhookHandler(router: RouterInstance) {
           break;
         }
 
-        // Classify the order by product (authoritative; metadata is a fallback):
-        //  - credits          → add to the credit balance
-        //  - one-time premium → extend premiumExpiration by 1 year
-        //  - recurring premium order (subscription create/renewal) → history
-        //    only; access is provisioned by the subscription.* events.
-        const isCredits =
-          order.productId === getEnv('POLAR_CREDITS_PRODUCT_ID') ||
-          metaString(order.metadata, 'kind') === 'credits';
+        // Classify the order:
+        //  - credits           → add to the credit balance
+        //  - one-time premium  → extend premiumExpiration by 1 year
+        //  - subscription order (create/renewal) → history only; access is
+        //    provisioned by the subscription.* events
+        //  - anything else (a donation, a manual order, an unknown product) →
+        //    ignored; guessing premium here would hand out a free year.
+        const kind = metaString(order.metadata, 'kind');
 
-        const isOneTimePremium =
-          order.productId === getEnv('POLAR_PREMIUM_ONETIME_PRODUCT_ID');
+        const isCredits =
+          order.productId === getEnv('POLAR_CREDITS_PRODUCT_ID', '') ||
+          kind === 'credits';
+
+        // Our own checkouts always carry `kind`; the product IDs are the
+        // fallback for orders created outside them (e.g. in the Polar UI).
+        const isPremium =
+          !isCredits &&
+          (kind === 'premium' || isPremiumProduct(order.productId));
+
+        // Subscriptions only ever sell premium here, and a renewal order may
+        // arrive without the checkout metadata, so those count as premium
+        // history regardless — they grant nothing on their own anyway.
+        const isSubscriptionOrder = order.subscriptionId !== null;
+
+        if (!isCredits && !isPremium && !isSubscriptionOrder) {
+          ctx.log.warn(
+            { orderId: order.id, productId: order.productId },
+            'unrecognized Polar order; nothing provisioned',
+          );
+
+          break;
+        }
+
+        const isOneTimePremium = isPremium && !isSubscriptionOrder;
 
         // For credits, the chosen count equals the net (pre-tax) amount in euro
         // cents; prefer the explicit metadata value when present.
@@ -147,15 +202,32 @@ export function attachPolarWebhookHandler(router: RouterInstance) {
         break;
       }
 
+      case 'subscription.created':
       case 'subscription.active':
       case 'subscription.updated':
       case 'subscription.uncanceled':
       case 'subscription.canceled': {
+        // `created` matters because a subscription that starts as a trial stays
+        // `trialing` (up to a year for us) and never fires `active` in the
+        // meantime — without it `polarSubscriptionId` would stay unset for the
+        // whole trial, so the app would keep offering a second subscription.
         // `canceled` keeps access until the period end, so we still provision up
         // to `currentPeriodEnd`.
         const sub = event.data;
 
-        const userId = resolveUserId(sub.metadata, sub.customer.externalId);
+        // A subscription whose first payment hasn't gone through grants
+        // nothing. It may never become active, `subscription.revoked`
+        // deliberately doesn't shorten `premiumExpiration`, and burning the
+        // win-back offer here would leave a failed payment permanently
+        // ineligible for it. Trials are `trialing`, not `incomplete`.
+        if (
+          sub.status === 'incomplete' ||
+          sub.status === 'incomplete_expired'
+        ) {
+          break;
+        }
+
+        const userId = await resolveUserId(sub.metadata, sub.customer);
 
         if (userId === undefined) {
           ctx.log.warn(
@@ -164,6 +236,53 @@ export function attachPolarWebhookHandler(router: RouterInstance) {
           );
 
           break;
+        }
+
+        // A subscription that has already ended must not re-take the stored ID:
+        // Polar also sends an `updated` for the status change around revocation
+        // and delivery isn't ordered, so a late one would leave the user marked
+        // as subscribed. Let the end win.
+        //
+        // code-review: accepted trade-off — this only catches snapshots that
+        // already know they ended. A snapshot taken *before* revocation and
+        // retried after it still carries `endedAt: null` and re-stores the ID.
+        // That's inert: `premiumExpiration` is never shortened here, so the
+        // dead ID comes with an expired premium, and every consumer goes
+        // through `liveSubscriptionSql`, which requires both. Ordering this
+        // properly would mean persisting `modifiedAt` per subscription; not
+        // worth it for a stale value nothing reads. Don't report it.
+        if (sub.endedAt !== null) {
+          await clearSubscription(userId, sub.id);
+
+          break;
+        }
+
+        // The checkout refuses to start a second subscription, but that check
+        // can't bind two checkouts created before either was paid. Only one ID
+        // can be stored, so the older subscription becomes invisible here —
+        // including to `subscription.revoked`, which matches on the stored ID.
+        // Nothing here can cancel it in Polar, so say so loudly.
+        //
+        // code-review: accepted trade-off — the checkout's guard is
+        // check-then-act by nature and a webhook can't stop Polar from holding
+        // two subscriptions. Logging the orphan is the whole remedy; don't
+        // report the race or ask for locking.
+        const previous = await pool.query<{ polarSubscriptionId: string }[]>(
+          sql`SELECT polarSubscriptionId FROM user
+              WHERE id = ${userId}
+                AND polarSubscriptionId IS NOT NULL
+                AND polarSubscriptionId <> ${sub.id}`,
+        );
+
+        if (previous.length > 0) {
+          ctx.log.warn(
+            {
+              userId,
+              orphanedSubscriptionId: previous[0]?.polarSubscriptionId,
+              subscriptionId: sub.id,
+            },
+            'user has a second Polar subscription; cancel the orphaned one manually',
+          );
         }
 
         // Never shorten premium granted by another source (e.g. legacy Rovas)
@@ -180,6 +299,15 @@ export function attachPolarWebhookHandler(router: RouterInstance) {
               WHERE id = ${userId}`,
         );
 
+        // The win-back offer is single-use: burn it as soon as the discounted
+        // subscription exists, so it can't be taken again after this one ends.
+        if (
+          isWinbackProduct(sub.productId) ||
+          metaString(sub.metadata, 'winback') === 'true'
+        ) {
+          await markWinbackRedeemed(userId);
+        }
+
         break;
       }
 
@@ -190,13 +318,10 @@ export function attachPolarWebhookHandler(router: RouterInstance) {
         // could wipe premium granted by another source (e.g. legacy Rovas).
         const sub = event.data;
 
-        const userId = resolveUserId(sub.metadata, sub.customer.externalId);
+        const userId = await resolveUserId(sub.metadata, sub.customer);
 
         if (userId !== undefined) {
-          await pool.query<unknown>(
-            sql`UPDATE user SET polarSubscriptionId = NULL
-                WHERE id = ${userId} AND polarSubscriptionId = ${sub.id}`,
-          );
+          await clearSubscription(userId, sub.id);
         }
 
         break;
