@@ -6,11 +6,7 @@ import { pool } from '../../database.js';
 import { getEnv } from '../../env.js';
 import { AUTH_REQUIRED, registerPath } from '../../openapi.js';
 import { getPolar } from '../../polar.js';
-import {
-  getPremiumProductId,
-  getWinbackProductId,
-} from '../../premiumPricing.js';
-import { getWinbackOffer } from '../../premiumWinback.js';
+import { getPremiumProductId } from '../../premiumPricing.js';
 import { liveSubscriptionSql } from '../../types.js';
 
 // 1 credit = €0.01, so the chosen credit count equals the amount in euro cents.
@@ -130,49 +126,12 @@ export function attachPolarCheckoutHandler(router: RouterInstance) {
         }
       }
 
-      // A lapsed one-time buyer subscribing again gets the original price
-      // whether or not the app knew about the offer when it sent the request —
-      // eligibility is decided here, so an offer can't be missed by a client
-      // that asked before the lookup finished, or before the user logged in.
-      // Selling premium must not depend on the win-back lookup working: if it
-      // fails, the user simply buys at the current price.
-      let offer;
-
       try {
-        offer = body.recurring ? await getWinbackOffer(user.id) : undefined;
-      } catch (err) {
-        ctx.log.error({ err }, 'win-back lookup failed');
-      }
-
-      // If the unlisted win-back product isn't configured we sell the regular
-      // one instead — an eligible user must never end up unable to buy premium.
-      const winbackProductId = offer ? getWinbackProductId() : undefined;
-
-      if (offer && winbackProductId === undefined) {
-        ctx.log.warn(
-          'POLAR_PREMIUM_WINBACK_PRODUCT_ID is not configured; selling the current price instead',
-        );
-      }
-
-      try {
-        productId = winbackProductId ?? getPremiumProductId(body.recurring);
+        productId = getPremiumProductId(body.recurring);
       } catch (err) {
         ctx.log.error({ err }, 'premium product is not configured');
 
         return ctx.throw(503, 'premium is not available');
-      }
-
-      // Mark the offer as taken only when it was actually honoured, so a
-      // misconfiguration doesn't burn it at the regular price.
-      //
-      // code-review: accepted trade-off — nothing is written here, so repeated
-      // or concurrent requests each get their own discounted checkout. The
-      // offer is burned in `markWinbackRedeemed` once a subscription exists;
-      // for a temporary offer capped at €8/year that is enough. Don't report
-      // the missing reservation, the lack of checkout reuse, or the fact that
-      // an abandoned checkout is replaced rather than handed back.
-      if (winbackProductId !== undefined) {
-        metadata.winback = 'true';
       }
 
       if (body.recurring) {

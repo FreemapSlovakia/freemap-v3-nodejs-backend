@@ -108,7 +108,7 @@ export async function mergeUserAccounts(
   }
 
   // A live Polar subscription must survive the merge, otherwise the merged user
-  // looks unsubscribed (and win-back eligible) while Polar keeps charging them.
+  // looks unsubscribed while Polar keeps charging them.
   // Liveness comes from the shared predicate, not from the ID being present: a
   // dead ID left behind by a lost `subscription.revoked` must not be treated as
   // a subscription, or the merge would hand the survivor a 409 on every premium
@@ -156,11 +156,6 @@ export async function mergeUserAccounts(
       'merged accounts both have a Polar subscription; cancel the orphaned one manually',
     );
   }
-
-  // code-review: accepted trade-off — `premiumWinback` is deliberately not
-  // merged, so merging an account that already took the offer can re-open it
-  // for the surviving one. The offer is temporary and worth €8/year, and the
-  // source's row is cascade-deleted with the user. Don't report it.
 
   // Free source's UNIQUE auth-provider IDs before the consolidating UPDATE,
   // otherwise transferring them to target would briefly duplicate the value

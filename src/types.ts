@@ -118,9 +118,9 @@ const USER_COLUMN_NAMES = [
  * SQL predicate for a Polar subscription that still grants access. A stored
  * subscription ID on its own isn't proof of one: a lost or out-of-order
  * `subscription.*` webhook can leave a dead ID behind. Every consumer — this
- * flag, the checkout's already-subscribed guard and the win-back lookup — must
- * agree on what "subscribed" means, or the client and the server end up
- * believing different things.
+ * flag and the checkout's already-subscribed guard — must agree on what
+ * "subscribed" means, or the client and the server end up believing different
+ * things.
  */
 export function liveSubscriptionSql(prefix = ''): string {
   return `(${prefix}polarSubscriptionId IS NOT NULL AND ${prefix}premiumExpiration > NOW())`;

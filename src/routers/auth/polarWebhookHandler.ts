@@ -7,8 +7,7 @@ import sql from 'sql-template-tag';
 import { pool, runInTransaction } from '../../database.js';
 import { getEnv } from '../../env.js';
 import { registerPath } from '../../openapi.js';
-import { isPremiumProduct, isWinbackProduct } from '../../premiumPricing.js';
-import { markWinbackRedeemed } from '../../premiumWinback.js';
+import { isPremiumProduct } from '../../premiumPricing.js';
 
 /**
  * Subscription statuses that provision nothing, because the period they carry
@@ -21,10 +20,6 @@ import { markWinbackRedeemed } from '../../premiumWinback.js';
  * deliberately never shortens `premiumExpiration`, granting it would mean a
  * free year for anyone whose card fails. `incomplete*` is the same story for a
  * first payment; trials are `trialing`, not `incomplete`, so they're unaffected.
- *
- * It also keeps the single-use win-back offer from being burned by a
- * subscription that was never paid for, which would leave the user unable to
- * take the offer again.
  *
  * Nothing is lost by waiting: a late payment re-activates the subscription,
  * which provisions the period then. The cost is that access lapses during
@@ -328,15 +323,6 @@ export function attachPolarWebhookHandler(router: RouterInstance) {
               email = COALESCE(email, ${sub.customer.email})
               WHERE id = ${userId}`,
         );
-
-        // The win-back offer is single-use: burn it as soon as the discounted
-        // subscription exists, so it can't be taken again after this one ends.
-        if (
-          isWinbackProduct(sub.productId) ||
-          metaString(sub.metadata, 'winback') === 'true'
-        ) {
-          await markWinbackRedeemed(userId);
-        }
 
         break;
       }

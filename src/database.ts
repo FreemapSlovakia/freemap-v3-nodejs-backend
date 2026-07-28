@@ -109,13 +109,6 @@ export async function initDatabase() {
       FOREIGN KEY (userId) REFERENCES user (id) ON DELETE CASCADE
     ) ENGINE=InnoDB`,
 
-    // Users who have taken the temporary win-back offer; a row means "used up".
-    sql`CREATE TABLE IF NOT EXISTS premiumWinback (
-      userId INT UNSIGNED PRIMARY KEY,
-      redeemedAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      FOREIGN KEY (userId) REFERENCES user (id) ON DELETE CASCADE
-    ) ENGINE=InnoDB`,
-
     sql`CREATE TABLE IF NOT EXISTS picture (
       id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
       pathname VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL UNIQUE,

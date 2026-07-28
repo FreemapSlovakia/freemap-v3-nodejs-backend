@@ -151,7 +151,7 @@ premium they already have (see below). A card that stopped working is fixed in
 the Polar customer portal; once a subscription really ends, `subscription.revoked`
 clears the stored ID and a new one can be bought.
 
-#### Price increase and win-back
+#### Price increase
 
 The yearly premium price rises from €8 to €15 for new customers on 1 September
 2026. The switch is manual: point `POLAR_PREMIUM_RECURRING_PRODUCT_ID` and
@@ -159,29 +159,13 @@ The yearly premium price rises from €8 to €15 for new customers on 1 Septemb
 the announcement in the frontend). A running subscription keeps the price it was
 created with — Polar grandfathers it — so nothing has to be migrated.
 
-A user who bought a one-time year and let it lapse is offered the original €8
-subscription instead — whether that year was bought through Polar or through
-the older Rovas flows. Anyone who has ever had a subscription is excluded: a
-lapsed €15 subscriber is not someone to win back to the old price.
-Eligibility is decided here, not by the client: any
-`POST /auth/polar/checkout` for a yearly subscription by an eligible user is
-created against the unlisted €8 product, and `GET /auth/premium/winback` only
-tells the app whether to advertise it. A row in the `premiumWinback` table means
-the offer has been used up; it is written when the discounted subscription
-appears, which is the only thing keeping the offer single-use. The offer is
-temporary and the code is deliberately thin: nothing guards against a user
-racing two checkouts, because the worst case is one extra €8 subscription. That
-product is configured separately so it survives the repointing above. If the user still has premium
-left (they can't under the default window), the subscription starts as a trial
-that long, so the periods don't overlap; Polar takes a trial as an interval and
-a count, not as an absolute end date.
-
-- `POLAR_PREMIUM_WINBACK_PRODUCT_ID` — product ID of the unlisted €8
-  auto-renewing yearly subscription. When unset the offer is simply not honoured
-  (checkouts fall back to the current price) instead of failing.
-- `PREMIUM_WINBACK_AFTER_DAYS` — offer the win-back only once the access has
-  been expired this long (default `30`).
-- `PREMIUM_WINBACK_WITHIN_DAYS` — and no longer than this (default `365`).
+Someone holding a one-time year has no such protection, so until that day the
+app offers them the switch to a subscription at the current price. A yearly
+subscription starts as a trial as long as the premium the user already has, so
+the periods don't overlap and nobody pays for the same days twice; Polar takes a
+trial as an interval and a count, not as an absolute end date. The trial is
+capped at two years, so someone who stacked more one-time years than that does
+overlap for the excess — it is logged when it happens.
 
 ### Tracking
 
