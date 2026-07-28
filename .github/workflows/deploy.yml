@@ -21,7 +21,17 @@ jobs:
           port: ${{ vars.DEPLOY_PORT }} # optional; defaults to 22
           username: freemap
           key: ${{ secrets.DEPLOY_SSH_KEY }}
+          # Without this the script runs on after a failing command, so a
+          # deploy that never updated the code still reports success.
+          script_stop: true
           script: |
             cd /home/freemap/freemap-v3-nodejs-backend
-            git pull --ff-only
+            # `git pull --ff-only` refuses once the server's branch has diverged
+            # from main (a rebase or force-push upstream is enough), and it did
+            # so silently for several deploys: the service kept restarting on an
+            # old commit. The server is a mirror of main, never a place to
+            # commit, so overwrite it instead of merging. Untracked files are
+            # left alone.
+            git fetch origin main
+            git reset --hard origin/main
             bash scripts/remote-deploy.sh
