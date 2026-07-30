@@ -31,6 +31,9 @@ const PurchaseIntentSchema = z.strictObject({
 const ResponseSchema = z.strictObject({
   purchases: z.array(PurchaseSchema),
   intents: z.array(PurchaseIntentSchema),
+  // Whether anything was ever bought through Polar, so there is a customer
+  // portal to link to. Purchases predating Polar (legacy Rovas) have neither.
+  polarCustomer: z.boolean(),
 });
 
 function stripLegacyPurchaseItemFields(item: unknown) {
@@ -85,7 +88,17 @@ export function attachGetPurchasesHandler(router: RouterInstance) {
           ORDER BY updatedAt DESC`,
     );
 
+    const polarCustomer = await pool.query<{ found: number }[]>(
+      sql`SELECT 1 AS found FROM user
+          WHERE id = ${userId}
+            AND (polarCustomerId IS NOT NULL
+                 OR EXISTS (SELECT 1 FROM purchase
+                            WHERE userId = ${userId}
+                              AND polarOrderId IS NOT NULL))`,
+    );
+
     ctx.body = ResponseSchema.parse({
+      polarCustomer: polarCustomer.length > 0,
       purchases: purchases.map((purchase) => ({
         ...purchase,
         item: stripLegacyPurchaseItemFields(purchase.item),

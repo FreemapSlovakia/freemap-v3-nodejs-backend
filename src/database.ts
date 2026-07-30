@@ -52,7 +52,8 @@ export async function initDatabase() {
       credits FLOAT NOT NULL DEFAULT 0,
       language CHAR(2) CHARSET ascii NULL,
       polarCustomerId VARCHAR(64) CHARSET ascii NULL,
-      polarSubscriptionId VARCHAR(64) CHARSET ascii NULL
+      polarSubscriptionId VARCHAR(64) CHARSET ascii NULL,
+      cancelAtPeriodEnd BIT NOT NULL DEFAULT false
     ) ENGINE=InnoDB`,
 
     sql`CREATE TABLE IF NOT EXISTS blockedCredit (
@@ -356,6 +357,11 @@ export async function initDatabase() {
       'ALTER TABLE mapWriteAccess MODIFY COLUMN mapId CHAR(8) CHARSET ascii NOT NULL',
       'ALTER TABLE mapWriteAccess ADD CONSTRAINT mwaMapFk FOREIGN KEY (mapId) REFERENCES map (id) ON DELETE CASCADE',
     ],
+
+    // Distinguishes a subscription still set to auto-renew from one the
+    // customer already canceled (access continues either way until
+    // `premiumExpiration`, so that alone can't tell them apart).
+    'ALTER TABLE user ADD COLUMN cancelAtPeriodEnd BIT NOT NULL DEFAULT false',
   ];
 
   const db = await pool.getConnection();

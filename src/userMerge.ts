@@ -118,10 +118,13 @@ export async function mergeUserAccounts(
       id: number;
       polarCustomerId: string | null;
       polarSubscriptionId: string | null;
+      cancelAtPeriodEnd: number | null;
       live: number | null;
     }[]
   >(
+    // `+ 0` so the BIT column arrives as a number rather than a Buffer.
     sql`SELECT id, polarCustomerId, polarSubscriptionId,
+               cancelAtPeriodEnd + 0 AS cancelAtPeriodEnd,
                ${raw(liveSubscriptionSql())} AS live
         FROM user WHERE id IN (${target.id}, ${source.id})`,
   );
@@ -137,10 +140,14 @@ export async function mergeUserAccounts(
   // Only one identity can be kept, and the customer ID has to travel with the
   // subscription: the webhook falls back to `polarCustomerId` to find the user
   // after a merge, and a mismatched pair would make renewals unroutable.
+  // `cancelAtPeriodEnd` describes the subscription being moved, so it has to
+  // travel with it too — the target's own value belongs to a subscription that
+  // is being dropped here.
   const polarFields =
     sourcePolar && sourceSubscribed && !targetSubscribed
       ? sql`polarCustomerId = ${sourcePolar.polarCustomerId},
-            polarSubscriptionId = ${sourcePolar.polarSubscriptionId},`
+            polarSubscriptionId = ${sourcePolar.polarSubscriptionId},
+            cancelAtPeriodEnd = ${Boolean(sourcePolar.cancelAtPeriodEnd)},`
       : sql`polarCustomerId = COALESCE(polarCustomerId, ${sourcePolar?.polarCustomerId ?? null}),`;
 
   // If both sides subscribe, the source's has to be cancelled by hand in

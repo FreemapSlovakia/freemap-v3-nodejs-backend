@@ -84,7 +84,7 @@ async function clearSubscription(
   subscriptionId: string,
 ): Promise<void> {
   await pool.query<unknown>(
-    sql`UPDATE user SET polarSubscriptionId = NULL
+    sql`UPDATE user SET polarSubscriptionId = NULL, cancelAtPeriodEnd = false
         WHERE id = ${userId} AND polarSubscriptionId = ${subscriptionId}`,
   );
 }
@@ -320,6 +320,7 @@ export function attachPolarWebhookHandler(router: RouterInstance) {
               ),
               polarSubscriptionId = ${sub.id},
               polarCustomerId = ${sub.customerId},
+              cancelAtPeriodEnd = ${sub.cancelAtPeriodEnd},
               email = COALESCE(email, ${sub.customer.email})
               WHERE id = ${userId}`,
         );
