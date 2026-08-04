@@ -110,6 +110,9 @@ importers:
       zod:
         specifier: ^4.4.3
         version: 4.4.3
+      zod-geojson:
+        specifier: ^1.7.0
+        version: 1.7.0(zod@4.4.3)
       zod-openapi:
         specifier: ^6.0.0
         version: 6.0.0(zod@4.4.3)
@@ -1801,6 +1804,11 @@ packages:
     resolution: {integrity: sha512-xYqdZFUK/VYazNl/oCDYN+3WloWQwMfZxBoiNt6qNyk+xfOdi598muWE42rNZFp1kNOiqW936q5RhUdnpqElSg==}
     engines: {node: '>=18'}
 
+  zod-geojson@1.7.0:
+    resolution: {integrity: sha512-yGc/smGkk/BkflTz5zF6sGsjVUUDuQPV4cx82AOcGxsZxC7sdtIc4lw9q1QCA/9bcQIvjwvf9orX6HsVZ56BZA==}
+    peerDependencies:
+      zod: '>=4.0.0'
+
   zod-openapi@6.0.0:
     resolution: {integrity: sha512-mS4eRJ4DGCPrg6elRbJqc/3nLe4EPVi8KiHRKZ7dcTR5m5orPy8EfoWmceAyGZAq71MAWuyrTTOag7W5N61ZPQ==}
     engines: {node: '>=22.14.0'}
@@ -3392,6 +3400,10 @@ snapshots:
       yoctocolors: 2.2.0
 
   yoctocolors@2.2.0: {}
+
+  zod-geojson@1.7.0(zod@4.4.3):
+    dependencies:
+      zod: 4.4.3
 
   zod-openapi@6.0.0(zod@4.4.3):
     dependencies:
