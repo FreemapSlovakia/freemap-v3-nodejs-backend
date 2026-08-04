@@ -51,11 +51,8 @@ export function attachCoveredCountriesHandler(router: RouterInstance) {
 
       try {
         geometry = BodySchema.parse(ctx.request.body);
-      } catch {
-        // Not the usual `ctx.throw(400, err)`: zod serializes the whole failed
-        // union into the message, so a rejected body comes back ~50x its own
-        // size - 1 MB in, 50 MB out - on an endpoint that takes up to 16 MB.
-        return ctx.throw(400, 'invalid GeoJSON');
+      } catch (err) {
+        return ctx.throw(400, err as Error);
       }
 
       // Serialize explicitly: the mariadb connector encodes any object whose
