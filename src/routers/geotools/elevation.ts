@@ -12,8 +12,10 @@ import { getEnv } from '../../env.js';
 import { AUTH_OPTIONAL, registerPath } from '../../openapi.js';
 import { acceptValidator } from '../../requestValidators.js';
 import {
+  createProjector,
   inBbox,
   type ParsedSource,
+  type Projector,
   parseElevationSources,
   SRTM_SOURCE_NAME,
   srtmKey,
@@ -37,14 +39,8 @@ type DatasetInfo = {
   height: number;
   // transform from WGS84 lon/lat into the dataset CRS; null when the dataset is
   // already geographic lon/lat (SRTM).
-  ct: gdal.CoordinateTransformation | null;
+  project: Projector | null;
 };
-
-// WGS84 built from proj4 to force traditional lon/lat axis order (GDAL 3 would
-// otherwise use lat/lon for EPSG:4326).
-const wgs84 = gdal.SpatialReference.fromProj4(
-  '+proj=longlat +datum=WGS84 +no_defs',
-);
 
 type LocalSource = ParsedSource & {
   info?: DatasetInfo;
@@ -77,18 +73,7 @@ function openLocalSource(src: LocalSource): DatasetInfo {
     geoTransform,
     width: dataset.rasterSize.x,
     height: dataset.rasterSize.y,
-    // Build the target from proj4 rather than using dataset.srs directly: this
-    // forces traditional easting/northing (x,y) axis order and drops the 3D
-    // vertical of compound CRSs. Some CRSs (e.g. SWEREF99 TM / EPSG:5845)
-    // declare northing-first axis order, which would otherwise make
-    // transformPoint return swapped coordinates (gdal-async 3.12 has no
-    // setAxisMappingStrategy to override it).
-    ct: dataset.srs
-      ? new gdal.CoordinateTransformation(
-          wgs84,
-          gdal.SpatialReference.fromProj4(dataset.srs.toProj4()),
-        )
-      : null,
+    project: createProjector(dataset.srs),
   };
 
   return src.info;
@@ -349,7 +334,7 @@ export async function resolveElevations(
             geoTransform,
             width: dataset.rasterSize.x,
             height: dataset.rasterSize.y,
-            ct: null,
+            project: null,
           });
         }
       }),
@@ -423,7 +408,7 @@ async function downloadData(key: string) {
 async function computeElevation(
   lat: number,
   lon: number,
-  { band, geoTransform, width, height, ct }: DatasetInfo,
+  { band, geoTransform, width, height, project }: DatasetInfo,
 ) {
   const [gt0, gt1, gt2, gt3, gt4, gt5] = geoTransform;
 
@@ -432,7 +417,7 @@ async function computeElevation(
   }
 
   // map lon/lat into the dataset CRS (identity for geographic SRTM)
-  const { x, y } = ct ? ct.transformPoint(lon, lat) : { x: lon, y: lat };
+  const { x, y } = project ? project(lon, lat) : { x: lon, y: lat };
 
   const px = (x - gt0) / gt1;
   const py = (y - gt3) / gt5;

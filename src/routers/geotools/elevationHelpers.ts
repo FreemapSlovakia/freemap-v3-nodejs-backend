@@ -1,3 +1,49 @@
+import gdal from 'gdal-async';
+
+// WGS84 built from proj4 to force traditional lon/lat axis order (GDAL 3 would
+// otherwise use lat/lon for EPSG:4326).
+const wgs84 = gdal.SpatialReference.fromProj4(
+  '+proj=longlat +datum=WGS84 +no_defs',
+);
+
+/** Projects WGS84 lon/lat into a dataset's own CRS, as (x, y) in that CRS. */
+export type Projector = (lon: number, lat: number) => { x: number; y: number };
+
+/**
+ * Build the WGS84 -> dataset projection, or null when the dataset is already
+ * geographic lon/lat (SRTM) and no projection is needed.
+ *
+ * Uses the dataset's SRS as-is. Rebuilding it from `toProj4()` would be lossy:
+ * a proj4 string carries no datum transformation, so a dataset on a datum that
+ * differs from WGS84 — OSGB36 / EPSG:27700 is the one that bites, the British
+ * national grid — would be read ~100 m off target, silently returning the
+ * elevation of a neighbouring hillside.
+ *
+ * The catch is axis order: some CRSs (EPSG:5845 SWEREF99 TM, EPSG:3035 LAEA)
+ * declare northing first, and GDAL honours that for an SRS carrying an EPSG
+ * authority, so `transformPoint` hands back (y, x). gdal-async 3.12 exposes no
+ * setAxisMappingStrategy to override it, so detect the case and swap.
+ */
+export function createProjector(
+  srs: gdal.SpatialReference | null,
+): Projector | null {
+  if (!srs) {
+    return null;
+  }
+
+  const ct = new gdal.CoordinateTransformation(wgs84, srs);
+
+  if (!srs.EPSGTreatsAsNorthingEasting()) {
+    return (lon, lat) => ct.transformPoint(lon, lat);
+  }
+
+  return (lon, lat) => {
+    const { x, y } = ct.transformPoint(lon, lat);
+
+    return { x: y, y: x };
+  };
+}
+
 export type Bbox = [
   minLon: number,
   minLat: number,

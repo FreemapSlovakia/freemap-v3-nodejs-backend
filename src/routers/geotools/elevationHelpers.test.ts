@@ -1,11 +1,51 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import gdal from 'gdal-async';
 import {
   type Bbox,
+  createProjector,
   inBbox,
   parseElevationSources,
   srtmKey,
 } from './elevationHelpers.js';
+
+test('createProjector: applies the datum shift a proj4 string would drop', () => {
+  // Charing Cross in OSGB36 / British National Grid. Going through
+  // `toProj4()` loses the OSGB36 datum transformation and lands ~113 m west,
+  // near 529916 — which is what silently misread every English sample.
+  const project = createProjector(gdal.SpatialReference.fromEPSG(27700));
+
+  assert.ok(project);
+
+  const { x, y } = project(-0.1278, 51.5074);
+
+  assert.ok(
+    Math.abs(x - 530029) < 25,
+    `easting ${x} is not within 25 m of 530029 — datum shift lost?`,
+  );
+
+  assert.ok(
+    Math.abs(y - 180380) < 25,
+    `northing ${y} is not within 25 m of 180380 — datum shift lost?`,
+  );
+});
+
+test('createProjector: undoes northing-first axis order', () => {
+  // EPSG:3035 (ETRS89-LAEA) declares northing first, so the raw
+  // transformPoint hands back (y, x); the projector must report (x, y).
+  const project = createProjector(gdal.SpatialReference.fromEPSG(3035));
+
+  assert.ok(project);
+
+  const { x, y } = project(10, 50);
+
+  assert.ok(Math.abs(x - 4321000) < 25, `easting ${x} looks like a northing`);
+  assert.ok(Math.abs(y - 2987511) < 25, `northing ${y} looks like an easting`);
+});
+
+test('createProjector: null for a dataset already in lon/lat', () => {
+  assert.equal(createProjector(null), null);
+});
 
 test('srtmKey: northern/eastern coordinates', () => {
   assert.equal(srtmKey(48.14, 17.11), 'N48E017');
