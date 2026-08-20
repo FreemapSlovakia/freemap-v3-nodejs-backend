@@ -7,38 +7,94 @@
  */
 export const PHOTO_EXT = /\.(jpe?g|png|webp)$/i;
 
-/**
- * Astronaut / spaceflight photography (ISS, Space Shuttle, Apollo, …) is
- * geotagged to the ground area it depicts, but it's shot from orbit — so it
- * scatters across the map at places it wasn't taken. These uploads use
- * systematic NASA frame ids in their filenames, e.g. `ISS028-E-25372`,
- * `STS-135-…`, `AS11-40-5875`. (Deliberately does NOT match `S<lat>E<lon>`
- * coordinate-style names, which are legitimate coordinate-named photos.)
- */
-export const SPACE_PHOTO =
-  /^(ISS\d+[-_ ]?e[-_ ]?\d+|STS[-_ ]?\d+|AS\d+-\d+-\d+)/i;
+const SPACE_PHOTO = /^(ISS\d+[-_ ]?e[-_ ]?\d+|STS[-_ ]?\d+|AS\d+-\d+-\d+)/i;
+
+const ORTHOPHOTO =
+  /ortho(photo|foto)|ortofoto|(?<![\p{L}\p{N}])DOP(?:\d[a-z0-9]*)?(?![\p{L}\p{N}])/iu;
+
+const BILDFLUG = /Bildflug/i;
+
+const STREIFEN = /Streifen/i;
 
 /**
- * Systematic non-photograph bulk uploads that arrive in ordinary photo formats
- * (so the extension check can't catch them) — chiefly national orthophoto
- * surveys, which tile whole regions into a grid. Matched by the keywords their
- * titles always carry: `orthophoto`/`orthofoto`/`ortofoto`, and the German `DOP`
- * (Digitales Orthophoto, e.g. "DOP20") tile designator. The `DOP` boundaries
- * use alphanumeric lookarounds, not `\b`: page-dump titles space-as-underscore,
- * and `_` is a word char, so `\bDOP` would miss `..._DOP_...`.
+ * Bulk upload programmes to keep off the photo layer, by what their titles look
+ * like. Held as one table rather than as separate constants ANDed together in
+ * {@link isPhotoTitle}: adding a programme is then a single entry here, and —
+ * the point — cannot be half-done. An unused exported regex raises nothing, so
+ * the old shape let you add a pattern and silently forget to consult it.
+ *
+ * Title matching is a blunt instrument, and deliberately so: `gt_type='camera'`
+ * in the geo_tags dump already encodes the distinction we actually want (where
+ * the camera was, not what is depicted), and everything below is mopping up
+ * uploads their own submitters mistagged. Before adding a fifth pattern, note
+ * that the image dump already stages `img_actor` as `wm_img.authorId` — each of
+ * these programmes is one account pushing tens of thousands of files, so an
+ * actor id excludes a whole programme at the join, survives them renaming their
+ * scheme, and catches their files that omit the keyword. Commons categories
+ * would be the truly right signal, but they live in a `categorylinks` dump this
+ * import does not stream, and a fifth multi-GB download is not worth ~12k rows.
  */
-export const NON_PHOTO_TITLE =
-  /ortho(photo|foto)|ortofoto|(?<![a-z0-9])DOP\d*(?![a-z0-9])/i;
+const BULK_UPLOADS = {
+  /**
+   * Astronaut / spaceflight photography (ISS, Space Shuttle, Apollo, …) is
+   * geotagged to the ground area it depicts, but it's shot from orbit — so it
+   * scatters across the map at places it wasn't taken. These uploads use
+   * systematic NASA frame ids in their filenames, e.g. `ISS028-E-25372`,
+   * `STS-135-…`, `AS11-40-5875`. (Deliberately does NOT match `S<lat>E<lon>`
+   * coordinate-style names, which are legitimate coordinate-named photos.)
+   */
+  spaceflight: (title: string) => SPACE_PHOTO.test(title),
+
+  /**
+   * Systematic non-photographs that arrive in ordinary photo formats (so the
+   * extension check can't catch them) — chiefly national orthophoto surveys,
+   * which tile whole regions into a grid. Matched by the keywords their titles
+   * always carry: `orthophoto`/`orthofoto`/`ortofoto`, and the German `DOP`
+   * (Digitales Orthophoto) tile designator, which carries a band/resolution
+   * suffix as often as not: Rheinland-Pfalz ships `DOP20RGB`, Nordrhein-
+   * Westfalen and Bremen `Dop10rgb`, Hamburg `Dop20c`.
+   *
+   * Requiring a digit right after `DOP` is most of what keeps this off ordinary
+   * words like `Doppelhaus`. The rest is the boundary, which spells out
+   * `\p{L}\p{N}` for two separate reasons: not `\b`, because page-dump titles
+   * write spaces as underscores and `_` is a word char, so `\bDOP` would miss
+   * `..._DOP_...`; and not ASCII, because an ASCII-only lookaround reads every
+   * accented letter as a boundary, which had bare `DOP` matching inside the
+   * Slovak and Czech titles this gallery is full of — `Dopĺňanie…`, `Dopředu…`.
+   */
+  orthophoto: (title: string) => ORTHOPHOTO.test(title),
+
+  /**
+   * Scanned frames from systematic aerial survey flights. Unlike the orthophoto
+   * tiles these really are photographs, but they're shot straight down from a
+   * survey aircraft and geotagged to the ground they depict, so they carpet the
+   * map in flight-strip grids just as the spaceflight uploads do. The visible
+   * case is the Landesarchiv Baden-Württemberg's ~12.5k 1950s frames, titled
+   * `Bildflug <n>, Streifen <n>, Bildnummer <range> - LABW - …`.
+   *
+   * Both terms are required, in either order: `Bildflug` ("photo flight") alone
+   * also turns up in ordinary ground photos that merely mention one, and
+   * `Streifen` ("strip") alone is an everyday word. Two plain tests rather than
+   * one `^(?=.*Bildflug)(?=.*Streifen)` — the anchored form reads like it does
+   * less work and measures ~6× slower, because each `.*` still scans the whole
+   * title while the leading `^`+lookahead denies V8 its literal-prefix fast
+   * scan. It also would not match across a newline, where these do.
+   */
+  aerialSurvey: (title: string) => BILDFLUG.test(title) && STREIFEN.test(title),
+} satisfies Record<string, (title: string) => boolean>;
+
+/** Hoisted so the hot path below doesn't rebuild the list per title. */
+const BULK_UPLOAD_TESTS = Object.values(BULK_UPLOADS);
 
 /**
- * A geotagged file we want on the photo layer: a real photograph — not shot
- * from orbit and not a systematic orthophoto/survey tile.
+ * A geotagged file we want on the photo layer: a real photograph taken from the
+ * ground — not shot from orbit or from a survey aircraft, and not a systematic
+ * orthophoto tile. Runs over every geotagged title in the page dump (~31M), so
+ * measure before making it fancier.
  */
 export function isPhotoTitle(title: string): boolean {
   return (
-    PHOTO_EXT.test(title) &&
-    !SPACE_PHOTO.test(title) &&
-    !NON_PHOTO_TITLE.test(title)
+    PHOTO_EXT.test(title) && !BULK_UPLOAD_TESTS.some((test) => test(title))
   );
 }
 

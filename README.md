@@ -194,6 +194,79 @@ overlap for the excess — it is logged when it happens.
 - `TRACKING_SOCKET_PORT` — TCP port for the raw GPS tracker socket; set to `0`
   or leave unset to disable.
 
+### Wikimedia Commons import
+
+- `WIKIMEDIA_GEO_TAGS_DUMP_URL`, `WIKIMEDIA_PAGE_DUMP_URL`,
+  `WIKIMEDIA_IMAGE_DUMP_URL`, `WIKIMEDIA_MEDIAINFO_DUMP_URL` — the four Commons
+  dumps the import streams. Default to `dumps.wikimedia.org`; point them at a
+  mirror to spare it the ~90 GB.
+- `WIKIMEDIA_IMPORT_NOTIFY_EMAIL` — comma-separated admins who get the report
+  mail after every run. Unset (the default) means no report is sent, so a
+  developer checkout never mails anyone; the addresses live in
+  `/etc/freemap.conf` on the server rather than in this repository. Also needs
+  `MAILGUN_ENABLE=true` and the rest of the Mailgun settings above.
+- `WIKIMEDIA_IMPORT_UNIT` — systemd unit named in the report mails' "check the
+  log" line. Defaults to `freemap-wikimedia-import.service`.
+- `WIKIMEDIA_IMPORT_STREAM_STALL_MS` — socket idle timeout for a dump download,
+  after which the pass truncates and retries. Defaults to 30 minutes. Keep it
+  generous: the timer also ages while the importer is backpressured on its own
+  database inserts, so a tight value makes a busy database re-download tens of
+  gigabytes.
+- `WIKIMEDIA_IMPORT_RETRY_BUDGET_MS` — how far into a run a failed pass may
+  still start a fresh retry, since a retry re-downloads its dump from the
+  beginning. Defaults to 7 hours, and is set alongside the matching
+  `TimeoutStartSec` in `systemd/freemap-wikimedia-import.service` — the two are
+  one invariant and must move together.
+- `WIKIMEDIA_IMPORT_BATCH_SIZE`, `WIKIMEDIA_IMPORT_COMMIT_ROWS`,
+  `WIKIMEDIA_IMPORT_PAGEID_BATCH` — load-tuning knobs; see the comments on the
+  constants in `src/wikimedia/importWikimedia.ts` before changing them.
+
+# Scheduled jobs (systemd)
+
+The Wikimedia Commons photo import runs monthly, off the units in `systemd/`.
+They are the reference copies; install and enable them on the API server with:
+
+```sh
+sudo cp systemd/freemap-wikimedia-import* /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now freemap-wikimedia-import.timer
+```
+
+Three units:
+
+- `freemap-wikimedia-import.service` — the import itself, a `oneshot` running
+  the built `importWikimedia.js` as `freemap`. Several hours; niced and on idle
+  I/O so it does not starve the live API.
+- `freemap-wikimedia-import.timer` — fires it on the 8th of each month, a slot
+  safely after the monthly Commons dumps finish.
+- `freemap-wikimedia-import-abort.service` — `OnFailure=` backstop that mails
+  the admins when the import dies without reporting for itself (OOM kill and
+  friends). Never started by hand.
+
+The import mails `WIKIMEDIA_IMPORT_NOTIFY_EMAIL` after every run — the live
+photo count and how far it moved on success, the error on failure. A failed run
+leaves the gallery untouched: the freshly built table is only swapped in at the
+very last step.
+
+`enable --now` does **not** import anything — it only starts the timer, and the
+first import happens on the next 8th. `Persistent=true` catches up a run missed
+while the machine was off, but it has nothing to catch up on the first enable:
+systemd creates the timestamp file it compares against at that moment, so the
+timer counts as having just fired. (Verified on fm6 — the stamp appears with the
+enable and `list-timers` shows `LAST` empty.)
+
+To import now rather than waiting for the 8th, start the service by hand — the
+timer is unaffected and carries on from its own schedule:
+
+`--no-block` because the unit is `Type=oneshot`: without it `systemctl` sits
+waiting for the whole multi-hour run to finish. (Ctrl-C only stops the waiting;
+the unit keeps running under systemd either way.)
+
+```sh
+sudo systemctl start --no-block freemap-wikimedia-import.service
+journalctl -u freemap-wikimedia-import -f
+```
+
 # Rovas callback tunneling
 
 ```sh

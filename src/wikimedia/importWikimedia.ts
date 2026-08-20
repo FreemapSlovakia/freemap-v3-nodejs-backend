@@ -8,6 +8,13 @@ import { getEnv, getEnvInteger } from '../env.js';
 import { appLogger } from '../logger.js';
 import { LICENSE_Q_MAP } from '../routers/gallery/wikimediaLicense.js';
 import {
+  failureReport,
+  type ImportStats,
+  notify,
+  SELF_REPORTED_EXIT_STATUS,
+  successReport,
+} from './importNotify.js';
+import {
   isPhotoTitle,
   makeBitset,
   makeStringBitset,
@@ -54,12 +61,62 @@ const PAGEID_BATCH = getEnvInteger('WIKIMEDIA_IMPORT_PAGEID_BATCH', 1_000_000);
 
 const FILE_NAMESPACE = 6;
 
+// Socket idle timeout for a dump download: without one, a half-open connection
+// stalls a pass forever and the whole import hangs until the unit's start
+// timeout kills it hours later.
+//
+// Deliberately far longer than any real stall needs, because this is NOT purely
+// a far-end liveness check. Node resets the timer on socket reads, and while a
+// pass awaits `conn.batch()`/`conn.commit()` the gunzip→socket chain is
+// backpressured and nothing is read — so our own slow inserts age the timer
+// just as an unresponsive server would. Set it near a plausible commit stall
+// and a busy database would make us re-download the ~75 GB mediainfo dump from
+// byte 0. Half an hour is beyond any plausible commit.
+const STREAM_STALL_MS = getEnvInteger(
+  'WIKIMEDIA_IMPORT_STREAM_STALL_MS',
+  30 * 60_000,
+);
+
+// How far into a run a pass may still start a fresh retry, so a doomed run ends
+// with a failure report rather than a SIGKILL.
+//
+// THE derivation for this number and the unit's TimeoutStartSec, which are one
+// invariant in two files: the budget bounds when a retry may *begin*, so the
+// timeout has to cover everything that can still follow it — the retry's own
+// download (~4.6h for the mediainfo dump) plus the final-table build after all
+// the passes (the ranged INSERT…SELECT over ~31M rows and three index builds, a
+// couple of hours on its own). 7h + 4.6h + build lands near 14h, so the timeout
+// is 20h. Raise one and raise the other. The deployed pair lives together in
+// systemd/freemap-wikimedia-import.service; this default only applies to a run
+// started by hand.
+const RETRY_BUDGET_MS = getEnvInteger(
+  'WIKIMEDIA_IMPORT_RETRY_BUDGET_MS',
+  7 * 3600_000,
+);
+
+/** Start of this process's import, for the retry budget above. */
+const importStarted = Date.now();
+
 /** Decompressed byte stream of a `.sql.gz` dump, with download errors forwarded. */
 function dumpStream(url: string) {
-  const src = got.stream(url, { retry: { limit: 2 } });
+  // A stall surfaces as ETIMEDOUT, which is already in RETRYABLE_STREAM_CODES —
+  // so the pass truncates and starts the download over rather than dying.
+  const src = got.stream(url, {
+    retry: { limit: 2 },
+    timeout: { socket: STREAM_STALL_MS },
+  });
+
   const gunzip = createGunzip();
 
   src.on('error', (err) => gunzip.destroy(err));
+
+  // And the other way. `pipe` only unpipes when the destination dies, so a
+  // consumer-side failure — a failed `conn.batch()`, the retry budget running
+  // out — would leave the request and its socket open, now for a full
+  // STREAM_STALL_MS. `loadPass` retries immediately, so the run would hold two
+  // connections to dumps.wikimedia.org at once against a per-IP limit. Harmless
+  // on a clean finish: the request has already completed by then.
+  gunzip.on('close', () => src.destroy());
 
   return src.pipe(gunzip);
 }
@@ -547,6 +604,21 @@ async function loadPass(
         throw err;
       }
 
+      // Retryable, but a retry restarts the download from byte 0 — ~4.6 h for
+      // the mediainfo dump at Wikimedia's per-connection limit — on top of a
+      // run that is already hours old. Left unbounded, the retry that was meant
+      // to rescue the import instead walks it past the unit's start timeout,
+      // where systemd SIGKILLs it and the admins get a generic "DIED" in place
+      // of the real reason. Checked after the retryability test above so this
+      // only ever explains a retry that was actually on the table.
+      if (Date.now() - importStarted > RETRY_BUDGET_MS) {
+        logger.error(
+          `${table} pass failed (${code}) with the retry budget spent; giving up`,
+        );
+
+        throw err;
+      }
+
       logger.warn(
         `${table} pass failed (${code}, attempt ${attempt}/${attempts}); truncating and retrying…`,
       );
@@ -558,7 +630,7 @@ async function loadPass(
   }
 }
 
-export async function importWikimedia(): Promise<void> {
+export async function importWikimedia(): Promise<ImportStats> {
   const started = Date.now();
 
   await pool.query(sql`DROP TABLE IF EXISTS wm_stage`);
@@ -653,7 +725,16 @@ export async function importWikimedia(): Promise<void> {
     `Staged metadata for ${imgCount} files and SDC for ${sdcCount} files. Building final table…`,
   );
 
-  await buildFinalTable(started);
+  const { live, previous } = await buildFinalTable(started);
+
+  return {
+    geoTags: geoCount,
+    photos: keepCount,
+    imageMeta: imgCount,
+    sdc: sdcCount,
+    live,
+    previous,
+  };
 }
 
 /**
@@ -661,9 +742,12 @@ export async function importWikimedia(): Promise<void> {
  * `wm_sdc` staging tables: batched insert (see {@link PAGEID_BATCH}), index
  * build, and atomic table swap. Idempotent (ADD INDEX IF NOT EXISTS, drops any
  * partial `wikimediaPicture_new` first), so it can be invoked on its own against
- * the staging tables a crashed run leaves behind.
+ * the staging tables a crashed run leaves behind. Returns the row counts either
+ * side of the swap, for the admin report.
  */
-async function buildFinalTable(started: number): Promise<void> {
+async function buildFinalTable(
+  started: number,
+): Promise<{ live: number | null; previous: number | null }> {
   // One sorted index build each — cheap versus maintaining them during the load.
   await pool.query(
     sql`ALTER TABLE wm_stage ADD INDEX IF NOT EXISTS wm_stage_pageId (pageId)`,
@@ -754,28 +838,112 @@ async function buildFinalTable(started: number): Promise<void> {
 
   await pool.query(sql`DROP TABLE IF EXISTS wikimediaPicture_old`);
 
+  // The report leads with how much the live set moved, which is the one number
+  // that shows a filter change (or a broken dump) at a glance. Both counts are
+  // taken before the swap and neither may take the import down with it: they
+  // are statistics, and by this point the table has already cost hours to
+  // build. Counting the incoming rows on `wikimediaPicture_new` instead of
+  // after the RENAME is what keeps the RENAME the last thing that can fail —
+  // so the failure mail's promise that the gallery is still serving the
+  // previous month's data holds whenever that mail is sent at all.
+  const previous = await countRowsOrNull('wikimediaPicture');
+
+  const live = await countRowsOrNull('wikimediaPicture_new');
+
   await pool.query(sql`RENAME TABLE
     wikimediaPicture TO wikimediaPicture_old,
     wikimediaPicture_new TO wikimediaPicture`);
 
-  await pool.query(sql`DROP TABLE wikimediaPicture_old`);
-
-  const [{ cnt }] = z
-    .array(z.object({ cnt: z.number() }))
-    .parse(await pool.query(sql`SELECT COUNT(*) AS cnt FROM wikimediaPicture`));
+  // Past the commit point: the new table is live and the import has succeeded.
+  // A leftover `_old` table is wasted disk and nothing worse — the next run
+  // drops it — so this must never turn a published import into a reported
+  // failure, which would mail the admins a body that is now simply untrue.
+  await pool.query(sql`DROP TABLE wikimediaPicture_old`).catch((err) => {
+    logger.warn(err, 'Could not drop wikimediaPicture_old; the next run will');
+  });
 
   logger.info(
-    `Wikimedia import done: ${cnt} photos live (${Math.round((Date.now() - started) / 1000)}s).`,
+    `Wikimedia import done: ${live ?? 'unknown'} photos live, was ${previous ?? 'unknown'} (${Math.round((Date.now() - started) / 1000)}s).`,
   );
+
+  return { live, previous };
+}
+
+/**
+ * Row count for the report. `null` rather than a throw: every caller is after a
+ * table that already exists and cost hours, so a lock-wait or a dropped
+ * connection here is worth a missing number and nothing more.
+ */
+async function countRowsOrNull(table: string): Promise<number | null> {
+  try {
+    const [{ cnt }] = z
+      .array(z.object({ cnt: z.number() }))
+      .parse(await pool.query(sql`SELECT COUNT(*) AS cnt FROM ${raw(table)}`));
+
+    return cnt;
+  } catch (err) {
+    logger.warn(err, `Could not count ${table}; the report will say so`);
+
+    return null;
+  }
+}
+
+/**
+ * Runs the import and mails the admins the result — every run reports, either
+ * way. `reportSuccess`/`reportFailure` swallow their own errors, so a Mailgun
+ * outage can neither change the exit status nor turn a good import into a bad
+ * one. Only the import itself is inside the `try`: reporting a success from
+ * within it would let a stumble there fall through into mailing a failure for
+ * an import that worked.
+ */
+async function runCli(): Promise<void> {
+  let stats: ImportStats | undefined;
+
+  try {
+    stats = await importWikimedia();
+  } catch (err) {
+    logger.error(err);
+
+    const reported = await notify(
+      failureReport(err, Date.now() - importStarted),
+    );
+
+    // The status has to reflect whether the admins were actually told, not
+    // whether we tried: exiting SELF_REPORTED_EXIT_STATUS after a send that
+    // failed — Mailgun down, key rotated, MAILGUN_DOMAIN missing — silences
+    // the backstop too, and the month's failure reaches nobody at all. Any
+    // other nonzero status hands it over.
+    process.exit(reported ? SELF_REPORTED_EXIT_STATUS : 1);
+  }
+
+  // Everything from here on runs *after* the swap has published the new table,
+  // so the import has already succeeded and nothing below may say otherwise.
+  // An escaping error would exit nonzero and have the backstop mail "DIED …
+  // still serving the previous month's data", which would be flatly untrue.
+  try {
+    // Unlike the failure path, whether this one was delivered changes nothing:
+    // an unsent success notice is a nuisance, not an incident, and escalating
+    // it would have the backstop mail "DIED" about an import that is serving.
+    await notify(successReport(stats, Date.now() - importStarted));
+
+    // Only on the way out of a success, where the pool is idle. The failure
+    // path deliberately exits without it: a pass still streaming when its
+    // sibling threw would hold the close open, and there is nothing to flush.
+    await pool.end();
+  } catch (err) {
+    logger.warn(err, 'Import succeeded; tidying up after it did not');
+  }
+
+  process.exit(0);
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
-  importWikimedia()
-    .then(() => pool.end())
-    .then(() => process.exit(0))
-    .catch((err) => {
-      logger.error(err);
+  // Last resort. Everything above is meant to handle its own errors; if one
+  // escapes anyway, exiting nonzero without SELF_REPORTED_EXIT_STATUS is what
+  // makes the backstop mail it rather than assume it was already reported.
+  runCli().catch((err) => {
+    logger.error(err);
 
-      process.exit(1);
-    });
+    process.exit(1);
+  });
 }

@@ -1,0 +1,50 @@
+# Monthly import of geotagged Wikimedia Commons photos into the gallery.
+# Deployed on the API server (fm6) as the `freemap` user; triggered by the
+# accompanying freemap-wikimedia-import.timer. Runs the backend's built
+# importer, which streams the Commons geo_tags + page + image + Structured-Data
+# (mediainfo) dumps into a fresh wikimediaPicture table (coordinates plus
+# capturedAt/uploadedAt/authorId/azimuth/license metadata) and atomically swaps
+# it in (zero downtime; ratings/comments untouched).
+#
+# Install with `sudo cp systemd/freemap-wikimedia-import* /etc/systemd/system/`
+# — see README "Scheduled jobs (systemd)".
+
+[Unit]
+Description=Import geotagged Wikimedia Commons photos into the gallery
+After=network-online.target mariadb.service
+Wants=network-online.target
+# The importer mails the admins itself, both on success and on a failure it
+# catches. This covers the deaths it cannot report: OOM kill, SIGKILL, the
+# start timeout above, and crashes early enough that its own error handling was
+# never reached. The abort unit stays quiet only for the one exit status the
+# importer uses to say it has already mailed.
+OnFailure=freemap-wikimedia-import-abort.service
+
+[Service]
+Type=oneshot
+User=freemap
+WorkingDirectory=/home/freemap/freemap-v3-nodejs-backend
+# Same env the API service uses (supplies MARIADB_*), so no decryptable .env is
+# needed on the server.
+EnvironmentFile=/etc/freemap.conf
+# Stable node via the fnm `default` alias (survives node upgrades).
+ExecStart=/home/freemap/.local/share/fnm/aliases/default/bin/node --enable-source-maps build/wikimedia/importWikimedia.js
+# The import runs several hours (it also streams the ~17 GB image dump and the
+# ~75 GB Structured-Data mediainfo dump), so the default start timeout would
+# kill it. Generous, but finite: with TimeoutStartSec=0 a wedged run stays
+# `activating` forever, and systemd then merges every later timer trigger into
+# that same job — the monthly import would quietly stop happening, with no
+# failure to hang OnFailure= off. A timeout instead kills it and mails us.
+#
+# These two are one invariant: a retry may begin up to the budget into a run and
+# still have its own multi-hour download plus the final-table build ahead of it,
+# so the timeout must cover budget + download + build or it kills the very run
+# the budget was protecting. Kept adjacent here so they cannot drift apart; the
+# arithmetic behind 7h/20h is on RETRY_BUDGET_MS in src/wikimedia/importWikimedia.ts.
+# Detecting a hang is not what the timeout is for — the importer's own 30-minute
+# socket timeout catches those in minutes; this is the last resort behind it.
+Environment=WIKIMEDIA_IMPORT_RETRY_BUDGET_MS=25200000
+TimeoutStartSec=20h
+# Keep the monthly build from starving the live API/DB.
+Nice=10
+IOSchedulingClass=idle
