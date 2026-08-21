@@ -121,9 +121,16 @@ const WikimediaBboxRowSchema = z.array(
     createdAt: z.date().nullish(),
     azimuth: z.number().nullish(),
     licenseId: z.number().nullish(),
-    // Numeric Commons actor id; kept as a plain number (actor ids fit well
-    // within 2^53) so colorize-by-author can bucket by it like our own userId.
-    userId: z.preprocess(
+    // Commons `actor_id` of the uploader, kept as a plain number (actor ids run
+    // to ~32M, well within 2^53) so colorize-by-author can bucket by it like our
+    // own userId. Reported as `authorId`, never as `userId`: it indexes Commons'
+    // `actor` table, not our `user` table, and the two spaces overlap in exactly
+    // the low numbers both use — Commons actor 2 is a prolific uploader, and
+    // Freemap user 2 is a person. It is unique per uploader within Commons, but
+    // it resolves to no name from any public dump (the `actor` table is withheld
+    // because it also holds anonymous editors' IPs), so it is only ever an
+    // opaque bucket key.
+    authorId: z.preprocess(
       (v) => (v == null ? v : Number(v)),
       z.number().int().nonnegative().nullish(),
     ),
@@ -556,6 +563,10 @@ async function byBbox(ctx: ParameterizedContext) {
   const galleryPictures = rows.map((row) =>
     Object.assign({}, row, {
       source: 0,
+      // Our own photos identify their author by `userId`; `authorId` is the
+      // Wikimedia arm's field and stays absent here, so a client never has to
+      // guess which id space a number came from.
+      authorId: undefined,
       rating: getRating ? row.rating : undefined,
       takenAt: toWireDate(row.takenAt, isProtobuf),
       createdAt: toWireDate(row.createdAt, isProtobuf),
@@ -584,8 +595,11 @@ async function byBbox(ctx: ParameterizedContext) {
     wmExtra.push('uploadedAt AS createdAt');
   }
 
+  // `userId` is the request-side selector for "who took it", shared by both
+  // sources; the response splits them, because a Commons actor id must not be
+  // mistaken for one of our user ids. See the WikimediaBboxRowSchema comment.
   if (fields?.includes('userId')) {
-    wmExtra.push('authorId AS userId');
+    wmExtra.push('authorId');
   }
 
   if (fields?.includes('azimuth')) {
@@ -629,7 +643,8 @@ async function byBbox(ctx: ParameterizedContext) {
     takenAt: toWireDate(row.takenAt, isProtobuf),
     createdAt: toWireDate(row.createdAt, isProtobuf),
     lastCommentedAt: undefined,
-    userId: row.userId ?? undefined,
+    userId: undefined,
+    authorId: row.authorId ?? undefined,
     pano: undefined,
     premium: undefined,
     azimuth: row.azimuth ?? undefined,
