@@ -47,7 +47,7 @@
     "apple-signin-auth": "^2.1.0",
     "better-sqlite3": "^13.0.3",
     "etag": "^1.8.1",
-    "exifreader": "^4.42.0",
+    "exifreader": "^4.44.0",
     "gdal-async": "^3.12.3",
     "got": "^15.1.0",
     "heic-convert": "^2.1.0",
@@ -74,7 +74,7 @@
     "zod-openapi": "^6.0.1"
   },
   "devDependencies": {
-    "@biomejs/biome": "^2.5.8",
+    "@biomejs/biome": "^2.5.10",
     "@dotenvx/dotenvx": "^2.21.0",
     "@types/better-sqlite3": "^9.6.0",
     "@types/etag": "^1.8.4",
