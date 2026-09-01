@@ -1,9 +1,9 @@
 import { getEnv } from './env.js';
 
-// Freemap Premium costs 8 €/year; on 1 September 2026 the price rises to
-// 15 €/year for new customers. Polar keeps a running subscription on the price
-// it was created with, so the switch is done by repointing
-// `POLAR_PREMIUM_*_PRODUCT_ID` at the 15 € products on that day.
+// Freemap Premium costs 15 €/year. The price is raised on the Polar products
+// themselves, so these IDs don't change; Polar grandfathers a running
+// subscription onto the amount it was created at, and those renewals must keep
+// provisioning.
 
 /** Product for a checkout offered in the app: whatever we currently sell. */
 export function getPremiumProductId(recurring: boolean): string {

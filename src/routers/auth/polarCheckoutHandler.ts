@@ -101,10 +101,9 @@ export function attachPolarCheckoutHandler(router: RouterInstance) {
       | undefined;
 
     // A subscription starts as a trial as long as the premium the user already
-    // has, so the periods never overlap and nobody pays for the same days
-    // twice — that's what makes switching from a one-time year to a
-    // subscription (before the price goes up) safe at any moment. Polar takes a
-    // trial as an interval and a count, not as an absolute end date.
+    // has, so the periods never overlap and nobody pays for the same days twice
+    // — a one-time year can be moved to a subscription at any moment. Polar
+    // takes a trial as an interval and a count, not as an absolute end date.
     let trialDays = 0;
 
     if (body.type === 'premium') {
@@ -148,9 +147,7 @@ export function attachPolarCheckoutHandler(router: RouterInstance) {
 
         // One-time years stack and admins can set `premiumExpiration` freely,
         // so this is not bounded by anything we sell. Keep it within what Polar
-        // accepts — a rejected value would fail the whole checkout. The app
-        // doesn't offer the switch past this, so the clamp only catches what
-        // reaches the endpoint another way.
+        // accepts — a rejected value would fail the whole checkout.
         trialDays = Math.min(wantedTrialDays, MAX_TRIAL_DAYS);
 
         if (trialDays < wantedTrialDays) {

@@ -146,16 +146,16 @@ pnpm start | pnpm exec pino-pretty
 ### Purchases (Polar)
 
 Polar ([polar.sh](https://polar.sh)) runs in parallel with the legacy Rovas
-flow during migration. Premium is pay-what-you-want (minimum €8) and the user
+flow during migration. Premium is pay-what-you-want (minimum €15) and the user
 chooses a one-time year or an auto-renewing yearly subscription; credits are
 one-time custom-amount top-ups (1 credit = €0.01, minimum 500).
 
 - `POLAR_ACCESS_TOKEN` — Polar Organization Access Token (`polar_oat_…`).
 - `POLAR_SERVER` — `sandbox` or `production` (default `sandbox`).
 - `POLAR_PREMIUM_RECURRING_PRODUCT_ID` — product ID of the auto-renewing yearly
-  premium subscription (custom amount, min €8).
+  premium subscription (custom amount, min €15).
 - `POLAR_PREMIUM_ONETIME_PRODUCT_ID` — product ID of the one-time one-year
-  premium (custom amount, min €8).
+  premium (custom amount, min €15).
 - `POLAR_CREDITS_PRODUCT_ID` — Polar product ID of the custom-amount credits
   product.
 - `POLAR_WEBHOOK_SECRET` — secret of the Polar webhook endpoint (Standard
@@ -173,21 +173,30 @@ premium they already have (see below). A card that stopped working is fixed in
 the Polar customer portal; once a subscription really ends, `subscription.revoked`
 clears the stored ID and a new one can be bought.
 
-#### Price increase
+#### Changing the price
 
-The yearly premium price rises from €8 to €15 for new customers on 1 September
-2026. The switch is manual: point `POLAR_PREMIUM_RECURRING_PRODUCT_ID` and
-`POLAR_PREMIUM_ONETIME_PRODUCT_ID` at the €15 products on that day (and drop
-the announcement in the frontend). A running subscription keeps the price it was
-created with — Polar grandfathers it — so nothing has to be migrated.
+Raise the amount (minimum and preset) on the two existing Polar products; the
+env vars stay as they are. Polar grandfathers a running subscription onto the
+amount it was created at, so a change only affects new purchases and nothing has
+to be migrated: subscriptions bought before 1 September 2026 still renew at €8.
+Those renewals must keep provisioning, which is why the `subscription.*` events
+don't filter by product and a renewal order is recognized by carrying a
+`subscriptionId` rather than by its product ID.
 
-Someone holding a one-time year has no such protection, so until that day the
-app offers them the switch to a subscription at the current price. A yearly
-subscription starts as a trial as long as the premium the user already has, so
-the periods don't overlap and nobody pays for the same days twice; Polar takes a
-trial as an interval and a count, not as an absolute end date. The trial is
-capped at two years, so someone who stacked more one-time years than that does
-overlap for the excess — it is logged when it happens.
+Creating new products and repointing the env vars instead also works — it splits
+the two eras in Polar's reporting — but then the old products' orders no longer
+match `isPremiumProduct`, leaving only that `subscriptionId` fallback. A
+product's pricing type and billing interval are locked after creation, so those
+do require a new product.
+
+#### Subscription trial
+
+A yearly subscription starts as a trial as long as the premium the user already
+has, so the periods don't overlap and nobody pays for the same days twice; that
+is what lets a one-time year be moved to a subscription at any moment. Polar
+takes a trial as an interval and a count, not as an absolute end date, and
+validates it at 1000 days — so someone who stacked more one-time years than that
+does overlap for the excess. It is logged when it happens.
 
 ### Tracking
 
