@@ -43,6 +43,20 @@ test('createProjector: undoes northing-first axis order', () => {
   assert.ok(Math.abs(y - 2987511) < 25, `northing ${y} looks like an easting`);
 });
 
+test('createProjector: undoes lat-first axis order of geographic EPSG:4326', () => {
+  // GEDTM30 carries a plain EPSG:4326 SRS, whose authority axis order is
+  // lat/lon. Feeding the raw transformPoint output to the geotransform read
+  // the wrong continent (Fruska Gora came back as 702 m, an Arabian plateau).
+  const project = createProjector(gdal.SpatialReference.fromEPSG(4326));
+
+  assert.ok(project);
+
+  const { x, y } = project(19.851715564727787, 45.16161498912903);
+
+  assert.ok(Math.abs(x - 19.851715564727787) < 1e-9, `x ${x} is a latitude`);
+  assert.ok(Math.abs(y - 45.16161498912903) < 1e-9, `y ${y} is a longitude`);
+});
+
 test('createProjector: null for a dataset already in lon/lat', () => {
   assert.equal(createProjector(null), null);
 });

@@ -19,10 +19,14 @@ export type Projector = (lon: number, lat: number) => { x: number; y: number };
  * national grid — would be read ~100 m off target, silently returning the
  * elevation of a neighbouring hillside.
  *
- * The catch is axis order: some CRSs (EPSG:5845 SWEREF99 TM, EPSG:3035 LAEA)
- * declare northing first, and GDAL honours that for an SRS carrying an EPSG
- * authority, so `transformPoint` hands back (y, x). gdal-async 3.12 exposes no
- * setAxisMappingStrategy to override it, so detect the case and swap.
+ * The catch is axis order: some CRSs declare the northing/latitude first, and
+ * GDAL honours that for an SRS carrying an EPSG authority, so `transformPoint`
+ * hands back (y, x). That covers both projected CRSs (EPSG:5845 SWEREF99 TM,
+ * EPSG:3035 LAEA) and — the one that bit GEDTM30 — plain geographic EPSG:4326,
+ * whose official axis order is lat/lon; a swapped lon/lat still lands inside
+ * the raster of a global dataset, so it reads the wrong continent instead of
+ * failing. gdal-async 3.12 exposes no setAxisMappingStrategy to override it,
+ * so detect both cases and swap.
  */
 export function createProjector(
   srs: gdal.SpatialReference | null,
@@ -33,7 +37,7 @@ export function createProjector(
 
   const ct = new gdal.CoordinateTransformation(wgs84, srs);
 
-  if (!srs.EPSGTreatsAsNorthingEasting()) {
+  if (!srs.EPSGTreatsAsNorthingEasting() && !srs.EPSGTreatsAsLatLong()) {
     return (lon, lat) => ct.transformPoint(lon, lat);
   }
 
