@@ -21,10 +21,12 @@ jobs:
           port: ${{ vars.DEPLOY_PORT }} # optional; defaults to 22
           username: freemap
           key: ${{ secrets.DEPLOY_SSH_KEY }}
-          # Without this the script runs on after a failing command, so a
-          # deploy that never updated the code still reports success.
-          script_stop: true
           script: |
+            # Without this the script runs on after a failing command, so a
+            # deploy that never updated the code still reports success.
+            # (`script_stop:` did this until appleboy/ssh-action v1.1.0 dropped
+            # the input; the moving `@v1` tag then silently ignored it.)
+            set -e
             cd /home/freemap/freemap-v3-nodejs-backend
             # `git pull --ff-only` refuses once the server's branch has diverged
             # from main (a rebase or force-push upstream is enough), and it did
