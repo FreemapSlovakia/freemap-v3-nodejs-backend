@@ -1,3 +1,5 @@
+import { readdirSync, readFileSync, statSync } from 'node:fs';
+import { isAbsolute, join } from 'node:path';
 import gdal from 'gdal-async';
 
 // WGS84 built from proj4 to force traditional lon/lat axis order (GDAL 3 would
@@ -48,6 +50,37 @@ export function createProjector(
   };
 }
 
+/** Projects a dataset's own (x, y) back to WGS84 lon/lat. */
+export type InverseProjector = (
+  x: number,
+  y: number,
+) => { lon: number; lat: number };
+
+/**
+ * The reverse of {@link createProjector}, used to work out a dataset's footprint
+ * in WGS84 without hard-coding one. Same axis-order caveat, mirrored: where the
+ * dataset's CRS declares the northing/latitude first, GDAL wants the *input*
+ * pair in that order, so the swap moves to the arguments.
+ */
+export function createInverseProjector(
+  srs: gdal.SpatialReference | null,
+): InverseProjector | null {
+  if (!srs) {
+    return null;
+  }
+
+  const ct = new gdal.CoordinateTransformation(srs, wgs84);
+
+  const swapped =
+    srs.EPSGTreatsAsNorthingEasting() || srs.EPSGTreatsAsLatLong();
+
+  return (x, y) => {
+    const p = ct.transformPoint(swapped ? y : x, swapped ? x : y);
+
+    return { lon: p.x, lat: p.y };
+  };
+}
+
 export type Bbox = [
   minLon: number,
   minLat: number,
@@ -57,41 +90,295 @@ export type Bbox = [
 
 export type ParsedSource = {
   // stable public identifier of the source, reported by the API; kept separate
-  // from `path` so that neither the filesystem layout nor a file rename leaks
-  // into the API contract
+  // from the directory so that neither the filesystem layout nor a file rename
+  // leaks into the API contract, and so several rasters can answer under one
+  // name (every Sonny country reports `sonny`)
   name: string;
   path: string;
-  bbox: Bbox;
+  attributions: SourceAttribution[];
+  // Where the raster lies, in WGS84. Optional: `source.json` may pin it, but it
+  // is normally left out and derived from the raster on first use — see
+  // {@link datasetBbox}. Deriving beats transcribing, because a hand-written
+  // bbox fails silently in both directions: too small and the source is never
+  // consulted, too large and every miss costs a pointless read.
+  bbox?: Bbox;
+};
+
+/** How a source wants to be credited, as the elevation API reports it. */
+export type SourceAttribution = {
+  /** The credit line itself, verbatim as the licence asks for it. */
+  name: string;
+  /** Where the dataset lives, when there is a page to link to. */
+  url?: string;
 };
 
 // Name reported for the global SRTM fallback dataset.
 export const SRTM_SOURCE_NAME = 'srtm';
 
-// Parse the ELEVATION_SOURCES config, in priority order (first wins). Format:
-//   name:/path/a.tif:minLon,minLat,maxLon,maxLat;other:/path/b.tif:...
-// Paths must not contain colons. Entries may be separated by a newline instead
-// of a semicolon, so the (long) value stays readable one source per line where
-// the environment can carry a multi-line value.
-export function parseElevationSources(raw: string): ParsedSource[] {
-  return raw
-    .split(/[;\n]/)
-    .map((entry) => entry.trim())
-    .filter(Boolean)
-    .map((entry) => {
-      const [name, path, rawBbox, ...rest] = entry.split(':');
+// The raster a source directory holds, when `source.json` doesn't name one.
+const DEFAULT_FILES = ['data.vrt', 'data.tif'];
 
-      if (!name || !path || !rawBbox || rest.length) {
-        throw new Error(`Invalid ELEVATION_SOURCES entry: ${entry}`);
+/**
+ * Load the elevation sources from a directory tree, in priority order: one
+ * subdirectory per source, consulted in the order the names sort, so a numeric
+ * prefix (`010-sk`, `999-gedtm30`) sets priority the way rc.d does.
+ *
+ * A subdirectory counts as a source only if it holds a `source.json`; anything
+ * else — a half-finished download, a scratch folder, the SRTM tile cache — is
+ * ignored rather than silently changing what the API serves.
+ *
+ *     { "name": "sonny",
+ *       "file": "de.tif",
+ *       "attributions": [{ "name": "Sonny's LiDAR DTM", "url": "https://..." }] }
+ *
+ * `file` is optional and may be absolute, so a source can point at a raster that
+ * stays where it is; without it the directory must hold `data.vrt` or
+ * `data.tif`. `bbox` is optional too, and normally omitted — see
+ * {@link datasetBbox}.
+ *
+ * Nothing here throws. This runs while the module is still being evaluated, so
+ * a throw takes down the whole API — gallery, routing and all — over an
+ * elevation problem, and the "drop in a directory" workflow would mean one
+ * malformed file could do it on the next restart. A bad source is dropped with
+ * a warning and the rest still load; the request path already treats a missing
+ * source as a fall-through.
+ */
+export function loadElevationSources(
+  root: string,
+  warn: (message: string, err: unknown) => void,
+): ParsedSource[] {
+  if (!root) {
+    return [];
+  }
+
+  let dirs: string[];
+
+  try {
+    dirs = readdirSync(root).sort();
+  } catch (err) {
+    warn(`Cannot read ELEVATION_DIR ${root}; no local sources`, err);
+
+    return [];
+  }
+
+  const sources: ParsedSource[] = [];
+
+  for (const dir of dirs) {
+    const dirPath = join(root, dir);
+
+    let raw: string;
+
+    try {
+      raw = readFileSync(join(dirPath, 'source.json'), 'utf8');
+    } catch (err) {
+      // A directory with no source.json is simply not a source. Anything else —
+      // EACCES after a deploy left the wrong ownership, EIO on a bad disk — is a
+      // real source going quietly missing, which is the silent under-coverage
+      // this design exists to avoid. Say so.
+      const code = (err as NodeJS.ErrnoException).code;
+
+      if (code !== 'ENOENT' && code !== 'ENOTDIR') {
+        warn(`Cannot read ${dirPath}/source.json; source skipped`, err);
       }
 
-      const bbox = rawBbox.split(',').map(Number);
+      continue;
+    }
 
-      if (bbox.length !== 4 || bbox.some(Number.isNaN)) {
-        throw new Error(`Invalid bbox in ELEVATION_SOURCES entry: ${entry}`);
+    try {
+      sources.push(parseSourceJson(raw, dirPath));
+    } catch (err) {
+      warn(`Ignoring ${dirPath}`, err);
+    }
+  }
+
+  return sources;
+}
+
+/** Parse one `source.json`, resolving its raster against its own directory. */
+export function parseSourceJson(raw: string, dirPath: string): ParsedSource {
+  let parsed: unknown;
+
+  try {
+    parsed = JSON.parse(raw);
+  } catch (err) {
+    throw new Error(`Invalid source.json in ${dirPath}: ${err}`);
+  }
+
+  if (!parsed || typeof parsed !== 'object') {
+    throw new Error(`Invalid source.json in ${dirPath}: not an object`);
+  }
+
+  const { name, file, bbox, attributions } = parsed as Record<string, unknown>;
+
+  if (typeof name !== 'string' || !name) {
+    throw new Error(`Invalid source.json in ${dirPath}: missing "name"`);
+  }
+
+  if (file !== undefined && (typeof file !== 'string' || !file)) {
+    throw new Error(`Invalid source.json in ${dirPath}: bad "file"`);
+  }
+
+  if (
+    bbox !== undefined &&
+    (!Array.isArray(bbox) ||
+      bbox.length !== 4 ||
+      bbox.some((n) => typeof n !== 'number' || Number.isNaN(n)))
+  ) {
+    throw new Error(`Invalid source.json in ${dirPath}: bad "bbox"`);
+  }
+
+  if (attributions !== undefined && !Array.isArray(attributions)) {
+    throw new Error(`Invalid source.json in ${dirPath}: bad "attributions"`);
+  }
+
+  return {
+    name,
+    path: file
+      ? isAbsolute(file)
+        ? file
+        : join(dirPath, file)
+      : defaultFile(dirPath),
+    bbox: bbox as Bbox | undefined,
+    attributions: ((attributions ?? []) as unknown[]).map((attr) => {
+      if (!attr || typeof attr !== 'object') {
+        throw new Error(`Invalid source.json in ${dirPath}: bad attribution`);
       }
 
-      return { name, path, bbox: bbox as Bbox };
-    });
+      const { name: credit, url } = attr as Record<string, unknown>;
+
+      if (typeof credit !== 'string' || !credit) {
+        throw new Error(
+          `Invalid source.json in ${dirPath}: attribution needs a "name"`,
+        );
+      }
+
+      return typeof url === 'string' && url
+        ? { name: credit, url }
+        : { name: credit };
+    }),
+  };
+}
+
+function defaultFile(dirPath: string): string {
+  for (const candidate of DEFAULT_FILES) {
+    const full = join(dirPath, candidate);
+
+    try {
+      statSync(full);
+
+      return full;
+    } catch {
+      // try the next candidate
+    }
+  }
+
+  throw new Error(
+    `No raster in ${dirPath}: give "file" or add ${DEFAULT_FILES.join(' / ')}`,
+  );
+}
+
+/**
+ * The WGS84 footprint of a raster, derived from its geotransform and CRS.
+ *
+ * Reprojection curves: the WGS84 outline of a projected raster is not the
+ * rectangle its four corners suggest. A UTM or LAEA sheet bows between them by
+ * far more than a rounding margin — on a wide one the top edge bulges well past
+ * the corner latitudes — so taking the corners alone clips real coverage off
+ * the sides, and the source then goes unconsulted for points it actually holds.
+ *
+ * So the whole footprint is sampled on a grid rather than just its outline. The
+ * edges carry the bulge for the usual projections, but an extreme can also fall
+ * strictly inside — a polar stereographic sheet containing the pole reaches 90°
+ * at an interior pixel, on no edge at all — and an interior grid costs nothing
+ * here, being computed once per source.
+ *
+ * A margin then absorbs what the sampling still misses between points. Erring
+ * wide only costs a read that finds nodata and falls through; erring narrow
+ * loses data silently, so the bias is deliberate.
+ */
+export function datasetBbox(
+  geoTransform: number[],
+  width: number,
+  height: number,
+  unproject: InverseProjector | null,
+): Bbox {
+  const [gt0, gt1, gt2, gt3, gt4, gt5] = geoTransform;
+
+  const STEPS = 64;
+
+  const lons: number[] = [];
+
+  const lats: number[] = [];
+
+  for (let i = 0; i <= STEPS; i++) {
+    for (let j = 0; j <= STEPS; j++) {
+      const px = (i / STEPS) * width;
+
+      const py = (j / STEPS) * height;
+
+      const x = gt0 + px * gt1 + py * gt2;
+
+      const y = gt3 + px * gt4 + py * gt5;
+
+      // a point outside the projection's valid domain transforms to a
+      // non-finite value; it bounds nothing, so leave it out
+      const { lon, lat } = unproject ? unproject(x, y) : { lon: x, lat: y };
+
+      if (Number.isFinite(lon) && Number.isFinite(lat)) {
+        lons.push(lon);
+        lats.push(lat);
+      }
+    }
+  }
+
+  if (!lons.length) {
+    throw new Error('Could not derive a WGS84 extent for the raster');
+  }
+
+  const margin = 0.01;
+
+  // Not handled: a raster crossing the antimeridian would sample near both
+  // +180 and -180 and yield a bbox the long way round the globe. No source
+  // does, and a single bbox has no way to say "wraps" anyway.
+  return [
+    Math.max(-180, Math.min(...lons) - margin),
+    Math.max(-90, Math.min(...lats) - margin),
+    Math.min(180, Math.max(...lons) + margin),
+    Math.min(90, Math.max(...lats) + margin),
+  ];
+}
+
+/**
+ * Record that `name` answered, keeping every distinct credit it brought.
+ *
+ * Both halves matter. Several rasters answer under one name, so their credits
+ * accumulate instead of the last one winning; and they usually carry the *same*
+ * credit, so identical entries collapse and a reader isn't told about Sonny
+ * nine times for a route crossing nine of his countries.
+ */
+export function mergeCredits(
+  into: Map<string, SourceAttribution[]>,
+  name: string,
+  attributions: SourceAttribution[],
+) {
+  const existing = into.get(name);
+
+  if (!existing) {
+    into.set(name, [...attributions]);
+
+    return;
+  }
+
+  for (const attribution of attributions) {
+    if (
+      !existing.some(
+        (seen) =>
+          seen.name === attribution.name && seen.url === attribution.url,
+      )
+    ) {
+      existing.push(attribution);
+    }
+  }
 }
 
 export function inBbox(

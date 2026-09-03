@@ -85,28 +85,59 @@ pnpm start | pnpm exec pino-pretty
 - `TRACKLOGS_DIRECTORY` — directory where uploaded GPX track logs are stored.
 - `ELEVATION_DATA_DIRECTORY` — directory containing HGT elevation tiles used by
   the elevation/profile endpoints.
-- `ELEVATION_SOURCES` — optional, premium-only high-precision elevation rasters
-  tried before the global fallback, in priority order (first match wins).
-  Semicolon- or newline-separated list of
-  `name:path:minLon,minLat,maxLon,maxLat`, e.g.
-  `sk:/data/dmr5.tif:16.8,47.7,22.6,49.7`. Paths must not contain colons, and
-  the bbox is WGS84 lon/lat regardless of the raster's own CRS — derive it by
-  reprojecting the raster's *densified* outline, since for anything but a plain
-  Mercator the edges bow and the four corners alone under-cover it.
+- `ELEVATION_DIR` — optional, root of the premium-only high-precision elevation
+  rasters tried before the global fallback. One subdirectory per source,
+  consulted in the order the directory names sort, so a numeric prefix sets
+  priority the way `rc.d` does:
 
-  Newlines let a long list stay readable one source per line. systemd's
-  `EnvironmentFile=` carries them if the value is double-quoted (it also joins
-  lines ending in a backslash, which inserts no separator — so keep the `;`
-  there).
+  ```
+  elevation-sources/010-sk/source.json
+                    250-sonny-de/source.json
+                    330-gedtm30/source.json
+  ```
 
-  `name` is reported by `/geotools/elevation?sources=1` and the frontend
-  resolves it to a data attribution, so it is an API contract, not a label:
-  use the lowercase ISO 3166-1 alpha-2 code of the country the model covers
-  (`sk`, `at`, …), or the model's own id for one that isn't country-scoped
-  (`gedtm30`). Several entries may share a name — the reported list is
-  deduplicated. An unrecognised name is still credited, but only under the
-  bare token, so keep names stable across file renames or re-projections. See
-  `elevationSourcesFromTokens` in the frontend for the resolution rules.
+  A subdirectory counts as a source only if it holds a `source.json`; anything
+  else is ignored, so a half-finished download cannot silently change what the
+  API serves. A malformed one is skipped with a warning rather than failing
+  startup.
+
+  ```json
+  {
+    "name": "sonny",
+    "file": "/fm/storage1/dtm/sonny/de/de.tif",
+    "attributions": [
+      { "name": "Sonny's LiDAR DTM (CC BY 4.0)", "url": "https://sonny.4lima.de/" }
+    ]
+  }
+  ```
+
+  - `name` (required) is reported by `/geotools/elevation?sources=1`, so it is
+    an API contract, not a label: use the lowercase ISO 3166-1 alpha-2 code of
+    the country the model covers (`sk`, `at`, …), or the model's own id for one
+    that isn't country-scoped (`gedtm30`, `sonny`). Several sources may share a
+    name — the reported list is deduplicated, and their credits are merged.
+    Keep names stable across file renames or re-projections.
+  - `file` (optional) is the raster, absolute or relative to the directory, so a
+    source can point at one that stays where it is. Without it the directory
+    must hold `data.vrt` or `data.tif`. `.vrt` and `.tif` are both fine.
+  - `attributions` (optional) is how the source wants crediting, served straight
+    to clients so a new dataset needs no web or mobile release. A country
+    stitched from two licensed datasets carries two entries.
+  - `bbox` (optional) pins the WGS84 footprint as `[minLon, minLat, maxLon,
+    maxLat]`. Normally omit it: it is derived from the raster on first use, by
+    sampling the footprint on a grid and reprojecting — hand-written bboxes fail
+    silently in both directions, too small and the source is never consulted,
+    too large and every miss costs a pointless read. Pin it only to skip the
+    derivation on a source where even that first open is too costly.
+
+  Deriving the bbox is deferred to a source's first use rather than done at
+  startup, so boot doesn't wait on every raster. Since the bbox is what the open
+  produces, the first request for a point no local source covers walks the whole
+  list — once per process.
+
+  Replaces `ELEVATION_SOURCES`, which is no longer read. If that variable is
+  still set while `ELEVATION_DIR` is not, startup warns: otherwise every premium
+  read would quietly degrade to SRTM.
 
 ### Map tiles
 
