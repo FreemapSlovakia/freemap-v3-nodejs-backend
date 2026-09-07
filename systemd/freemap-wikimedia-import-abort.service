@@ -1,0 +1,34 @@
+# OnFailure= backstop for freemap-wikimedia-import.service: mails the admins
+# when the import dies without getting to report for itself — an OOM kill, the
+# start timeout, or a throw early enough that its own error handling was never
+# reached. systemd passes $MONITOR_SERVICE_RESULT / $MONITOR_EXIT_CODE /
+# $MONITOR_EXIT_STATUS to units started this way; the reporter stays silent for
+# exactly one exit status, the one the importer uses to say it has already
+# mailed. Every other way of failing gets reported here.
+#
+# One case it cannot cover: this unit runs the same node binary, by the same
+# hardcoded path, as the unit it reports on. If a node upgrade moves that path,
+# both fail 203/EXEC and nobody is mailed. Deliberately not worked around with
+# a shell wrapper or a PATH lookup — that trades a narrow failure this unit
+# shares with its subject for a broader one where the wrapper picks a different
+# node than the import was built against. Watch for the monthly mail instead:
+# its absence is the signal.
+#
+# Deliberately does NOT touch the timer. The GraphHopper/Photon updaters halt
+# their schedule on a death like this, but those run daily; a month is already
+# more than enough of a window to look into it, and a halted monthly job is
+# indistinguishable from a forgotten one.
+#
+# Install with `sudo cp systemd/freemap-wikimedia-import* /etc/systemd/system/`
+# — see README "Scheduled jobs (systemd)".
+
+[Unit]
+Description=Report an abruptly terminated Wikimedia Commons import
+
+[Service]
+Type=oneshot
+User=freemap
+WorkingDirectory=/home/freemap/freemap-v3-nodejs-backend
+# Supplies MAILGUN_* and WIKIMEDIA_IMPORT_NOTIFY_EMAIL, same as the import unit.
+EnvironmentFile=/etc/freemap.conf
+ExecStart=/home/freemap/.local/share/fnm/aliases/default/bin/node build/wikimedia/importNotify.js --abrupt

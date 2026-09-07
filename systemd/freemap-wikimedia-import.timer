@@ -1,0 +1,19 @@
+# Schedules freemap-wikimedia-import.service. The 8th of the month is a safe slot
+# after the monthly Commons SQL dumps finish (they start on the 1st/20th and take
+# days); adjust to your mirror's timing.
+#
+# Persistent=true catches up a run missed while the machine was off. It does NOT
+# make `enable --now` import anything: with no stamp file yet, systemd writes one
+# at enable time, so there is nothing to catch up and the first run waits for the
+# 8th. Start the service by hand to import sooner.
+
+[Unit]
+Description=Monthly Wikimedia Commons photo import
+
+[Timer]
+OnCalendar=*-*-08 03:30:00
+Persistent=true
+RandomizedDelaySec=1h
+
+[Install]
+WantedBy=timers.target

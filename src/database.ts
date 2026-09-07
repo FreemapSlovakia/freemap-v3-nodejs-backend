@@ -29,6 +29,7 @@ export async function initDatabase() {
       facebookUserId VARCHAR(32) CHARSET ascii NULL UNIQUE,
       googleUserId VARCHAR(32) CHARSET ascii NULL UNIQUE,
       garminUserId VARCHAR(60) CHARSET ascii NULL UNIQUE,
+      appleUserId VARCHAR(255) CHARSET ascii NULL UNIQUE,
       garminAccessToken VARCHAR(255) CHARSET ascii NULL,
       garminAccessTokenSecret VARCHAR(255) CHARSET ascii NULL,
       githubUserId VARCHAR(32) CHARSET ascii NULL,
@@ -43,15 +44,16 @@ export async function initDatabase() {
       description TEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL,
       roles JSON NOT NULL DEFAULT '[]',
       createdAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      lat FLOAT(8, 6) NULL,
-      lon FLOAT(9, 6) NULL,
+      lat DECIMAL(8, 6) NULL,
+      lon DECIMAL(9, 6) NULL,
       settings JSON NOT NULL DEFAULT '{}',
       sendGalleryEmails BIT NOT NULL DEFAULT true,
       premiumExpiration TIMESTAMP NULL,
       credits FLOAT NOT NULL DEFAULT 0,
-      language CHAR(2) NULL,
+      language CHAR(2) CHARSET ascii NULL,
       polarCustomerId VARCHAR(64) CHARSET ascii NULL,
-      polarSubscriptionId VARCHAR(64) CHARSET ascii NULL
+      polarSubscriptionId VARCHAR(64) CHARSET ascii NULL,
+      cancelAtPeriodEnd BIT NOT NULL DEFAULT false
     ) ENGINE=InnoDB`,
 
     sql`CREATE TABLE IF NOT EXISTS blockedCredit (
@@ -66,7 +68,6 @@ export async function initDatabase() {
       authToken VARCHAR(255) CHARSET ascii PRIMARY KEY,
       userId INT UNSIGNED NOT NULL,
       createdAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      INDEX authTokenIdx (authToken),
       FOREIGN KEY (userId) REFERENCES user (id) ON DELETE CASCADE
     ) ENGINE=InnoDB`,
 
@@ -86,7 +87,7 @@ export async function initDatabase() {
       updatedAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
       expireAt TIMESTAMP NOT NULL,
       item JSON NOT NULL,
-      status ENUM('created','awaiting_payment','confirmed','rejected') NOT NULL DEFAULT 'created',
+      status ENUM('created','awaiting_payment','confirmed','rejected') CHARSET ascii NOT NULL DEFAULT 'created',
       lastEvent VARCHAR(32) CHARSET ascii NULL,
       lastOccurredAt INT UNSIGNED NULL,
       amountPaid INT UNSIGNED NULL,
@@ -100,6 +101,7 @@ export async function initDatabase() {
     ) ENGINE=InnoDB`,
 
     sql`CREATE TABLE IF NOT EXISTS purchase (
+      id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
       userId INT UNSIGNED NOT NULL,
       item JSON NOT NULL,
       createdAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -110,7 +112,7 @@ export async function initDatabase() {
 
     sql`CREATE TABLE IF NOT EXISTS picture (
       id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-      pathname VARCHAR(255) CHARSET utf8 COLLATE utf8_bin NOT NULL UNIQUE,
+      pathname VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL UNIQUE,
       userId INT UNSIGNED NOT NULL,
       title VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL,
       description VARCHAR(4096) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL,
@@ -170,6 +172,57 @@ export async function initDatabase() {
       INDEX plhPictureIdx (pictureId, changedAt)
     ) ENGINE=InnoDB`,
 
+    // Geotagged Wikimedia Commons photos, bulk-imported monthly from the Commons
+    // `geo_tags` + `page` + `image` + SDC mediainfo dumps (see
+    // src/wikimedia/importWikimedia.ts), which atomically swaps in a fresh copy.
+    // Created here too so a fresh deploy has the table before the first import
+    // runs — otherwise the gallery's Wikimedia arm errors on the missing table.
+    // Carries no foreign keys and nothing references it. capturedAt (EXIF
+    // DateTimeOriginal, falling back to the SDC P571 inception date), uploadedAt
+    // (upload time), authorId (numeric Commons actor id — the name isn't in any
+    // public dump), azimuth (EXIF GPSImgDirection) and licenseId (raw Wikidata
+    // license item from SDC P275, mapped to a family at query time) back the
+    // gallery's date/season/author/license colorizing and the direction markers;
+    // the file title, image URL and CC attribution are still fetched by the
+    // client straight from the Commons API by pageId when a photo is opened.
+    sql`CREATE TABLE IF NOT EXISTS wikimediaPicture (
+      pageId INT UNSIGNED NOT NULL PRIMARY KEY,
+      location POINT NOT NULL,
+      capturedAt DATETIME NULL,
+      uploadedAt DATETIME NULL,
+      authorId BIGINT UNSIGNED NULL,
+      azimuth SMALLINT UNSIGNED NULL,
+      licenseId INT UNSIGNED NULL,
+      SPATIAL KEY wikimediaPicture_location_spx (location),
+      KEY wikimediaPicture_capturedAt (capturedAt),
+      KEY wikimediaPicture_uploadedAt (uploadedAt)
+    ) ENGINE=InnoDB`,
+
+    // Ratings for Wikimedia photos. Keyed on the stable Commons pageId and kept
+    // deliberately independent of `wikimediaPicture` (no FK) so the monthly
+    // table swap never disturbs them; ratings whose photo later disappears from
+    // Commons simply stop rendering.
+    sql`CREATE TABLE IF NOT EXISTS wikimediaRating (
+      pageId INT UNSIGNED NOT NULL,
+      userId INT UNSIGNED NOT NULL,
+      stars TINYINT UNSIGNED NOT NULL,
+      ratedAt TIMESTAMP NOT NULL,
+      PRIMARY KEY (pageId, userId),
+      FOREIGN KEY (userId) REFERENCES user (id) ON DELETE CASCADE
+    ) ENGINE=InnoDB`,
+
+    // Comments on Wikimedia photos. Also keyed on the stable Commons pageId and
+    // independent of `wikimediaPicture` (see wikimediaRating).
+    sql`CREATE TABLE IF NOT EXISTS wikimediaComment (
+      id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+      pageId INT UNSIGNED NOT NULL,
+      userId INT UNSIGNED NOT NULL,
+      createdAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      comment VARCHAR(4096) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+      FOREIGN KEY (userId) REFERENCES user (id) ON DELETE CASCADE,
+      INDEX wcPageIdIdx (pageId, createdAt)
+    ) ENGINE=InnoDB`,
+
     sql`CREATE TABLE IF NOT EXISTS trackingDevice (
       id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
       userId INT UNSIGNED NOT NULL,
@@ -185,8 +238,8 @@ export async function initDatabase() {
       id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
       deviceId INT UNSIGNED NOT NULL,
       createdAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      lat FLOAT(8, 6) NOT NULL,
-      lon FLOAT(9, 6) NOT NULL,
+      lat DECIMAL(8, 6) NOT NULL,
+      lon DECIMAL(9, 6) NOT NULL,
       altitude FLOAT NULL,
       speed FLOAT NULL,
       accuracy FLOAT NULL,
@@ -213,19 +266,19 @@ export async function initDatabase() {
     ) ENGINE=InnoDB`,
 
     sql`CREATE TABLE IF NOT EXISTS map (
-      id CHAR(8) PRIMARY KEY,
+      id CHAR(8) CHARSET ascii PRIMARY KEY,
       createdAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
       modifiedAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
       name VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL,
       userId INT UNSIGNED NOT NULL,
       public BIT NOT NULL DEFAULT false,
-      data MEDIUMTEXT CHARSET utf8 COLLATE utf8_bin NOT NULL DEFAULT '{}',
+      data MEDIUMTEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL DEFAULT '{}',
       CONSTRAINT umUserFk FOREIGN KEY (userId) REFERENCES user (id) ON DELETE CASCADE,
       INDEX umCreatedAtIdx (createdAt)
     ) ENGINE=InnoDB`,
 
     sql`CREATE TABLE IF NOT EXISTS mapWriteAccess (
-      mapId CHAR(8) NOT NULL,
+      mapId CHAR(8) CHARSET ascii NOT NULL,
       userId INT UNSIGNED NOT NULL,
       PRIMARY KEY (mapId, userId),
       CONSTRAINT mwaUserFk FOREIGN KEY (userId) REFERENCES user (id) ON DELETE CASCADE,
@@ -300,40 +353,47 @@ export async function initDatabase() {
         END`,
   ];
 
+  // Schema changes for databases created before the CREATE TABLEs above were
+  // last changed. Failures are logged and ignored, so an already applied step
+  // is harmless — but note that MODIFY COLUMN rebuilds the whole table every
+  // time it runs, so drop these entries once they have been applied everywhere
+  // (as commit 6d2fe75 did with the previous batch).
   const updates: (string | string[])[] = [
-    'ALTER TABLE user ADD COLUMN description TEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL',
-    'ALTER TABLE user ADD COLUMN appleUserId VARCHAR(255) DEFAULT NULL',
-    'CREATE UNIQUE INDEX user_appleUserId ON user(appleUserId)',
-    'ALTER TABLE user ADD COLUMN picture MEDIUMBLOB NULL',
-    "ALTER TABLE user MODIFY COLUMN settings JSON NOT NULL DEFAULT '{}'",
-    'ALTER TABLE user ADD COLUMN githubUserId VARCHAR(32) CHARSET ascii DEFAULT NULL',
-    'CREATE UNIQUE INDEX user_githubUserId ON user(githubUserId)',
-    'ALTER TABLE user ADD COLUMN stravaUserId VARCHAR(32) CHARSET ascii DEFAULT NULL',
-    'CREATE UNIQUE INDEX user_stravaUserId ON user(stravaUserId)',
-    'ALTER TABLE user ADD COLUMN microsoftUserId VARCHAR(64) CHARSET ascii DEFAULT NULL',
-    'CREATE UNIQUE INDEX user_microsoftUserId ON user(microsoftUserId)',
-    'ALTER TABLE user ADD COLUMN stravaAccessToken VARCHAR(255) CHARSET ascii DEFAULT NULL',
-    'ALTER TABLE user ADD COLUMN stravaRefreshToken VARCHAR(255) CHARSET ascii DEFAULT NULL',
-    'ALTER TABLE user ADD COLUMN stravaTokenExpiresAt TIMESTAMP NULL DEFAULT NULL',
-    // Replace the boolean isAdmin flag with a granular roles array. Existing
-    // admins gain all roles so their access is unchanged. Sequenced as one
-    // entry so backfill runs after the column is added and before it is dropped.
+    // Redundant: authToken is already the PRIMARY KEY.
+    'ALTER TABLE auth DROP INDEX IF EXISTS authTokenIdx',
+
+    // The table had no PRIMARY KEY at all.
+    'ALTER TABLE purchase ADD COLUMN IF NOT EXISTS id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY FIRST',
+
+    // utf8 is utf8mb3, so saving a map containing an emoji failed with
+    // "Incorrect string value" under STRICT_TRANS_TABLES.
+    "ALTER TABLE map MODIFY COLUMN data MEDIUMTEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL DEFAULT '{}'",
+    'ALTER TABLE picture MODIFY COLUMN pathname VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL',
+
+    // FLOAT is single precision and cannot hold the 8 significant digits a
+    // coordinate needs; 48.123456 came back as 48.123455 (~11 cm off).
+    'ALTER TABLE user MODIFY COLUMN lat DECIMAL(8, 6) NULL, MODIFY COLUMN lon DECIMAL(9, 6) NULL',
+    'ALTER TABLE trackingPoint MODIFY COLUMN lat DECIMAL(8, 6) NOT NULL, MODIFY COLUMN lon DECIMAL(9, 6) NOT NULL',
+
+    // Pin the charset of the columns that used to inherit the server default,
+    // so every database ends up with the same schema.
+    'ALTER TABLE user MODIFY COLUMN language CHAR(2) CHARSET ascii NULL',
+    "ALTER TABLE purchaseIntent MODIFY COLUMN status ENUM('created','awaiting_payment','confirmed','rejected') CHARSET ascii NOT NULL DEFAULT 'created'",
+
+    // map.id and mapWriteAccess.mapId are a foreign key pair and must keep
+    // matching charsets, so the constraint has to go first. That also stops the
+    // sequence from re-running once applied, since the DROP then fails.
     [
-      "ALTER TABLE user ADD COLUMN roles JSON NOT NULL DEFAULT '[]'",
-      "UPDATE user SET roles = JSON_ARRAY('userManager', 'galleryModerator', 'mapModerator', 'trackingManager', 'layerPreview') WHERE isAdmin = 1",
-      'ALTER TABLE user DROP COLUMN isAdmin',
+      'ALTER TABLE mapWriteAccess DROP FOREIGN KEY mwaMapFk',
+      'ALTER TABLE map MODIFY COLUMN id CHAR(8) CHARSET ascii NOT NULL',
+      'ALTER TABLE mapWriteAccess MODIFY COLUMN mapId CHAR(8) CHARSET ascii NOT NULL',
+      'ALTER TABLE mapWriteAccess ADD CONSTRAINT mwaMapFk FOREIGN KEY (mapId) REFERENCES map (id) ON DELETE CASCADE',
     ],
-    // Polar billing (parallel to the legacy Rovas flow).
-    'ALTER TABLE user ADD COLUMN polarCustomerId VARCHAR(64) CHARSET ascii DEFAULT NULL',
-    'ALTER TABLE user ADD COLUMN polarSubscriptionId VARCHAR(64) CHARSET ascii DEFAULT NULL',
-    'ALTER TABLE purchase ADD COLUMN polarOrderId VARCHAR(64) CHARSET ascii DEFAULT NULL',
-    'CREATE UNIQUE INDEX purchase_polarOrderId ON purchase(polarOrderId)',
-    // Per-photo license (default backfills every existing row to CC BY-SA 4.0).
-    "ALTER TABLE picture ADD COLUMN license VARCHAR(32) CHARSET ascii NOT NULL DEFAULT 'CC-BY-SA-4.0'",
-    // Seed the license history for pictures that predate the history table (or
-    // the column). Guarded so it only ever inserts the missing rows; retries
-    // harmlessly on later boots if the column was not yet present.
-    'INSERT INTO pictureLicenseHistory (pictureId, license, changedAt) SELECT id, license, createdAt FROM picture WHERE id NOT IN (SELECT pictureId FROM pictureLicenseHistory)',
+
+    // Distinguishes a subscription still set to auto-renew from one the
+    // customer already canceled (access continues either way until
+    // `premiumExpiration`, so that alone can't tell them apart).
+    'ALTER TABLE user ADD COLUMN cancelAtPeriodEnd BIT NOT NULL DEFAULT false',
   ];
 
   const db = await pool.getConnection();

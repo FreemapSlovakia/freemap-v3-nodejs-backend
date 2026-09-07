@@ -15,6 +15,7 @@ import { initDatabase } from './database.js';
 import { getEnv, getEnvInteger } from './env.js';
 import { appLogger } from './logger.js';
 import { paths } from './openapi.js';
+import { nanoid } from './randomId.js';
 import { authRouter } from './routers/auth/index.js';
 import { trackingRouter } from './routers/deviceTracking/index.js';
 import { attachDownloadMapHandler } from './routers/downloadMapHandler.js';
@@ -24,7 +25,6 @@ import { attachPostGarminCourses } from './routers/garminCoursesHandler.js';
 import { attachGeoIp } from './routers/geoip.js';
 import { geotoolsRouter } from './routers/geotools/index.js';
 import { attachGetUsers } from './routers/getUsersHandler.js';
-import { attachLoggerHandler } from './routers/loggerHandler.js';
 import { mapsRouter } from './routers/maps/index.js';
 import { attachStravaHandlers } from './routers/stravaHandler.js';
 import { tracklogsRouter } from './routers/tracklogs/index.js';
@@ -79,6 +79,10 @@ if (httpsPort) {
 app.use(
   koaPinoLogger({
     base: { module: 'koa' },
+    // Default is a per-process counter, which repeats across restarts and
+    // workers; a random id keeps `req.id` unique so a single request can be
+    // grepped across log lines.
+    genReqId: () => nanoid(),
     serializers: {
       req(req) {
         return {
@@ -105,6 +109,15 @@ app.use(
     },
   }),
 );
+
+// koa-pino-logger only exposes `ctx.log`; surface the request id it generated
+// so handlers that build their own logger for detached work (downloadMap,
+// deleteUser, postPictureComment) can correlate it back to the request.
+app.use((ctx, next) => {
+  ctx.reqId = String(ctx.req.id);
+
+  return next();
+});
 
 app.use(
   cors({
@@ -196,8 +209,6 @@ router.use('/events', eventsRouter.routes(), eventsRouter.allowedMethods());
 
 attachDownloadMapHandler(router);
 
-attachLoggerHandler(router);
-
 attachGetUsers(router);
 
 attachGeoIp(router);
@@ -228,6 +239,14 @@ router.get('/documentation', (ctx) => {
     ],
     paths,
   });
+});
+
+// The API host exposes only JSON/RPC endpoints — nothing meant for search
+// indexing — so disallow all crawlers to keep them from spending crawl budget
+// here.
+router.get('/robots.txt', (ctx) => {
+  ctx.type = 'text/plain';
+  ctx.body = 'User-agent: *\nDisallow: /\n';
 });
 
 router.get('/scalar', (ctx) => {

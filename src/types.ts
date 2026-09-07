@@ -74,6 +74,14 @@ export const CommonUserSchema = {
   sendGalleryEmails: z.boolean(),
   hasPicture: z.coerce.boolean(),
   premium: z.coerce.boolean(),
+  // Whether premium comes from a Polar subscription rather than a one-time
+  // purchase, and if so, whether it's still set to auto-renew:
+  //  - 'none'     one-time purchase, or no premium at all
+  //  - 'active'   live subscription, will auto-renew (don't show an end date)
+  //  - 'canceled' live subscription, but already set to end at
+  //               `premiumExpiration` (show it)
+  // See `liveSubscriptionSql` and `premiumSubscriptionStatusSql`.
+  premiumSubscriptionStatus: z.enum(['none', 'active', 'canceled']),
 };
 
 /** UNIQUE auth-provider ID columns on the user table. */
@@ -110,17 +118,44 @@ const USER_COLUMN_NAMES = [
   'language',
 ] as const;
 
+/**
+ * SQL predicate for a Polar subscription that still grants access. A stored
+ * subscription ID on its own isn't proof of one: a lost or out-of-order
+ * `subscription.*` webhook can leave a dead ID behind. Every consumer — this
+ * flag and the checkout's already-subscribed guard — must agree on what
+ * "subscribed" means, or the client and the server end up believing different
+ * things.
+ */
+export function liveSubscriptionSql(prefix = ''): string {
+  return `(${prefix}polarSubscriptionId IS NOT NULL AND ${prefix}premiumExpiration > NOW())`;
+}
+
+/** SQL for the `premiumSubscriptionStatus` column; see `CommonUserSchema`. */
+export function premiumSubscriptionStatusSql(prefix = ''): string {
+  // Tested positively, not as `WHEN NOT <live> THEN 'none'`: a NULL
+  // `premiumExpiration` next to a stored subscription ID makes the predicate
+  // NULL, and `NOT NULL` is NULL too, so that arm would not match and the
+  // status would come out 'active'/'canceled' for someone with no premium.
+  return `(CASE
+    WHEN ${liveSubscriptionSql(prefix)} THEN
+      (CASE WHEN ${prefix}cancelAtPeriodEnd THEN 'canceled' ELSE 'active' END)
+    ELSE 'none'
+  END)`;
+}
+
 /** SQL column list for SELECTing user rows without loading the picture bytes. */
 export const USER_COLUMNS_SQL =
   USER_COLUMN_NAMES.join(', ') +
   ', picture IS NOT NULL AS hasPicture' +
-  ', (premiumExpiration IS NOT NULL AND premiumExpiration > NOW()) AS premium';
+  ', (premiumExpiration IS NOT NULL AND premiumExpiration > NOW()) AS premium' +
+  `, ${premiumSubscriptionStatusSql()} AS premiumSubscriptionStatus`;
 
 /** Same, with each column qualified by `user.` (for joins). */
 export const USER_COLUMNS_SQL_PREFIXED =
   USER_COLUMN_NAMES.map((c) => `user.${c}`).join(', ') +
   ', user.picture IS NOT NULL AS hasPicture' +
-  ', (user.premiumExpiration IS NOT NULL AND user.premiumExpiration > NOW()) AS premium';
+  ', (user.premiumExpiration IS NOT NULL AND user.premiumExpiration > NOW()) AS premium' +
+  `, ${premiumSubscriptionStatusSql('user.')} AS premiumSubscriptionStatus`;
 
 export const UserResponseSchema = z
   .object({
@@ -143,10 +178,7 @@ export const UserResponseSchema = z
     coordinates: z
       .strictObject({ lat: z.number(), lon: z.number() })
       .nullable(),
-    premiumExpiration: z
-      .date()
-      .nullable()
-      .transform((d) => (d === null ? null : d.toISOString())),
+    premiumExpiration: zNullableDateToIso,
     settings: z.record(z.string(), z.unknown()).nullable(),
   })
   .meta({ id: 'UserResponse' });

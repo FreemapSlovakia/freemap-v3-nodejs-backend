@@ -455,7 +455,7 @@ async function download(
 
           const chunks: Buffer[] = [];
 
-          req.on('data', (chunk) => chunks.push(chunk));
+          req.on('data', (chunk: Buffer) => chunks.push(chunk));
 
           req.on('end', () => {
             resolve(Buffer.concat(chunks));

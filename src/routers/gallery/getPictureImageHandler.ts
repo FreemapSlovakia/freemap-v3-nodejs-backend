@@ -91,11 +91,44 @@ export function attachGetPictureImageHandler(router: RouterInstance) {
 
       ctx.append('Vary', 'Width');
 
-      ctx.response.etag = calculate(stats, {
+      ctx.type = 'image/jpeg';
+
+      const requested = parseInt(
+        getFirst(ctx.headers.width) || getFirst(ctx.query.width) || 'NaN',
+        10,
+      );
+
+      // Clamp the requested width to the picture's own width. Upscaling costs
+      // CPU and bandwidth for no added detail, and an unbounded value is a cheap
+      // amplification attack: ?width=60000 on a 3776px photo takes over a minute
+      // to encode and yields an 83 MiB response. A request at or above native
+      // size (common on hi-DPI screens in fullscreen) serves the file untouched,
+      // which also avoids a pointless re-compression of an already lossy JPEG.
+      let width = 0;
+
+      if (requested > 0) {
+        try {
+          const meta = await sharp(pathname).metadata();
+
+          // EXIF orientations 5-8 rotate by 90°, so the width the client sees
+          // is the stored height.
+          const nativeWidth =
+            ((meta.orientation ?? 1) >= 5 ? meta.height : meta.width) ?? 0;
+
+          if (requested < nativeWidth) {
+            width = requested;
+          }
+        } catch {
+          // unreadable header - fall through and serve the file untouched
+        }
+      }
+
+      // The width is part of what the body is, so it has to be part of the
+      // validator too. Keying only on the file's stats made every width share
+      // one ETag, letting a cache answer a full-size request with a thumbnail.
+      ctx.response.etag = calculate(`${stats.size}-${stats.mtimeMs}-${width}`, {
         weak: true,
       });
-
-      ctx.type = 'image/jpeg';
 
       if (ctx.fresh) {
         ctx.status = 304;
@@ -103,16 +136,14 @@ export function attachGetPictureImageHandler(router: RouterInstance) {
         return;
       }
 
-      const w = parseInt(
-        getFirst(ctx.headers.width) || getFirst(ctx.query.width) || 'NaN',
-        10,
-      );
-
-      const resize = w ? sharp().resize(w).jpeg() : null;
-
       const fileStream = createReadStream(pathname);
 
-      ctx.body = resize ? fileStream.pipe(resize) : fileStream;
+      // rotate() applies the EXIF orientation up front, because sharp drops the
+      // tag when re-encoding - without it a resized photo that relies on the tag
+      // comes out sideways while the unresized URL renders upright.
+      ctx.body = width
+        ? fileStream.pipe(sharp().rotate().resize(width).jpeg())
+        : fileStream;
     },
   );
 }

@@ -12,9 +12,17 @@ import { getEnv } from '../../env.js';
 import { AUTH_OPTIONAL, registerPath } from '../../openapi.js';
 import { acceptValidator } from '../../requestValidators.js';
 import {
+  type Bbox,
+  createInverseProjector,
+  createProjector,
+  datasetBbox,
   inBbox,
+  loadElevationSources,
+  mergeCredits,
   type ParsedSource,
-  parseElevationSources,
+  type Projector,
+  type SourceAttribution,
+  SRTM_SOURCE_NAME,
   srtmKey,
 } from './elevationHelpers.js';
 
@@ -36,31 +44,81 @@ type DatasetInfo = {
   height: number;
   // transform from WGS84 lon/lat into the dataset CRS; null when the dataset is
   // already geographic lon/lat (SRTM).
-  ct: gdal.CoordinateTransformation | null;
+  project: Projector | null;
 };
 
-// WGS84 built from proj4 to force traditional lon/lat axis order (GDAL 3 would
-// otherwise use lat/lon for EPSG:4326).
-const wgs84 = gdal.SpatialReference.fromProj4(
-  '+proj=longlat +datum=WGS84 +no_defs',
-);
+// A local source additionally knows its WGS84 footprint, which is what decides
+// whether it is asked about a point at all. SRTM tiles carry none: they are
+// addressed by tile key, so they are never bbox-tested.
+type LocalDatasetInfo = DatasetInfo & {
+  // from `source.json` when it pins one, else derived on open
+  bbox: Bbox;
+};
 
 type LocalSource = ParsedSource & {
-  info?: DatasetInfo;
+  info?: LocalDatasetInfo;
+  // Set once opening has failed, so a source on an unmounted drive is tried
+  // once rather than once per coordinate — a request carries an unbounded list
+  // of them, and each retry is a synchronous gdal.open plus a log line.
+  broken?: boolean;
 };
 
 // Higher-precision, non-tiled sources, in priority order (first wins). A point
 // is sampled from the first source whose bbox contains it and that returns real
 // data; otherwise it falls back to the next source, then SRTM.
-const localSources: LocalSource[] = parseElevationSources(
-  getEnv('ELEVATION_SOURCES', ''),
+//
+// Each lives in its own directory under ELEVATION_DIR with a `source.json`
+// carrying its reported name and its credits, so adding a model is a directory
+// drop: no config to edit, no bbox to transcribe, and — because the API serves
+// the credits — no client release to make them visible.
+const elevationDir = getEnv('ELEVATION_DIR', '');
+
+const localSources: LocalSource[] = loadElevationSources(
+  elevationDir,
+  // console rather than the request logger: this runs while the module is
+  // still being evaluated, before any logger exists
+  (message, err) => console.warn(message, err),
 );
 
-// Local sources are opened lazily and kept open for the process lifetime.
-function openLocalSource(src: LocalSource): DatasetInfo {
+// ELEVATION_SOURCES was the previous config and is no longer read. Left set on
+// its own it would degrade every premium read to SRTM in silence, so say so
+// rather than let the high-precision models quietly disappear.
+if (!elevationDir && getEnv('ELEVATION_SOURCES', '')) {
+  console.warn(
+    'ELEVATION_SOURCES is set but ELEVATION_DIR is not: it has been replaced ' +
+      'by one directory per source (see README). No local elevation sources ' +
+      'are loaded, so every read falls back to SRTM.',
+  );
+}
+
+// SRTM has no source directory — the code owns the tile scheme and the download
+// URL, so it owns the credit too.
+const SRTM_ATTRIBUTION: SourceAttribution[] = [
+  { name: 'SRTM', url: 'https://www.earthdata.nasa.gov/data/instruments/srtm' },
+];
+
+/**
+ * Local sources are opened lazily and kept open for the process lifetime, and
+ * their footprint is derived on that first open rather than at startup, so boot
+ * doesn't wait on 30-odd rasters.
+ *
+ * The cost is moved rather than removed: since the bbox is what the open
+ * produces, the priority loop has to open a source to find out whether it even
+ * covers the point, so the first request for somewhere no local source holds
+ * walks the whole list. That is one open and one derivation per source, once per
+ * process. Pin `bbox` in `source.json` for a source where even that is too much
+ * — the derivation is then skipped and only the read itself is deferred.
+ */
+function openLocalSource(src: LocalSource): LocalDatasetInfo {
   if (src.info) {
     return src.info;
   }
+
+  if (src.broken) {
+    throw new Error(`Elevation source ${src.path} failed to open earlier`);
+  }
+
+  src.broken = true; // cleared once the open has actually succeeded
 
   const dataset = gdal.open(src.path);
 
@@ -70,25 +128,28 @@ function openLocalSource(src: LocalSource): DatasetInfo {
     throw new Error(`Invalid geotransform for ${src.path}`);
   }
 
+  const width = dataset.rasterSize.x;
+
+  const height = dataset.rasterSize.y;
+
   src.info = {
     dataset,
     band: dataset.bands.get(1),
     geoTransform,
-    width: dataset.rasterSize.x,
-    height: dataset.rasterSize.y,
-    // Build the target from proj4 rather than using dataset.srs directly: this
-    // forces traditional easting/northing (x,y) axis order and drops the 3D
-    // vertical of compound CRSs. Some CRSs (e.g. SWEREF99 TM / EPSG:5845)
-    // declare northing-first axis order, which would otherwise make
-    // transformPoint return swapped coordinates (gdal-async 3.12 has no
-    // setAxisMappingStrategy to override it).
-    ct: dataset.srs
-      ? new gdal.CoordinateTransformation(
-          wgs84,
-          gdal.SpatialReference.fromProj4(dataset.srs.toProj4()),
-        )
-      : null,
+    width,
+    height,
+    project: createProjector(dataset.srs),
+    bbox:
+      src.bbox ??
+      datasetBbox(
+        geoTransform,
+        width,
+        height,
+        createInverseProjector(dataset.srs),
+      ),
   };
+
+  src.broken = false;
 
   return src.info;
 }
@@ -114,6 +175,40 @@ const ElevationResponseSchema = z.array(
     .meta({ description: 'elevation in meters above sea level' }),
 );
 
+const AttributionSchema = z.object({
+  name: z.string().meta({
+    description: 'the credit line, verbatim as the licence asks for it',
+  }),
+  url: z
+    .string()
+    .optional()
+    .meta({ description: 'where the dataset lives, when there is a page' }),
+});
+
+// Returned instead of the bare array when `sources=1` is in the query string.
+const ElevationWithSourcesResponseSchema = z.object({
+  elevations: ElevationResponseSchema,
+  sources: z.array(z.string()).meta({
+    description:
+      'names of the elevation datasets that answered, deduplicated; ' +
+      'local sources first, then the global fallback. The order carries no ' +
+      'meaning beyond that — do not rely on it',
+  }),
+  attributions: z.array(AttributionSchema).meta({
+    description:
+      'every credit to display for the datasets that answered, deduplicated. ' +
+      'Show these rather than mapping `sources` yourself, so a dataset added ' +
+      'server-side needs no client release. NOT parallel to `sources`: one ' +
+      'name may carry several credits (a country stitched from two licensed ' +
+      'datasets) or none, so do not pair them up by index',
+  }),
+});
+
+const SourcesSchema = z
+  .literal('1')
+  .optional()
+  .meta({ description: 'set to 1 to also report the datasets used' });
+
 export function attachElevationHandler(router: RouterInstance) {
   registerPath('/geotools/elevation', {
     get: {
@@ -126,11 +221,19 @@ export function attachElevationHandler(router: RouterInstance) {
       requestParams: {
         query: z.object({
           coordinates: CoordsSchemaC,
+          sources: SourcesSchema,
         }),
       },
       responses: {
         200: {
-          content: { 'application/json': { schema: ElevationResponseSchema } },
+          content: {
+            'application/json': {
+              schema: z.union([
+                ElevationResponseSchema,
+                ElevationWithSourcesResponseSchema,
+              ]),
+            },
+          },
         },
       },
     },
@@ -141,12 +244,24 @@ export function attachElevationHandler(router: RouterInstance) {
         'others get the global fallback dataset.',
       tags: ['geotools'],
       security: AUTH_OPTIONAL,
+      requestParams: {
+        query: z.object({
+          sources: SourcesSchema,
+        }),
+      },
       requestBody: {
         content: { 'application/json': { schema: CoordsSchema } },
       },
       responses: {
         200: {
-          content: { 'application/json': { schema: ElevationResponseSchema } },
+          content: {
+            'application/json': {
+              schema: z.union([
+                ElevationResponseSchema,
+                ElevationWithSourcesResponseSchema,
+              ]),
+            },
+          },
         },
         400: {},
       },
@@ -183,9 +298,20 @@ async function compute(ctx: ParameterizedContext) {
 
   const premium = Boolean(premiumExpiration && premiumExpiration > new Date());
 
-  ctx.response.body = ElevationResponseSchema.parse(
-    await resolveElevations(cs, premium, ctx.log),
-  );
+  const usedSources =
+    ctx.query.sources === '1'
+      ? new Map<string, SourceAttribution[]>()
+      : undefined;
+
+  const elevations = await resolveElevations(cs, premium, ctx.log, usedSources);
+
+  ctx.response.body = usedSources
+    ? ElevationWithSourcesResponseSchema.parse({
+        elevations,
+        sources: [...usedSources.keys()],
+        attributions: [...usedSources.values()].flat(),
+      })
+    : ElevationResponseSchema.parse(elevations);
 }
 
 /**
@@ -193,11 +319,18 @@ async function compute(ctx: ParameterizedContext) {
  * `null` where no source covers the point. Premium callers get the
  * high-precision local sources first (priority order), with the global SRTM
  * dataset as the fallback for everyone.
+ *
+ * When `usedSources` is given, every source that actually yielded a value is
+ * added to it, mapped to how it wants to be credited. The local sources are all
+ * resolved before the SRTM fallback pass runs, so SRTM always lands last
+ * regardless of which point it answered first — the map is a membership report,
+ * not an ordering.
  */
 export async function resolveElevations(
   cs: [number, number][],
   premium: boolean,
   log: Pick<Logger, 'warn'>,
+  usedSources?: Map<string, SourceAttribution[]>,
 ): Promise<(number | null)[]> {
   const results: (number | null)[] = new Array(cs.length).fill(null);
 
@@ -213,14 +346,18 @@ export async function resolveElevations(
     let resolved = false;
 
     for (const src of sources) {
-      if (!inBbox(src.bbox, lat, lon)) {
-        continue;
-      }
-
       let v: number | null;
 
       try {
-        v = await computeElevation(lat, lon, openLocalSource(src));
+        // opening also settles the footprint, so the bbox test comes after it;
+        // the open is cached, making this a plain comparison from then on
+        const info = openLocalSource(src);
+
+        if (!inBbox(info.bbox, lat, lon)) {
+          continue;
+        }
+
+        v = await computeElevation(lat, lon, info);
       } catch (err) {
         // a broken/unavailable local source (e.g. unmounted drive) must not
         // fail the request — fall back to the next source, then SRTM
@@ -235,6 +372,13 @@ export async function resolveElevations(
       if (v != null) {
         results[i] = v;
         resolved = true;
+        if (usedSources) {
+          // One name can be answered by several rasters — every Sonny country
+          // reports `sonny` — so merge rather than overwrite, or whichever
+          // answered last would be the only one credited.
+          mergeCredits(usedSources, src.name, src.attributions);
+        }
+
         break;
       }
     }
@@ -298,7 +442,7 @@ export async function resolveElevations(
             geoTransform,
             width: dataset.rasterSize.x,
             height: dataset.rasterSize.y,
-            ct: null,
+            project: null,
           });
         }
       }),
@@ -310,6 +454,10 @@ export async function resolveElevations(
       const ds = dsMap.get(srtmKey(lat, lon));
 
       results[i] = ds ? await computeElevation(lat, lon, ds) : null;
+
+      if (results[i] != null && usedSources) {
+        mergeCredits(usedSources, SRTM_SOURCE_NAME, SRTM_ATTRIBUTION);
+      }
     }
 
     return results;
@@ -368,7 +516,7 @@ async function downloadData(key: string) {
 async function computeElevation(
   lat: number,
   lon: number,
-  { band, geoTransform, width, height, ct }: DatasetInfo,
+  { band, geoTransform, width, height, project }: DatasetInfo,
 ) {
   const [gt0, gt1, gt2, gt3, gt4, gt5] = geoTransform;
 
@@ -377,7 +525,7 @@ async function computeElevation(
   }
 
   // map lon/lat into the dataset CRS (identity for geographic SRTM)
-  const { x, y } = ct ? ct.transformPoint(lon, lat) : { x: lon, y: lat };
+  const { x, y } = project ? project(lon, lat) : { x: lon, y: lat };
 
   const px = (x - gt0) / gt1;
   const py = (y - gt3) / gt5;
