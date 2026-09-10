@@ -28,7 +28,9 @@ export async function initDatabase() {
       osmId INT UNSIGNED NULL UNIQUE,
       facebookUserId VARCHAR(32) CHARSET ascii NULL UNIQUE,
       googleUserId VARCHAR(32) CHARSET ascii NULL UNIQUE,
-      garminUserId VARCHAR(60) CHARSET ascii NULL UNIQUE,
+      -- Garmin documents no maximum; observed values are a 36-char dashed
+      -- UUID, or a 32-char hex id on older accounts.
+      garminUserId VARCHAR(64) CHARSET ascii NULL UNIQUE,
       appleUserId VARCHAR(255) CHARSET ascii NULL UNIQUE,
       garminAccessToken VARCHAR(255) CHARSET ascii NULL,
       garminAccessTokenSecret VARCHAR(255) CHARSET ascii NULL,
@@ -65,7 +67,7 @@ export async function initDatabase() {
     ) ENGINE=InnoDB`,
 
     sql`CREATE TABLE IF NOT EXISTS auth (
-      authToken VARCHAR(255) CHARSET ascii PRIMARY KEY,
+      authToken VARCHAR(255) CHARSET ascii COLLATE ascii_bin PRIMARY KEY,
       userId INT UNSIGNED NOT NULL,
       createdAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (userId) REFERENCES user (id) ON DELETE CASCADE
@@ -120,7 +122,7 @@ export async function initDatabase() {
       createdAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
       location POINT NOT NULL,
       country CHAR(2) CHARSET ascii NULL,
-      pano BIT NOT NULL,
+      pano BIT NOT NULL DEFAULT false,
       premium BIT NOT NULL DEFAULT FALSE,
       azimuth FLOAT DEFAULT NULL,
       license VARCHAR(32) CHARSET ascii NOT NULL DEFAULT 'CC-BY-SA-4.0',
@@ -348,20 +350,70 @@ export async function initDatabase() {
     'ALTER TABLE user MODIFY COLUMN language CHAR(2) CHARSET ascii NULL',
     "ALTER TABLE purchaseIntent MODIFY COLUMN status ENUM('created','awaiting_payment','confirmed','rejected') CHARSET ascii NOT NULL DEFAULT 'created'",
 
-    // map.id and mapWriteAccess.mapId are a foreign key pair and must keep
-    // matching charsets, so the constraint has to go first. That also stops the
-    // sequence from re-running once applied, since the DROP then fails.
-    [
-      'ALTER TABLE mapWriteAccess DROP FOREIGN KEY mwaMapFk',
-      'ALTER TABLE map MODIFY COLUMN id CHAR(8) CHARSET ascii NOT NULL',
-      'ALTER TABLE mapWriteAccess MODIFY COLUMN mapId CHAR(8) CHARSET ascii NOT NULL',
-      'ALTER TABLE mapWriteAccess ADD CONSTRAINT mwaMapFk FOREIGN KEY (mapId) REFERENCES map (id) ON DELETE CASCADE',
-    ],
-
     // Distinguishes a subscription still set to auto-renew from one the
     // customer already canceled (access continues either way until
     // `premiumExpiration`, so that alone can't tell them apart).
     'ALTER TABLE user ADD COLUMN cancelAtPeriodEnd BIT NOT NULL DEFAULT false',
+
+    // Nullable in databases predating the NOT NULL above; no NULLs exist and
+    // both columns have a foreign key to `user`. The priciest entries here —
+    // `picture` is ~700k rows — so prune them once applied everywhere.
+    'ALTER TABLE picture MODIFY COLUMN userId INT UNSIGNED NOT NULL',
+    'ALTER TABLE auth MODIFY COLUMN userId INT UNSIGNED NOT NULL',
+
+    // Older tables still default to utf8mb3, so a column added without an
+    // explicit CHARACTER SET silently inherits it — the trap that made
+    // `map.data` reject emoji. Retargets the default only; existing columns
+    // are converted below. Deliberately not CONVERT TO CHARACTER SET, which
+    // would also rewrite the columns pinned to `ascii` (map.id,
+    // picture.license, the OAuth ids) and break the charset match that the
+    // map.id / mapWriteAccess.mapId foreign key needs.
+    ...[
+      'auth',
+      'map',
+      'picture',
+      'pictureComment',
+      'pictureRating',
+      'pictureTag',
+      'trackingAccessToken',
+      'trackingDevice',
+      'trackingPoint',
+      'user',
+    ].map((table) => `ALTER TABLE ${table} DEFAULT CHARACTER SET utf8mb4`),
+
+    // Columns that inherited utf8mb3 from those defaults, one statement per
+    // table. Checked first: no value in a narrowed column holds a non-ASCII
+    // byte, and pictureTag's (pictureId, name) key has no pairs that collide
+    // under utf8mb4_unicode_ci.
+    'ALTER TABLE map MODIFY COLUMN name VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL',
+    'ALTER TABLE pictureTag MODIFY COLUMN name VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL',
+    'ALTER TABLE trackingAccessToken MODIFY COLUMN listingLabel VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL, MODIFY COLUMN note VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL',
+    'ALTER TABLE trackingDevice MODIFY COLUMN name VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL',
+    'ALTER TABLE trackingPoint MODIFY COLUMN message VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL',
+    'ALTER TABLE picture MODIFY COLUMN title VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL, MODIFY COLUMN country CHAR(2) CHARSET ascii NULL',
+    'ALTER TABLE user MODIFY COLUMN email VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL, MODIFY COLUMN appleUserId VARCHAR(255) CHARSET ascii NULL, MODIFY COLUMN facebookUserId VARCHAR(32) CHARSET ascii NULL, MODIFY COLUMN googleUserId VARCHAR(32) CHARSET ascii NULL',
+
+    // utf8mb3_bin in older databases: narrows the charset while keeping the
+    // case-sensitive comparison. See the CREATE TABLE above.
+    'ALTER TABLE auth MODIFY COLUMN authToken VARCHAR(255) CHARSET ascii COLLATE ascii_bin NOT NULL',
+
+    // Held only Panoramio/Picasa ids from the 2016 imports; both services are
+    // gone and nothing read the column. Not IF EXISTS on purpose — the plain
+    // form fails once applied, so it stops rebuilding the table every startup.
+    'ALTER TABLE picture DROP COLUMN hiddenNote',
+
+    // Long-expired Facebook access tokens from the old login flow, unread by
+    // any code. Credential material tied to a user is not worth retaining.
+    'ALTER TABLE auth DROP COLUMN facebookAccessToken',
+
+    // Every caller sets `item`, so DEFAULT '{}' only means a bad insert
+    // records an empty purchase instead of failing. Billing data should
+    // fail loudly.
+    'ALTER TABLE purchase ALTER COLUMN item DROP DEFAULT',
+
+    // Drops a legacy ON UPDATE current_timestamp() that silently restamps a
+    // rating on any UPDATE. wikimediaRating.ratedAt never had it.
+    'ALTER TABLE pictureRating MODIFY COLUMN ratedAt TIMESTAMP NOT NULL',
   ];
 
   const db = await pool.getConnection();

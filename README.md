@@ -31,6 +31,19 @@ OSM administrative boundaries) is required — it is not created by
 it, and `POST /geotools/covered-countries` queries it directly; without the
 table both fail with `Table 'country' doesn't exist`.
 
+For development, an empty table is enough to make both work — photos then get
+no country and the endpoint reports none covered:
+
+```sql
+CREATE TABLE country (
+  rowid INT NOT NULL AUTO_INCREMENT,
+  geom GEOMETRY NOT NULL,
+  alpha2 TEXT NULL,
+  UNIQUE KEY rowid (rowid),
+  SPATIAL INDEX country_geom_spx (geom)
+) ENGINE=InnoDB;
+```
+
 Connection settings are read from the `MARIADB_*` environment variables (see
 below).
 
