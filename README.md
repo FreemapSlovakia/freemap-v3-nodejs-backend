@@ -205,6 +205,15 @@ one-time custom-amount top-ups (1 credit = €0.01, minimum 500).
 - `POLAR_WEBHOOK_SECRET` — secret of the Polar webhook endpoint (Standard
   Webhooks signature). Set on the endpoint that points at `/auth/polar/webhook`.
 
+The API version is pinned in `src/polar.ts` (`POLAR_API_VERSION`), which sends
+`Polar-Version` on every request. Polar releases a new version in the first
+week of January, April, July and October and keeps three alive (current,
+deprecated, next); unpinned requests silently follow whatever is current.
+`2026-04` is deprecated from October 1, 2026 and removed at the January 2027
+release, so the pin has to be moved to `2026-10` before then. The webhook
+payload version is *not* covered by the pin — it is a per-endpoint setting in
+the Polar dashboard and has to be moved there in step.
+
 Endpoints: `POST /auth/polar/checkout` (auth required) returns a hosted
 `checkoutUrl` to redirect the user to; `POST /auth/polar/webhook` provisions
 `premiumExpiration` (from subscription events) and `credits` (from
