@@ -874,9 +874,12 @@ async function byOrder(ctx: ParameterizedContext) {
 
   const wmConds = wikimediaColumnConds(orderByQuery);
 
-  const wmJoin = wmConds.length
-    ? sql`JOIN wikimediaPicture wp ON wp.pageId = w.pageId WHERE ${join(wmConds, ' AND ')}`
-    : empty;
+  // Joined even with no conditions to filter on: a rating or comment outlives
+  // the photo row the monthly import rebuilds, and listing an id whose detail
+  // endpoint then 404s breaks the viewer.
+  const wmJoin = sql`JOIN wikimediaPicture wp ON wp.pageId = w.pageId ${
+    wmConds.length ? sql`WHERE ${join(wmConds, ' AND ')}` : empty
+  }`;
 
   let wmArm: Sql;
 
