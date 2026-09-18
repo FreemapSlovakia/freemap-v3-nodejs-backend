@@ -4,7 +4,7 @@ import got from 'got';
 import sql, { raw } from 'sql-template-tag';
 import z from 'zod';
 import { pool } from '../database.js';
-import { getEnv, getEnvInteger } from '../env.js';
+import { getEnv, getEnvBoolean, getEnvInteger } from '../env.js';
 import { appLogger } from '../logger.js';
 import { LICENSE_Q_MAP } from '../routers/gallery/wikimediaLicense.js';
 import {
@@ -58,6 +58,10 @@ const COMMIT_ROWS = getEnvInteger('WIKIMEDIA_IMPORT_COMMIT_ROWS', 200_000);
 // 1206). Small enough that even a dense pageId range stays well under the lock
 // table limit; sparse ranges just insert fewer (or zero) rows.
 const PAGEID_BATCH = getEnvInteger('WIKIMEDIA_IMPORT_PAGEID_BATCH', 1_000_000);
+
+// Smallest share of the live photo count a fresh import may have and still be
+// swapped in. Commons only grows, so anything near this is a broken dump.
+const MIN_KEEP_RATIO = 0.5;
 
 const FILE_NAMESPACE = 6;
 
@@ -630,6 +634,15 @@ async function loadPass(
   }
 }
 
+/** Throws when a dump pass staged no rows at all, which only a broken parse does. */
+function assertStaged(count: number, dump: string): void {
+  if (count === 0) {
+    throw new Error(
+      `The ${dump} dump staged 0 rows — its format has most likely changed; refusing to publish an empty import.`,
+    );
+  }
+}
+
 export async function importWikimedia(): Promise<ImportStats> {
   const started = Date.now();
 
@@ -688,6 +701,10 @@ export async function importWikimedia(): Promise<ImportStats> {
     () => geoTagRows(seen),
   );
 
+  // A pass that stages nothing means the dump stopped parsing, not that Commons
+  // lost every file; without this the run ends in a swapped-in empty table.
+  assertStaged(geoCount, 'geo_tags');
+
   logger.info(
     `Loaded ${geoCount} camera geo tags. Streaming page dump for photo titles…`,
   );
@@ -697,6 +714,8 @@ export async function importWikimedia(): Promise<ImportStats> {
     'INSERT IGNORE INTO wm_keep (pageId, title) VALUES (?, ?)',
     () => pageKeepRows(seen, titleBits, keptBits),
   );
+
+  assertStaged(keepCount, 'page');
 
   logger.info(
     `${keepCount} geotagged files are photos (of ${geoCount}). Streaming image + SDC dumps concurrently…`,
@@ -720,6 +739,9 @@ export async function importWikimedia(): Promise<ImportStats> {
       () => mediaInfoRows(keptBits),
     ),
   ]);
+
+  assertStaged(imgCount, 'image');
+  assertStaged(sdcCount, 'mediainfo');
 
   logger.info(
     `Staged metadata for ${imgCount} files and SDC for ${sdcCount} files. Building final table…`,
@@ -808,6 +830,28 @@ async function buildFinalTable(
       ORDER BY s.pageId`);
   }
 
+  // Counted on `wikimediaPicture_new` rather than after the RENAME, which keeps
+  // the RENAME the last thing that can fail — so the failure mail's promise
+  // that the gallery still serves the previous month's data always holds.
+  // `wikimediaPicture` is absent on the very first run, which counts as null.
+  const previous = await countRowsOrNull('wikimediaPicture');
+
+  const live = await countRowsOrNull('wikimediaPicture_new');
+
+  // Don't publish a collapsed table; an unknown (null) count is not a drop.
+  // Checked before the staging tables are dropped and the indexes built, so a
+  // refusal is cheap and leaves the staged data for a rerun of this function.
+  if (
+    live !== null &&
+    previous !== null &&
+    live < previous * MIN_KEEP_RATIO &&
+    !getEnvBoolean('WIKIMEDIA_IMPORT_ALLOW_SHRINK', false)
+  ) {
+    throw new Error(
+      `Import built only ${live} photos, down from ${previous} — refusing to swap it in. Set WIKIMEDIA_IMPORT_ALLOW_SHRINK=1 if the drop is real.`,
+    );
+  }
+
   // Free the staging tables before the (temp-space-hungry) spatial index build —
   // keeps peak disk usage down on a nearly-full volume.
   await pool.query(sql`DROP TABLE wm_stage, wm_keep, wm_img, wm_sdc`);
@@ -837,18 +881,6 @@ async function buildFinalTable(
   ) ENGINE=InnoDB`);
 
   await pool.query(sql`DROP TABLE IF EXISTS wikimediaPicture_old`);
-
-  // The report leads with how much the live set moved, which is the one number
-  // that shows a filter change (or a broken dump) at a glance. Both counts are
-  // taken before the swap and neither may take the import down with it: they
-  // are statistics, and by this point the table has already cost hours to
-  // build. Counting the incoming rows on `wikimediaPicture_new` instead of
-  // after the RENAME is what keeps the RENAME the last thing that can fail —
-  // so the failure mail's promise that the gallery is still serving the
-  // previous month's data holds whenever that mail is sent at all.
-  const previous = await countRowsOrNull('wikimediaPicture');
-
-  const live = await countRowsOrNull('wikimediaPicture_new');
 
   await pool.query(sql`RENAME TABLE
     wikimediaPicture TO wikimediaPicture_old,

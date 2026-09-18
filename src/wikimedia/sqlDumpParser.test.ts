@@ -62,6 +62,30 @@ test('parses target-table rows with column names, ignoring other tables', async 
   assert.deepEqual(rows[2].values, [3, 300, 'earth', 'landmark', 'x']);
 });
 
+// mariadb-dump 10.11 breaks the line after VALUES; 10.5 kept it on one line.
+const DUMP_10_11 = `CREATE TABLE \`geo_tags\` (
+  \`gt_id\` int unsigned NOT NULL AUTO_INCREMENT,
+  \`gt_page_id\` int unsigned NOT NULL,
+  \`gt_globe\` varbinary(32) NOT NULL,
+  PRIMARY KEY (\`gt_id\`)
+);
+INSERT INTO \`geo_tags\` VALUES
+(1,100,'earth'),
+(2,200,'earth');
+`;
+
+test('parses the newline-after-VALUES, tuple-per-line form', async () => {
+  const rows = [];
+
+  for await (const row of streamDumpRows(byByte(DUMP_10_11), 'geo_tags')) {
+    rows.push(row);
+  }
+
+  assert.equal(rows.length, 2);
+  assert.deepEqual(rows[0].values, [1, 100, 'earth']);
+  assert.deepEqual(rows[1].values, [2, 200, 'earth']);
+});
+
 test('is robust to arbitrary chunk boundaries', async () => {
   const rows = [];
 

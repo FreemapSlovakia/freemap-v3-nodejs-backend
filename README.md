@@ -270,6 +270,10 @@ does overlap for the excess. It is logged when it happens.
   beginning. Defaults to 7 hours, and is set alongside the matching
   `TimeoutStartSec` in `systemd/freemap-wikimedia-import.service` — the two are
   one invariant and must move together.
+- `WIKIMEDIA_IMPORT_ALLOW_SHRINK` — publish an import even though it built less
+  than half the live photo count. The run otherwise fails rather than swapping a
+  collapsed table in, which is what a changed dump format looks like. Set it
+  only once the drop is confirmed real.
 - `WIKIMEDIA_IMPORT_BATCH_SIZE`, `WIKIMEDIA_IMPORT_COMMIT_ROWS`,
   `WIKIMEDIA_IMPORT_PAGEID_BATCH` — load-tuning knobs; see the comments on the
   constants in `src/wikimedia/importWikimedia.ts` before changing them.
