@@ -17,6 +17,7 @@ import { getEnv } from '../env.js';
 import { appLogger } from '../logger.js';
 import { sendMail } from '../mailer.js';
 import { AUTH_REQUIRED, registerPath } from '../openapi.js';
+import { fetchLicenses, TileCodeCollector } from '../tileAttribution.js';
 
 const CONCURRENCY = 8;
 
@@ -26,7 +27,7 @@ type Combo = {
 };
 
 type Translation = {
-  success: Combo;
+  success: Combo & { credits: string };
   error: Combo;
 };
 
@@ -35,6 +36,8 @@ const translations: Record<string, Translation> = {
     success: {
       subject: 'Freemap Map Download',
       body: 'Your map is ready at {URL} for 24 hours.',
+      credits:
+        'Sources — please keep this credit with the map wherever you share or publish it:',
     },
     error: {
       subject: 'Freemap Map Download Error',
@@ -48,6 +51,8 @@ const translations: Record<string, Translation> = {
     success: {
       subject: 'Stiahnutie mapy Freemap',
       body: 'Vaša mapa je pripravená na stiahnutie na {URL} počas 24 hodín.',
+      credits:
+        'Zdroje — pri zdieľaní alebo zverejnení mapy prosím uveďte tento zoznam:',
     },
     error: {
       subject: 'Chyba pri sťahovaní mapy Freemap',
@@ -61,6 +66,8 @@ const translations: Record<string, Translation> = {
     success: {
       subject: 'Stažení mapy Freemap',
       body: 'Vaše mapa je připravena ke stažení na {URL} po dobu 24 hodin.',
+      credits:
+        'Zdroje — při sdílení nebo zveřejnění mapy prosím uveďte tento seznam:',
     },
     error: {
       subject: 'Chyba při stahování mapy Freemap',
@@ -74,6 +81,8 @@ const translations: Record<string, Translation> = {
     success: {
       subject: 'Pobranie mapy Freemap',
       body: 'Twoja mapa jest gotowa do pobrania pod adresem {URL} przez 24 godziny.',
+      credits:
+        'Źródła — udostępniając lub publikując mapę, prosimy zachować tę informację:',
     },
     error: {
       subject: 'Błąd pobierania mapy Freemap',
@@ -87,6 +96,8 @@ const translations: Record<string, Translation> = {
     success: {
       subject: 'Freemap térkép letöltése',
       body: 'A térképed készen áll letöltésre a következő címen: {URL} 24 órán keresztül.',
+      credits:
+        'Források — a térkép megosztásakor vagy közzétételekor kérjük, tüntesd fel ezt a listát:',
     },
     error: {
       subject: 'Hiba a Freemap térkép letöltésekor',
@@ -100,6 +111,8 @@ const translations: Record<string, Translation> = {
     success: {
       subject: 'Download mappa Freemap',
       body: 'La tua mappa è pronta per il download a {URL} per 24 ore.',
+      credits:
+        'Fonti — se condividi o pubblichi la mappa, per favore mantieni questa attribuzione:',
     },
     error: {
       subject: 'Errore nel download della mappa Freemap',
@@ -113,6 +126,8 @@ const translations: Record<string, Translation> = {
     success: {
       subject: 'Freemap Karten-Download',
       body: 'Ihre Karte steht zum Download bereit unter {URL} für 24 Stunden.',
+      credits:
+        'Quellen — bitte geben Sie diese Angaben an, wenn Sie die Karte weitergeben oder veröffentlichen:',
     },
     error: {
       subject: 'Fehler beim Freemap Karten-Download',
@@ -126,6 +141,8 @@ const translations: Record<string, Translation> = {
     success: {
       subject: 'Prenos zemljevida Freemap',
       body: 'Vaš zemljevid je pripravljen za prenos na {URL} 24 ur.',
+      credits:
+        'Viri — ob deljenju ali objavi zemljevida prosimo navedite ta seznam:',
     },
     error: {
       subject: 'Napaka pri prenosu zemljevida Freemap',
@@ -139,6 +156,8 @@ const translations: Record<string, Translation> = {
     success: {
       subject: 'Téléchargement de la carte Freemap',
       body: 'Votre carte est prête à être téléchargée sur {URL} pendant 24 heures.',
+      credits:
+        'Sources — merci de conserver cette attribution partout où vous partagez ou publiez la carte :',
     },
     error: {
       subject: 'Erreur lors du téléchargement de la carte Freemap',
@@ -324,8 +343,15 @@ async function download(
   email: string,
   totalTiles: number,
   logger: Logger,
-  translation: Combo,
+  translation: Translation['success'],
 ) {
+  // Up front, so a renderer that can't say what its tiles credit fails the job
+  // before any file or tile exists rather than after.
+  const licenses =
+    'licensesUrl' in map ? await fetchLicenses(map.licensesUrl) : undefined;
+
+  const collector = licenses && new TileCodeCollector();
+
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
 
   const safeName = name
@@ -371,8 +397,7 @@ async function download(
       ('description', 'Downloaded map tiles from www.freemap.sk'),
       ('minzoom', ${minZoom}),
       ('maxzoom', ${maxZoom}),
-      ('bounds', ${bbox(boundary).join(',')}),
-      ('attribution', ${map.attribution})`;
+      ('bounds', ${bbox(boundary).join(',')})`;
 
     db.prepare(combo.sql).run(...combo.values);
   } else if (format === 'sqlitedb') {
@@ -380,6 +405,9 @@ async function download(
       `
         CREATE TABLE tiles (x INTEGER, y INTEGER, z INTEGER, s INTEGER, image BLOB, PRIMARY KEY (x, y, z, s));
         CREATE TABLE info (minzoom INTEGER, maxzoom INTEGER, tilesize INTEGER, center_x DOUBLE, center_y DOUBLE, zooms TEXT, provider INTEGER);
+        -- The format has no place for credits; this borrows MBTiles' shape so
+        -- the file at least carries them.
+        CREATE TABLE metadata (name TEXT PRIMARY KEY, value TEXT);
       `,
     );
 
@@ -414,6 +442,8 @@ async function download(
 
   let client!: ClientHttp2Session;
 
+  let attribution: string;
+
   const handleGoaway = () => {
     if (!closing) {
       client = connect(new URL(map.url).origin);
@@ -436,6 +466,8 @@ async function download(
 
     let buffer: Buffer<ArrayBufferLike>;
 
+    let statusCode = 0;
+
     for (let i = 0; ; i++) {
       try {
         buffer = await new Promise<Buffer>((resolve, reject) => {
@@ -445,7 +477,7 @@ async function download(
           });
 
           req.on('response', (headers) => {
-            const statusCode = Number(headers[':status']);
+            statusCode = Number(headers[':status']);
 
             if (statusCode !== 200 && statusCode !== 404) {
               reject(new Error(`Unexpected status code: ${statusCode}`));
@@ -495,6 +527,11 @@ async function download(
 
     downloadedCount++;
 
+    // a 404 paints nothing, so it has nothing to credit
+    if (statusCode === 200) {
+      collector?.add(buffer);
+    }
+
     if (Date.now() - logTs > 1_000) {
       logger.info('Downloaded tiles: %d/%d', downloadedCount, totalTiles);
 
@@ -535,6 +572,15 @@ async function download(
       }
     }
 
+    attribution =
+      'attribution' in map
+        ? map.attribution
+        : collector!.credits(licenses!).join(', ');
+
+    db.prepare(
+      `INSERT INTO metadata (name, value) VALUES ('attribution', ?)`,
+    ).run(attribution);
+
     db.close();
   } catch (err) {
     db.close();
@@ -550,13 +596,15 @@ async function download(
 
   logger.info('Map download successful, sending email notification.');
 
+  // For an export the mail is the only moment the user is present, so it is
+  // the one place the credits are sure to reach them.
   await sendMail(
     email,
     translation.subject,
-    translation.body.replace(
+    `${translation.body.replace(
       '{URL}',
       `${getEnv('MBTILES_URL_PREFIX')}/${encodeURIComponent(dbName)}.${format}`,
-    ),
+    )}\n\n${translation.credits}\n${attribution}`,
   );
 }
 

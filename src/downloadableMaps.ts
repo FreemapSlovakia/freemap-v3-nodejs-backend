@@ -5,9 +5,17 @@ export type DownloadableMap = {
   minZoom: number;
   maxNativeZoom: number;
   creditsPerMTile: number;
-  attribution: string;
   overlay?: boolean;
-};
+} & (
+  | { attribution: string }
+  | {
+      /**
+       * The renderer's `GET /licenses`, for a map whose tiles name the datasets
+       * they drew from. The renderer is the only authority for its credits.
+       */
+      licensesUrl: string;
+    }
+);
 
 export const downloadableMaps: DownloadableMap[] = [
   {
@@ -17,8 +25,7 @@ export const downloadableMaps: DownloadableMap[] = [
     minZoom: 6,
     maxNativeZoom: 19,
     creditsPerMTile: 5000,
-    attribution:
-      'map: © Freemap Slovakia, data: © OpenStreetMap contributors, data: DTM providers…',
+    licensesUrl: 'https://outdoor.tiles.freemap.sk/licenses',
   },
   {
     type: 'A',
