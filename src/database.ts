@@ -21,6 +21,12 @@ export const pool = createPool({
 
 const logger = appLogger.child({ module: 'db' });
 
+/**
+ * Delete a session this long after its last use. Generous because the gallery
+ * is used seasonally — a year off between hikes should not sign anyone out.
+ */
+const SESSION_INACTIVITY_MONTHS = 12;
+
 export async function initDatabase() {
   const scripts = [
     sql`CREATE TABLE IF NOT EXISTS user (
@@ -70,7 +76,11 @@ export async function initDatabase() {
       authToken VARCHAR(255) CHARSET ascii COLLATE ascii_bin PRIMARY KEY,
       userId INT UNSIGNED NOT NULL,
       createdAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      FOREIGN KEY (userId) REFERENCES user (id) ON DELETE CASCADE
+      -- Drives session expiry in cleanup(). Refreshed at most hourly by the
+      -- authenticator, so it is approximate by design.
+      lastUsedAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (userId) REFERENCES user (id) ON DELETE CASCADE,
+      INDEX authLastUsedIdx (lastUsedAt)
     ) ENGINE=InnoDB`,
 
     sql`CREATE TABLE IF NOT EXISTS purchaseToken (
@@ -414,6 +424,12 @@ export async function initDatabase() {
     // Drops a legacy ON UPDATE current_timestamp() that silently restamps a
     // rating on any UPDATE. wikimediaRating.ratedAt never had it.
     'ALTER TABLE pictureRating MODIFY COLUMN ratedAt TIMESTAMP NOT NULL',
+
+    // Existing rows get the time of this ALTER, not their createdAt: sessions
+    // are only expired once observed unused, so nobody is logged out by the
+    // migration itself and the first cleanup can delete nothing until the
+    // inactivity window has actually elapsed.
+    'ALTER TABLE auth ADD COLUMN lastUsedAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP, ADD INDEX authLastUsedIdx (lastUsedAt)',
   ];
 
   const db = await pool.getConnection();
@@ -487,6 +503,13 @@ export async function initDatabase() {
         sql`DELETE FROM blockedCredit WHERE createdAt < ${yesterday}`,
       );
     });
+
+    // Last, so a failure here can't hold up the credit refunds above. By
+    // inactivity, not age: a client that keeps its token (the mobile app)
+    // would otherwise be logged out despite daily use.
+    await pool.query<unknown>(
+      sql`DELETE FROM auth WHERE lastUsedAt < NOW() - INTERVAL ${raw(String(SESSION_INACTIVITY_MONTHS))} MONTH`,
+    );
   }
 
   cleanup();

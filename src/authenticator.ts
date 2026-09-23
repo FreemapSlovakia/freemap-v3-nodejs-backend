@@ -1,12 +1,18 @@
 import type { Middleware } from 'koa';
 import sql, { raw } from 'sql-template-tag';
+import z from 'zod';
 import { pool } from './database.js';
 import type { User } from './koaTypes.js';
+import { appLogger } from './logger.js';
 import {
   USER_COLUMNS_SQL_PREFIXED,
   type UserRow,
   UserRowSchema,
 } from './types.js';
+
+const SessionStaleSchema = z.object({ sessionStale: z.coerce.boolean() });
+
+const logger = appLogger.child({ module: 'authenticator' });
 
 export const authProviderToColumn = {
   facebook: 'facebookUserId',
@@ -53,7 +59,8 @@ export function authenticator(require?: boolean): Middleware {
     }
 
     const [userRow] = await pool.query<unknown[]>(sql`
-      SELECT ${raw(USER_COLUMNS_SQL_PREFIXED)}
+      SELECT ${raw(USER_COLUMNS_SQL_PREFIXED)},
+        auth.lastUsedAt < NOW() - INTERVAL 1 HOUR AS sessionStale
       FROM user INNER JOIN auth ON (userId = id)
       WHERE authToken = ${authToken}
     `);
@@ -74,6 +81,21 @@ export function authenticator(require?: boolean): Middleware {
     }
 
     ctx.state.user = rowToUser(UserRowSchema.parse(userRow), authToken);
+
+    // Stamp the session as used so cleanup() can expire it on inactivity.
+    // Throttled: the window is months wide, so an hour of drift is irrelevant
+    // and a write on every authenticated request would not be. Compared in SQL
+    // so the Node and DB timezones can't disagree; not awaited, since a failed
+    // stamp must not fail the request.
+    if (SessionStaleSchema.parse(userRow).sessionStale) {
+      pool
+        .query<unknown>(
+          sql`UPDATE auth SET lastUsedAt = NOW() WHERE authToken = ${authToken}`,
+        )
+        .catch((err) => {
+          logger.warn({ err }, 'Failed to stamp session as used.');
+        });
+    }
 
     await next();
   };
