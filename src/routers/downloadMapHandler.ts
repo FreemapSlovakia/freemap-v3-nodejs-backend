@@ -468,6 +468,8 @@ async function download(
 
     let statusCode = 0;
 
+    let codes: string | undefined;
+
     for (let i = 0; ; i++) {
       try {
         buffer = await new Promise<Buffer>((resolve, reject) => {
@@ -478,6 +480,10 @@ async function download(
 
           req.on('response', (headers) => {
             statusCode = Number(headers[':status']);
+
+            const header = headers['x-attribution'];
+
+            codes = Array.isArray(header) ? header.join(' ') : header;
 
             if (statusCode !== 200 && statusCode !== 404) {
               reject(new Error(`Unexpected status code: ${statusCode}`));
@@ -529,7 +535,7 @@ async function download(
 
     // a 404 paints nothing, so it has nothing to credit
     if (statusCode === 200) {
-      collector?.add(buffer);
+      collector?.add(codes);
     }
 
     if (Date.now() - logTs > 1_000) {

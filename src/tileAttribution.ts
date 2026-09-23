@@ -16,67 +16,6 @@ const OSM = 'osm';
 // tile put none of it on screen. Used when the dictionary lacks the entry.
 const OSM_TITLE = '© OpenStreetMap contributors';
 
-/**
- * The codes in a JPEG's first `COM` segment, or `null` if it has none before
- * the image data. Walks the segment chain per the JPEG spec rather than
- * trusting where the renderer puts the segment.
- */
-export function readTileCodes(tile: Uint8Array): string[] | null {
-  if (tile[0] !== 0xff || tile[1] !== 0xd8) {
-    return null;
-  }
-
-  let at = 2;
-
-  for (;;) {
-    if (tile[at] !== 0xff) {
-      return null;
-    }
-
-    // any number of 0xFF fill bytes may precede a marker
-    while (tile[at] === 0xff) {
-      at++;
-    }
-
-    const marker = tile[at++];
-
-    // standalone markers carry no length
-    if (
-      marker === 0x01 ||
-      (marker !== undefined && marker >= 0xd0 && marker <= 0xd7)
-    ) {
-      continue;
-    }
-
-    // start of scan or end of image: no header segments follow
-    if (
-      marker === undefined ||
-      marker === 0xda ||
-      marker === 0xd9 ||
-      at + 2 > tile.length
-    ) {
-      return null;
-    }
-
-    const length = (tile[at]! << 8) | tile[at + 1]!;
-
-    const end = at + length;
-
-    if (length < 2 || end > tile.length) {
-      return null;
-    }
-
-    if (marker === 0xfe) {
-      return Buffer.from(tile.subarray(at + 2, end))
-        .toString('utf8')
-        .split(/[,\s]+/)
-        .filter(Boolean);
-    }
-
-    at = end;
-  }
-}
-
 /** The code as `/licenses` keys it, or `null` if it isn't one at all. */
 export function expandCode(code: string): string | null {
   if (code === 'o') {
@@ -156,18 +95,19 @@ export class TileCodeCollector {
 
   #complete = true;
 
-  add(tile: Uint8Array) {
-    // An empty list is a tile outside the renderer's coverage and narrows the
-    // credit; no list at all must widen it.
-    const codes = readTileCodes(tile);
-
-    if (!codes) {
+  /**
+   * `header` is the tile's `X-Attribution`. Empty is a tile outside the
+   * renderer's coverage and narrows the credit; absent is a tile whose codes
+   * are unknown and must widen it.
+   */
+  add(header: string | undefined) {
+    if (header === undefined) {
       this.#complete = false;
 
       return;
     }
 
-    for (const code of codes) {
+    for (const code of header.split(',').filter(Boolean)) {
       const key = expandCode(code);
 
       if (key) {
