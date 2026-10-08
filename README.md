@@ -25,24 +25,25 @@ GRANT ALL PRIVILEGES ON freemap.* TO 'freemap'@'localhost';
 FLUSH PRIVILEGES;
 ```
 
-A `country` table (`alpha2` plus a `geom` polygon, populated externally from
-OSM administrative boundaries) is required — it is not created by
-`initDatabase()`. The `picture` triggers look up each photo's country code in
-it, and `POST /geotools/covered-countries` queries it directly; without the
-table both fail with `Table 'country' doesn't exist`.
+A `country` table is required — it is not created by `initDatabase()`. The
+`picture` triggers look up each photo's country code in it, and
+`POST /geotools/covered-countries` queries it directly; without the table both
+fail with `Table 'country' doesn't exist`. Build it with:
 
-For development, an empty table is enough to make both work — photos then get
-no country and the endpoint reports none covered:
-
-```sql
-CREATE TABLE country (
-  rowid INT NOT NULL AUTO_INCREMENT,
-  geom GEOMETRY NOT NULL,
-  alpha2 TEXT NULL,
-  UNIQUE KEY rowid (rowid),
-  SPATIAL INDEX country_geom_spx (geom)
-) ENGINE=InnoDB;
+```sh
+pnpm build && pnpm import:countries
 ```
+
+It reads the `division_area` polygons of the latest
+[Overture Maps](https://docs.overturemaps.org/guides/divisions/) release
+(OSM-derived, ODbL) from Overture's public S3 bucket, keeps one area per
+country or dependency — the maritime one (land plus territorial waters) where
+there is one, the land one otherwise — splits them to at most 256 vertices and
+swaps the result in, then re-resolves the country of every photo. Codes are
+lowercase ISO 3166-1 alpha-2, plus Overture's user-assigned `x*` codes for
+disputed areas (e.g. `xg` Gaza, `xw` West Bank). Set `OVERTURE_RELEASE` (e.g.
+`2026-09-23.1`) to pin a release instead of taking the latest. A run takes about
+two minutes and ~8 GB of RAM.
 
 Connection settings are read from the `MARIADB_*` environment variables (see
 below).

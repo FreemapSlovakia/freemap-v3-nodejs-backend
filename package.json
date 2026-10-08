@@ -29,6 +29,7 @@
     "test": "tsc && node --test 'build/**/*.test.js'",
     "dev:serve": "pnpm run copy:proto && dotenvx run --overload -- sh -c 'node --enable-source-maps --import ./build/instrument.js build/index.js | pino-pretty -S -t -i hostname,pid'",
     "dev": "tsc-watch --onSuccess \"pnpm run dev:serve\"",
+    "import:countries": "dotenvx run --overload -- node --enable-source-maps build/countries/importCountries.js",
     "import:wikimedia": "dotenvx run --overload -- node --enable-source-maps build/wikimedia/importWikimedia.js",
     "deploy": "ssh ${DEPLOY_SSH_HOST:-freemap-fm6} 'cd /home/freemap/freemap-v3-nodejs-backend && git pull --ff-only && bash scripts/remote-deploy.sh'",
     "precommit": "lint-staged",
@@ -36,6 +37,7 @@
     "lint:fix": "biome check --write --error-on-warnings"
   },
   "dependencies": {
+    "@duckdb/node-api": "^1.5.6-r.1",
     "@koa/router": "^15.7.0",
     "@mapbox/node-pre-gyp": "^2.0.3",
     "@mapbox/tilebelt": "^2.0.3",
