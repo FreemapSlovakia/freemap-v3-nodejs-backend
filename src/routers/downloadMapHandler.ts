@@ -201,7 +201,15 @@ const DownloadBodySchema = z.strictObject({
   boundary: GeoJSONFeatureSchema,
   name: z.string(),
   email: z.email(),
-  scale: z.number().int().min(1).max(3).optional(),
+  scale: z.number().int().min(1).max(4).optional(),
+  // a shading map's, as the web client's `serializeShading` writes it; the
+  // cap is nginx's 8k request line, which the same URL meets on screen
+  shading: z
+    .strictObject({
+      spec: z.string().nonempty().max(8000),
+      opaque: z.boolean(),
+    })
+    .optional(),
 });
 
 export function attachDownloadMapHandler(router: RouterInstance) {
@@ -233,14 +241,71 @@ export function attachDownloadMapHandler(router: RouterInstance) {
 
     const translation = translations[lang]!;
 
-    const map = downloadableMaps.find(({ type }) => type === body.map);
+    const listed = downloadableMaps.find(({ type }) => type === body.map);
 
-    if (!map) {
+    if (!listed) {
       ctx.throw(400, 'invalid map');
       return;
     }
 
+    if (Boolean(listed.shading) !== Boolean(body.shading)) {
+      ctx.throw(400, 'shading goes with a shading map only');
+      return;
+    }
+
     const { minZoom, maxZoom, boundary, scale, name, email, format } = body;
+
+    // Past its range a map answers 404, which is no tile.
+    if (
+      minZoom > maxZoom ||
+      minZoom < listed.minZoom ||
+      maxZoom > listed.maxNativeZoom
+    ) {
+      ctx.throw(400, 'zoom out of the map range');
+      return;
+    }
+
+    if (scale && scale !== 1 && !listed.extraScales?.includes(scale)) {
+      ctx.throw(400, 'scale not offered by the map');
+      return;
+    }
+
+    // An opaque shading is a base map; one that shows through needs alpha.
+    const shadingFormat = body.shading?.opaque ? 'jpg' : 'png';
+
+    const map: DownloadableMap = body.shading
+      ? {
+          ...listed,
+          url: `${listed.url}?format=${shadingFormat}&shading=${encodeURIComponent(body.shading.spec)}`,
+          overlay: !body.shading.opaque,
+          tileFormat: shadingFormat,
+        }
+      : listed;
+
+    // A shading terrain-tiles can't read fails every tile; refuse it before
+    // charging rather than refund it after.
+    if (body.shading) {
+      const first = calculateTiles(boundary, minZoom, minZoom).next().value;
+
+      if (first) {
+        const [x, y, z] = first;
+
+        const res = await fetch(
+          map.url
+            .replace('{x}', String(x))
+            .replace('{y}', String(y))
+            .replace('{z}', String(z)),
+          { signal: AbortSignal.timeout(30_000) },
+        );
+
+        await res.body?.cancel();
+
+        if (res.status !== 200 && res.status !== 404) {
+          ctx.throw(400, `invalid shading (${res.status})`);
+          return;
+        }
+      }
+    }
 
     let totalTiles = 0;
 
@@ -391,7 +456,7 @@ async function download(
 
     const combo = sql`INSERT INTO metadata (name, value) VALUES
       ('name', ${name}),
-      ('format', 'jpg'),
+      ('format', ${map.tileFormat ?? 'jpg'}),
       ('type', ${map.overlay ? 'overlay' : 'baselayer'}),
       ('version', '1.0'),
       ('description', 'Downloaded map tiles from www.freemap.sk'),
@@ -456,12 +521,17 @@ async function download(
   async function downloadTile(tile: Tile) {
     const [x, y, z] = tile;
 
+    const [path, query] = map.url
+      .replace('{x}', x.toString())
+      .replace('{y}', y.toString())
+      .replace('{z}', z.toString())
+      .split('?');
+
+    // the scale goes on the path, ahead of any query
     const url = new URL(
-      map.url
-        .replace('{x}', x.toString())
-        .replace('{y}', y.toString())
-        .replace('{z}', z.toString()) +
-        (scale && map.extraScales?.includes(scale) ? `@${scale}x` : ''),
+      path +
+        (scale && map.extraScales?.includes(scale) ? `@${scale}x` : '') +
+        (query === undefined ? '' : `?${query}`),
     );
 
     let buffer: Buffer<ArrayBufferLike>;
@@ -542,6 +612,11 @@ async function download(
       logger.info('Downloaded tiles: %d/%d', downloadedCount, totalTiles);
 
       logTs = Date.now();
+    }
+
+    // its body is an error message, not an image
+    if (statusCode === 404) {
+      return;
     }
 
     if (format === 'mbtiles') {

@@ -6,6 +6,10 @@ export type DownloadableMap = {
   maxNativeZoom: number;
   creditsPerMTile: number;
   overlay?: boolean;
+  /** What the tiles are; `jpg` unless set. */
+  tileFormat?: 'jpg' | 'png';
+  /** Rendered by terrain-tiles from the shading the request carries. */
+  shading?: true;
 } & (
   | { attribution: string }
   | {
@@ -21,11 +25,20 @@ export const downloadableMaps: DownloadableMap[] = [
   {
     type: 'X',
     url: 'https://outdoor.tiles.freemap.sk/{z}/{x}/{y}',
-    extraScales: [2, 3],
-    minZoom: 6,
-    maxNativeZoom: 19,
+    extraScales: [2, 3, 4],
+    minZoom: 5,
+    maxNativeZoom: 20,
     creditsPerMTile: 5000,
     licensesUrl: 'https://outdoor.tiles.freemap.sk/licenses',
+  },
+  {
+    type: 'h',
+    url: 'https://terrain.tiles.freemap.sk/hillshade/{z}/{x}/{y}',
+    minZoom: 0,
+    maxNativeZoom: 18,
+    creditsPerMTile: 1000,
+    shading: true,
+    licensesUrl: 'https://terrain.tiles.freemap.sk/licenses',
   },
   {
     type: 'A',
@@ -71,7 +84,15 @@ export const downloadableMaps: DownloadableMap[] = [
     attribution: 'map: © GKÚ, NLC, map: © ČÚZK',
   },
   {
-    type: 'J',
+    type: 'J2',
+    url: 'https://ofmozaika2c.tiles.freemap.sk/{z}/{x}/{y}.jpg',
+    minZoom: 0,
+    maxNativeZoom: 19,
+    creditsPerMTile: 1000,
+    attribution: 'map: © GKÚ, NLC',
+  },
+  {
+    type: 'J1',
     url: 'https://ofmozaika1c.tiles.freemap.sk/{z}/{x}/{y}.jpg',
     minZoom: 0,
     maxNativeZoom: 19,
@@ -111,27 +132,13 @@ export const downloadableMaps: DownloadableMap[] = [
     attribution: 'map: © Freemap Slovakia, data: DMP 1.0: © ÚGKK SR',
   },
   {
-    type: 'l',
+    type: 'l1',
     url: 'https://nlc.tiles.freemap.sk/{z}/{x}/{y}.png',
+    tileFormat: 'png',
+    overlay: true,
     minZoom: 11,
     maxNativeZoom: 15,
     creditsPerMTile: 1000,
     attribution: 'map: © NLC Zvolen',
-  },
-  {
-    type: 't',
-    url: 'http://tiles.freemap.sk/trails/{z}/{x}/{y}.png',
-    minZoom: 8,
-    maxNativeZoom: 16,
-    creditsPerMTile: 1000,
-    attribution: 'map: © Freemap Slovakia, data: © OpenStreetMap contributors',
-  },
-  {
-    type: 'c',
-    url: 'http://tiles.freemap.sk/cycle/{z}/{x}/{y}.png',
-    minZoom: 8,
-    maxNativeZoom: 16,
-    creditsPerMTile: 1000,
-    attribution: 'map: © Freemap Slovakia, data: © OpenStreetMap contributors',
   },
 ];

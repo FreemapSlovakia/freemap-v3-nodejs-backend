@@ -40,6 +40,33 @@ test('composeCredits: OSM is credited even when no tile named it', () => {
   ]);
 });
 
+// terrain-tiles': no OSM, and its global model keyed by its own id
+const TERRAIN_LICENSES: LicenseDict = {
+  'shading:gedtm30': [{ title: 'GEDTM30' }],
+  'shading:sk': [{ title: 'DMR 5.0: ÚGKK SR' }],
+  'shading:at': [{ title: 'ALS DTM: Geoland.at' }],
+};
+
+test('composeCredits: no OSM where the dictionary names none, fallback last', () => {
+  assert.deepEqual(
+    composeCredits(['shading:gedtm30', 'shading:sk'], TERRAIN_LICENSES),
+    ['©\xa0Freemap Slovakia', 'DMR 5.0: ÚGKK SR', 'GEDTM30'],
+  );
+});
+
+test('TileCodeCollector: widening to every dataset adds no OSM either', () => {
+  const collector = new TileCodeCollector();
+
+  collector.add(undefined);
+
+  assert.deepEqual(collector.credits(TERRAIN_LICENSES), [
+    '©\xa0Freemap Slovakia',
+    'ALS DTM: Geoland.at',
+    'DMR 5.0: ÚGKK SR',
+    'GEDTM30',
+  ]);
+});
+
 test('composeCredits: an unknown key refuses rather than drops a source', () => {
   assert.equal(composeCredits(['shading:xx'], LICENSES), null);
 });

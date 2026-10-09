@@ -12,10 +12,6 @@ const FREEMAP = '©\xa0Freemap Slovakia';
 
 const OSM = 'osm';
 
-// Seeded whatever the tiles say: the map is an OSM-derived work even where a
-// tile put none of it on screen. Used when the dictionary lacks the entry.
-const OSM_TITLE = '© OpenStreetMap contributors';
-
 /** The code as `/licenses` keys it, or `null` if it isn't one at all. */
 export function expandCode(code: string): string | null {
   if (code === 'o') {
@@ -39,9 +35,12 @@ export async function fetchLicenses(url: string): Promise<LicenseDict> {
   return LicenseDictSchema.parse(await res.json());
 }
 
+// The renderer keys its global model `_`; terrain-tiles by its own id.
+const GLOBAL_KEYS = new Set(['_', 'gedtm30']);
+
 /** Where a key sits in the line, as the renderer's burnt-in credit ranks it. */
 function rank(key: string): number {
-  return key === OSM ? 0 : key.endsWith(':_') ? 2 : 1;
+  return key === OSM ? 0 : GLOBAL_KEYS.has(key.split(':')[1] ?? '') ? 2 : 1;
 }
 
 function collationKey(title: string): string {
@@ -59,9 +58,11 @@ export function composeCredits(
   keys: Iterable<string>,
   licenses: LicenseDict,
 ): string[] | null {
-  const ranked = new Map<string, number>([
-    [licenses[OSM]?.[0]?.title ?? OSM_TITLE, 0],
-  ]);
+  // A dictionary naming OSM is an OSM-derived map's: credited even where a tile
+  // put none of it on screen.
+  const ranked = new Map<string, number>(
+    licenses[OSM]?.map(({ title }) => [title, 0]) ?? [],
+  );
 
   for (const key of keys) {
     const entries = licenses[key];
