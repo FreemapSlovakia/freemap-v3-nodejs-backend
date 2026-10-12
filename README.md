@@ -105,9 +105,13 @@ pnpm start | pnpm exec pino-pretty
 
   ```
   elevation-sources/010-sk/source.json
-                    250-sonny-de/source.json
-                    330-gedtm30/source.json
+                    245-de_by/source.json
+                    999-gedtm30/source.json
   ```
+
+  It is a checkout of
+  [elevation-sources](https://github.com/FreemapSlovakia/elevation-sources),
+  which terrain-tiles and dem-pyramid read too.
 
   A subdirectory counts as a source only if it holds a `source.json`; anything
   else is ignored, so a half-finished download cannot silently change what the
@@ -116,23 +120,24 @@ pnpm start | pnpm exec pino-pretty
 
   ```json
   {
-    "name": "sonny",
-    "file": "/fm/storage1/dtm/sonny/de/de.tif",
     "attributions": [
-      { "name": "Sonny's LiDAR DTM (CC BY 4.0)", "url": "https://sonny.4lima.de/" }
+      { "name": "Bayerische Vermessungsverwaltung: DGM1 1 m, dl-de/by-2-0" }
     ]
   }
   ```
 
-  - `name` (required) is reported by `/geotools/elevation?sources=1`, so it is
-    an API contract, not a label: use the lowercase ISO 3166-1 alpha-2 code of
-    the country the model covers (`sk`, `at`, …), or the model's own id for one
-    that isn't country-scoped (`gedtm30`, `sonny`). Several sources may share a
-    name — the reported list is deduplicated, and their credits are merged.
-    Keep names stable across file renames or re-projections.
-  - `file` (optional) is the raster, absolute or relative to the directory, so a
-    source can point at one that stays where it is. Without it the directory
-    must hold `data.vrt` or `data.tif`. `.vrt` and `.tif` are both fine.
+  - `name` (optional) is reported by `/geotools/elevation?sources=1`, so it is
+    an API contract, not a label: the lowercase ISO 3166-1 alpha-2 code of the
+    country the model covers (`sk`, `at`, …), or the model's own id for one
+    that isn't country-scoped (`gedtm30`). Without it the directory gives it:
+    the part past the number up to the first `-` or `_`, so `245-de_by` and
+    `249-de_th` both report `de`; a directory that yields no lowercase name is
+    skipped with a warning. So renaming a directory can change the API; give
+    `name` to pin it. Several sources may share a name — the reported list is
+    deduplicated, and their credits are merged.
+  - `file` (optional) is the raster, absolute or relative to the directory.
+    Without it the directory must hold `source.vrt` or `source.tif`, normally a
+    link to a raster that stays where it is. `.vrt` and `.tif` are both fine.
   - `attributions` (optional) is how the source wants crediting, served straight
     to clients so a new dataset needs no web or mobile release. A country
     stitched from two licensed datasets carries two entries.

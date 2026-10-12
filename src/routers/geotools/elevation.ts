@@ -68,9 +68,10 @@ type LocalSource = ParsedSource & {
 // data; otherwise it falls back to the next source, then SRTM.
 //
 // Each lives in its own directory under ELEVATION_DIR with a `source.json`
-// carrying its reported name and its credits, so adding a model is a directory
-// drop: no config to edit, no bbox to transcribe, and — because the API serves
-// the credits — no client release to make them visible.
+// carrying its credits; the directory gives its reported name unless that file
+// does. So adding a model is a directory drop: no config to edit, no bbox to
+// transcribe, and — because the API serves the credits — no client release to
+// make them visible.
 const elevationDir = getEnv('ELEVATION_DIR', '');
 
 const localSources: LocalSource[] = loadElevationSources(
@@ -373,8 +374,8 @@ export async function resolveElevations(
         results[i] = v;
         resolved = true;
         if (usedSources) {
-          // One name can be answered by several rasters — every Sonny country
-          // reports `sonny` — so merge rather than overwrite, or whichever
+          // One name can be answered by several rasters — every German state
+          // reports `de` — so merge rather than overwrite, or whichever
           // answered last would be the only one credited.
           mergeCredits(usedSources, src.name, src.attributions);
         }

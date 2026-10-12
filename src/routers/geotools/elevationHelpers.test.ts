@@ -1,5 +1,11 @@
 import assert from 'node:assert/strict';
-import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
+import {
+  mkdirSync,
+  mkdtempSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
@@ -12,6 +18,7 @@ import {
   inBbox,
   loadElevationSources,
   mergeCredits,
+  nameFromDir,
   parseSourceJson,
   srtmKey,
 } from './elevationHelpers.js';
@@ -139,6 +146,65 @@ test('parseSourceJson: several credits under one name', () => {
   ]);
 });
 
+test('parseSourceJson: without "name", the directory gives it', () => {
+  // The datasets of one model share the part before the first - or _.
+  for (const [dir, name] of [
+    ['/dtm/245-de_by', 'de'],
+    ['/dtm/090-es-29', 'es'],
+    ['/dtm/232-be_wal', 'be'],
+    ['/dtm/010-sk', 'sk'],
+    ['/dtm/999-gedtm30', 'gedtm30'],
+  ]) {
+    assert.equal(
+      parseSourceJson(JSON.stringify({ file: 'x.tif' }), dir).name,
+      name,
+    );
+  }
+});
+
+test('parseSourceJson: an explicit "name" outranks the directory', () => {
+  assert.equal(
+    parseSourceJson(
+      JSON.stringify({ name: 'sonny', file: 'x.tif' }),
+      '/dtm/340-gb',
+    ).name,
+    'sonny',
+  );
+});
+
+test('nameFromDir: a directory without NNN-lowercase gives no name', () => {
+  for (const dir of [
+    '/dtm/010_sk',
+    '/dtm/245-DE_by',
+    '/dtm/300.5-at',
+    '/dtm/sk',
+  ]) {
+    assert.throws(() => nameFromDir(dir), /No name/, dir);
+  }
+});
+
+test('parseSourceJson: without "file", the linked source raster is read', (t) => {
+  const root = mkdtempSync(join(tmpdir(), 'elev-'));
+
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+
+  const dir = join(root, '245-de_by');
+
+  mkdirSync(dir);
+
+  // a link whose target is not mounted yet still names the source
+  symlinkSync(join(root, 'not-mounted.vrt'), join(dir, 'source.vrt'));
+
+  assert.equal(parseSourceJson('{}', dir).path, join(dir, 'source.vrt'));
+
+  // a directory under the name is not a raster
+  const other = join(root, '246-de_nw');
+
+  mkdirSync(join(other, 'source.vrt'), { recursive: true });
+
+  assert.throws(() => parseSourceJson('{}', other), /No raster/);
+});
+
 test('parseSourceJson: a pinned bbox is kept', () => {
   const src = parseSourceJson(
     JSON.stringify({ name: 'x', file: 'x.tif', bbox: [1, 2, 3, 4] }),
@@ -154,8 +220,8 @@ test('parseSourceJson: rejects malformed entries', () => {
   assert.throws(() => parseSourceJson('not json', at), /Invalid source.json/);
   assert.throws(() => parseSourceJson('[]', at), /Invalid source.json/);
   assert.throws(
-    () => parseSourceJson(JSON.stringify({ file: 'x.tif' }), at),
-    /missing "name"/,
+    () => parseSourceJson(JSON.stringify({ name: '', file: 'x.tif' }), at),
+    /bad "name"/,
   );
   assert.throws(
     () =>
