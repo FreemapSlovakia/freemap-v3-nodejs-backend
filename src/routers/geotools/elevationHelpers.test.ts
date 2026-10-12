@@ -2,13 +2,14 @@ import assert from 'node:assert/strict';
 import {
   mkdirSync,
   mkdtempSync,
+  readFileSync,
   rmSync,
   symlinkSync,
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import test from 'node:test';
+import test, { type TestContext } from 'node:test';
 import gdal from 'gdal-async';
 import {
   type Bbox,
@@ -98,46 +99,56 @@ test('inBbox: inclusive bounds', () => {
   assert.equal(inBbox(bbox, 50, 20), false); // north of bbox
 });
 
-test('parseSourceJson: name, file and attributions', () => {
+/**
+ * A dataset directory under a fresh temporary root, linking its raster as
+ * `source.vrt`; the root goes when the test ends.
+ */
+function datasets(t: TestContext) {
+  const root = mkdtempSync(join(tmpdir(), 'elev-'));
+
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+
+  return {
+    root,
+    add(dir: string, json: unknown = {}) {
+      const path = join(root, dir);
+
+      mkdirSync(path);
+      symlinkSync(join(root, `${dir}.vrt`), join(path, 'source.vrt'));
+      writeFileSync(join(path, 'source.json'), JSON.stringify(json));
+
+      return path;
+    },
+  };
+}
+
+test('parseSourceJson: name, raster and attributions', (t) => {
+  const dir = datasets(t).add('245-de_by', {
+    attributions: [{ name: 'DGM1', url: 'https://geodaten.bayern.de/' }],
+  });
+
   const src = parseSourceJson(
-    JSON.stringify({
-      name: 'sonny',
-      file: 'de.tif',
-      attributions: [
-        { name: "Sonny's LiDAR DTM", url: 'https://sonny.4lima.de/' },
-      ],
-    }),
-    '/dtm/700-sonny-de',
+    readFileSync(join(dir, 'source.json'), 'utf8'),
+    dir,
   );
 
-  assert.equal(src.name, 'sonny');
-  assert.equal(src.path, '/dtm/700-sonny-de/de.tif');
+  assert.equal(src.name, 'de');
+  assert.equal(src.path, join(dir, 'source.vrt'));
   assert.equal(src.bbox, undefined);
   assert.deepEqual(src.attributions, [
-    { name: "Sonny's LiDAR DTM", url: 'https://sonny.4lima.de/' },
+    { name: 'DGM1', url: 'https://geodaten.bayern.de/' },
   ]);
 });
 
-test('parseSourceJson: an absolute file is left where it is', () => {
-  // So a source can be described without moving the raster it points at.
-  const src = parseSourceJson(
-    JSON.stringify({ name: 'sk', file: '/fm/storage1/dmr5.tif' }),
-    '/dtm/010-sk',
-  );
+test('parseSourceJson: several credits under one name', (t) => {
+  // A dataset merged from two providers must show both credits.
+  const dir = datasets(t).add('232-be_wal');
 
-  assert.equal(src.path, '/fm/storage1/dmr5.tif');
-  assert.deepEqual(src.attributions, []);
-});
-
-test('parseSourceJson: several credits under one name', () => {
-  // Belgium is two models under two licences, both of which must be shown.
   const src = parseSourceJson(
     JSON.stringify({
-      name: 'be',
-      file: 'be.vrt',
       attributions: [{ name: 'SPW', url: 'http://spw/' }, { name: 'DHMV II' }],
     }),
-    '/dtm/160-be',
+    dir,
   );
 
   assert.deepEqual(src.attributions, [
@@ -146,8 +157,8 @@ test('parseSourceJson: several credits under one name', () => {
   ]);
 });
 
-test('parseSourceJson: without "name", the directory gives it', () => {
-  // The datasets of one model share the part before the first - or _.
+test('nameFromDir: the datasets of one model share a name', () => {
+  // the part past the number, up to the first - or _
   for (const [dir, name] of [
     ['/dtm/245-de_by', 'de'],
     ['/dtm/090-es-29', 'es'],
@@ -155,20 +166,16 @@ test('parseSourceJson: without "name", the directory gives it', () => {
     ['/dtm/010-sk', 'sk'],
     ['/dtm/999-gedtm30', 'gedtm30'],
   ]) {
-    assert.equal(
-      parseSourceJson(JSON.stringify({ file: 'x.tif' }), dir).name,
-      name,
-    );
+    assert.equal(nameFromDir(dir), name);
   }
 });
 
-test('parseSourceJson: an explicit "name" outranks the directory', () => {
+test('parseSourceJson: a "name" in source.json is not read', (t) => {
+  const dir = datasets(t).add('340-gb');
+
   assert.equal(
-    parseSourceJson(
-      JSON.stringify({ name: 'sonny', file: 'x.tif' }),
-      '/dtm/340-gb',
-    ).name,
-    'sonny',
+    parseSourceJson(JSON.stringify({ name: 'sonny' }), dir).name,
+    'gb',
   );
 });
 
@@ -183,17 +190,11 @@ test('nameFromDir: a directory without NNN-lowercase gives no name', () => {
   }
 });
 
-test('parseSourceJson: without "file", the linked source raster is read', (t) => {
-  const root = mkdtempSync(join(tmpdir(), 'elev-'));
-
-  t.after(() => rmSync(root, { recursive: true, force: true }));
-
-  const dir = join(root, '245-de_by');
-
-  mkdirSync(dir);
+test('parseSourceJson: the raster is the source link, dangling or not', (t) => {
+  const { root, add } = datasets(t);
 
   // a link whose target is not mounted yet still names the source
-  symlinkSync(join(root, 'not-mounted.vrt'), join(dir, 'source.vrt'));
+  const dir = add('245-de_by');
 
   assert.equal(parseSourceJson('{}', dir).path, join(dir, 'source.vrt'));
 
@@ -205,42 +206,26 @@ test('parseSourceJson: without "file", the linked source raster is read', (t) =>
   assert.throws(() => parseSourceJson('{}', other), /No raster/);
 });
 
-test('parseSourceJson: a pinned bbox is kept', () => {
-  const src = parseSourceJson(
-    JSON.stringify({ name: 'x', file: 'x.tif', bbox: [1, 2, 3, 4] }),
-    '/dtm/x',
-  );
+test('parseSourceJson: a pinned bbox is kept', (t) => {
+  const dir = datasets(t).add('010-sk');
 
-  assert.deepEqual(src.bbox, [1, 2, 3, 4]);
+  assert.deepEqual(
+    parseSourceJson(JSON.stringify({ bbox: [1, 2, 3, 4] }), dir).bbox,
+    [1, 2, 3, 4],
+  );
 });
 
-test('parseSourceJson: rejects malformed entries', () => {
-  const at = '/dtm/x';
+test('parseSourceJson: rejects malformed entries', (t) => {
+  const at = datasets(t).add('010-sk');
 
   assert.throws(() => parseSourceJson('not json', at), /Invalid source.json/);
   assert.throws(() => parseSourceJson('[]', at), /Invalid source.json/);
   assert.throws(
-    () => parseSourceJson(JSON.stringify({ name: '', file: 'x.tif' }), at),
-    /bad "name"/,
-  );
-  assert.throws(
-    () =>
-      parseSourceJson(
-        JSON.stringify({ name: 'x', file: 'x.tif', bbox: [1, 2] }),
-        at,
-      ),
+    () => parseSourceJson(JSON.stringify({ bbox: [1, 2] }), at),
     /bad "bbox"/,
   );
   assert.throws(
-    () =>
-      parseSourceJson(
-        JSON.stringify({
-          name: 'x',
-          file: 'x.tif',
-          attributions: [{ url: 'u' }],
-        }),
-        at,
-      ),
+    () => parseSourceJson(JSON.stringify({ attributions: [{ url: 'u' }] }), at),
     /attribution needs a "name"/,
   );
 });
@@ -254,23 +239,12 @@ test('loadElevationSources: empty root means no local sources', () => {
   );
 });
 
-test('loadElevationSources: reads directories in name order', () => {
-  const root = mkdtempSync(join(tmpdir(), 'elev-'));
+test('loadElevationSources: reads directories in name order', (t) => {
+  const { root, add } = datasets(t);
 
-  for (const [dir, name] of [
-    ['020-cz', 'cz'],
-    ['010-sk', 'sk'],
-    ['not-a-source', ''],
-  ] as const) {
-    mkdirSync(join(root, dir));
-
-    if (name) {
-      writeFileSync(
-        join(root, dir, 'source.json'),
-        JSON.stringify({ name, file: '/x.tif' }),
-      );
-    }
-  }
+  add('255-cz');
+  add('010-sk');
+  mkdirSync(join(root, 'not-a-source'));
 
   const warnings: string[] = [];
 
@@ -285,18 +259,13 @@ test('loadElevationSources: reads directories in name order', () => {
   assert.deepEqual(warnings, []);
 });
 
-test('loadElevationSources: a bad source.json is skipped, not thrown', () => {
+test('loadElevationSources: a bad source.json is skipped, not thrown', (t) => {
   // This runs during module evaluation, so a throw would take the whole API
   // down over one malformed file dropped into the directory.
-  const root = mkdtempSync(join(tmpdir(), 'elev-'));
+  const { root, add } = datasets(t);
 
-  mkdirSync(join(root, '010-good'));
-  writeFileSync(
-    join(root, '010-good', 'source.json'),
-    JSON.stringify({ name: 'sk', file: '/x.tif' }),
-  );
-
-  mkdirSync(join(root, '020-broken'));
+  add('010-sk');
+  add('020-broken');
   writeFileSync(join(root, '020-broken', 'source.json'), '{ not json');
 
   const warnings: string[] = [];

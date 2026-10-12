@@ -1,5 +1,5 @@
 import { lstatSync, readdirSync, readFileSync } from 'node:fs';
-import { basename, isAbsolute, join } from 'node:path';
+import { basename, join } from 'node:path';
 import gdal from 'gdal-async';
 
 // WGS84 built from proj4 to force traditional lon/lat axis order (GDAL 3 would
@@ -90,8 +90,8 @@ export type Bbox = [
 
 export type ParsedSource = {
   // public identifier reported by the API, shared by the rasters of one model
-  // (every German state reports `de`); taken from the directory unless
-  // `source.json` gives it, so renaming a directory can change the API
+  // (every German state reports `de`); taken from the directory, so renaming
+  // one can change the API
   name: string;
   path: string;
   attributions: SourceAttribution[];
@@ -114,8 +114,8 @@ export type SourceAttribution = {
 // Name reported for the global SRTM fallback dataset.
 export const SRTM_SOURCE_NAME = 'srtm';
 
-// The raster a source directory links, when `source.json` doesn't name one.
-const DEFAULT_FILES = ['source.vrt', 'source.tif'];
+// The raster a source directory links.
+const RASTER_FILES = ['source.vrt', 'source.tif'];
 
 /**
  * Load the elevation sources from a directory tree, in priority order: one
@@ -128,10 +128,9 @@ const DEFAULT_FILES = ['source.vrt', 'source.tif'];
  *
  *     { "attributions": [{ "name": "Bayerische Vermessungsverwaltung: DGM1 1 m" }] }
  *
- * `name` is optional: without it the directory name gives it — see
- * {@link nameFromDir}. `file` is optional and may be absolute; without it the
- * directory must hold `source.vrt` or `source.tif`, usually a link to a raster
- * that stays where it is. `bbox` is optional too, and normally omitted — see
+ * The directory name gives the reported name — see {@link nameFromDir} — and
+ * the directory holds the raster as `source.vrt` or `source.tif`, usually a link
+ * to one that stays where it is. `bbox` is optional, and normally omitted — see
  * {@link datasetBbox}.
  *
  * Nothing here throws. This runs while the module is still being evaluated, so
@@ -206,15 +205,7 @@ export function parseSourceJson(raw: string, dirPath: string): ParsedSource {
     throw new Error(`Invalid source.json in ${dirPath}: not an object`);
   }
 
-  const { name, file, bbox, attributions } = parsed as Record<string, unknown>;
-
-  if (name !== undefined && (typeof name !== 'string' || !name)) {
-    throw new Error(`Invalid source.json in ${dirPath}: bad "name"`);
-  }
-
-  if (file !== undefined && (typeof file !== 'string' || !file)) {
-    throw new Error(`Invalid source.json in ${dirPath}: bad "file"`);
-  }
+  const { bbox, attributions } = parsed as Record<string, unknown>;
 
   if (
     bbox !== undefined &&
@@ -230,12 +221,8 @@ export function parseSourceJson(raw: string, dirPath: string): ParsedSource {
   }
 
   return {
-    name: (name as string | undefined) ?? nameFromDir(dirPath),
-    path: file
-      ? isAbsolute(file)
-        ? file
-        : join(dirPath, file)
-      : defaultFile(dirPath),
+    name: nameFromDir(dirPath),
+    path: rasterFile(dirPath),
     bbox: bbox as Bbox | undefined,
     attributions: ((attributions ?? []) as unknown[]).map((attr) => {
       if (!attr || typeof attr !== 'object') {
@@ -266,21 +253,19 @@ export function nameFromDir(dirPath: string): string {
   const name = /^\d+-([a-z][a-z0-9]*)(?:[-_].*)?$/.exec(basename(dirPath))?.[1];
 
   if (!name) {
-    throw new Error(
-      `No name in ${dirPath}: give "name" or name it NNN-name (lowercase)`,
-    );
+    throw new Error(`No name in ${dirPath}: name it NNN-name (lowercase)`);
   }
 
   return name;
 }
 
-function defaultFile(dirPath: string): string {
-  for (const candidate of DEFAULT_FILES) {
+function rasterFile(dirPath: string): string {
+  for (const candidate of RASTER_FILES) {
     const full = join(dirPath, candidate);
 
     try {
       // lstat, so a link whose target is not mounted yet still names the
-      // source; opening it is retried on first use, like an explicit "file"
+      // source; opening it is retried on first use
       const stat = lstatSync(full);
 
       if (stat.isFile() || stat.isSymbolicLink()) {
@@ -291,9 +276,7 @@ function defaultFile(dirPath: string): string {
     }
   }
 
-  throw new Error(
-    `No raster in ${dirPath}: give "file" or add ${DEFAULT_FILES.join(' / ')}`,
-  );
+  throw new Error(`No raster in ${dirPath}: link ${RASTER_FILES.join(' or ')}`);
 }
 
 /**

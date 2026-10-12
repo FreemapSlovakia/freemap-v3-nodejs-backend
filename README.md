@@ -126,18 +126,18 @@ pnpm start | pnpm exec pino-pretty
   }
   ```
 
-  - `name` (optional) is reported by `/geotools/elevation?sources=1`, so it is
-    an API contract, not a label: the lowercase ISO 3166-1 alpha-2 code of the
-    country the model covers (`sk`, `at`, …), or the model's own id for one
-    that isn't country-scoped (`gedtm30`). Without it the directory gives it:
-    the part past the number up to the first `-` or `_`, so `245-de_by` and
-    `249-de_th` both report `de`; a directory that yields no lowercase name is
-    skipped with a warning. So renaming a directory can change the API; give
-    `name` to pin it. Several sources may share a name — the reported list is
-    deduplicated, and their credits are merged.
-  - `file` (optional) is the raster, absolute or relative to the directory.
-    Without it the directory must hold `source.vrt` or `source.tif`, normally a
-    link to a raster that stays where it is. `.vrt` and `.tif` are both fine.
+  The directory name gives the name reported by
+  `/geotools/elevation?sources=1`: the part past the number up to the first `-`
+  or `_`, so `245-de_by` and `249-de_th` both report `de`. It is an API
+  contract, not a label — the lowercase ISO 3166-1 alpha-2 code of the country
+  the model covers, or the model's own id for one that isn't country-scoped
+  (`gedtm30`) — so renaming a directory changes the API. A directory that
+  yields no lowercase name is skipped with a warning. Several sources may share
+  a name: the reported list is deduplicated, and their credits are merged.
+
+  The raster is the directory's `source.vrt` or `source.tif`, normally a link
+  to one that stays where it is.
+
   - `attributions` (optional) is how the source wants crediting, served straight
     to clients so a new dataset needs no web or mobile release. A country
     stitched from two licensed datasets carries two entries.
