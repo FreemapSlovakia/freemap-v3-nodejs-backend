@@ -10,10 +10,6 @@ if (dsn) {
       'SENTRY_ENVIRONMENT',
       getEnv('NODE_ENV', 'development'),
     ),
-    // Attach request IP / user / headers to events. Safe-ish here because the
-    // Sentry instance is self-hosted; Sentry's default data scrubber still
-    // redacts the Authorization header and token-like fields.
-    sendDefaultPii: true,
     // 0 = errors only; raise to sample performance traces.
     tracesSampleRate: Number(getEnv('SENTRY_TRACES_SAMPLE_RATE', '0')),
     // Don't report expected client errors (4xx) thrown via ctx.throw().

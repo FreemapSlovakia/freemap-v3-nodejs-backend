@@ -13,6 +13,29 @@ const BodySchema = z.strictObject({
 
 const ResponseSchema = z.strictObject({ portalUrl: z.url() });
 
+// Polar answers an unknown customer with a 422 on the customer field, not a 404.
+function isMissingCustomer(err: unknown): boolean {
+  const { statusCode, error } = err as { statusCode?: number; error?: unknown };
+
+  if (statusCode !== 422 || typeof error !== 'object' || error === null) {
+    return false;
+  }
+
+  const { detail } = error as { detail?: { type?: string; loc?: unknown[] }[] };
+
+  // Only `value_error`: any invalid body also reports the other union variant's
+  // customer field as `missing`.
+  return (
+    Array.isArray(detail) &&
+    detail.some(
+      (d) =>
+        d.type === 'value_error' &&
+        (d.loc?.includes('customer_id') ||
+          d.loc?.includes('external_customer_id')),
+    )
+  );
+}
+
 export function attachPolarPortalHandler(router: RouterInstance) {
   registerPath('/auth/polar/portal', {
     post: {
@@ -47,7 +70,7 @@ export function attachPolarPortalHandler(router: RouterInstance) {
     // customer whose Polar `external_id` still names the account that was
     // merged away, so looking up by our user ID would miss it (or, worse, find
     // the wrong customer). Users who only ever bought credits have no stored ID
-    // — the checkout always sets `externalCustomerId`, so that covers them.
+    // — the checkout always sets `external_customer_id`, so that covers them.
     const rows = await pool.query<{ polarCustomerId: string | null }[]>(
       sql`SELECT polarCustomerId FROM user WHERE id = ${user.id}`,
     );
@@ -59,15 +82,15 @@ export function attachPolarPortalHandler(router: RouterInstance) {
     try {
       session = await getPolar().customerSessions.create({
         ...(customerId === null
-          ? { externalCustomerId: String(user.id) }
-          : { customerId }),
-        ...(body.returnUrl === undefined ? {} : { returnUrl: body.returnUrl }),
+          ? { external_customer_id: String(user.id) }
+          : { customer_id: customerId }),
+        ...(body.returnUrl === undefined ? {} : { return_url: body.returnUrl }),
       });
     } catch (err) {
       // Nothing was ever bought through Polar, so there is no customer to open
       // a portal for. Distinguished from a real outage so the client can simply
       // not offer the link rather than show an error.
-      if ((err as { statusCode?: number }).statusCode === 404) {
+      if (isMissingCustomer(err)) {
         return ctx.throw(404, 'no Polar customer');
       }
 
@@ -76,6 +99,6 @@ export function attachPolarPortalHandler(router: RouterInstance) {
       return ctx.throw(502, 'failed to create customer portal session');
     }
 
-    ctx.body = ResponseSchema.parse({ portalUrl: session.customerPortalUrl });
+    ctx.body = ResponseSchema.parse({ portalUrl: session.customer_portal_url });
   });
 }

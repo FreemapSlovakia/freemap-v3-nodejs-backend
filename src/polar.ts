@@ -1,30 +1,25 @@
-import { Polar } from '@polar-sh/sdk';
-import { HTTPClient } from '@polar-sh/sdk/lib/http.js';
+import { createPolar, type Polar, webhooks } from '@polar-sh/sdk/2026-10';
 import { getEnv } from './env.js';
 
-/**
- * API contract the integration is pinned to. Polar ships a new version in the
- * first week of January, April, July and October; unpinned requests follow
- * whatever is current at the time, so we send the header explicitly. Bump this
- * only together with a review of the changed endpoints and webhook payloads.
- */
-const POLAR_API_VERSION = '2026-04';
+// The import path pins the Polar API version (sent as `Polar-Version`). Polar
+// ships a new version in the first week of January, April, July and October;
+// bump it only together with a review of the changed endpoints and webhook
+// payloads. Webhooks are re-exported so they parse with the same version.
+
+export { webhooks };
 
 let polar: Polar | undefined;
 
-/** Lazily-constructed Polar SDK client, pinned to {@link POLAR_API_VERSION}. */
+/** Lazily-constructed Polar SDK client. */
 export function getPolar(): Polar {
   if (!polar) {
-    const httpClient = new HTTPClient();
-
-    httpClient.addHook('beforeRequest', (req) => {
-      req.headers.set('Polar-Version', POLAR_API_VERSION);
-    });
-
-    polar = new Polar({
+    polar = createPolar({
       accessToken: getEnv('POLAR_ACCESS_TOKEN'),
-      server: getEnv('POLAR_SERVER', 'sandbox') as 'sandbox' | 'production',
-      httpClient,
+      environment: getEnv('POLAR_SERVER', 'sandbox') as
+        | 'sandbox'
+        | 'production',
+      // The SDK default is 5 s, short enough to fail a slow checkout creation.
+      timeout: 30,
     });
   }
 
