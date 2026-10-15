@@ -7,7 +7,7 @@ export type DownloadableMap = {
   creditsPerMTile: number;
   overlay?: boolean;
   /** What the tiles are; `jpg` unless set. */
-  tileFormat?: 'jpg' | 'png';
+  tileFormat?: 'jpg' | 'png' | 'webp';
   /** Rendered by terrain-tiles from the shading the request carries. */
   shading?: true;
 } & (
@@ -21,15 +21,67 @@ export type DownloadableMap = {
     }
 );
 
+const OUTDOOR_URL = 'https://outdoor.tiles.freemap.sk';
+
+const OUTDOOR_LICENSES_URL = `${OUTDOOR_URL}/licenses`;
+
+const FREEMAP_OSM_ATTRIBUTION =
+  'map: © Freemap Slovakia, data: © OpenStreetMap contributors';
+
 export const downloadableMaps: DownloadableMap[] = [
   {
     type: 'X',
-    url: 'https://outdoor.tiles.freemap.sk/{z}/{x}/{y}',
+    url: `${OUTDOOR_URL}/{z}/{x}/{y}`,
     extraScales: [2, 3, 4],
     minZoom: 5,
     maxNativeZoom: 20,
-    creditsPerMTile: 5000,
-    licensesUrl: 'https://outdoor.tiles.freemap.sk/licenses',
+    creditsPerMTile: 3000,
+    licensesUrl: OUTDOOR_LICENSES_URL,
+  },
+  {
+    type: 'XK',
+    url: `${OUTDOOR_URL}/kst/{z}/{x}/{y}`,
+    extraScales: [2, 3, 4],
+    minZoom: 5,
+    maxNativeZoom: 20,
+    creditsPerMTile: 1500,
+    licensesUrl: OUTDOOR_LICENSES_URL,
+  },
+  ...(
+    [
+      ['xh', 'hiking', 9, 500],
+      ['xb', 'bicycle', 9, 500],
+      ['xl', 'ski', 9, 500],
+      ['xr', 'horse', 9, 500],
+      ['xs', 'sac', 12, 500],
+      ['xm', 'mtb', 12, 500],
+      ['xq', 'smoothness', 12, 500],
+      ['xa', 'aerial', 5, 1000],
+    ] as const
+  ).map(
+    ([type, route, minZoom, creditsPerMTile]): DownloadableMap => ({
+      type,
+      url: `${OUTDOOR_URL}/o/${route}/{z}/{x}/{y}`,
+      extraScales: [2, 3],
+      tileFormat: 'webp',
+      overlay: true,
+      minZoom,
+      maxNativeZoom: 20,
+      creditsPerMTile,
+      attribution: FREEMAP_OSM_ATTRIBUTION,
+    }),
+  ),
+  // contours, which take their credit from the datasets they were drawn from
+  {
+    type: 'xc',
+    url: `${OUTDOOR_URL}/o/contours/{z}/{x}/{y}`,
+    extraScales: [2, 3],
+    tileFormat: 'webp',
+    overlay: true,
+    minZoom: 12,
+    maxNativeZoom: 20,
+    creditsPerMTile: 1000,
+    licensesUrl: OUTDOOR_LICENSES_URL,
   },
   {
     type: 'h',
@@ -40,13 +92,14 @@ export const downloadableMaps: DownloadableMap[] = [
     shading: true,
     licensesUrl: 'https://terrain.tiles.freemap.sk/licenses',
   },
+  // legacy A, T, C and K: the web client no longer offers them
   {
     type: 'A',
     url: 'http://tile.freemap.sk/A/{z}/{x}/{y}.jpeg',
     minZoom: 8,
     maxNativeZoom: 16,
     creditsPerMTile: 1000,
-    attribution: 'map: © Freemap Slovakia, data: © OpenStreetMap contributors',
+    attribution: FREEMAP_OSM_ATTRIBUTION,
   },
   {
     type: 'T',
@@ -54,8 +107,7 @@ export const downloadableMaps: DownloadableMap[] = [
     minZoom: 8,
     maxNativeZoom: 16,
     creditsPerMTile: 1000,
-    attribution:
-      'map: © Freemap Slovakia, data: © OpenStreetMap contributors, data: © SRTM',
+    attribution: `${FREEMAP_OSM_ATTRIBUTION}, data: © SRTM`,
   },
   {
     type: 'C',
@@ -63,8 +115,7 @@ export const downloadableMaps: DownloadableMap[] = [
     minZoom: 8,
     maxNativeZoom: 16,
     creditsPerMTile: 1000,
-    attribution:
-      'map: © Freemap Slovakia, data: © OpenStreetMap contributors, data: © SRTM',
+    attribution: `${FREEMAP_OSM_ATTRIBUTION}, data: © SRTM`,
   },
   {
     type: 'K',
@@ -72,8 +123,7 @@ export const downloadableMaps: DownloadableMap[] = [
     minZoom: 8,
     maxNativeZoom: 16,
     creditsPerMTile: 1000,
-    attribution:
-      'map: © Freemap Slovakia, data: © OpenStreetMap contributors, data: © SRTM',
+    attribution: `${FREEMAP_OSM_ATTRIBUTION}, data: © SRTM`,
   },
   {
     type: 'Z',
@@ -99,6 +149,7 @@ export const downloadableMaps: DownloadableMap[] = [
     creditsPerMTile: 1000,
     attribution: 'map: © GKÚ, NLC',
   },
+  // legacy: the web client no longer offers it
   {
     type: '4',
     url: 'https://dmr5-light-shading.tiles.freemap.sk/{z}/{x}/{y}.jpg',
@@ -115,6 +166,7 @@ export const downloadableMaps: DownloadableMap[] = [
     creditsPerMTile: 1000,
     attribution: 'map: © Freemap Slovakia, data: LLS DMR: © ÚGKK SR',
   },
+  // legacy: the web client no longer offers it
   {
     type: '5',
     url: 'https://dmr5-shading.tiles.freemap.sk/{z}/{x}/{y}.jpg',

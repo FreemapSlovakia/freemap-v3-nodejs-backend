@@ -17,6 +17,7 @@ import { getEnv } from '../env.js';
 import { appLogger } from '../logger.js';
 import { sendMail } from '../mailer.js';
 import { AUTH_REQUIRED, registerPath } from '../openapi.js';
+import { acceptValidator } from '../requestValidators.js';
 import { fetchLicenses, TileCodeCollector } from '../tileAttribution.js';
 
 const CONCURRENCY = 8;
@@ -212,7 +213,39 @@ const DownloadBodySchema = z.strictObject({
     .optional(),
 });
 
+const DownloadableMapsSchema = z.array(
+  z.object({ type: z.string(), creditsPerMTile: z.number() }),
+);
+
+const downloadableMapPrices: z.infer<typeof DownloadableMapsSchema> =
+  downloadableMaps.map(({ type, creditsPerMTile }) => ({
+    type,
+    creditsPerMTile,
+  }));
+
 export function attachDownloadMapHandler(router: RouterInstance) {
+  registerPath('/downloadableMaps', {
+    get: {
+      summary:
+        'List the maps an offline package can be made of, with their prices',
+      tags: ['maps'],
+      responses: {
+        200: {
+          content: { 'application/json': { schema: DownloadableMapsSchema } },
+        },
+      },
+    },
+  });
+
+  // The web client offers exactly these, in its export and its offline maps.
+  router.get(
+    '/downloadableMaps',
+    acceptValidator('application/json'),
+    (ctx) => {
+      ctx.body = downloadableMapPrices;
+    },
+  );
+
   registerPath('/downloadMap', {
     post: {
       summary:
