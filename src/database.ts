@@ -261,7 +261,8 @@ export async function initDatabase() {
       gsmSignal FLOAT NULL,
       message VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL,
       CONSTRAINT tpDeviceIdFk FOREIGN KEY (deviceId) REFERENCES trackingDevice (id) ON DELETE CASCADE,
-      INDEX tpCreatedAtIdx (createdAt)
+      INDEX tpDeviceIdx (deviceId),
+      INDEX tpDeviceCreatedAtIdx (deviceId, createdAt)
     ) ENGINE=InnoDB`,
 
     sql`CREATE TABLE IF NOT EXISTS trackingAccessToken (
@@ -430,6 +431,14 @@ export async function initDatabase() {
     // migration itself and the first cleanup can delete nothing until the
     // inactivity window has actually elapsed.
     'ALTER TABLE auth ADD COLUMN lastUsedAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP, ADD INDEX authLastUsedIdx (lastUsedAt)',
+
+    // Pruning a device's points needs (deviceId, createdAt) for the age limit
+    // and (deviceId) for the id order of the count limit; without them it
+    // scans the device's whole history. The FK's implicit index, if any, is
+    // replaced by the named one so every database matches the CREATE TABLE.
+    // Every createdAt filter also has a deviceId, so the createdAt-only index
+    // goes.
+    'ALTER TABLE trackingPoint ADD INDEX IF NOT EXISTS tpDeviceIdx (deviceId), ADD INDEX IF NOT EXISTS tpDeviceCreatedAtIdx (deviceId, createdAt), DROP INDEX IF EXISTS tpDeviceIdFk, DROP INDEX IF EXISTS tpCreatedAtIdx',
   ];
 
   const db = await pool.getConnection();

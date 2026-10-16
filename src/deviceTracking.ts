@@ -2,6 +2,35 @@ import type { PoolConnection } from 'mariadb';
 import sql from 'sql-template-tag';
 import { trackRegister } from './trackRegister.js';
 
+// Both deletes are index range scans over the device's pruned points only.
+// Callers hold the trackingDevice row FOR UPDATE, so one device's inserts and
+// prunes run one at a time instead of deadlocking.
+export async function pruneTrackPoints(
+  conn: PoolConnection,
+  id: number,
+  maxAge: number | null | undefined,
+  maxCount: number | null | undefined,
+) {
+  if (maxAge != null) {
+    await conn.query<unknown>(
+      sql`DELETE FROM trackingPoint WHERE deviceId = ${id} AND createdAt < NOW() - INTERVAL ${maxAge} SECOND`,
+    );
+  }
+
+  if (maxCount != null) {
+    // A plain SELECT is a non-locking read, unlike a subquery inside DELETE.
+    const [newestPruned] = await conn.query<{ id: number }[]>(
+      sql`SELECT id FROM trackingPoint WHERE deviceId = ${id} ORDER BY id DESC LIMIT 1 OFFSET ${maxCount}`,
+    );
+
+    if (newestPruned) {
+      await conn.query<unknown>(
+        sql`DELETE FROM trackingPoint WHERE deviceId = ${id} AND id <= ${newestPruned.id}`,
+      );
+    }
+  }
+}
+
 export async function storeTrackPoint(
   conn: PoolConnection,
   id: number,
@@ -69,20 +98,7 @@ export async function storeTrackPoint(
       createdAt = ${time}
   `);
 
-  if (maxAge != null) {
-    await conn.query<unknown>(
-      sql`DELETE FROM trackingPoint WHERE deviceId = ${id} AND TIMESTAMPDIFF(SECOND, createdAt, NOW()) > ${maxAge}`,
-    );
-  }
-
-  if (maxCount != null) {
-    await conn.query<unknown>(sql`
-      DELETE t FROM trackingPoint AS t JOIN (
-        SELECT id FROM trackingPoint WHERE deviceId = ${id}
-          ORDER BY id DESC LIMIT 18446744073709551615 OFFSET ${maxCount}
-      ) tlimit ON t.id = tlimit.id
-    `);
-  }
+  await pruneTrackPoints(conn, id, maxAge, maxCount);
 
   const rows = await conn.query<{ token: string }[]>(sql`
     SELECT token FROM trackingAccessToken

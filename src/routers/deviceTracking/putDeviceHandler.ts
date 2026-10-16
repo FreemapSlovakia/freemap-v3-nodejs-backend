@@ -4,6 +4,7 @@ import sql from 'sql-template-tag';
 import z from 'zod';
 import { authenticator } from '../../authenticator.js';
 import { isSqlDuplicateError, runInTransaction } from '../../database.js';
+import { pruneTrackPoints } from '../../deviceTracking.js';
 import { AUTH_REQUIRED, registerPath } from '../../openapi.js';
 import { nanoid } from '../../randomId.js';
 import { acceptValidator } from '../../requestValidators.js';
@@ -54,7 +55,11 @@ export function attachPutDeviceHandler(router: RouterInstance) {
         return ctx.throw(400, err as Error);
       }
 
-      const { id } = ctx.params;
+      const id = Number(ctx.params.id);
+
+      if (!Number.isSafeInteger(id) || id < 0) {
+        return ctx.throw(400, 'invalid id');
+      }
 
       const { name, maxCount, maxAge, token = nanoid() } = body;
 
@@ -83,22 +88,7 @@ export function attachPutDeviceHandler(router: RouterInstance) {
           throw err;
         }
 
-        if (maxAge != null) {
-          await conn.query<unknown>(sql`
-            DELETE FROM trackingPoint WHERE deviceId = ${id} AND TIMESTAMPDIFF(SECOND, createdAt, NOW()) > ${maxAge}
-          `);
-        }
-
-        if (maxCount != null) {
-          await conn.query<unknown>(sql`
-            DELETE t
-            FROM trackingPoint AS t
-            JOIN (
-              SELECT id FROM trackingPoint WHERE deviceId = ${id}
-                ORDER BY id DESC LIMIT 18446744073709551615 OFFSET ${maxCount}
-            ) tlimit ON t.id = tlimit.id
-        `);
-        }
+        await pruneTrackPoints(conn, id, maxAge, maxCount);
       });
 
       ctx.body = { token };

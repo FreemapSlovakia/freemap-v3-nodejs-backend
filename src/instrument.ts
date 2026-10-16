@@ -14,11 +14,22 @@ if (dsn) {
     tracesSampleRate: Number(getEnv('SENTRY_TRACES_SAMPLE_RATE', '0')),
     // Don't report expected client errors (4xx) thrown via ctx.throw().
     beforeSend(event, hint) {
-      const status =
-        (hint?.originalException as { status?: number; statusCode?: number })
-          ?.status ??
-        (hint?.originalException as { status?: number; statusCode?: number })
-          ?.statusCode;
+      // A client that hung up mid-response, reported by Koa's body pipeline
+      // (Koa sets headerSent on errors raised after the response started).
+      const ex = hint?.originalException as
+        | {
+            code?: string;
+            headerSent?: boolean;
+            status?: number;
+            statusCode?: number;
+          }
+        | undefined;
+
+      if (ex?.code === 'ERR_STREAM_PREMATURE_CLOSE' && ex.headerSent) {
+        return null;
+      }
+
+      const status = ex?.status ?? ex?.statusCode;
 
       if (typeof status === 'number' && status >= 400 && status < 500) {
         return null;
