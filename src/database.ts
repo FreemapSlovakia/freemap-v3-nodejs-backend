@@ -38,6 +38,8 @@ export async function initDatabase() {
       -- UUID, or a 32-char hex id on older accounts.
       garminUserId VARCHAR(64) CHARSET ascii NULL UNIQUE,
       appleUserId VARCHAR(255) CHARSET ascii NULL UNIQUE,
+      -- Only a token granted the write_gpx scope is stored.
+      osmAccessToken VARCHAR(255) CHARSET ascii COLLATE ascii_bin NULL,
       garminAccessToken VARCHAR(255) CHARSET ascii NULL,
       garminAccessTokenSecret VARCHAR(255) CHARSET ascii NULL,
       githubUserId VARCHAR(32) CHARSET ascii NULL,
@@ -61,7 +63,9 @@ export async function initDatabase() {
       language CHAR(2) CHARSET ascii NULL,
       polarCustomerId VARCHAR(64) CHARSET ascii NULL,
       polarSubscriptionId VARCHAR(64) CHARSET ascii NULL,
-      cancelAtPeriodEnd BIT NOT NULL DEFAULT false
+      cancelAtPeriodEnd BIT NOT NULL DEFAULT false,
+      -- Whether any account still holds a token, before revoking it.
+      INDEX userOsmAccessTokenIdx (osmAccessToken)
     ) ENGINE=InnoDB`,
 
     sql`CREATE TABLE IF NOT EXISTS blockedCredit (
@@ -439,6 +443,8 @@ export async function initDatabase() {
     // Every createdAt filter also has a deviceId, so the createdAt-only index
     // goes.
     'ALTER TABLE trackingPoint ADD INDEX IF NOT EXISTS tpDeviceIdx (deviceId), ADD INDEX IF NOT EXISTS tpDeviceCreatedAtIdx (deviceId, createdAt), DROP INDEX IF EXISTS tpDeviceIdFk, DROP INDEX IF EXISTS tpCreatedAtIdx',
+
+    'ALTER TABLE user ADD COLUMN IF NOT EXISTS osmAccessToken VARCHAR(255) CHARSET ascii COLLATE ascii_bin NULL AFTER appleUserId, ADD INDEX IF NOT EXISTS userOsmAccessTokenIdx (osmAccessToken)',
   ];
 
   const db = await pool.getConnection();

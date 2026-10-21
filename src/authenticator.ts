@@ -109,5 +109,6 @@ export function rowToUser(row: UserRow, authToken: string): User {
       .map(([column]) => columnToAuthProvider[column]),
     authToken,
     isAdmin: row.roles.length > 0,
+    osmGpxAuthorized: row.osmAccessToken !== null,
   };
 }

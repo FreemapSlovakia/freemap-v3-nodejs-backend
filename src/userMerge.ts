@@ -14,6 +14,7 @@ const SOURCE_AUTH_COLS = [
   'garminAccessToken',
   'garminAccessTokenSecret',
   'osmId',
+  'osmAccessToken',
   'facebookUserId',
   'googleUserId',
   'appleUserId',
@@ -62,8 +63,8 @@ export async function mergeUserAccounts(
   source: UserRow,
   opts: {
     /** Extra columns to write onto `target` (e.g. a new provider ID being
-     * connected during a login flow). Applied via COALESCE alongside the
-     * source's auth columns. */
+     * connected during a login flow). They overwrite the target's values and
+     * take the place of the source's. */
     extraTargetFields?: Record<string, unknown>;
     /** A freshly-fetched OAuth picture to use as a higher-priority fallback
      * than the source's stored picture. */
@@ -87,7 +88,17 @@ export async function mergeUserAccounts(
     authData[col] = source[col];
   }
 
-  Object.assign(authData, opts.extraTargetFields ?? {});
+  const extraFields = opts.extraTargetFields ?? {};
+
+  for (const column of Object.keys(extraFields)) {
+    delete authData[column];
+  }
+
+  // The token belongs to the source's OSM account; a forced merge keeping the
+  // target's other one must not pair them.
+  if (target.osmId !== null && source.osmId !== target.osmId) {
+    delete authData['osmAccessToken'];
+  }
 
   await conn.query<unknown>(sql`DELETE FROM auth WHERE userId = ${source.id}`);
 
@@ -207,12 +218,16 @@ export async function mergeUserAccounts(
       credits = credits + ${credits},
       ${polarFields}
       picture = COALESCE(picture, ${opts.newPicture ?? null}, (SELECT picture FROM (SELECT picture FROM user WHERE id = ${sourceId}) t)),
-      ${join(
-        Object.entries(authData).map(
+      ${join([
+        ...Object.entries(authData).map(
           ([column, value]) =>
             sql`${raw(column)} = COALESCE(${raw(column)}, ${value})`,
         ),
-      )}
+        // What the caller sets wins over the target's own, e.g. a new token.
+        ...Object.entries(extraFields).map(
+          ([column, value]) => sql`${raw(column)} = ${value}`,
+        ),
+      ])}
     WHERE id = ${target.id}
   `);
 

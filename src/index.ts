@@ -25,6 +25,7 @@ import { attachGeoIp } from './routers/geoip.js';
 import { geotoolsRouter } from './routers/geotools/index.js';
 import { attachGetUsers } from './routers/getUsersHandler.js';
 import { mapsRouter } from './routers/maps/index.js';
+import { attachOsmGpxHandlers } from './routers/osmGpxHandler.js';
 import { attachStravaHandlers } from './routers/stravaHandler.js';
 import { tracklogsRouter } from './routers/tracklogs/index.js';
 import { startSocketDeviceTracking } from './socketDeviceTracking.js';
@@ -211,6 +212,8 @@ attachGetUsers(router);
 attachGeoIp(router);
 
 attachPostGarminCourses(router);
+
+attachOsmGpxHandlers(router);
 
 attachStravaHandlers(router);
 

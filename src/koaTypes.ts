@@ -8,6 +8,7 @@ export type User = z.infer<typeof UserRowSchema> & {
   authToken: string;
   /** Backward-compatible flag: true when the user holds any role. */
   isAdmin: boolean;
+  osmGpxAuthorized: boolean;
 };
 
 declare module 'koa' {
