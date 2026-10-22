@@ -49,44 +49,49 @@ export function attachPutPictureHandler(router: RouterInstance) {
     },
   });
 
-  router.put('/pictures/:id', authenticator(true), async (ctx) => {
-    let body;
+  router.put(
+    '/pictures/:id',
+    authenticator(true, 'gallery:write'),
+    async (ctx) => {
+      let body;
 
-    try {
-      body = BodySchema.parse(ctx.request.body);
-    } catch (err) {
-      return ctx.throw(400, err as Error);
-    }
-
-    const {
-      title,
-      description,
-      takenAt,
-      position: { lat, lon },
-      tags = [],
-      azimuth,
-      premium,
-      license,
-    } = body;
-
-    await runInTransaction(async (conn) => {
-      const rows = await conn.query<{ userId: number; license: string }[]>(
-        sql`SELECT userId, license FROM picture WHERE id = ${ctx.params.id} FOR UPDATE`,
-      );
-
-      if (rows.length === 0) {
-        ctx.throw(404, 'no such picture');
+      try {
+        body = BodySchema.parse(ctx.request.body);
+      } catch (err) {
+        return ctx.throw(400, err as Error);
       }
 
-      if (!isOwnerOrRole(ctx.state.user, rows[0].userId, 'galleryModerator')) {
-        ctx.throw(403);
-      }
+      const {
+        title,
+        description,
+        takenAt,
+        position: { lat, lon },
+        tags = [],
+        azimuth,
+        premium,
+        license,
+      } = body;
 
-      const licenseChanged =
-        license !== undefined && license !== rows[0].license;
+      await runInTransaction(async (conn) => {
+        const rows = await conn.query<{ userId: number; license: string }[]>(
+          sql`SELECT userId, license FROM picture WHERE id = ${ctx.params.id} FOR UPDATE`,
+        );
 
-      const queries = [
-        conn.query<unknown>(sql`
+        if (rows.length === 0) {
+          ctx.throw(404, 'no such picture');
+        }
+
+        if (
+          !isOwnerOrRole(ctx.state.user, rows[0].userId, 'galleryModerator')
+        ) {
+          ctx.throw(403);
+        }
+
+        const licenseChanged =
+          license !== undefined && license !== rows[0].license;
+
+        const queries = [
+          conn.query<unknown>(sql`
           UPDATE picture SET
             title = ${title},
             description = ${description},
@@ -98,34 +103,35 @@ export function attachPutPictureHandler(router: RouterInstance) {
             WHERE id = ${ctx.params.id}
         `),
 
-        // delete missing tags
-        conn.query<unknown>(
-          sql`DELETE FROM pictureTag WHERE pictureId = ${ctx.params.id}
+          // delete missing tags
+          conn.query<unknown>(
+            sql`DELETE FROM pictureTag WHERE pictureId = ${ctx.params.id}
             ${tags?.length ? ` AND name NOT IN (${join(tags)})` : empty}`,
-        ),
-      ];
-
-      if (licenseChanged) {
-        queries.push(
-          conn.query<unknown>(
-            sql`INSERT INTO pictureLicenseHistory (pictureId, license) VALUES (${ctx.params.id}, ${license})`,
           ),
-        );
-      }
+        ];
 
-      if (tags?.length) {
-        queries.push(
-          conn.query<unknown>(
-            sql`INSERT INTO pictureTag (name, pictureId)
+        if (licenseChanged) {
+          queries.push(
+            conn.query<unknown>(
+              sql`INSERT INTO pictureLicenseHistory (pictureId, license) VALUES (${ctx.params.id}, ${license})`,
+            ),
+          );
+        }
+
+        if (tags?.length) {
+          queries.push(
+            conn.query<unknown>(
+              sql`INSERT INTO pictureTag (name, pictureId)
                   VALUES ${bulk(tags.map((tag: string) => [tag, ctx.params.id]))}
                   ON DUPLICATE KEY UPDATE name = name`,
-          ),
-        );
-      }
+            ),
+          );
+        }
 
-      await Promise.all(queries);
-    });
+        await Promise.all(queries);
+      });
 
-    ctx.status = 204;
-  });
+      ctx.status = 204;
+    },
+  );
 }

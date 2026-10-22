@@ -112,7 +112,7 @@ export function attachGetPictureHandler(router: RouterInstance) {
   router.get(
     '/pictures/:id',
     acceptValidator('application/json'),
-    authenticator(false),
+    authenticator(false, 'gallery:read'),
     async (ctx) => {
       const ref = parsePictureId(ctx.params.id);
 

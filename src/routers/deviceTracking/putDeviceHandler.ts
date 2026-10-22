@@ -45,7 +45,7 @@ export function attachPutDeviceHandler(router: RouterInstance) {
   router.put(
     '/devices/:id',
     acceptValidator('application/json'),
-    authenticator(true),
+    authenticator(true, 'tracking:write'),
     async (ctx) => {
       let body;
 

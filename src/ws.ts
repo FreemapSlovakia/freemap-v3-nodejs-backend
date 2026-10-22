@@ -18,7 +18,7 @@ import { trackRegister } from './trackRegister.js';
 export function attachWs(app: KoaWebsocket.App) {
   const wsRouter = new Router();
 
-  wsRouter.all('/ws', authenticator(), async (ctx) => {
+  wsRouter.all('/ws', authenticator(false, 'tracking:read'), async (ctx) => {
     console.log('WebSocket connection established');
 
     const { pingInterval } = ctx.query;

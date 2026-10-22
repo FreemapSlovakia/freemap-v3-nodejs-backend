@@ -35,6 +35,7 @@ const SIMPLE_FK_TABLES = [
   'purchaseToken',
   'purchaseIntent',
   'blockedCredit',
+  'appToken',
 ] as const;
 
 // Tables whose PK contains userId — winner may already have a row for the

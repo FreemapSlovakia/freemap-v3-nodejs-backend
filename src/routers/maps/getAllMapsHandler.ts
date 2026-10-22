@@ -39,7 +39,7 @@ export function attachGetAllMapsHandler(router: RouterInstance) {
   router.get(
     '/',
     acceptValidator('application/json'),
-    authenticator(true),
+    authenticator(true, 'maps:read'),
     async (ctx) => {
       const user = ctx.state.user!;
 

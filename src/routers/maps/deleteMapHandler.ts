@@ -30,7 +30,7 @@ export function attachDeleteMapHandler(router: RouterInstance) {
   router.delete(
     '/:id',
     acceptValidator('application/json'),
-    authenticator(true),
+    authenticator(true, 'maps:write'),
     async (ctx) => {
       await runInTransaction(async (conn) => {
         const [item] = await conn.query<{ userId: number }[]>(

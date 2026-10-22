@@ -60,7 +60,7 @@ export function attachPatchMapHandler(router: RouterInstance) {
   router.patch(
     '/:id',
     acceptValidator('application/json'),
-    authenticator(true),
+    authenticator(true, 'maps:write'),
     async (ctx) => {
       let body;
 

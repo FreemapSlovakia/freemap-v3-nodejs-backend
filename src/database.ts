@@ -87,6 +87,21 @@ export async function initDatabase() {
       INDEX authLastUsedIdx (lastUsedAt)
     ) ENGINE=InnoDB`,
 
+    // Only the SHA-256 of the token is kept; it is shown to the user once.
+    sql`CREATE TABLE IF NOT EXISTS appToken (
+      id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+      userId INT UNSIGNED NOT NULL,
+      tokenHash BINARY(32) NOT NULL UNIQUE,
+      note VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL,
+      scopes JSON NOT NULL,
+      createdAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      expiresAt TIMESTAMP NULL,
+      lastUsedAt TIMESTAMP NULL,
+      lastUserAgent VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL,
+      FOREIGN KEY (userId) REFERENCES user (id) ON DELETE CASCADE,
+      INDEX appTokenExpiresAtIdx (expiresAt)
+    ) ENGINE=InnoDB`,
+
     sql`CREATE TABLE IF NOT EXISTS purchaseToken (
       token VARCHAR(255) CHARSET ascii NULL PRIMARY KEY,
       userId INT UNSIGNED NOT NULL,
@@ -490,6 +505,10 @@ export async function initDatabase() {
 
     await pool.query<unknown>(
       sql`DELETE FROM purchaseIntent WHERE expireAt < NOW()`,
+    );
+
+    await pool.query<unknown>(
+      sql`DELETE FROM appToken WHERE expiresAt < NOW()`,
     );
 
     await runInTransaction(async (conn) => {

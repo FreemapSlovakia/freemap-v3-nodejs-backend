@@ -44,7 +44,7 @@ export function attachGetAllTokensHandler(router: RouterInstance) {
   router.get(
     '/devices/:id/access-tokens',
     acceptValidator('application/json'),
-    authenticator(true),
+    authenticator(true, 'tracking:read'),
     async (ctx) => {
       const [device] = await pool.query<{ userId: number }[]>(
         sql`SELECT userId FROM trackingDevice WHERE id = ${ctx.params.id}`,

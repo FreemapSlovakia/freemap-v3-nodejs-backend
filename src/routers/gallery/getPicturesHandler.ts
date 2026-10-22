@@ -322,7 +322,7 @@ export function attachGetPicturesHandler(router: RouterInstance) {
   router.get(
     '/pictures',
     acceptValidator('application/json', 'application/x-protobuf'),
-    authenticator(false),
+    authenticator(false, 'gallery:read'),
     async (ctx) => {
       const method = methods[ctx.query.by as string];
 

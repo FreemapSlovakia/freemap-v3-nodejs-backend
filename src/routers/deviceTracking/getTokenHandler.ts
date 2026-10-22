@@ -43,7 +43,7 @@ export function attachGetTokenHandler(router: RouterInstance) {
   router.get(
     '/access-tokens/:id',
     acceptValidator('application/json'),
-    authenticator(true),
+    authenticator(true, 'tracking:read'),
     async (ctx) => {
       const [item] = TokenDetailSchema.array()
         .max(1)

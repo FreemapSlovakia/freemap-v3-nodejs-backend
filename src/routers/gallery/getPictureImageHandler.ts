@@ -41,7 +41,7 @@ export function attachGetPictureImageHandler(router: RouterInstance) {
   router.get(
     '/pictures/:id/image',
     acceptValidator('image/jpeg'),
-    authenticator(false),
+    authenticator(false, 'gallery:read'),
     async (ctx) => {
       const [row] = await pool.query<
         {

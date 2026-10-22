@@ -32,7 +32,7 @@ export function attachPostMapHandler(router: RouterInstance) {
   router.post(
     '/',
     acceptValidator('application/json'),
-    authenticator(true),
+    authenticator(true, 'maps:write'),
     async (ctx) => {
       let body;
 

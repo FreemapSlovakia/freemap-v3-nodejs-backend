@@ -38,7 +38,7 @@ export function attachPostDeviceHandler(router: RouterInstance) {
   router.post(
     '/devices',
     acceptValidator('application/json'),
-    authenticator(true),
+    authenticator(true, 'tracking:write'),
     async (ctx) => {
       let body;
 

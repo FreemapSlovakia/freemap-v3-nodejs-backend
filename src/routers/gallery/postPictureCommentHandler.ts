@@ -43,7 +43,7 @@ export function attachPostPictureCommentHandler(router: RouterInstance) {
 
   router.post(
     '/pictures/:id/comments',
-    authenticator(true),
+    authenticator(true, 'gallery:write'),
     acceptValidator('application/json'),
     async (ctx) => {
       const ref = parsePictureId(ctx.params.id);
