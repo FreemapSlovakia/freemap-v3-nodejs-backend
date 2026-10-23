@@ -4,7 +4,13 @@ import { AppTokenScopeSchema } from '../../appTokens.js';
 import { authenticator } from '../../authenticator.js';
 import { AUTH_REQUIRED, registerPath } from '../../openapi.js';
 
-const QuerySchema = z.object({ scope: AppTokenScopeSchema.optional() });
+const QuerySchema = z.object({
+  scope: AppTokenScopeSchema.optional(),
+  premium: z
+    .literal('1')
+    .optional()
+    .meta({ description: 'Refuse with 403 unless the account has premium' }),
+});
 
 const ResponseSchema = z
   .strictObject({
@@ -29,7 +35,9 @@ export function attachCheckHandler(router: RouterInstance) {
         },
         400: {},
         401: {},
-        403: { description: 'the app token lacks the scope' },
+        403: {
+          description: 'the app token lacks the scope, or premium is required',
+        },
       },
     },
   });
@@ -60,6 +68,10 @@ export function attachCheckHandler(router: RouterInstance) {
 
     const premium =
       user.premiumExpiration !== null && user.premiumExpiration > new Date();
+
+    if (query.premium && !premium) {
+      ctx.throw(403, 'premium required');
+    }
 
     ctx.set('X-User-Id', String(user.id));
 
