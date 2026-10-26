@@ -92,6 +92,13 @@ if (!elevationDir && getEnv('ELEVATION_SOURCES', '')) {
   );
 }
 
+const sourceNames = [
+  ...new Set([
+    ...localSources.map((src) => src.name),
+    ...(elevationDataDir ? [SRTM_SOURCE_NAME] : []),
+  ]),
+];
+
 // SRTM has no source directory — the code owns the tile scheme and the download
 // URL, so it owns the credit too.
 const SRTM_ATTRIBUTION: SourceAttribution[] = [
@@ -205,6 +212,8 @@ const ElevationWithSourcesResponseSchema = z.object({
   }),
 });
 
+const SourceNamesSchema = z.array(z.string());
+
 const SourcesSchema = z
   .literal('1')
   .optional()
@@ -269,6 +278,23 @@ export function attachElevationHandler(router: RouterInstance) {
     },
   });
 
+  registerPath('/geotools/elevation/sources', {
+    get: {
+      summary: 'List the elevation datasets, in priority order',
+      description:
+        'Distinct source names, highest priority first; a name served by ' +
+        'several rasters takes the position of its highest-priority one. ' +
+        'Lists every configured source regardless of premium status or ' +
+        'whether it is currently readable.',
+      tags: ['geotools'],
+      responses: {
+        200: {
+          content: { 'application/json': { schema: SourceNamesSchema } },
+        },
+      },
+    },
+  });
+
   router.get('/elevation', authenticator(false), compute);
 
   router.post(
@@ -277,6 +303,12 @@ export function attachElevationHandler(router: RouterInstance) {
     authenticator(false),
     compute,
   );
+
+  router.get('/elevation/sources', (ctx) => {
+    ctx.set('Cache-Control', 'public, max-age=3600');
+
+    ctx.body = SourceNamesSchema.parse(sourceNames);
+  });
 }
 
 async function compute(ctx: ParameterizedContext) {

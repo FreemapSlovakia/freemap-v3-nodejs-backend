@@ -127,11 +127,13 @@ pnpm start | pnpm exec pino-pretty
   ```
 
   The directory name gives the name reported by
-  `/geotools/elevation?sources=1`: the part past the number up to the first `-`
-  or `_`, so `245-de_by` and `249-de_th` both report `de`. It is an API
-  contract, not a label — the lowercase ISO 3166-1 alpha-2 code of the country
-  the model covers, or the model's own id for one that isn't country-scoped
-  (`gedtm30`) — so renaming a directory changes the API. A directory that
+  `/geotools/elevation?sources=1` and listed by `/geotools/elevation/sources`:
+  the part past the number up to the first `-` or `_`, so `245-de_by` and
+  `249-de_th` both report `de`. It is an API contract, not a label — the
+  lowercase ISO 3166-1 alpha-2 code of the country the model covers, or the
+  model's own id for one that isn't country-scoped (`gedtm30`) — so renaming a
+  directory changes the API, and renumbering one changes the order
+  `/geotools/elevation/sources` lists it in. A directory that
   yields no lowercase name is skipped with a warning. Several sources may share
   a name: the reported list is deduplicated, and their credits are merged.
 
