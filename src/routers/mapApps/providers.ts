@@ -130,6 +130,16 @@ export const PROVIDERS: Provider[] = [
     attribution: OFM_ATTRIBUTION,
   },
   {
+    id: 846019,
+    mode: 'Orthophoto CZ 2022–2023',
+    url: 'https://ortofoto-cz-2022-2023.tiles.freemap.sk/{z}/{x}/{y}.jpg',
+    minZoom: 0,
+    maxZoom: 20,
+    countries: 'Czech Republic',
+    usage: 'photo',
+    attribution: 'ČÚZK',
+  },
+  {
     id: 846001,
     mode: 'Lesné cesty NLC',
     url: 'https://nlc.tiles.freemap.sk/{z}/{x}/{y}.png',
