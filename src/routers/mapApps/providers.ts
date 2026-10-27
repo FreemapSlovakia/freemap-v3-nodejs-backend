@@ -36,7 +36,7 @@ const overlay = (
   minZoom,
   maxZoom: 20,
   gated: true,
-  scales: [2, 3],
+  scales: [2, 3, 4],
   overlay: true,
   countries: 'Europe',
   usage,
