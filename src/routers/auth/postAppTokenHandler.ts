@@ -7,14 +7,12 @@ import {
   AppTokenScopeSchema,
   generateAppToken,
   hashAppToken,
+  isValidExpiresAt,
 } from '../../appTokens.js';
 import { authenticator } from '../../authenticator.js';
 import { runInTransaction } from '../../database.js';
 import { AUTH_REQUIRED, registerPath } from '../../openapi.js';
 import { acceptValidator } from '../../requestValidators.js';
-
-// The column is a TIMESTAMP.
-const MAX_EXPIRES_AT = new Date('2038-01-01T00:00:00Z');
 
 const BodySchema = z
   .strictObject({
@@ -71,10 +69,7 @@ export function attachPostAppTokenHandler(router: RouterInstance) {
 
       const expiresAt = body.expiresAt ? new Date(body.expiresAt) : null;
 
-      if (
-        expiresAt &&
-        (expiresAt <= new Date() || expiresAt > MAX_EXPIRES_AT)
-      ) {
+      if (expiresAt && !isValidExpiresAt(expiresAt)) {
         ctx.throw(400, 'expiresAt must be in the future and before 2038');
       }
 

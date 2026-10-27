@@ -33,6 +33,13 @@ export const AppTokenSchema = z
   })
   .meta({ id: 'AppToken' });
 
+// The column is a TIMESTAMP.
+const MAX_EXPIRES_AT = new Date('2038-01-01T00:00:00Z');
+
+export function isValidExpiresAt(expiresAt: Date) {
+  return expiresAt > new Date() && expiresAt <= MAX_EXPIRES_AT;
+}
+
 export const APP_TOKEN_COLUMNS_SQL =
   'id, note, scopes, createdAt, expiresAt, lastUsedAt, lastUserAgent';
 

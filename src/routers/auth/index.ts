@@ -19,6 +19,7 @@ import { attachLoginWithOsmHandler } from './loginWithOsmHandler.js';
 import { attachLoginWithStravaHandler } from './loginWithStravaHandler.js';
 import { attachLogoutHandler } from './logoutHandler.js';
 import { attachMergeUsersHandler } from './mergeUsersHandler.js';
+import { attachPatchAppTokenHandler } from './patchAppTokenHandler.js';
 import { attachPatchUserHandler } from './patchUserHandler.js';
 import { attachPolarCheckoutHandler } from './polarCheckoutHandler.js';
 import { attachPolarPortalHandler } from './polarPortalHandler.js';
@@ -56,6 +57,7 @@ attachMergeUsersHandler(router);
 attachAdminPatchUserHandler(router);
 attachGetAppTokensHandler(router);
 attachPostAppTokenHandler(router);
+attachPatchAppTokenHandler(router);
 attachDeleteAppTokenHandler(router);
 attachCheckHandler(router);
 
