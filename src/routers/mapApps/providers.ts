@@ -1,9 +1,6 @@
-// Docs: https://docs.locusmap.eu/doku.php?id=manual:advanced:customization:online_maps
-
-import { escapeXml } from '../../xml.js';
-
-type Provider = {
-  // stable: Locus keys the user's choice and tile cache by it
+/** The online maps installed into Locus Map and OruxMaps. */
+export type Provider = {
+  // stable: the apps key the user's choice and tile cache by it
   id: number;
   mode: string;
   url: string;
@@ -12,6 +9,7 @@ type Provider = {
   // the server's premium zooms need the token
   gated?: boolean;
   scales?: number[];
+  overlay?: boolean;
   countries: string;
   usage: string;
   attribution: string;
@@ -39,12 +37,13 @@ const overlay = (
   maxZoom: 20,
   gated: true,
   scales: [2, 3],
+  overlay: true,
   countries: 'Europe',
-  usage: `overlay,${usage}`,
+  usage,
   attribution: OUTDOOR_ATTRIBUTION,
 });
 
-const PROVIDERS: Provider[] = [
+export const PROVIDERS: Provider[] = [
   {
     id: 846007,
     mode: 'Outdoor',
@@ -142,64 +141,5 @@ const PROVIDERS: Provider[] = [
   },
 ];
 
-function providerXml(p: Provider, token: string | null) {
-  const query = p.gated && token ? `?token=${token}` : '';
-
-  const scales = p.scales
-    ? [
-        '      <tileScales>',
-        '        <tileScale dpi="0" multi="1.0" replace="" />',
-        ...p.scales.map(
-          (s) =>
-            `        <tileScale dpi="${s * 160}" multi="${s}.0" replace="@${s}x" />`,
-        ),
-        '      </tileScales>',
-      ]
-    : [];
-
-  // Locus zoom levels are offset by 8
-  return [
-    `  <provider id="${p.id}" type="0" visible="true" required="false" background="-1">`,
-    '      <name>Freemap</name>',
-    `      <mode>${escapeXml(p.mode)}</mode>`,
-    `      <url>${escapeXml(p.url + (p.scales ? '{ts}' : '') + query)}</url>`,
-    '      <zoomPart>{z}-8</zoomPart>',
-    `      <zoomMin>${p.minZoom + 8}</zoomMin>`,
-    `      <zoomMax>${p.maxZoom + 8}</zoomMax>`,
-    '      <tileSize>256</tileSize>',
-    ...scales,
-    `      <countries>${escapeXml(p.countries)}</countries>`,
-    `      <usage>${p.usage}</usage>`,
-    `      <attribution>${escapeXml(p.attribution)}</attribution>`,
-    '  </provider>',
-  ].join('\n');
-}
-
-/** Locus online-map providers; `token` unlocks the premium zooms. */
-export function providersXml(token: string | null) {
-  return [
-    '<?xml version="1.0" encoding="UTF-8"?>',
-    '<providers>',
-    ...PROVIDERS.map((p) => providerXml(p, token)),
-    '</providers>',
-    '',
-  ].join('\n');
-}
-
-/** A Locus Actions file that installs `providersUrl` and the group icon. */
-export function actionsXml(providersUrl: string, iconUrl: string) {
-  // the icon first: refreshMap after the providers should find it in place
-  return `<?xml version="1.0" encoding="UTF-8"?>
-<locusActions>
-  <download>
-    <source><![CDATA[${iconUrl}]]></source>
-    <dest><![CDATA[/mapsOnline/custom/Freemap.png]]></dest>
-  </download>
-  <download>
-    <source><![CDATA[${providersUrl}]]></source>
-    <dest><![CDATA[/mapsOnline/custom/locus-providers.xml]]></dest>
-    <after>refreshMap</after>
-  </download>
-</locusActions>
-`;
-}
+export const tokenQuery = (p: Provider, token: string | null) =>
+  p.gated && token ? `?token=${token}` : '';

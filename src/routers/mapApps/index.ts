@@ -1,28 +1,15 @@
-import { createHmac, randomBytes } from 'node:crypto';
+import { randomBytes } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import Router from '@koa/router';
 import sql from 'sql-template-tag';
 import z from 'zod';
-import {
-  APP_TOKEN_PREFIX,
-  type AppTokenScope,
-  generateAppToken,
-  hashAppToken,
-} from '../../appTokens.js';
 import { authenticator } from '../../authenticator.js';
 import { pool, runInTransaction } from '../../database.js';
 import { getEnv } from '../../env.js';
-import { AUTH_REQUIRED, registerPath } from '../../openapi.js';
-import { actionsXml, providersXml } from './providers.js';
-
-// Every install of a user carries the same token, found by this note.
-const TOKEN_NOTE = 'Locus Map';
-
-const TOKEN_SCOPES = JSON.stringify([
-  'tiles:outdoor',
-  'tiles:shading',
-  'tiles:aerial',
-] satisfies AppTokenScope[]);
+import { AUTH_OPTIONAL, AUTH_REQUIRED, registerPath } from '../../openapi.js';
+import { actionsXml, providersXml } from './locus.js';
+import { onlineMapSourcesXml } from './orux.js';
+import { mapAppsToken } from './token.js';
 
 const baseUrl = `${getEnv('API_URL', 'https://backend.freemap.sk')}/locus`;
 
@@ -43,8 +30,8 @@ const router = new Router();
 registerPath('/locus/installs', {
   post: {
     summary:
-      'Create a Locus Map install link carrying the user\'s "Locus Map" app token',
-    tags: ['locus'],
+      'Create a Locus Map install link carrying the user\'s "Map apps" app token',
+    tags: ['mapApps'],
     security: AUTH_REQUIRED,
     responses: {
       200: {
@@ -73,7 +60,7 @@ router.post('/installs', authenticator(true), async (ctx) => {
 registerPath('/locus/install', {
   get: {
     summary: 'Locus Actions file installing the maps without premium zooms',
-    tags: ['locus'],
+    tags: ['mapApps'],
     responses: { 200: { content: { 'application/xml': {} } } },
   },
 });
@@ -86,28 +73,11 @@ router.get('/install', (ctx) => {
 registerPath('/locus/install/{nonce}', {
   get: {
     summary: 'Locus Actions file installing the maps with an app token',
-    tags: ['locus'],
+    tags: ['mapApps'],
     requestParams: { path: NonceParamsSchema },
     responses: { 200: { content: { 'application/xml': {} } }, 404: {} },
   },
 });
-
-/** Derived from the row id, so a reinstall can hand out the token again while only its hash is stored. */
-function locusToken(appTokenId: number) {
-  // the ids are sequential, so the secret is the token's only entropy
-  const secret = getEnv('LOCUS_TOKEN_SECRET', '');
-
-  if (secret.length < 32) {
-    throw new Error('LOCUS_TOKEN_SECRET must have at least 32 characters');
-  }
-
-  return (
-    APP_TOKEN_PREFIX +
-    createHmac('sha256', secret)
-      .update(`locus:${appTokenId}`)
-      .digest('base64url')
-  );
-}
 
 function parseNonce(params: unknown) {
   return NonceParamsSchema.safeParse(params).data?.nonce;
@@ -136,7 +106,7 @@ router.get('/install/:nonce', async (ctx) => {
 registerPath('/locus/providers', {
   get: {
     summary: 'Locus online-map providers without premium zooms',
-    tags: ['locus'],
+    tags: ['mapApps'],
     responses: { 200: { content: { 'application/xml': {} } } },
   },
 });
@@ -149,8 +119,8 @@ router.get('/providers', (ctx) => {
 registerPath('/locus/providers/{nonce}', {
   get: {
     summary:
-      'Locus online-map providers with the user\'s "Locus Map" app token, created on first use; uses up the install link',
-    tags: ['locus'],
+      'Locus online-map providers with the user\'s "Map apps" app token, created on first use; uses up the install link',
+    tags: ['mapApps'],
     requestParams: { path: NonceParamsSchema },
     responses: { 200: { content: { 'application/xml': {} } }, 404: {} },
   },
@@ -182,49 +152,7 @@ router.get('/providers/:nonce', async (ctx) => {
 
       await conn.query(sql`DELETE FROM locusInstall WHERE nonce = ${nonce}`);
 
-      // serializes concurrent installs of one user, which would each insert a token
-      await conn.query(
-        sql`SELECT 1 FROM user WHERE id = ${install.userId} FOR UPDATE`,
-      );
-
-      const candidates = await conn.query<{ id: number; tokenHash: Buffer }[]>(
-        sql`
-          SELECT id, tokenHash FROM appToken
-            WHERE userId = ${install.userId}
-              AND note COLLATE utf8mb4_bin = ${TOKEN_NOTE}
-              AND (expiresAt IS NULL OR expiresAt > NOW())
-        `,
-      );
-
-      // a token of that note the user made by hand doesn't match the derived hash
-      const reused = candidates.find(({ id, tokenHash }) =>
-        hashAppToken(locusToken(id)).equals(tokenHash),
-      );
-
-      if (reused) {
-        await conn.query(
-          sql`UPDATE appToken SET scopes = ${TOKEN_SCOPES} WHERE id = ${reused.id}`,
-        );
-
-        return locusToken(reused.id);
-      }
-
-      // the hash needs the id, so insert under a throwaway one first
-      const { insertId } = await conn.query<{ insertId: number }>(sql`
-        INSERT INTO appToken SET
-          userId = ${install.userId},
-          tokenHash = ${hashAppToken(generateAppToken())},
-          note = ${TOKEN_NOTE},
-          scopes = ${TOKEN_SCOPES}
-      `);
-
-      const token = locusToken(insertId);
-
-      await conn.query(
-        sql`UPDATE appToken SET tokenHash = ${hashAppToken(token)} WHERE id = ${insertId}`,
-      );
-
-      return token;
+      return mapAppsToken(conn, install.userId);
     }));
 
   if (!token) {
@@ -243,3 +171,45 @@ router.get('/Freemap.png', (ctx) => {
 });
 
 export const locusRouter = router;
+
+export const oruxRouter = new Router();
+
+registerPath('/oruxmaps/onlinemapsources.xml', {
+  get: {
+    summary:
+      'OruxMaps online-map sources; logged in, with the user\'s "Map apps" app token, created on first use',
+    tags: ['mapApps'],
+    security: AUTH_OPTIONAL,
+    responses: {
+      200: { content: { 'application/xml': {} } },
+      401: {},
+      403: { description: 'app tokens may not mint the token' },
+    },
+  },
+});
+
+oruxRouter.get('/onlinemapsources.xml', authenticator(false), async (ctx) => {
+  ctx.type = 'application/xml';
+  ctx.attachment('onlinemapsources.xml');
+
+  // a cached anonymous copy must not answer a later logged-in request
+  ctx.set(
+    'Cache-Control',
+    ctx.get('Authorization') ? 'no-store' : 'public, max-age=3600',
+  );
+
+  // the router answers HEAD with this handler too; it must not mint a token
+  if (ctx.method === 'HEAD') {
+    ctx.status = 200;
+
+    return;
+  }
+
+  const user = ctx.state.user;
+
+  const token = user
+    ? await runInTransaction((conn) => mapAppsToken(conn, user.id))
+    : null;
+
+  ctx.body = onlineMapSourcesXml(token);
+});
