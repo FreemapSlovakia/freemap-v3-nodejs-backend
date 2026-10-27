@@ -82,6 +82,8 @@ pnpm start | pnpm exec pino-pretty
 - `HTTP_SSL_KEY` — path to the TLS private key file (required if HTTPS is enabled).
 - `WEB_BASE_URL` — comma-separated list of allowed web frontend origins; the
   first entry is used when generating absolute links (e.g. in emails).
+- `API_URL` — this API's public URL, for links an app follows back to it
+  (default `https://backend.freemap.sk`).
 
 ### MariaDB
 
@@ -193,6 +195,8 @@ pnpm start | pnpm exec pino-pretty
   is more than this many seconds in the future (default `600`).
 - `PREMIUM_PHOTO_SECRET` — HMAC secret used to sign access URLs for premium
   (paid) photos.
+- `LOCUS_TOKEN_SECRET` — HMAC secret (at least 32 characters) the "Locus Map"
+  app tokens are derived from; changing it invalidates every Locus install.
 
 ### Purchases (Polar)
 

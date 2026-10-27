@@ -24,10 +24,10 @@
   },
   "scripts": {
     "start": "node --enable-source-maps --import ./build/instrument.js build/index.js",
-    "copy:proto": "cp src/routers/gallery/pictures.proto build/routers/gallery/pictures.proto",
-    "build": "tsc && pnpm run copy:proto",
+    "copy:assets": "cp src/routers/gallery/pictures.proto build/routers/gallery/pictures.proto && cp src/routers/locus/Freemap.png build/routers/locus/Freemap.png",
+    "build": "tsc && pnpm run copy:assets",
     "test": "tsc && node --test 'build/**/*.test.js'",
-    "dev:serve": "pnpm run copy:proto && dotenvx run --overload -- sh -c 'node --enable-source-maps --import ./build/instrument.js build/index.js | pino-pretty -S -t -i hostname,pid'",
+    "dev:serve": "pnpm run copy:assets && dotenvx run --overload -- sh -c 'node --enable-source-maps --import ./build/instrument.js build/index.js | pino-pretty -S -t -i hostname,pid'",
     "dev": "tsc-watch --onSuccess \"pnpm run dev:serve\"",
     "import:wikimedia": "dotenvx run --overload -- node --enable-source-maps build/wikimedia/importWikimedia.js",
     "deploy": "ssh ${DEPLOY_SSH_HOST:-freemap-fm6} 'cd /home/freemap/freemap-v3-nodejs-backend && git pull --ff-only && bash scripts/remote-deploy.sh'",

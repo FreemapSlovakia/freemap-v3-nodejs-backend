@@ -24,6 +24,7 @@ import { attachPostGarminCourses } from './routers/garminCoursesHandler.js';
 import { attachGeoIp } from './routers/geoip.js';
 import { geotoolsRouter } from './routers/geotools/index.js';
 import { attachGetUsers } from './routers/getUsersHandler.js';
+import { locusRouter } from './routers/locus/index.js';
 import { mapsRouter } from './routers/maps/index.js';
 import { attachOsmGpxHandlers } from './routers/osmGpxHandler.js';
 import { attachStravaHandlers } from './routers/stravaHandler.js';
@@ -204,6 +205,8 @@ router.use(
 );
 
 router.use('/maps', mapsRouter.routes(), mapsRouter.allowedMethods());
+
+router.use('/locus', locusRouter.routes(), locusRouter.allowedMethods());
 
 attachDownloadMapHandler(router);
 

@@ -35,6 +35,7 @@ const SIMPLE_FK_TABLES = [
   'purchaseToken',
   'purchaseIntent',
   'blockedCredit',
+  'locusInstall',
   'appToken',
 ] as const;
 

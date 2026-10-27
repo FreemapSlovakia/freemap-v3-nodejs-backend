@@ -102,6 +102,13 @@ export async function initDatabase() {
       INDEX appTokenExpiresAtIdx (expiresAt)
     ) ENGINE=InnoDB`,
 
+    sql`CREATE TABLE IF NOT EXISTS locusInstall (
+      nonce CHAR(43) CHARSET ascii COLLATE ascii_bin NOT NULL PRIMARY KEY,
+      userId INT UNSIGNED NOT NULL,
+      expireAt TIMESTAMP NOT NULL,
+      FOREIGN KEY (userId) REFERENCES user (id) ON DELETE CASCADE
+    ) ENGINE=InnoDB`,
+
     sql`CREATE TABLE IF NOT EXISTS purchaseToken (
       token VARCHAR(255) CHARSET ascii NULL PRIMARY KEY,
       userId INT UNSIGNED NOT NULL,
@@ -509,6 +516,10 @@ export async function initDatabase() {
 
     await pool.query<unknown>(
       sql`DELETE FROM appToken WHERE expiresAt < NOW()`,
+    );
+
+    await pool.query<unknown>(
+      sql`DELETE FROM locusInstall WHERE expireAt < NOW()`,
     );
 
     await runInTransaction(async (conn) => {

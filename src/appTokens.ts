@@ -15,6 +15,7 @@ export const AppTokenScopeSchema = z
     'tracking:write',
     'tiles:outdoor',
     'tiles:shading',
+    'tiles:aerial',
   ])
   .meta({ id: 'AppTokenScope' });
 
