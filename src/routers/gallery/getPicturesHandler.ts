@@ -160,7 +160,11 @@ const OrderByQuerySchema = CommonQuerySchema.extend({
 const IdRowSchema = z.array(z.object({ id: z.number() }));
 
 const RadiusRowSchema = z.array(
-  z.object({ id: z.uint32(), distance: z.number() }),
+  z.object({
+    id: z.uint32(),
+    distance: z.number(),
+    takenAt: z.date().nullable(),
+  }),
 );
 
 const BboxRowSchema = z.array(
@@ -393,7 +397,7 @@ async function byRadius(ctx: ParameterizedContext) {
   const minLon = lon - k;
   const maxLon = lon + k;
 
-  const query = sql`SELECT picture.id,
+  const query = sql`SELECT picture.id, picture.takenAt,
     ST_Distance_Sphere(location, POINT(${lon}, ${lat})) / 1000 AS distance
     ${ratingFrom !== undefined || ratingTo !== undefined ? sql`, ${raw(ratingSubquery)}` : empty}
     FROM picture
@@ -422,13 +426,12 @@ async function byRadius(ctx: ParameterizedContext) {
     HAVING distance <= ${distance}
     ${ratingFrom == null ? empty : sql`AND rating >= ${ratingFrom}`}
     ${ratingTo == null ? empty : sql`AND rating <= ${ratingTo}`}
-    ORDER BY distance
+    ORDER BY distance, picture.takenAt IS NULL, picture.takenAt, picture.id
     LIMIT 1000`;
 
   const galleryRows = includeGallery
     ? RadiusRowSchema.parse(await pool.query<unknown>(query)).map((row) => ({
-        id: row.id,
-        distance: row.distance,
+        ...row,
         source: 0,
       }))
     : [];
@@ -436,7 +439,7 @@ async function byRadius(ctx: ParameterizedContext) {
   const wikimediaRows = includeWikimedia
     ? RadiusRowSchema.parse(
         await pool.query<unknown>(sql`
-          SELECT pageId AS id,
+          SELECT pageId AS id, capturedAt AS takenAt,
             ST_Distance_Sphere(location, POINT(${lon}, ${lat})) / 1000 AS distance
             ${wmRatingConds.length ? raw(`, ${wikimediaRatingSubquery}`) : empty}
           FROM wikimediaPicture
@@ -444,13 +447,22 @@ async function byRadius(ctx: ParameterizedContext) {
           ${wmConds.length ? sql`AND ${join(wmConds, ' AND ')}` : empty}
           HAVING distance <= ${distance}
           ${wmRatingConds.length ? sql`AND ${join(wmRatingConds, ' AND ')}` : empty}
-          ORDER BY distance
+          ORDER BY distance, capturedAt IS NULL, capturedAt, pageId
           LIMIT 1000`),
-      ).map((row) => ({ id: row.id, distance: row.distance, source: 1 }))
+      ).map((row) => ({ ...row, source: 1 }))
     : [];
 
+  // Photos from one spot (e.g. a panorama series) tie on distance; show them
+  // in shooting order, undated last.
   ctx.body = [...galleryRows, ...wikimediaRows]
-    .sort((a, b) => a.distance - b.distance)
+    .sort(
+      (a, b) =>
+        a.distance - b.distance ||
+        Number(a.takenAt === null) - Number(b.takenAt === null) ||
+        (a.takenAt?.getTime() ?? 0) - (b.takenAt?.getTime() ?? 0) ||
+        a.source - b.source ||
+        a.id - b.id,
+    )
     .slice(0, 1000)
     .map((row) => ({ id: row.id, source: row.source }));
 }
