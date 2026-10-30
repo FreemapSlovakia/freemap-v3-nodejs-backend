@@ -533,6 +533,7 @@
         "proxy": true,
         "tileCache": 30,
         "tileClasses": ["#94BBF2", "#3179DF"],
+        "defaultOpacity": 0.75,
         "attribution": [
           {
             "type": "data",
@@ -570,6 +571,7 @@
         "proxy": true,
         "tileCache": 30,
         "tileClasses": ["#FFD9B3", "#FF8C1A"],
+        "defaultOpacity": 0.75,
         "attribution": [
           {
             "type": "data",
@@ -606,6 +608,7 @@
         "proxy": true,
         "tileCache": 30,
         "tileClasses": ["#FFCCE0", "#FF1A75"],
+        "defaultOpacity": 0.75,
         "attribution": [
           {
             "type": "data",
@@ -636,6 +639,7 @@
         "proxy": true,
         "tileCache": 30,
         "tileClasses": ["#E6CCFF", "#A94DFF"],
+        "defaultOpacity": 0.75,
         "attribution": [
           {
             "type": "data",

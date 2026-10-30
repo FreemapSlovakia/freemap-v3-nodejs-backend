@@ -199,6 +199,37 @@ test('the rules refuse what the proxy must not fetch', () => {
       .length,
   );
 
+  const tiled = {
+    ...entry,
+    body: {
+      ...entry.body,
+      tileCache: 30,
+      tileClasses: ['#FFD9B3', '#ff8c1a'],
+      defaultOpacity: 0.75,
+    },
+  };
+
+  assert.deepEqual(entryProblems(tiled), []);
+
+  for (const body of [
+    { tileCache: 0 },
+    { tileCache: 1.5 },
+    { tileClasses: ['#FFD9B'] },
+    { tileClasses: [] },
+    { tileCache: undefined },
+    { defaultOpacity: 0 },
+    { defaultOpacity: 1.2 },
+    { defaultOpacity: '0.5' },
+  ]) {
+    assert.ok(
+      entryProblems({ ...tiled, body: { ...tiled.body, ...body } }).length,
+      JSON.stringify(body),
+    );
+  }
+
+  // Both are an overlay's.
+  assert.ok(entryProblems({ ...tiled, layer: 'base' }).length);
+
   assert.deepEqual(fileProblems({ source: 'ELI', maps: [] }), []);
 
   assert.ok(fileProblems({ maps: null }).length);

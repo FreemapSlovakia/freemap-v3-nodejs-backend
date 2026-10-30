@@ -142,6 +142,16 @@ export function mapProblems(map) {
     problems.push('tileClasses not 1–16 #rrggbb colours of a tileCache map');
   }
 
+  // The app applies it to overlays only.
+  if (
+    body.defaultOpacity !== undefined &&
+    (map.layer !== 'overlay' ||
+      typeof body.defaultOpacity !== 'number' ||
+      !(body.defaultOpacity > 0 && body.defaultOpacity <= 1))
+  ) {
+    problems.push('defaultOpacity not above 0 and at most 1 of an overlay');
+  }
+
   const { layers, url } = body;
 
   if (
