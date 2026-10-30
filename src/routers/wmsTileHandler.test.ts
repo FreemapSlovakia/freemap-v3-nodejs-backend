@@ -106,6 +106,32 @@ test('composeBest: each pixel its best class as opacity in the best colour, none
   assert.deepEqual((await pixel([none]))[3], 0);
 });
 
+test('Gate: background waits behind everyone else', async () => {
+  const gate = new Gate(1);
+
+  const signal = new AbortController().signal;
+
+  assert.equal(await gate.enter(signal), true);
+
+  const order: string[] = [];
+
+  const background = gate
+    .enter(signal, 'background')
+    .then(() => order.push('background'));
+
+  const normal = gate.enter(signal).then(() => order.push('normal'));
+
+  gate.leave();
+
+  await normal;
+
+  gate.leave();
+
+  await background;
+
+  assert.deepEqual(order, ['normal', 'background']);
+});
+
 test('tileBounds: zoom 0 is the world, zoom 1 its quarters', () => {
   const half = 20037508.342789244;
 

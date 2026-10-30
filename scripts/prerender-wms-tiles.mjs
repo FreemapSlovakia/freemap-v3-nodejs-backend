@@ -111,7 +111,10 @@ const queue = urls();
 async function worker() {
   for (const url of queue) {
     for (let attempt = 1; ; attempt++) {
-      const res = await fetch(url).catch((err) => ({ ok: false, err }));
+      // Queued behind every user's render.
+      const res = await fetch(url, { headers: { 'x-prerender': '1' } }).catch(
+        (err) => ({ ok: false, err }),
+      );
 
       // Read whatever came, so the connection is free again.
       await res.arrayBuffer?.().catch(() => undefined);

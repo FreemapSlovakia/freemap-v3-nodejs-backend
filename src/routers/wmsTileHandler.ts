@@ -43,7 +43,8 @@ const MAX_LAYERS = 40;
 // still gains throughput at 16 (3.8 tiles/s against 2 at 4).
 const PER_HOST = 16;
 
-const MAX_WAITING = 400;
+// Layer renders, so one cold view of a 10-layer map can bring hundreds.
+const MAX_WAITING = 5000;
 
 const MAX_WAIT = 60_000;
 
@@ -68,6 +69,9 @@ export class Gate {
 
   private readonly waiting: Array<() => void> = [];
 
+  // Served only when nobody else waits.
+  private readonly background: Array<() => void> = [];
+
   private readonly max: number;
 
   constructor(max: number) {
@@ -76,9 +80,13 @@ export class Gate {
 
   /**
    * Whether a slot was had; not when the queue is full, waited out or aborted.
-   * `first` jumps the queue, for work already under way.
+   * `first` jumps the queue, for work already under way; `background` waits
+   * behind everyone, without a time limit.
    */
-  enter(signal: AbortSignal, first = false): Promise<boolean> {
+  enter(
+    signal: AbortSignal,
+    priority: 'first' | 'normal' | 'background' = 'normal',
+  ): Promise<boolean> {
     if (signal.aborted) {
       return Promise.resolve(false);
     }
@@ -89,9 +97,14 @@ export class Gate {
       return Promise.resolve(true);
     }
 
-    if (!first && this.waiting.length >= MAX_WAITING) {
+    if (
+      priority !== 'first' &&
+      this.waiting.length + this.background.length >= MAX_WAITING
+    ) {
       return Promise.resolve(false);
     }
+
+    const queue = priority === 'background' ? this.background : this.waiting;
 
     return new Promise((resolve) => {
       const done = (ok: boolean) => {
@@ -99,10 +112,10 @@ export class Gate {
 
         signal.removeEventListener('abort', onAbort);
 
-        const i = this.waiting.indexOf(go);
+        const i = queue.indexOf(go);
 
         if (i !== -1) {
-          this.waiting.splice(i, 1);
+          queue.splice(i, 1);
         }
 
         resolve(ok);
@@ -113,20 +126,23 @@ export class Gate {
 
       const onAbort = () => done(false);
 
-      const timer = setTimeout(() => done(false), MAX_WAIT);
+      const timer =
+        priority === 'background'
+          ? undefined
+          : setTimeout(() => done(false), MAX_WAIT);
 
       signal.addEventListener('abort', onAbort, { once: true });
 
-      if (first) {
-        this.waiting.unshift(go);
+      if (priority === 'first') {
+        queue.unshift(go);
       } else {
-        this.waiting.push(go);
+        queue.push(go);
       }
     });
   }
 
   leave() {
-    const next = this.waiting.shift();
+    const next = this.waiting.shift() ?? this.background.shift();
 
     if (next) {
       next();
@@ -319,6 +335,8 @@ type Render = {
   ac: AbortController;
   waiters: number;
   started: boolean;
+  // Queued behind every user's render (the prerender's).
+  background: boolean;
 };
 
 const renders = new Map<string, Render>();
@@ -344,7 +362,12 @@ async function render(
     gates.set(url.host, gate);
   }
 
-  if (!(await gate.enter(entry.ac.signal))) {
+  if (
+    !(await gate.enter(
+      entry.ac.signal,
+      entry.background ? 'background' : 'normal',
+    ))
+  ) {
     throw entry.ac.signal.aborted ? new AbortedError() : new QueueFullError();
   }
 
@@ -425,7 +448,7 @@ async function fetchRetrying(url: URL, gate: Gate): Promise<Buffer> {
 
       checkReachable(url);
 
-      if (!(await gate.enter(new AbortController().signal, true))) {
+      if (!(await gate.enter(new AbortController().signal, 'first'))) {
         throw new QueueFullError();
       }
     }
@@ -481,6 +504,7 @@ async function layerTile(
   x: number,
   y: number,
   signal: AbortSignal,
+  background: boolean,
 ): Promise<LayerTile> {
   const path = layerTilePath(map, layer, z, x, y);
 
@@ -491,12 +515,23 @@ async function layerTile(
 
   let entry = renders.get(path);
 
+  // A user doesn't wait behind the background: that render gives way (its
+  // waiters ask again) to one queued as theirs.
+  if (entry?.background && !background && !entry.started) {
+    entry.ac.abort();
+
+    renders.delete(path);
+
+    entry = undefined;
+  }
+
   if (!entry) {
     const created: Render = {
       promise: Promise.resolve({ body: EMPTY_TILE, at: 0 }),
       ac: new AbortController(),
       waiters: 0,
       started: false,
+      background,
     };
 
     created.promise = render(map, layer, z, x, y, path, created).finally(() => {
@@ -750,6 +785,11 @@ export function attachWmsTileHandler(router: RouterInstance) {
 
     ctx.res.once('close', () => ac.abort());
 
+    // The prerender's, past nginx (which sets X-Forwarded-For): it waits
+    // behind every user.
+    const background =
+      ctx.get('x-prerender') === '1' && !ctx.get('x-forwarded-for');
+
     ctx.set('X-Content-Type-Options', 'nosniff');
 
     const map = catalogMap(ctx.params.type);
@@ -833,7 +873,8 @@ export function attachWmsTileHandler(router: RouterInstance) {
       const tiles = await Promise.all(
         layers.map(
           (layer, i) =>
-            cached[i] ?? layerTile(map, layer, zoom, x, y, ac.signal),
+            cached[i] ??
+            layerTile(map, layer, zoom, x, y, ac.signal, background),
         ),
       );
 
