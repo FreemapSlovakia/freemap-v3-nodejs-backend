@@ -606,7 +606,7 @@ export function attachWmsProxyHandler(router: RouterInstance) {
         'Ask a map library WMS for what a browser must read, for a server that sends no CORS',
       description:
         "`type` is a catalog map's id. The query is the WMS request's own: one SERVICE=WMS and one REQUEST, GetCapabilities or GetFeatureInfo; the service URL comes from the catalog. Capabilities are cached for a day.",
-      tags: ['maps'],
+      tags: ['map-library'],
       requestParams: { path: z.object({ type: z.string() }) },
       responses: {
         200: { description: 'the upstream answer, its status passed through' },

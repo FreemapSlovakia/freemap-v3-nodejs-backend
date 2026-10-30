@@ -228,7 +228,7 @@ export function attachDownloadMapHandler(router: RouterInstance) {
     get: {
       summary:
         'List the maps an offline package can be made of, with their prices',
-      tags: ['maps'],
+      tags: ['offline-maps'],
       responses: {
         200: {
           content: { 'application/json': { schema: DownloadableMapsSchema } },
@@ -250,7 +250,7 @@ export function attachDownloadMapHandler(router: RouterInstance) {
     post: {
       summary:
         'Request an offline map tile package download (async, costs credits)',
-      tags: ['maps'],
+      tags: ['offline-maps'],
       security: AUTH_REQUIRED,
       responses: { 204: {}, 400: {}, 401: {}, 409: {} },
     },

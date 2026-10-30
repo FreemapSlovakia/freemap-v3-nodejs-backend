@@ -244,7 +244,12 @@ router.get('/documentation', (ctx) => {
       { name: 'auth', description: 'Authentication' },
       { name: 'tracking', description: 'Device location tracking' },
       { name: 'gallery', description: 'Picture gallery' },
-      { name: 'maps', description: 'Map annotations' },
+      { name: 'maps', description: 'My maps: saved map annotations' },
+      {
+        name: 'map-library',
+        description: 'The catalog of maps users can install, and its WMS proxy',
+      },
+      { name: 'offline-maps', description: 'Offline map tile packages' },
       { name: 'strava', description: 'Strava activity import' },
     ],
     paths,

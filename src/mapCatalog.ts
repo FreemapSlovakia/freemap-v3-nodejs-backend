@@ -126,7 +126,7 @@ export function attachMapCatalogHandler(router: RouterInstance) {
   registerPath('/map-catalog', {
     get: {
       summary: "The map library's catalog: maps users can install",
-      tags: ['maps'],
+      tags: ['map-library'],
       requestParams: { query: QuerySchema },
       responses: {
         200: {
