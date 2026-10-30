@@ -521,7 +521,6 @@
       "technology": "wms",
       "body": {
         "url": "https://mapypokrytia.teleoff.gov.sk/geoserver/o2/ows",
-        "tiled": true,
         "layers": [
           "o2-0700-p-5g_2026_q2_class",
           "o2-0800-p-4g_2026_q2_class",
@@ -553,7 +552,6 @@
       "technology": "wms",
       "body": {
         "url": "https://mapypokrytia.teleoff.gov.sk/geoserver/osk/ows",
-        "tiled": true,
         "layers": [
           "osk-0700-p-4g_2026_q2_class",
           "osk-0700-p-5g_2026_q2_class",
@@ -589,7 +587,6 @@
       "technology": "wms",
       "body": {
         "url": "https://mapypokrytia.teleoff.gov.sk/geoserver/st/ows",
-        "tiled": true,
         "layers": [
           "st-0700-p-4g_2026_q2_class",
           "st-0700-p-5g_2026_q2_class",
@@ -624,7 +621,6 @@
       "technology": "wms",
       "body": {
         "url": "https://mapypokrytia.teleoff.gov.sk/geoserver/swan/ows",
-        "tiled": true,
         "layers": [
           "swan-1800-p-2g_2026_q2_class",
           "swan-1800-p-4g_2026_q2_class",
