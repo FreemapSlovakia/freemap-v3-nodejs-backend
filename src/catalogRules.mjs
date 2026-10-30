@@ -118,6 +118,30 @@ export function mapProblems(map) {
     problems.push('proxy not a boolean');
   }
 
+  if (
+    body.tileCache !== undefined &&
+    (technology !== 'wms' ||
+      map.layer !== 'overlay' ||
+      !Number.isInteger(body.tileCache) ||
+      body.tileCache < 1 ||
+      body.tileCache > 365)
+  ) {
+    problems.push('tileCache not 1–365 days of a WMS overlay');
+  }
+
+  if (
+    body.tileClasses !== undefined &&
+    (body.tileCache === undefined ||
+      !Array.isArray(body.tileClasses) ||
+      !body.tileClasses.length ||
+      body.tileClasses.length > 16 ||
+      body.tileClasses.some(
+        (c) => typeof c !== 'string' || !/^#[\da-f]{6}$/i.test(c),
+      ))
+  ) {
+    problems.push('tileClasses not 1–16 #rrggbb colours of a tileCache map');
+  }
+
   const { layers, url } = body;
 
   if (

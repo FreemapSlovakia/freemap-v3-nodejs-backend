@@ -531,6 +531,8 @@
           "o2-3600-p-5g_2026_q2_class"
         ],
         "proxy": true,
+        "tileCache": 30,
+        "tileClasses": ["#94BBF2", "#3179DF"],
         "attribution": [
           {
             "type": "data",
@@ -566,6 +568,8 @@
           "osk-3600-p-5g_2026_q2_class"
         ],
         "proxy": true,
+        "tileCache": 30,
+        "tileClasses": ["#FFD9B3", "#FF8C1A"],
         "attribution": [
           {
             "type": "data",
@@ -600,6 +604,8 @@
           "st-3600-p-5g_2026_q2_class"
         ],
         "proxy": true,
+        "tileCache": 30,
+        "tileClasses": ["#FFCCE0", "#FF1A75"],
         "attribution": [
           {
             "type": "data",
@@ -628,6 +634,8 @@
           "swan-3600-p-5g_2026_q2_class"
         ],
         "proxy": true,
+        "tileCache": 30,
+        "tileClasses": ["#E6CCFF", "#A94DFF"],
         "attribution": [
           {
             "type": "data",

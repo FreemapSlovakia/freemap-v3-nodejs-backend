@@ -15,7 +15,18 @@ import { registerPath } from './openapi.js';
 export type CatalogMap = {
   type: string;
   technology?: string;
+  layer?: string;
+  /** West, south, east, north in degrees. */
+  bbox?: [number, number, number, number];
   body: {
+    /** Days the proxy's tiles of it are cached; without it, none are served. */
+    tileCache?: number;
+    /**
+     * The colours of its classes, `#rrggbb`, worst first: a tile then shows each
+     * pixel's best class of the picked layers as opacity in the best class's
+     * colour, and nothing else.
+     */
+    tileClasses?: string[];
     url: string;
     layers?: string[];
     // The app's hint to go through the proxy straight away; the proxy itself

@@ -31,6 +31,7 @@ import { attachOsmGpxHandlers } from './routers/osmGpxHandler.js';
 import { attachStravaHandlers } from './routers/stravaHandler.js';
 import { tracklogsRouter } from './routers/tracklogs/index.js';
 import { attachWmsProxyHandler } from './routers/wmsProxyHandler.js';
+import { attachWmsTileHandler } from './routers/wmsTileHandler.js';
 import { startSocketDeviceTracking } from './socketDeviceTracking.js';
 import { attachWs } from './ws.js';
 
@@ -227,6 +228,8 @@ attachStravaHandlers(router);
 attachMapCatalogHandler(router);
 
 attachWmsProxyHandler(router);
+
+attachWmsTileHandler(router);
 
 router.get('/documentation', (ctx) => {
   ctx.body = createDocument({

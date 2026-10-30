@@ -90,19 +90,34 @@ const values = (params: URLSearchParams, name: string) =>
     .filter(([key]) => key.toLowerCase() === name)
     .map(([, value]) => value.toLowerCase());
 
-/** The WMS request, lower-cased, or undefined unless one allowed request is asked. */
-export function wmsRequest(params: URLSearchParams): string | undefined {
+/** The WMS request, lower-cased, or undefined unless exactly one is asked. */
+function anyWmsRequest(params: URLSearchParams): string | undefined {
   // One of each only: servers differ in which of several they obey.
   const services = values(params, 'service');
 
   const requests = values(params, 'request');
 
-  return services.length === 1 &&
-    services[0] === 'wms' &&
-    requests.length === 1 &&
-    ALLOWED_REQUESTS.has(requests[0])
+  return services.length === 1 && services[0] === 'wms' && requests.length === 1
     ? requests[0]
     : undefined;
+}
+
+/** The WMS request, lower-cased, or undefined unless one allowed request is asked. */
+export function wmsRequest(params: URLSearchParams): string | undefined {
+  const request = anyWmsRequest(params);
+
+  return request && ALLOWED_REQUESTS.has(request) ? request : undefined;
+}
+
+/** Sets a parameter, dropping it first in any case: WMS names ignore case. */
+export function setParam(url: URL, name: string, value: string) {
+  for (const key of [...url.searchParams.keys()]) {
+    if (key.toLowerCase() === name.toLowerCase()) {
+      url.searchParams.delete(key);
+    }
+  }
+
+  url.searchParams.set(name, value);
 }
 
 /**
@@ -121,22 +136,12 @@ export function upstreamUrl(
   if (request === 'getcapabilities') {
     const version = values(params, 'version')[0];
 
-    // Names are case-insensitive to WMS, not to `set`.
-    const set = (name: string, value: string) => {
-      for (const key of [...url.searchParams.keys()]) {
-        if (key.toLowerCase() === name.toLowerCase()) {
-          url.searchParams.delete(key);
-        }
-      }
+    setParam(url, 'SERVICE', 'WMS');
 
-      url.searchParams.set(name, value);
-    };
+    setParam(url, 'REQUEST', 'GetCapabilities');
 
-    set('SERVICE', 'WMS');
-
-    set('REQUEST', 'GetCapabilities');
-
-    set(
+    setParam(
+      url,
       'VERSION',
       version === '1.1.1' || version === '1.1.0' ? version : '1.3.0',
     );
@@ -187,13 +192,13 @@ export function redirectAllowed(from: URL, to: URL, request: string): boolean {
     to.protocol === from.protocol &&
     portOf(to) === portOf(from) &&
     path(to) === path(from) &&
-    wmsRequest(to.searchParams) === request
+    anyWmsRequest(to.searchParams) === request
   );
 }
 
 // Resolves as usual but keeps public addresses only, so the check covers the
 // address actually connected to, on every redirect too.
-const publicLookup = ((hostname, options, callback) => {
+export const publicLookup = ((hostname, options, callback) => {
   lookup(hostname, { ...options, all: true }, (err, addresses) => {
     if (err) {
       callback(err, '', 0);
@@ -224,7 +229,7 @@ const publicLookup = ((hostname, options, callback) => {
   });
 }) as LookupFunction;
 
-type Answer = { status: number; type: string; body: Buffer };
+export type Answer = { status: number; type: string; body: Buffer };
 
 const cache = new Map<string, { answer: Answer; expires: number }>();
 
@@ -279,8 +284,8 @@ function cached(key: string): Answer | undefined {
 }
 
 /** The start of a body as text, by its byte-order mark, the mark dropped. */
-function headText(body: Buffer): string {
-  const head = body.subarray(0, 65536);
+function headText(body: Buffer, limit = 65536): string {
+  const head = body.subarray(0, limit);
 
   if (head[0] === 0xff && head[1] === 0xfe) {
     return head.subarray(2).toString('utf16le');
@@ -382,9 +387,9 @@ export class Backoff {
 
 // By upstream host, which maps share: each request to a dead server, for
 // capabilities or feature info, would otherwise wait out the timeout.
-const unreachable = new Backoff(60 * 1000);
+export const unreachable = new Backoff(60 * 1000);
 
-const UNREACHABLE_CODES = new Set([
+export const UNREACHABLE_CODES = new Set([
   'ENOTFOUND',
   'EAI_AGAIN',
   'ECONNREFUSED',
@@ -396,10 +401,16 @@ const UNREACHABLE_CODES = new Set([
 // By capabilities URL: each asks up to 30 s and 10 MB.
 const capabilitiesFailed = new Backoff(5 * 60 * 1000);
 
-const FAILED: Answer = {
+export const FAILED: Answer = {
   status: 502,
   type: 'text/plain',
   body: Buffer.from('upstream unreachable or refused'),
+};
+
+export const TOO_LARGE: Answer = {
+  status: 502,
+  type: 'text/plain',
+  body: Buffer.from('response too large'),
 };
 
 // Per kind, so slow capabilities downloads can't starve map clicks.
@@ -426,16 +437,25 @@ async function fetchUpstream(
   }
 }
 
-async function fetchLimited(
+/**
+ * One upstream request, size-capped, redirects kept on the service. `types`
+ * are what a non-capabilities answer may be, else it is a 415.
+ */
+export async function fetchLimited(
   url: URL,
   request: string,
   signal?: AbortSignal,
+  types = ALLOWED_TYPES,
 ): Promise<Answer> {
   const stream = got.stream(url, {
     dnsLookup: publicLookup,
     throwHttpErrors: false,
-    // Capabilities can be large and slow; feature info holds up a click.
-    timeout: { request: request === 'getcapabilities' ? 30_000 : 10_000 },
+    // Capabilities can be large and slow, a map render too; feature info holds
+    // up a click.
+    timeout: {
+      request:
+        request === 'getcapabilities' || request === 'getmap' ? 30_000 : 10_000,
+    },
     headers: { 'user-agent': 'Freemap WMS proxy (https://www.freemap.sk/)' },
     maxRedirects: 5,
     signal,
@@ -484,7 +504,7 @@ async function fetchLimited(
 
   // Capabilities are judged by their body (`isCapabilities`), as some servers
   // label them octet-stream or not at all, and are then served as XML.
-  if (request !== 'getcapabilities' && !ALLOWED_TYPES.test(type)) {
+  if (request !== 'getcapabilities' && !types.test(type)) {
     stream.destroy();
 
     const ok = statusCode >= 200 && statusCode < 300;
@@ -504,11 +524,7 @@ async function fetchLimited(
   if (Number(response.headers['content-length']) > MAX_BYTES) {
     stream.destroy();
 
-    return {
-      status: 502,
-      type: 'text/plain',
-      body: Buffer.from('response too large'),
-    };
+    return TOO_LARGE;
   }
 
   const chunks: Buffer[] = [];
@@ -521,11 +537,7 @@ async function fetchLimited(
     if (size > MAX_BYTES) {
       stream.destroy();
 
-      return {
-        status: 502,
-        type: 'text/plain',
-        body: Buffer.from('response too large'),
-      };
+      return TOO_LARGE;
     }
 
     chunks.push(chunk);
@@ -597,6 +609,119 @@ function fetchCapabilities(
   }
 
   return p;
+}
+
+const layerNames = new WeakMap<Buffer, Set<string>>();
+
+const ENTITIES: Record<string, string> = {
+  amp: '&',
+  lt: '<',
+  gt: '>',
+  quot: '"',
+  apos: "'",
+};
+
+export const unescapeXml = (s: string) =>
+  s.replace(/&(?:#x([\da-f]+)|#(\d+)|(\w+));/gi, (all, hex, dec, name) =>
+    hex || dec
+      ? // What XML allows as a character, else kept as written.
+        (() => {
+          const code = parseInt(hex ?? dec, hex ? 16 : 10);
+
+          return code === 0x9 ||
+            code === 0xa ||
+            code === 0xd ||
+            (code >= 0x20 && code <= 0xd7ff) ||
+            (code >= 0xe000 && code <= 0xfffd) ||
+            (code >= 0x10000 && code <= 0x10ffff)
+            ? String.fromCodePoint(code)
+            : all;
+        })()
+      : (ENTITIES[name] ?? all),
+  );
+
+/**
+ * The names of a capabilities document's layers: a `Name` first in its
+ * `Layer`, as the schema orders it, so no style's or the service's.
+ */
+export function layerNamesOf(body: Buffer): Set<string> {
+  let text;
+
+  if (
+    (body[0] === 0xff && body[1] === 0xfe) ||
+    (body[0] === 0xfe && body[1] === 0xff)
+  ) {
+    text = headText(body, Infinity);
+  } else {
+    // As declared, else UTF-8, XML's default, which a UTF-8 mark also says.
+    const encoding =
+      body[0] === 0xef && body[1] === 0xbb && body[2] === 0xbf
+        ? undefined
+        : /^<\?xml[^>]*\bencoding=["']([\w.:-]+)["']/i.exec(
+            body.subarray(0, 200).toString('latin1'),
+          )?.[1];
+
+    try {
+      text = new TextDecoder(encoding ?? 'utf-8').decode(body);
+    } catch {
+      text = body.toString('utf8');
+    }
+  }
+
+  return new Set(
+    [
+      ...text.matchAll(
+        /<(?:[\w.-]+:)?Layer\b[^>]*>\s*<(?:[\w.-]+:)?Name>\s*([^<]*?)\s*<\/(?:[\w.-]+:)?Name>/g,
+      ),
+    ].map((m) => unescapeXml(m[1])),
+  );
+}
+
+/**
+ * The layer names of the map's capabilities, or undefined while they can't be
+ * had.
+ */
+export async function capabilityNames(
+  map: CatalogMap,
+): Promise<Set<string> | undefined> {
+  // The version the app asks for, so both share one cached document.
+  const url = upstreamUrl(
+    map,
+    new URLSearchParams('version=1.3.0'),
+    'getcapabilities',
+  );
+
+  const key = url.toString();
+
+  let answer = cached(key);
+
+  if (!answer) {
+    if (unreachable.has(url.host)) {
+      return undefined;
+    }
+
+    try {
+      const fetched = await fetchCapabilities(key, url, map.type);
+
+      if (!fetched.kept) {
+        return undefined;
+      }
+
+      answer = fetched.answer;
+    } catch {
+      return undefined;
+    }
+  }
+
+  let names = layerNames.get(answer.body);
+
+  if (!names) {
+    names = layerNamesOf(answer.body);
+
+    layerNames.set(answer.body, names);
+  }
+
+  return names;
 }
 
 export function attachWmsProxyHandler(router: RouterInstance) {
