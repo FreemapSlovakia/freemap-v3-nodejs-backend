@@ -20,16 +20,16 @@
     "url": "https://github.com/FreemapSlovakia/freemap-v3-nodejs-backend/issues"
   },
   "lint-staged": {
-    "*.{js,ts}": [
+    "*.{js,mjs,ts}": [
       "biome check --error-on-warnings",
       "git add"
     ]
   },
   "scripts": {
     "start": "node --enable-source-maps --import ./build/instrument.js build/index.js",
-    "copy:assets": "cp src/routers/gallery/pictures.proto build/routers/gallery/pictures.proto && cp src/routers/mapApps/Freemap.png build/routers/mapApps/Freemap.png",
+    "copy:assets": "cp src/routers/gallery/pictures.proto build/routers/gallery/pictures.proto && cp src/routers/mapApps/Freemap.png build/routers/mapApps/Freemap.png && rm -rf build/mapCatalog && mkdir -p build/mapCatalog/eli build/mapCatalog/curated && cp mapCatalog/eli/eliCatalog.json build/mapCatalog/eli/ && cp mapCatalog/curated/curatedCatalog.json build/mapCatalog/curated/",
     "build": "tsc && pnpm run copy:assets",
-    "test": "tsc && node --test 'build/**/*.test.js'",
+    "test": "tsc && pnpm run copy:assets && node --test 'build/**/*.test.js'",
     "dev:serve": "pnpm run copy:assets && dotenvx run --overload -- sh -c 'node --enable-source-maps --import ./build/instrument.js build/index.js | pino-pretty -S -t -i hostname,pid'",
     "dev": "tsc-watch --onSuccess \"pnpm run dev:serve\"",
     "import:wikimedia": "dotenvx run --overload -- node --enable-source-maps build/wikimedia/importWikimedia.js",

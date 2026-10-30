@@ -1,0 +1,125 @@
+name: Map library harvest
+
+# Re-probes every catalog map and opens a PR with what changed, so a dead or
+# moved server is reviewed rather than found by users. No --reuse-probe: a
+# reused answer never notices a map dying.
+on:
+  schedule:
+    # Weekly, Monday, UTC.
+    - cron: '0 4 * * 1'
+  workflow_dispatch: {}
+
+concurrency:
+  group: harvest
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  harvest:
+    # Probed from Europe, where the users are: European servers refuse GitHub's
+    # US runners (and some US ones refuse Europe), which reads as dead maps.
+    runs-on: [self-hosted, fm5]
+    timeout-minutes: 30
+    env:
+      BRANCH: harvest/map-library
+    steps:
+      # The write token only for the two steps that need it, not in .git/config
+      # where the harvest and the Biome download could read it.
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 11.5.0
+
+      # No `cache: pnpm`: on a self-hosted runner the store is already on the box.
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+
+      # The probe record outlives a run on fm5's disk: a week with no catalog
+      # change commits nothing, and the failingSince dates must still count.
+      - name: Restore the probe record
+        run: |
+          STATE="$HOME/.cache/freemap-harvest/probe.json"
+          if [ -f "$STATE" ]; then cp "$STATE" mapCatalog/eli/probe.json; fi
+
+      - name: Harvest
+        run: |
+          node scripts/harvest-eli.mjs --report="$RUNNER_TEMP/report.md"
+          cat "$RUNNER_TEMP/report.md"
+
+      # Right after the harvest, so a failing step below can't lose this run's
+      # failingSince dates.
+      - name: Keep the probe record
+        run: |
+          mkdir -p "$HOME/.cache/freemap-harvest"
+          cp mapCatalog/eli/probe.json "$HOME/.cache/freemap-harvest/probe.json"
+
+      # The harvest needs only Node built-ins, so no install of the API's
+      # dependencies. Biome at the version pnpm-lock.yaml resolves: bump both
+      # together.
+      - run: pnpm dlx @biomejs/biome@2.6.4 check --write mapCatalog/eli
+
+      # As the deploy checks it: no PR for a catalog every deploy would refuse.
+      - name: Check the catalog
+        run: node scripts/check-catalog.mjs
+
+      # One open PR at a time: a new run replaces the branch, and the PR's
+      # body follows the latest report.
+      - name: Push the branch
+        id: push
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # probe.json alone changes on most runs: failures are asked again.
+          if git diff --quiet -- mapCatalog/eli/eliCatalog.json mapCatalog/eli/ids.json; then
+            echo "The catalog is unchanged."
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git checkout -B "$BRANCH"
+          git add mapCatalog/eli
+          git commit -q -m "chore(map-library): weekly harvest"
+          git -c http.extraheader="AUTHORIZATION: basic $(printf 'x-access-token:%s' "$GITHUB_TOKEN" | base64 -w0)" push -f origin "$BRANCH"
+          echo "changed=true" >> "$GITHUB_OUTPUT"
+
+      # The REST API rather than `gh`, which fm5 doesn't have. With the catalog
+      # back to main's, an open PR is closed: merging its old diff would undo it.
+      - name: Open, update or close the PR
+        env:
+          CHANGED: ${{ steps.push.outputs.changed }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          node --input-type=module -e '
+            const { GITHUB_TOKEN, GITHUB_REPOSITORY, BRANCH, RUNNER_TEMP, CHANGED } = process.env;
+            // GitHub refuses a PR body over 65,536 characters.
+            const report = (await import("node:fs")).readFileSync(`${RUNNER_TEMP}/report.md`, "utf8");
+            const body = report.length > 60000 ? `${report.slice(0, 60000)}\n\n… (report cut short; the full one is in the run log)` : report;
+            const api = (path, init = {}) =>
+              fetch(`https://api.github.com/repos/${GITHUB_REPOSITORY}${path}`, {
+                ...init,
+                headers: { Authorization: `Bearer ${GITHUB_TOKEN}`, Accept: "application/vnd.github+json" },
+              }).then(async (res) => {
+                if (!res.ok) throw new Error(`${path}: ${res.status} ${await res.text()}`);
+                return res.json();
+              });
+            const owner = GITHUB_REPOSITORY.split("/")[0];
+            const [open] = await api(`/pulls?state=open&head=${owner}:${BRANCH}`);
+            if (CHANGED !== "true") {
+              if (open) {
+                await api(`/pulls/${open.number}`, { method: "PATCH", body: JSON.stringify({ state: "closed" }) });
+              }
+            } else if (open) {
+              await api(`/pulls/${open.number}`, { method: "PATCH", body: JSON.stringify({ body }) });
+            } else {
+              await api("/pulls", { method: "POST", body: JSON.stringify({ head: BRANCH, base: "main", title: "Map library: weekly harvest", body }) });
+            }
+          '

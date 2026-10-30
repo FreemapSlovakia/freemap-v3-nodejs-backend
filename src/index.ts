@@ -14,6 +14,7 @@ import { createDocument } from 'zod-openapi';
 import { initDatabase } from './database.js';
 import { getEnv, getEnvInteger } from './env.js';
 import { appLogger } from './logger.js';
+import { attachMapCatalogHandler } from './mapCatalog.js';
 import { paths } from './openapi.js';
 import { nanoid } from './randomId.js';
 import { authRouter } from './routers/auth/index.js';
@@ -29,6 +30,7 @@ import { mapsRouter } from './routers/maps/index.js';
 import { attachOsmGpxHandlers } from './routers/osmGpxHandler.js';
 import { attachStravaHandlers } from './routers/stravaHandler.js';
 import { tracklogsRouter } from './routers/tracklogs/index.js';
+import { attachWmsProxyHandler } from './routers/wmsProxyHandler.js';
 import { startSocketDeviceTracking } from './socketDeviceTracking.js';
 import { attachWs } from './ws.js';
 
@@ -221,6 +223,10 @@ attachPostGarminCourses(router);
 attachOsmGpxHandlers(router);
 
 attachStravaHandlers(router);
+
+attachMapCatalogHandler(router);
+
+attachWmsProxyHandler(router);
 
 router.get('/documentation', (ctx) => {
   ctx.body = createDocument({
