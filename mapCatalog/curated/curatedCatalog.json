@@ -530,7 +530,6 @@
           "o2-2100-p-5g_2026_q2_class",
           "o2-3600-p-5g_2026_q2_class"
         ],
-        "wmts": "https://mapypokrytia.teleoff.gov.sk/geoserver/gwc/service/wmts?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0&LAYER=o2:{layer}&STYLE=&TILEMATRIXSET=EPSG:900913&TILEMATRIX=EPSG:900913:{z}&TILEROW={y}&TILECOL={x}&FORMAT=image/png",
         "proxy": true,
         "attribution": [
           {
@@ -566,7 +565,6 @@
           "osk-2600-p-4g_2026_q2_class",
           "osk-3600-p-5g_2026_q2_class"
         ],
-        "wmts": "https://mapypokrytia.teleoff.gov.sk/geoserver/gwc/service/wmts?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0&LAYER=osk:{layer}&STYLE=&TILEMATRIXSET=EPSG:900913&TILEMATRIX=EPSG:900913:{z}&TILEROW={y}&TILECOL={x}&FORMAT=image/png",
         "proxy": true,
         "attribution": [
           {
@@ -601,7 +599,6 @@
           "st-2600-p-5g_2026_q2_class",
           "st-3600-p-5g_2026_q2_class"
         ],
-        "wmts": "https://mapypokrytia.teleoff.gov.sk/geoserver/gwc/service/wmts?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0&LAYER=st:{layer}&STYLE=&TILEMATRIXSET=EPSG:900913&TILEMATRIX=EPSG:900913:{z}&TILEROW={y}&TILECOL={x}&FORMAT=image/png",
         "proxy": true,
         "attribution": [
           {
@@ -630,7 +627,6 @@
           "swan-3600-p-4g_2026_q2_class",
           "swan-3600-p-5g_2026_q2_class"
         ],
-        "wmts": "https://mapypokrytia.teleoff.gov.sk/geoserver/gwc/service/wmts?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0&LAYER=swan:{layer}&STYLE=&TILEMATRIXSET=EPSG:900913&TILEMATRIX=EPSG:900913:{z}&TILEROW={y}&TILECOL={x}&FORMAT=image/png",
         "proxy": true,
         "attribution": [
           {

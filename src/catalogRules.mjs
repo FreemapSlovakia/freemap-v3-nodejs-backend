@@ -164,25 +164,6 @@ export function mapProblems(map) {
       problems.push('WMS URL with a placeholder');
     }
 
-    if (body.wmts !== undefined) {
-      const wmts =
-        typeof body.wmts === 'string' &&
-        body.wmts.includes('{layer}') &&
-        parseMapUrl(body.wmts, false);
-
-      if (!wmts) {
-        problems.push("WMTS template doesn't parse");
-      } else if (wmts.protocol !== 'https:' || /^\/\//.test(body.wmts)) {
-        problems.push('WMTS not on https');
-      } else {
-        const wmtsRefusal = hostRefusal(wmts.hostname);
-
-        if (wmtsRefusal) {
-          problems.push(`WMTS ${wmtsRefusal}`);
-        }
-      }
-    }
-
     // Decoded, as the proxy reads them.
     if (
       [...parsed.searchParams.keys()].some((k) =>
