@@ -97,6 +97,7 @@ pnpm start | pnpm exec pino-pretty
 ### File storage
 
 - `PICTURES_DIRECTORY` — directory where uploaded gallery pictures are stored.
+- `EVENT_COVERS_DIRECTORY` — directory where event cover images are stored.
 - `TRACKLOGS_DIRECTORY` — directory where uploaded GPX track logs are stored.
 - `ELEVATION_DATA_DIRECTORY` — directory containing HGT elevation tiles used by
   the elevation/profile endpoints.

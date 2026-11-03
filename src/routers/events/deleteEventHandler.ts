@@ -3,9 +3,13 @@ import sql from 'sql-template-tag';
 import z from 'zod';
 import { authenticator } from '../../authenticator.js';
 import { runInTransaction } from '../../database.js';
+import { appLogger } from '../../logger.js';
 import { AUTH_REQUIRED, registerPath } from '../../openapi.js';
 import { acceptValidator } from '../../requestValidators.js';
+import { removeCover } from './cover.js';
 import { canWriteEvent } from './types.js';
+
+const logger = appLogger.child({ module: 'deleteEvent' });
 
 export function attachDeleteEventHandler(router: RouterInstance) {
   registerPath('/events/{id}', {
@@ -30,13 +34,13 @@ export function attachDeleteEventHandler(router: RouterInstance) {
     acceptValidator('application/json'),
     authenticator(true),
     async (ctx) => {
-      await runInTransaction(async (conn) => {
+      const cover = await runInTransaction(async (conn) => {
         const [item] = z
-          .array(z.object({ userId: z.uint32() }))
+          .array(z.object({ userId: z.uint32(), cover: z.string().nullable() }))
           .max(1)
           .parse(
             await conn.query<unknown>(
-              sql`SELECT userId FROM event WHERE id = ${ctx.params.id} FOR UPDATE`,
+              sql`SELECT userId, cover FROM event WHERE id = ${ctx.params.id} FOR UPDATE`,
             ),
           );
 
@@ -51,7 +55,13 @@ export function attachDeleteEventHandler(router: RouterInstance) {
         await conn.query<unknown>(
           sql`DELETE FROM event WHERE id = ${ctx.params.id}`,
         );
+
+        return item.cover;
       });
+
+      if (cover) {
+        await removeCover(cover, logger);
+      }
 
       ctx.status = 204;
     },

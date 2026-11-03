@@ -6,6 +6,7 @@ import { runInTransaction } from '../../database.js';
 import { appLogger } from '../../logger.js';
 import { AUTH_REQUIRED, registerPath } from '../../openapi.js';
 import { revokeOsmTokenLater } from '../../osm.js';
+import { removeCover } from '../events/cover.js';
 import { picturesDir } from '../gallery/constants.js';
 
 export function attachDeleteUserHandler(router: RouterInstance) {
@@ -24,24 +25,33 @@ export function attachDeleteUserHandler(router: RouterInstance) {
       reqId: ctx.reqId,
     });
 
-    const { osmToken, pathnames } = await runInTransaction(async (conn) => {
-      const [userRow] = await conn.query<{ osmAccessToken: string | null }[]>(
-        sql`SELECT osmAccessToken FROM user WHERE id = ${ctx.state.user!.id} FOR UPDATE`,
-      );
+    const { osmToken, pathnames, covers } = await runInTransaction(
+      async (conn) => {
+        const [userRow] = await conn.query<{ osmAccessToken: string | null }[]>(
+          sql`SELECT osmAccessToken FROM user WHERE id = ${ctx.state.user!.id} FOR UPDATE`,
+        );
 
-      const rows = await conn.query<{ pathname: string }[]>(
-        sql`SELECT pathname FROM picture WHERE userId = ${ctx.state.user!.id} FOR UPDATE`,
-      );
+        const rows = await conn.query<{ pathname: string }[]>(
+          sql`SELECT pathname FROM picture WHERE userId = ${ctx.state.user!.id} FOR UPDATE`,
+        );
 
-      await conn.query<unknown>(
-        sql`DELETE FROM user WHERE id = ${ctx.state.user!.id}`,
-      );
+        const coverRows = await conn.query<{ cover: string }[]>(
+          sql`SELECT cover FROM event WHERE userId = ${ctx.state.user!.id} AND cover IS NOT NULL FOR UPDATE`,
+        );
 
-      return {
-        osmToken: userRow?.osmAccessToken,
-        pathnames: rows.map((row) => row.pathname),
-      };
-    });
+        await conn.query<unknown>(
+          sql`DELETE FROM user WHERE id = ${ctx.state.user!.id}`,
+        );
+
+        return {
+          osmToken: userRow?.osmAccessToken,
+          pathnames: rows.map((row) => row.pathname),
+          covers: coverRows.map((row) => row.cover),
+        };
+      },
+    );
+
+    await Promise.all(covers.map((cover) => removeCover(cover, logger)));
 
     // Only once committed: a rolled-back or retried deletion keeps them.
     await Promise.all(

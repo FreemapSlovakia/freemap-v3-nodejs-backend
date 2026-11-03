@@ -338,6 +338,7 @@ export async function initDatabase() {
       startLat DECIMAL(8, 6) NOT NULL,
       startLon DECIMAL(9, 6) NOT NULL,
       visibility ENUM('public', 'unlisted') CHARSET ascii NOT NULL DEFAULT 'public',
+      cover VARCHAR(24) CHARSET ascii NULL,
       transports VARCHAR(512) CHARSET ascii NULL,
       difficulty ENUM('easy', 'moderate', 'demanding', 'expert') CHARSET ascii NULL,
       dogs BIT NULL,

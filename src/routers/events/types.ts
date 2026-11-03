@@ -68,6 +68,8 @@ export const EventSchema = z
     endAt: zNullableDateToIso,
     startPoint: PointSchema,
     visibility: VisibilitySchema,
+    /** The cover image's name, for `/events/covers/{name}`. */
+    cover: z.string().nullable(),
     transports: TransportsSchema,
     ...StatsShape,
     ...AttributesShape,
@@ -89,6 +91,7 @@ export const EventRowSchema = z.object({
   startLat: z.number(),
   startLon: z.number(),
   visibility: VisibilitySchema,
+  cover: z.string().nullable(),
   transports: z
     .string()
     .nullable()
@@ -110,7 +113,7 @@ export const EVENT_FROM_SQL =
 
 export const EVENT_COLUMNS_SQL =
   'e.id, e.userId, e.mapId, map.name AS mapName, e.title, e.description, ' +
-  'e.startAt, e.endAt, e.startLat, e.startLon, e.visibility, ' +
+  'e.startAt, e.endAt, e.startLat, e.startLon, e.visibility, e.cover, ' +
   'e.transports, e.distance, e.duration, e.ascent, e.descent, ' +
   'e.difficulty, e.dogs, e.children, ' +
   'e.createdAt, e.updatedAt, ' +
