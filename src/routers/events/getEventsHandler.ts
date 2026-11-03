@@ -26,6 +26,13 @@ const QuerySchema = z.object({
     .transform((s) => s.split(',').map(Number))
     .pipe(z.number().array().length(4))
     .optional(),
+  // lat,lon — with `radius` (km), matched against the start point.
+  near: z
+    .string()
+    .transform((s) => s.split(',').map(Number))
+    .pipe(z.tuple([z.number().min(-90).max(90), z.number().min(-180).max(180)]))
+    .optional(),
+  radius: z.coerce.number().positive().max(1000).optional(),
   visibility: VisibilitySchema.optional(),
   // Comma-separated transport types; any of them matches.
   transport: z
@@ -88,7 +95,7 @@ export function attachGetEventsHandler(router: RouterInstance) {
         return ctx.throw(400, err as Error);
       }
 
-      const { from, to, bbox, visibility } = query;
+      const { from, to, bbox, near, radius, visibility } = query;
 
       const myUserId = ctx.state.user?.id ?? -1;
 
@@ -114,6 +121,27 @@ export function attachGetEventsHandler(router: RouterInstance) {
 
         wh.push(
           sql`e.startLat BETWEEN ${minLat} AND ${maxLat} AND e.startLon BETWEEN ${minLon} AND ${maxLon}`,
+        );
+      }
+
+      if (near) {
+        if (radius === undefined) {
+          return ctx.throw(400, 'near needs a radius');
+        }
+
+        const [lat, lon] = near;
+
+        // The box first, which the start point's index serves; the exact
+        // distance only on what it leaves.
+        const dLat = radius / 111.2;
+
+        const dLon =
+          radius / (111.2 * Math.max(Math.cos((lat * Math.PI) / 180), 0.01));
+
+        wh.push(
+          sql`e.startLat BETWEEN ${lat - dLat} AND ${lat + dLat}`,
+          sql`e.startLon BETWEEN ${lon - dLon} AND ${lon + dLon}`,
+          sql`ST_Distance_Sphere(POINT(e.startLon, e.startLat), POINT(${lon}, ${lat})) <= ${radius * 1000}`,
         );
       }
 

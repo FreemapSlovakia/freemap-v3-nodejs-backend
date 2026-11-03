@@ -17,8 +17,9 @@ const BodySchema = z
     name: z.string().optional(),
     email: z.email().nullish(),
     description: z.string().nullish(),
-    lat: z.number().optional(),
-    lon: z.number().optional(),
+    // The home location; `null` removes it.
+    lat: z.number().min(-90).max(90).nullish(),
+    lon: z.number().min(-180).max(180).nullish(),
     settings: z.record(z.string(), z.unknown()).optional(),
     sendGalleryEmails: z.boolean().nullish(),
     language: z.string().min(2).max(2).nullish(),
@@ -28,6 +29,9 @@ const BodySchema = z
   })
   .refine((data) => Object.values(data).some((v) => v !== undefined), {
     message: 'At least one field must be provided',
+  })
+  .refine((data) => (data.lat === undefined) === (data.lon === undefined), {
+    message: 'lat and lon go together',
   });
 
 export function attachPatchUserHandler(router: RouterInstance) {
