@@ -89,7 +89,7 @@ async function jsonHandler(ctx: ParameterizedContext) {
     const [item] = await conn.query<
       { id: number; maxCount: number; maxAge: number }[]
     >(
-      sql`SELECT id, maxCount, maxAge FROM trackingDevice WHERE token = ${body.device_id}`,
+      sql`SELECT id, maxCount, maxAge FROM trackingDevice WHERE token = ${body.device_id} FOR UPDATE`,
     );
 
     if (!item) {

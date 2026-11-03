@@ -2,15 +2,18 @@ import type { RouterInstance } from '@koa/router';
 import got from 'got';
 import z from 'zod';
 import { authenticator } from '../../authenticator.js';
-import { getEnv } from '../../env.js';
 import { AUTH_OPTIONAL, registerPath } from '../../openapi.js';
+import {
+  OSM_CLIENT_ID as clientId,
+  OSM_CLIENT_SECRET as clientSecret,
+  fetchOsmUser,
+  OSM_USER_AGENT,
+  revokeOsmTokenIfUnheld,
+  revokeOsmTokenLater,
+} from '../../osm.js';
 import { acceptValidator } from '../../requestValidators.js';
 import { LoginResponseSchema } from '../../types.js';
 import { login } from './loginProcessor.js';
-
-const clientId = getEnv('OSM_OAUTH2_CLIENT_ID');
-
-const clientSecret = getEnv('OSM_OAUTH2_CLIENT_SECRET');
 
 const BodySchema = z.strictObject({
   code: z.string().nonempty(),
@@ -19,15 +22,9 @@ const BodySchema = z.strictObject({
   redirectUri: z.url(),
 });
 
-const OsmTokenSchema = z.object({ access_token: z.string() });
-
-const OsmUserDetailsSchema = z.object({
-  user: z.object({
-    id: z.uint32(),
-    display_name: z.string(),
-    home: z.object({ lat: z.number(), lon: z.number() }).optional(),
-    img: z.object({ href: z.url() }).optional(),
-  }),
+const OsmTokenSchema = z.object({
+  access_token: z.string(),
+  scope: z.string().optional(),
 });
 
 export function attachLoginWithOsmHandler(router: RouterInstance) {
@@ -65,6 +62,7 @@ export function attachLoginWithOsmHandler(router: RouterInstance) {
           },
         },
         400: {},
+        409: { description: 'A different OSM account than the connected one' },
       },
     },
   });
@@ -102,41 +100,70 @@ export function attachLoginWithOsmHandler(router: RouterInstance) {
           .post(`https://www.openstreetmap.org/oauth2/token?${sp.toString()}`, {
             headers: {
               'content-type': 'application/x-www-form-urlencoded', // otherwise server returns 415
+              'user-agent': OSM_USER_AGENT,
             },
           })
           .json(),
       );
 
-      const userDetails = OsmUserDetailsSchema.parse(
-        await got
-          .get('https://api.openstreetmap.org/api/0.6/user/details', {
-            headers: {
-              authorization: `Bearer ${body.access_token}`,
-            },
-          })
-          .json(),
-      );
+      // Without it a write_gpx grant can't be told from a plain login, and the
+      // upload would ask to authorize again and again.
+      if (body.scope === undefined) {
+        ctx.log.warn('OSM token response has no scope.');
+      }
 
-      const {
-        user: { display_name: osmName, id: osmId, home, img },
-      } = userDetails;
+      // A plain login asks for read_prefs only; that token is of no use later
+      // and is revoked below.
+      const storesToken = Boolean(body.scope?.split(' ').includes('write_gpx'));
 
-      const { lat, lon } = home ?? {};
+      let stored = false;
 
-      await login(
-        ctx,
-        'osm',
-        osmId,
-        osmName,
-        null,
-        lat === undefined ? undefined : lat,
-        lon === undefined ? undefined : lon,
-        language,
-        connect,
-        undefined,
-        undefined,
-        img?.href ?? null,
-      );
+      try {
+        const {
+          display_name: osmName,
+          id: osmId,
+          home,
+          img,
+        } = await fetchOsmUser(body.access_token);
+
+        await login(
+          ctx,
+          'osm',
+          osmId,
+          osmName,
+          null,
+          home?.lat,
+          home?.lon,
+          language,
+          connect,
+          storesToken ? { osmAccessToken: body.access_token } : undefined,
+          undefined,
+          img?.href ?? null,
+          storesToken
+            ? (previousRows) => {
+                stored = true;
+
+                // The tokens the new one replaced on the rows the login wrote;
+                // no other row can hold them.
+                for (const { osmAccessToken } of previousRows) {
+                  if (osmAccessToken && osmAccessToken !== body.access_token) {
+                    revokeOsmTokenLater(osmAccessToken, ctx.log);
+                  }
+                }
+              }
+            : undefined,
+        );
+      } finally {
+        // Nothing would revoke these later. A plain login's token is never
+        // stored; one the login failed to store (e.g. another OSM account than
+        // the connected one) may be after all. Without a scope it may be a real
+        // grant, so it is left alone.
+        if (!storesToken && body.scope !== undefined) {
+          revokeOsmTokenLater(body.access_token, ctx.log);
+        } else if (storesToken && !stored) {
+          revokeOsmTokenIfUnheld(body.access_token, ctx.log);
+        }
+      }
     },
   );
 }

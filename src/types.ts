@@ -99,6 +99,7 @@ export const PROVIDER_ID_COLUMNS = [
 const USER_COLUMN_NAMES = [
   'id',
   ...PROVIDER_ID_COLUMNS,
+  'osmAccessToken',
   'garminAccessToken',
   'garminAccessTokenSecret',
   'stravaAccessToken',
@@ -175,6 +176,8 @@ export const UserResponseSchema = z
         'microsoft',
       ]),
     ),
+    // Whether GPS traces can be uploaded to OSM without authorizing again.
+    osmGpxAuthorized: z.boolean(),
     coordinates: z
       .strictObject({ lat: z.number(), lon: z.number() })
       .nullable(),
@@ -215,6 +218,7 @@ export const UserRowSchema = z
     githubUserId: z.string().nullable(),
     stravaUserId: z.string().nullable(),
     microsoftUserId: z.string().nullable(),
+    osmAccessToken: z.string().nullable(),
     garminAccessToken: z.string().nullable(),
     garminAccessTokenSecret: z.string().nullable(),
     stravaAccessToken: z.string().nullable(),

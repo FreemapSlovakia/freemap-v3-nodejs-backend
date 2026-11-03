@@ -8,6 +8,7 @@ import {
   STRAVA_API_BASE,
   StravaNotConnectedError,
 } from '../strava.js';
+import { escapeXml } from '../xml.js';
 
 // Curated subset of a Strava summary activity, enough to render a picker.
 const ActivitySchema = z.object({
@@ -48,14 +49,6 @@ const StreamSetSchema = z.object({
 // pads streams with `null` where a sensor dropped out.
 function num(v: number | null | undefined): string {
   return v == null ? '' : String(Math.round(v * 1000) / 1000);
-}
-
-function xmlEscape(s: string): string {
-  return s
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
 }
 
 export function attachStravaHandlers(router: RouterInstance) {
@@ -210,7 +203,7 @@ export function attachStravaHandlers(router: RouterInstance) {
       ctx.body =
         `<?xml version="1.0" encoding="UTF-8"?>` +
         `<gpx version="1.1" creator="Freemap" xmlns="http://www.topografix.com/GPX/1/1" xmlns:gpxtpx="http://www.garmin.com/xmlschemas/TrackPointExtension/v1">` +
-        `<trk><name>${xmlEscape(detail.name)}</name><trkseg>${points}</trkseg></trk>` +
+        `<trk><name>${escapeXml(detail.name)}</name><trkseg>${points}</trkseg></trk>` +
         `</gpx>`;
     },
   );

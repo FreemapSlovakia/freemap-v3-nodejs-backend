@@ -31,6 +31,19 @@ OSM administrative boundaries) is required — it is not created by
 it, and `POST /geotools/covered-countries` queries it directly; without the
 table both fail with `Table 'country' doesn't exist`.
 
+For development, an empty table is enough to make both work — photos then get
+no country and the endpoint reports none covered:
+
+```sql
+CREATE TABLE country (
+  rowid INT NOT NULL AUTO_INCREMENT,
+  geom GEOMETRY NOT NULL,
+  alpha2 TEXT NULL,
+  UNIQUE KEY rowid (rowid),
+  SPATIAL INDEX country_geom_spx (geom)
+) ENGINE=InnoDB;
+```
+
 Connection settings are read from the `MARIADB_*` environment variables (see
 below).
 
@@ -69,6 +82,8 @@ pnpm start | pnpm exec pino-pretty
 - `HTTP_SSL_KEY` — path to the TLS private key file (required if HTTPS is enabled).
 - `WEB_BASE_URL` — comma-separated list of allowed web frontend origins; the
   first entry is used when generating absolute links (e.g. in emails).
+- `API_URL` — this API's public URL, for links an app follows back to it
+  (default `https://backend.freemap.sk`).
 
 ### MariaDB
 
@@ -92,9 +107,13 @@ pnpm start | pnpm exec pino-pretty
 
   ```
   elevation-sources/010-sk/source.json
-                    250-sonny-de/source.json
-                    330-gedtm30/source.json
+                    245-de_by/source.json
+                    999-gedtm30/source.json
   ```
+
+  It is a checkout of
+  [elevation-sources](https://github.com/FreemapSlovakia/elevation-sources),
+  which terrain-tiles and dem-pyramid read too.
 
   A subdirectory counts as a source only if it holds a `source.json`; anything
   else is ignored, so a half-finished download cannot silently change what the
@@ -103,23 +122,26 @@ pnpm start | pnpm exec pino-pretty
 
   ```json
   {
-    "name": "sonny",
-    "file": "/fm/storage1/dtm/sonny/de/de.tif",
     "attributions": [
-      { "name": "Sonny's LiDAR DTM (CC BY 4.0)", "url": "https://sonny.4lima.de/" }
+      { "name": "Bayerische Vermessungsverwaltung: DGM1 1 m, dl-de/by-2-0" }
     ]
   }
   ```
 
-  - `name` (required) is reported by `/geotools/elevation?sources=1`, so it is
-    an API contract, not a label: use the lowercase ISO 3166-1 alpha-2 code of
-    the country the model covers (`sk`, `at`, …), or the model's own id for one
-    that isn't country-scoped (`gedtm30`, `sonny`). Several sources may share a
-    name — the reported list is deduplicated, and their credits are merged.
-    Keep names stable across file renames or re-projections.
-  - `file` (optional) is the raster, absolute or relative to the directory, so a
-    source can point at one that stays where it is. Without it the directory
-    must hold `data.vrt` or `data.tif`. `.vrt` and `.tif` are both fine.
+  The directory name gives the name reported by
+  `/geotools/elevation?sources=1` and listed by `/geotools/elevation/sources`:
+  the part past the number up to the first `-` or `_`, so `245-de_by` and
+  `249-de_th` both report `de`. It is an API contract, not a label — the
+  lowercase ISO 3166-1 alpha-2 code of the country the model covers, or the
+  model's own id for one that isn't country-scoped (`gedtm30`) — so renaming a
+  directory changes the API, and renumbering one changes the order
+  `/geotools/elevation/sources` lists it in. A directory that
+  yields no lowercase name is skipped with a warning. Several sources may share
+  a name: the reported list is deduplicated, and their credits are merged.
+
+  The raster is the directory's `source.vrt` or `source.tif`, normally a link
+  to one that stays where it is.
+
   - `attributions` (optional) is how the source wants crediting, served straight
     to clients so a new dataset needs no web or mobile release. A country
     stitched from two licensed datasets carries two entries.
@@ -173,6 +195,8 @@ pnpm start | pnpm exec pino-pretty
   is more than this many seconds in the future (default `600`).
 - `PREMIUM_PHOTO_SECRET` — HMAC secret used to sign access URLs for premium
   (paid) photos.
+- `LOCUS_TOKEN_SECRET` — HMAC secret (at least 32 characters) the "Locus Map"
+  app tokens are derived from; changing it invalidates every Locus install.
 
 ### Purchases (Polar)
 
@@ -191,6 +215,15 @@ one-time custom-amount top-ups (1 credit = €0.01, minimum 500).
   product.
 - `POLAR_WEBHOOK_SECRET` — secret of the Polar webhook endpoint (Standard
   Webhooks signature). Set on the endpoint that points at `/auth/polar/webhook`.
+
+The API version is pinned by the SDK import path (`@polar-sh/sdk/2026-10`, in
+`src/polar.ts` and the webhook handler), which sends `Polar-Version` on every
+request. Polar releases a new version in the first week of January, April, July
+and October and keeps three alive (current, deprecated, next); unpinned
+requests silently follow whatever is current. `2026-10` is deprecated at the
+January 2027 release and removed at the April 2027 release. The webhook
+payload version is *not* covered by the pin — it is a per-endpoint setting in
+the Polar dashboard and has to be moved there in step.
 
 Endpoints: `POST /auth/polar/checkout` (auth required) returns a hosted
 `checkoutUrl` to redirect the user to; `POST /auth/polar/webhook` provisions
@@ -257,6 +290,10 @@ does overlap for the excess. It is logged when it happens.
   beginning. Defaults to 7 hours, and is set alongside the matching
   `TimeoutStartSec` in `systemd/freemap-wikimedia-import.service` — the two are
   one invariant and must move together.
+- `WIKIMEDIA_IMPORT_ALLOW_SHRINK` — publish an import even though it built less
+  than half the live photo count. The run otherwise fails rather than swapping a
+  collapsed table in, which is what a changed dump format looks like. Set it
+  only once the drop is confirmed real.
 - `WIKIMEDIA_IMPORT_BATCH_SIZE`, `WIKIMEDIA_IMPORT_COMMIT_ROWS`,
   `WIKIMEDIA_IMPORT_PAGEID_BATCH` — load-tuning knobs; see the comments on the
   constants in `src/wikimedia/importWikimedia.ts` before changing them.

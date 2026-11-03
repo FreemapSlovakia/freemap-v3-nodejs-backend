@@ -87,7 +87,7 @@ export function trackingSubscribeHandler(
         }
         ${
           maxAge
-            ? sql` AND TIMESTAMPDIFF(SECOND, trackingPoint.createdAt, NOW()) < ${maxAge}`
+            ? sql` AND trackingPoint.createdAt > NOW() - INTERVAL ${maxAge} SECOND`
             : empty
         }
         ${

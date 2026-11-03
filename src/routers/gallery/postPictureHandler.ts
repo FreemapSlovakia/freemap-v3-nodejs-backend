@@ -73,7 +73,7 @@ export function attachPostPictureHandler(router: RouterInstance) {
 
   router.post(
     '/pictures',
-    authenticator(true),
+    authenticator(true, 'gallery:write'),
     contentTypeMiddleware({
       'application/json': [
         async (ctx) => {

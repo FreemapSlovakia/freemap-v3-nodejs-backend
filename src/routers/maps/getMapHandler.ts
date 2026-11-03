@@ -52,7 +52,7 @@ export function attachGetMapHandler(router: RouterInstance) {
   router.get(
     '/:id',
     acceptValidator('application/json'),
-    authenticator(false),
+    authenticator(false, 'maps:read'),
     async (ctx) => {
       const [item] = DbRowSchema.array()
         .max(1)

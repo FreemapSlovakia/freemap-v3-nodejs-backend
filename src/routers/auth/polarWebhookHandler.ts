@@ -1,19 +1,18 @@
 import type { RouterInstance } from '@koa/router';
-import {
-  validateEvent,
-  WebhookVerificationError,
-} from '@polar-sh/sdk/webhooks';
+import type { ParameterizedContext } from 'koa';
 import sql from 'sql-template-tag';
+import z from 'zod';
 import { pool, runInTransaction } from '../../database.js';
 import { getEnv } from '../../env.js';
 import { registerPath } from '../../openapi.js';
+import { webhooks } from '../../polar.js';
 import { isPremiumProduct } from '../../premiumPricing.js';
 
 /**
  * Subscription statuses that provision nothing, because the period they carry
  * hasn't been paid for.
  *
- * Polar advances `currentPeriodEnd` at the cycle boundary, *before* the renewal
+ * Polar advances `current_period_end` at the cycle boundary, *before* the renewal
  * payment settles, and always emits a `subscription.updated` alongside the
  * status change. So a `past_due` subscription arrives holding a period end a
  * year ahead that nobody has paid — and since `subscription.revoked`
@@ -34,6 +33,71 @@ const UNPAID_STATUSES = new Set([
 
 type MetaValue = string | number | boolean;
 
+// The SDK only verifies the signature and casts the parsed JSON, so the fields
+// that decide what gets provisioned are checked here. A missing
+// `subscription_id` or `ended_at` would otherwise read as "not null" and
+// silently misprovision.
+const MetadataSchema = z.record(
+  z.string(),
+  z.union([z.string(), z.number(), z.boolean()]),
+);
+
+const CustomerSchema = z.object({
+  id: z.string(),
+  external_id: z.string().nullish(),
+  email: z
+    .string()
+    .nullish()
+    .transform((v) => v ?? null),
+});
+
+const OrderSchema = z.object({
+  id: z.string(),
+  product_id: z.string().nullable(),
+  subscription_id: z.string().nullable(),
+  subtotal_amount: z.number().int(),
+  billing_reason: z.string(),
+  metadata: MetadataSchema,
+  customer: CustomerSchema,
+});
+
+const SubscriptionSchema = z.object({
+  id: z.string(),
+  status: z.string(),
+  customer_id: z.string(),
+  current_period_end: z.iso
+    .datetime({ offset: true })
+    .transform((v) => new Date(v)),
+  ended_at: z.iso.datetime({ offset: true }).nullable(),
+  cancel_at_period_end: z.boolean(),
+  metadata: MetadataSchema,
+  customer: CustomerSchema,
+});
+
+// Revocation only detaches the stored ID, so it shouldn't fail on fields it
+// never reads.
+const RevokedSubscriptionSchema = SubscriptionSchema.pick({
+  id: true,
+  metadata: true,
+  customer: true,
+});
+
+function parseData<T>(
+  ctx: ParameterizedContext,
+  schema: z.ZodType<T>,
+  data: unknown,
+): T {
+  const result = schema.safeParse(data);
+
+  if (!result.success) {
+    ctx.log.error({ err: result.error }, 'malformed Polar webhook payload');
+
+    return ctx.throw(400, 'malformed payload');
+  }
+
+  return result.data;
+}
+
 function metaString(
   metadata: Record<string, MetaValue> | undefined | null,
   key: string,
@@ -52,10 +116,10 @@ function metaString(
  */
 async function resolveUserId(
   metadata: Record<string, MetaValue> | undefined | null,
-  customer: { id: string; externalId?: string | null },
+  customer: { id: string; external_id?: string | null },
 ): Promise<number | undefined> {
   const raw =
-    metaString(metadata, 'userId') ?? customer.externalId ?? undefined;
+    metaString(metadata, 'userId') ?? customer.external_id ?? undefined;
 
   if (raw !== undefined) {
     const id = Number(raw);
@@ -110,14 +174,23 @@ export function attachPolarWebhookHandler(router: RouterInstance) {
     let event;
 
     try {
-      event = validateEvent(
+      event = await webhooks.validateEvent(
         rawBody,
         ctx.headers as Record<string, string>,
         getEnv('POLAR_WEBHOOK_SECRET'),
       );
     } catch (err) {
-      if (err instanceof WebhookVerificationError) {
+      if (err instanceof webhooks.PolarWebhookVerificationError) {
         return ctx.throw(403, 'invalid signature');
+      }
+
+      // Thrown only after the signature checked out. Acknowledge it like any
+      // other ignored event; a 4xx would make Polar retry and eventually
+      // disable the endpoint.
+      if (err instanceof webhooks.PolarWebhookUnknownTypeError) {
+        ctx.status = 204;
+
+        return;
       }
 
       return ctx.throw(400, err as Error);
@@ -125,7 +198,7 @@ export function attachPolarWebhookHandler(router: RouterInstance) {
 
     switch (event.type) {
       case 'order.paid': {
-        const order = event.data;
+        const order = parseData(ctx, OrderSchema, event.data);
 
         const userId = await resolveUserId(order.metadata, order.customer);
 
@@ -148,23 +221,23 @@ export function attachPolarWebhookHandler(router: RouterInstance) {
         const kind = metaString(order.metadata, 'kind');
 
         const isCredits =
-          order.productId === getEnv('POLAR_CREDITS_PRODUCT_ID', '') ||
+          order.product_id === getEnv('POLAR_CREDITS_PRODUCT_ID', '') ||
           kind === 'credits';
 
         // Our own checkouts always carry `kind`; the product IDs are the
         // fallback for orders created outside them (e.g. in the Polar UI).
         const isPremium =
           !isCredits &&
-          (kind === 'premium' || isPremiumProduct(order.productId));
+          (kind === 'premium' || isPremiumProduct(order.product_id));
 
         // Subscriptions only ever sell premium here, and a renewal order may
         // arrive without the checkout metadata, so those count as premium
         // history regardless — they grant nothing on their own anyway.
-        const isSubscriptionOrder = order.subscriptionId !== null;
+        const isSubscriptionOrder = order.subscription_id !== null;
 
         if (!isCredits && !isPremium && !isSubscriptionOrder) {
           ctx.log.warn(
-            { orderId: order.id, productId: order.productId },
+            { orderId: order.id, productId: order.product_id },
             'unrecognized Polar order; nothing provisioned',
           );
 
@@ -174,13 +247,13 @@ export function attachPolarWebhookHandler(router: RouterInstance) {
         const isOneTimePremium = isPremium && !isSubscriptionOrder;
 
         // For credits, the chosen count is what the buyer was charged in euro
-        // cents, which is `subtotalAmount`: our prices are tax-inclusive, so a
+        // cents, which is `subtotal_amount`: our prices are tax-inclusive, so a
         // 500-credit order reads subtotal 500, tax 93, net 407. Using the net
         // here would short-change the buyer by the tax. Metadata is set by our
         // own checkout and wins; this only covers orders made elsewhere.
         const credits = isCredits
           ? Number(
-              metaString(order.metadata, 'credits') ?? order.subtotalAmount,
+              metaString(order.metadata, 'credits') ?? order.subtotal_amount,
             )
           : null;
 
@@ -196,7 +269,7 @@ export function attachPolarWebhookHandler(router: RouterInstance) {
                   : { type: 'premium' },
               )},
               createdAt = NOW(),
-              note = ${`polar:${order.billingReason}`},
+              note = ${`polar:${order.billing_reason}`},
               polarOrderId = ${order.id}`,
           );
 
@@ -239,8 +312,8 @@ export function attachPolarWebhookHandler(router: RouterInstance) {
         // meantime — without it `polarSubscriptionId` would stay unset for the
         // whole trial, so the app would keep offering a second subscription.
         // `canceled` keeps access until the period end, so we still provision up
-        // to `currentPeriodEnd`.
-        const sub = event.data;
+        // to `current_period_end`.
+        const sub = parseData(ctx, SubscriptionSchema, event.data);
 
         if (UNPAID_STATUSES.has(sub.status)) {
           break;
@@ -262,7 +335,7 @@ export function attachPolarWebhookHandler(router: RouterInstance) {
         // and delivery isn't ordered, so a late one would leave the user marked
         // as subscribed. Let the end win.
         //
-        // `endedAt` is the right test, not `canceled`/`endsAt`: Polar sets it
+        // `ended_at` is the right test, not `canceled`/`ends_at`: Polar sets it
         // only when access is actually over — an immediate revoke, or the cycle
         // that finds `cancel_at_period_end` set — and clears it on reactivation.
         // Cancelling with time left on the period leaves it null, so this does
@@ -270,13 +343,13 @@ export function attachPolarWebhookHandler(router: RouterInstance) {
         //
         // code-review: accepted trade-off — this only catches snapshots that
         // already know they ended. A snapshot taken *before* revocation and
-        // retried after it still carries `endedAt: null` and re-stores the ID.
+        // retried after it still carries `ended_at: null` and re-stores the ID.
         // That's inert: `premiumExpiration` is never shortened here, so the
         // dead ID comes with an expired premium, and every consumer goes
         // through `liveSubscriptionSql`, which requires both. Ordering this
-        // properly would mean persisting `modifiedAt` per subscription; not
+        // properly would mean persisting `modified_at` per subscription; not
         // worth it for a stale value nothing reads. Don't report it.
-        if (sub.endedAt !== null) {
+        if (sub.ended_at !== null) {
           await clearSubscription(userId, sub.id);
 
           break;
@@ -315,12 +388,12 @@ export function attachPolarWebhookHandler(router: RouterInstance) {
         await pool.query<unknown>(
           sql`UPDATE user SET
               premiumExpiration = GREATEST(
-                COALESCE(premiumExpiration, ${sub.currentPeriodEnd}),
-                ${sub.currentPeriodEnd}
+                COALESCE(premiumExpiration, ${sub.current_period_end}),
+                ${sub.current_period_end}
               ),
               polarSubscriptionId = ${sub.id},
-              polarCustomerId = ${sub.customerId},
-              cancelAtPeriodEnd = ${sub.cancelAtPeriodEnd},
+              polarCustomerId = ${sub.customer_id},
+              cancelAtPeriodEnd = ${sub.cancel_at_period_end},
               email = COALESCE(email, ${sub.customer.email})
               WHERE id = ${userId}`,
         );
@@ -333,7 +406,7 @@ export function attachPolarWebhookHandler(router: RouterInstance) {
         // already reflects the last (now-past) period end set on active/updated.
         // We deliberately don't force it to NOW(): during the migration that
         // could wipe premium granted by another source (e.g. legacy Rovas).
-        const sub = event.data;
+        const sub = parseData(ctx, RevokedSubscriptionSchema, event.data);
 
         const userId = await resolveUserId(sub.metadata, sub.customer);
 

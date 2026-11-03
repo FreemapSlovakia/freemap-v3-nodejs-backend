@@ -21,6 +21,12 @@ export const pool = createPool({
 
 const logger = appLogger.child({ module: 'db' });
 
+/**
+ * Delete a session this long after its last use. Generous because the gallery
+ * is used seasonally — a year off between hikes should not sign anyone out.
+ */
+const SESSION_INACTIVITY_MONTHS = 12;
+
 export async function initDatabase() {
   const scripts = [
     sql`CREATE TABLE IF NOT EXISTS user (
@@ -28,8 +34,12 @@ export async function initDatabase() {
       osmId INT UNSIGNED NULL UNIQUE,
       facebookUserId VARCHAR(32) CHARSET ascii NULL UNIQUE,
       googleUserId VARCHAR(32) CHARSET ascii NULL UNIQUE,
-      garminUserId VARCHAR(60) CHARSET ascii NULL UNIQUE,
+      -- Garmin documents no maximum; observed values are a 36-char dashed
+      -- UUID, or a 32-char hex id on older accounts.
+      garminUserId VARCHAR(64) CHARSET ascii NULL UNIQUE,
       appleUserId VARCHAR(255) CHARSET ascii NULL UNIQUE,
+      -- Only a token granted the write_gpx scope is stored.
+      osmAccessToken VARCHAR(255) CHARSET ascii COLLATE ascii_bin NULL,
       garminAccessToken VARCHAR(255) CHARSET ascii NULL,
       garminAccessTokenSecret VARCHAR(255) CHARSET ascii NULL,
       githubUserId VARCHAR(32) CHARSET ascii NULL,
@@ -53,7 +63,9 @@ export async function initDatabase() {
       language CHAR(2) CHARSET ascii NULL,
       polarCustomerId VARCHAR(64) CHARSET ascii NULL,
       polarSubscriptionId VARCHAR(64) CHARSET ascii NULL,
-      cancelAtPeriodEnd BIT NOT NULL DEFAULT false
+      cancelAtPeriodEnd BIT NOT NULL DEFAULT false,
+      -- Whether any account still holds a token, before revoking it.
+      INDEX userOsmAccessTokenIdx (osmAccessToken)
     ) ENGINE=InnoDB`,
 
     sql`CREATE TABLE IF NOT EXISTS blockedCredit (
@@ -65,9 +77,35 @@ export async function initDatabase() {
     ) ENGINE=InnoDB`,
 
     sql`CREATE TABLE IF NOT EXISTS auth (
-      authToken VARCHAR(255) CHARSET ascii PRIMARY KEY,
+      authToken VARCHAR(255) CHARSET ascii COLLATE ascii_bin PRIMARY KEY,
       userId INT UNSIGNED NOT NULL,
       createdAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      -- Drives session expiry in cleanup(). Refreshed at most hourly by the
+      -- authenticator, so it is approximate by design.
+      lastUsedAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (userId) REFERENCES user (id) ON DELETE CASCADE,
+      INDEX authLastUsedIdx (lastUsedAt)
+    ) ENGINE=InnoDB`,
+
+    // Only the SHA-256 of the token is kept; it is shown to the user once.
+    sql`CREATE TABLE IF NOT EXISTS appToken (
+      id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+      userId INT UNSIGNED NOT NULL,
+      tokenHash BINARY(32) NOT NULL UNIQUE,
+      note VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL,
+      scopes JSON NOT NULL,
+      createdAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      expiresAt TIMESTAMP NULL,
+      lastUsedAt TIMESTAMP NULL,
+      lastUserAgent VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL,
+      FOREIGN KEY (userId) REFERENCES user (id) ON DELETE CASCADE,
+      INDEX appTokenExpiresAtIdx (expiresAt)
+    ) ENGINE=InnoDB`,
+
+    sql`CREATE TABLE IF NOT EXISTS locusInstall (
+      nonce CHAR(43) CHARSET ascii COLLATE ascii_bin NOT NULL PRIMARY KEY,
+      userId INT UNSIGNED NOT NULL,
+      expireAt TIMESTAMP NOT NULL,
       FOREIGN KEY (userId) REFERENCES user (id) ON DELETE CASCADE
     ) ENGINE=InnoDB`,
 
@@ -120,7 +158,7 @@ export async function initDatabase() {
       createdAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
       location POINT NOT NULL,
       country CHAR(2) CHARSET ascii NULL,
-      pano BIT NOT NULL,
+      pano BIT NOT NULL DEFAULT false,
       premium BIT NOT NULL DEFAULT FALSE,
       azimuth FLOAT DEFAULT NULL,
       license VARCHAR(32) CHARSET ascii NOT NULL DEFAULT 'CC-BY-SA-4.0',
@@ -249,7 +287,8 @@ export async function initDatabase() {
       gsmSignal FLOAT NULL,
       message VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL,
       CONSTRAINT tpDeviceIdFk FOREIGN KEY (deviceId) REFERENCES trackingDevice (id) ON DELETE CASCADE,
-      INDEX tpCreatedAtIdx (createdAt)
+      INDEX tpDeviceIdx (deviceId),
+      INDEX tpDeviceCreatedAtIdx (deviceId, createdAt)
     ) ENGINE=InnoDB`,
 
     sql`CREATE TABLE IF NOT EXISTS trackingAccessToken (
@@ -380,20 +419,86 @@ export async function initDatabase() {
     'ALTER TABLE user MODIFY COLUMN language CHAR(2) CHARSET ascii NULL',
     "ALTER TABLE purchaseIntent MODIFY COLUMN status ENUM('created','awaiting_payment','confirmed','rejected') CHARSET ascii NOT NULL DEFAULT 'created'",
 
-    // map.id and mapWriteAccess.mapId are a foreign key pair and must keep
-    // matching charsets, so the constraint has to go first. That also stops the
-    // sequence from re-running once applied, since the DROP then fails.
-    [
-      'ALTER TABLE mapWriteAccess DROP FOREIGN KEY mwaMapFk',
-      'ALTER TABLE map MODIFY COLUMN id CHAR(8) CHARSET ascii NOT NULL',
-      'ALTER TABLE mapWriteAccess MODIFY COLUMN mapId CHAR(8) CHARSET ascii NOT NULL',
-      'ALTER TABLE mapWriteAccess ADD CONSTRAINT mwaMapFk FOREIGN KEY (mapId) REFERENCES map (id) ON DELETE CASCADE',
-    ],
-
     // Distinguishes a subscription still set to auto-renew from one the
     // customer already canceled (access continues either way until
     // `premiumExpiration`, so that alone can't tell them apart).
     'ALTER TABLE user ADD COLUMN cancelAtPeriodEnd BIT NOT NULL DEFAULT false',
+
+    // Nullable in databases predating the NOT NULL above; no NULLs exist and
+    // both columns have a foreign key to `user`. The priciest entries here —
+    // `picture` is ~700k rows — so prune them once applied everywhere.
+    'ALTER TABLE picture MODIFY COLUMN userId INT UNSIGNED NOT NULL',
+    'ALTER TABLE auth MODIFY COLUMN userId INT UNSIGNED NOT NULL',
+
+    // Older tables still default to utf8mb3, so a column added without an
+    // explicit CHARACTER SET silently inherits it — the trap that made
+    // `map.data` reject emoji. Retargets the default only; existing columns
+    // are converted below. Deliberately not CONVERT TO CHARACTER SET, which
+    // would also rewrite the columns pinned to `ascii` (map.id,
+    // picture.license, the OAuth ids) and break the charset match that the
+    // map.id / mapWriteAccess.mapId foreign key needs.
+    ...[
+      'auth',
+      'map',
+      'picture',
+      'pictureComment',
+      'pictureRating',
+      'pictureTag',
+      'trackingAccessToken',
+      'trackingDevice',
+      'trackingPoint',
+      'user',
+    ].map((table) => `ALTER TABLE ${table} DEFAULT CHARACTER SET utf8mb4`),
+
+    // Columns that inherited utf8mb3 from those defaults, one statement per
+    // table. Checked first: no value in a narrowed column holds a non-ASCII
+    // byte, and pictureTag's (pictureId, name) key has no pairs that collide
+    // under utf8mb4_unicode_ci.
+    'ALTER TABLE map MODIFY COLUMN name VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL',
+    'ALTER TABLE pictureTag MODIFY COLUMN name VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL',
+    'ALTER TABLE trackingAccessToken MODIFY COLUMN listingLabel VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL, MODIFY COLUMN note VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL',
+    'ALTER TABLE trackingDevice MODIFY COLUMN name VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL',
+    'ALTER TABLE trackingPoint MODIFY COLUMN message VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL',
+    'ALTER TABLE picture MODIFY COLUMN title VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL, MODIFY COLUMN country CHAR(2) CHARSET ascii NULL',
+    'ALTER TABLE user MODIFY COLUMN email VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL, MODIFY COLUMN appleUserId VARCHAR(255) CHARSET ascii NULL, MODIFY COLUMN facebookUserId VARCHAR(32) CHARSET ascii NULL, MODIFY COLUMN googleUserId VARCHAR(32) CHARSET ascii NULL',
+
+    // utf8mb3_bin in older databases: narrows the charset while keeping the
+    // case-sensitive comparison. See the CREATE TABLE above.
+    'ALTER TABLE auth MODIFY COLUMN authToken VARCHAR(255) CHARSET ascii COLLATE ascii_bin NOT NULL',
+
+    // Held only Panoramio/Picasa ids from the 2016 imports; both services are
+    // gone and nothing read the column. Not IF EXISTS on purpose — the plain
+    // form fails once applied, so it stops rebuilding the table every startup.
+    'ALTER TABLE picture DROP COLUMN hiddenNote',
+
+    // Long-expired Facebook access tokens from the old login flow, unread by
+    // any code. Credential material tied to a user is not worth retaining.
+    'ALTER TABLE auth DROP COLUMN facebookAccessToken',
+
+    // Every caller sets `item`, so DEFAULT '{}' only means a bad insert
+    // records an empty purchase instead of failing. Billing data should
+    // fail loudly.
+    'ALTER TABLE purchase ALTER COLUMN item DROP DEFAULT',
+
+    // Drops a legacy ON UPDATE current_timestamp() that silently restamps a
+    // rating on any UPDATE. wikimediaRating.ratedAt never had it.
+    'ALTER TABLE pictureRating MODIFY COLUMN ratedAt TIMESTAMP NOT NULL',
+
+    // Existing rows get the time of this ALTER, not their createdAt: sessions
+    // are only expired once observed unused, so nobody is logged out by the
+    // migration itself and the first cleanup can delete nothing until the
+    // inactivity window has actually elapsed.
+    'ALTER TABLE auth ADD COLUMN lastUsedAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP, ADD INDEX authLastUsedIdx (lastUsedAt)',
+
+    // Pruning a device's points needs (deviceId, createdAt) for the age limit
+    // and (deviceId) for the id order of the count limit; without them it
+    // scans the device's whole history. The FK's implicit index, if any, is
+    // replaced by the named one so every database matches the CREATE TABLE.
+    // Every createdAt filter also has a deviceId, so the createdAt-only index
+    // goes.
+    'ALTER TABLE trackingPoint ADD INDEX IF NOT EXISTS tpDeviceIdx (deviceId), ADD INDEX IF NOT EXISTS tpDeviceCreatedAtIdx (deviceId, createdAt), DROP INDEX IF EXISTS tpDeviceIdFk, DROP INDEX IF EXISTS tpCreatedAtIdx',
+
+    'ALTER TABLE user ADD COLUMN IF NOT EXISTS osmAccessToken VARCHAR(255) CHARSET ascii COLLATE ascii_bin NULL AFTER appleUserId, ADD INDEX IF NOT EXISTS userOsmAccessTokenIdx (osmAccessToken)',
   ];
 
   const db = await pool.getConnection();
@@ -441,6 +546,14 @@ export async function initDatabase() {
       sql`DELETE FROM purchaseIntent WHERE expireAt < NOW()`,
     );
 
+    await pool.query<unknown>(
+      sql`DELETE FROM appToken WHERE expiresAt < NOW()`,
+    );
+
+    await pool.query<unknown>(
+      sql`DELETE FROM locusInstall WHERE expireAt < NOW()`,
+    );
+
     await runInTransaction(async (conn) => {
       // TODO track pending downloads taking more than a day :-o
 
@@ -467,6 +580,13 @@ export async function initDatabase() {
         sql`DELETE FROM blockedCredit WHERE createdAt < ${yesterday}`,
       );
     });
+
+    // Last, so a failure here can't hold up the credit refunds above. By
+    // inactivity, not age: a client that keeps its token (the mobile app)
+    // would otherwise be logged out despite daily use.
+    await pool.query<unknown>(
+      sql`DELETE FROM auth WHERE lastUsedAt < NOW() - INTERVAL ${raw(String(SESSION_INACTIVITY_MONTHS))} MONTH`,
+    );
   }
 
   cleanup();

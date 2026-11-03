@@ -2,7 +2,7 @@ import type { RouterInstance } from '@koa/router';
 import sql, { join, raw } from 'sql-template-tag';
 import z from 'zod';
 import { authenticator } from '../../authenticator.js';
-import { pool } from '../../database.js';
+import { pool, runInTransaction } from '../../database.js';
 import { AUTH_REQUIRED, registerPath } from '../../openapi.js';
 import {
   MAX_PICTURE_INPUT_BYTES,
@@ -34,6 +34,8 @@ export function attachPatchUserHandler(router: RouterInstance) {
   registerPath('/auth/settings', {
     patch: {
       summary: 'Update authenticated user settings',
+      description:
+        '`settings` is merged into the stored settings by top-level key; a `null` value removes the key.',
       tags: ['auth'],
       security: AUTH_REQUIRED,
       requestBody: { content: { 'application/json': { schema: BodySchema } } },
@@ -69,10 +71,16 @@ export function attachPatchUserHandler(router: RouterInstance) {
     }
 
     const keys = (Object.keys(body) as (keyof typeof body)[]).filter(
-      (k) => k !== 'picture' && body[k] !== undefined,
+      (k) => k !== 'picture' && k !== 'settings' && body[k] !== undefined,
     );
 
-    if (keys.length === 0 && processedPicture === undefined) {
+    const { settings } = body;
+
+    if (
+      keys.length === 0 &&
+      processedPicture === undefined &&
+      settings === undefined
+    ) {
       ctx.status = 204;
 
       return;
@@ -80,18 +88,46 @@ export function attachPatchUserHandler(router: RouterInstance) {
 
     // TODO validate duplicates
 
-    const assignments = keys.map(
-      (key) =>
-        sql`${raw(key)} = ${key === 'settings' ? JSON.stringify(body[key]) : body[key]}`,
-    );
+    const assignments = keys.map((key) => sql`${raw(key)} = ${body[key]}`);
 
     if (processedPicture !== undefined) {
       assignments.push(sql`picture = ${processedPicture}`);
     }
 
-    await pool.query<unknown>(
-      sql`UPDATE user SET ${join(assignments)} WHERE id = ${ctx.state.user!.id}`,
-    );
+    const userId = ctx.state.user!.id;
+
+    if (settings === undefined) {
+      await pool.query<unknown>(
+        sql`UPDATE user SET ${join(assignments)} WHERE id = ${userId}`,
+      );
+    } else {
+      await runInTransaction(async (conn) => {
+        // Clients each own their top-level keys (the mobile app keeps
+        // `freemapApp`), so one client's save must not drop another's. Not
+        // JSON_MERGE_PATCH: its recursion would keep entries deleted inside a
+        // key's value.
+        const [row] = await conn.query<{ settings: Record<string, unknown> }[]>(
+          sql`SELECT settings FROM user WHERE id = ${userId} FOR UPDATE`,
+        );
+
+        const merged = { ...row?.settings };
+
+        for (const [k, v] of Object.entries(settings)) {
+          if (v === null) {
+            delete merged[k];
+          } else {
+            merged[k] = v;
+          }
+        }
+
+        await conn.query<unknown>(
+          sql`UPDATE user SET ${join([
+            ...assignments,
+            sql`settings = ${JSON.stringify(merged)}`,
+          ])} WHERE id = ${userId}`,
+        );
+      });
+    }
 
     ctx.status = 204;
   });

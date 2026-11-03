@@ -156,7 +156,7 @@ async function traccarHandler(ctx: ParameterizedContext) {
     const [item] = await conn.query<
       { id: number; maxCount: number; maxAge: number }[]
     >(
-      sql`SELECT id, maxCount, maxAge FROM trackingDevice WHERE token = ${device.uniqueId}`,
+      sql`SELECT id, maxCount, maxAge FROM trackingDevice WHERE token = ${device.uniqueId} FOR UPDATE`,
     );
 
     if (!item) {

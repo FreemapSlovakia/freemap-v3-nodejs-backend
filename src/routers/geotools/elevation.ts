@@ -68,9 +68,10 @@ type LocalSource = ParsedSource & {
 // data; otherwise it falls back to the next source, then SRTM.
 //
 // Each lives in its own directory under ELEVATION_DIR with a `source.json`
-// carrying its reported name and its credits, so adding a model is a directory
-// drop: no config to edit, no bbox to transcribe, and — because the API serves
-// the credits — no client release to make them visible.
+// carrying its credits; the directory gives its reported name unless that file
+// does. So adding a model is a directory drop: no config to edit, no bbox to
+// transcribe, and — because the API serves the credits — no client release to
+// make them visible.
 const elevationDir = getEnv('ELEVATION_DIR', '');
 
 const localSources: LocalSource[] = loadElevationSources(
@@ -90,6 +91,13 @@ if (!elevationDir && getEnv('ELEVATION_SOURCES', '')) {
       'are loaded, so every read falls back to SRTM.',
   );
 }
+
+const sourceNames = [
+  ...new Set([
+    ...localSources.map((src) => src.name),
+    ...(elevationDataDir ? [SRTM_SOURCE_NAME] : []),
+  ]),
+];
 
 // SRTM has no source directory — the code owns the tile scheme and the download
 // URL, so it owns the credit too.
@@ -204,6 +212,8 @@ const ElevationWithSourcesResponseSchema = z.object({
   }),
 });
 
+const SourceNamesSchema = z.array(z.string());
+
 const SourcesSchema = z
   .literal('1')
   .optional()
@@ -268,6 +278,23 @@ export function attachElevationHandler(router: RouterInstance) {
     },
   });
 
+  registerPath('/geotools/elevation/sources', {
+    get: {
+      summary: 'List the elevation datasets, in priority order',
+      description:
+        'Distinct source names, highest priority first; a name served by ' +
+        'several rasters takes the position of its highest-priority one. ' +
+        'Lists every configured source regardless of premium status or ' +
+        'whether it is currently readable.',
+      tags: ['geotools'],
+      responses: {
+        200: {
+          content: { 'application/json': { schema: SourceNamesSchema } },
+        },
+      },
+    },
+  });
+
   router.get('/elevation', authenticator(false), compute);
 
   router.post(
@@ -276,6 +303,12 @@ export function attachElevationHandler(router: RouterInstance) {
     authenticator(false),
     compute,
   );
+
+  router.get('/elevation/sources', (ctx) => {
+    ctx.set('Cache-Control', 'public, max-age=3600');
+
+    ctx.body = SourceNamesSchema.parse(sourceNames);
+  });
 }
 
 async function compute(ctx: ParameterizedContext) {
@@ -373,8 +406,8 @@ export async function resolveElevations(
         results[i] = v;
         resolved = true;
         if (usedSources) {
-          // One name can be answered by several rasters — every Sonny country
-          // reports `sonny` — so merge rather than overwrite, or whichever
+          // One name can be answered by several rasters — every German state
+          // reports `de` — so merge rather than overwrite, or whichever
           // answered last would be the only one credited.
           mergeCredits(usedSources, src.name, src.attributions);
         }

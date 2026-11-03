@@ -29,7 +29,7 @@ export function attachDeleteTokenHandler(router: RouterInstance) {
   router.delete(
     '/access-tokens/:id',
     acceptValidator('application/json'),
-    authenticator(true),
+    authenticator(true, 'tracking:write'),
     async (ctx) => {
       await runInTransaction(async (conn) => {
         const [item] = await conn.query<{ userId: number }[]>(sql`

@@ -183,7 +183,7 @@ export async function* streamDumpRows(
   opts: StreamOptions = {},
 ): AsyncGenerator<ParsedRow> {
   const decoder = new StringDecoder('utf8');
-  const insertPrefix = `INSERT INTO \`${tableName}\` VALUES `;
+  const insertPrefix = `INSERT INTO \`${tableName}\` VALUES`;
   const maxFields = opts.maxFields ?? 0;
 
   let buf = '';

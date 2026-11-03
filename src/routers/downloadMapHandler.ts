@@ -17,6 +17,8 @@ import { getEnv } from '../env.js';
 import { appLogger } from '../logger.js';
 import { sendMail } from '../mailer.js';
 import { AUTH_REQUIRED, registerPath } from '../openapi.js';
+import { acceptValidator } from '../requestValidators.js';
+import { fetchLicenses, TileCodeCollector } from '../tileAttribution.js';
 
 const CONCURRENCY = 8;
 
@@ -26,7 +28,7 @@ type Combo = {
 };
 
 type Translation = {
-  success: Combo;
+  success: Combo & { credits: string };
   error: Combo;
 };
 
@@ -35,6 +37,8 @@ const translations: Record<string, Translation> = {
     success: {
       subject: 'Freemap Map Download',
       body: 'Your map is ready at {URL} for 24 hours.',
+      credits:
+        'Sources — please keep this credit with the map wherever you share or publish it:',
     },
     error: {
       subject: 'Freemap Map Download Error',
@@ -48,6 +52,8 @@ const translations: Record<string, Translation> = {
     success: {
       subject: 'Stiahnutie mapy Freemap',
       body: 'Vaša mapa je pripravená na stiahnutie na {URL} počas 24 hodín.',
+      credits:
+        'Zdroje — pri zdieľaní alebo zverejnení mapy prosím uveďte tento zoznam:',
     },
     error: {
       subject: 'Chyba pri sťahovaní mapy Freemap',
@@ -61,6 +67,8 @@ const translations: Record<string, Translation> = {
     success: {
       subject: 'Stažení mapy Freemap',
       body: 'Vaše mapa je připravena ke stažení na {URL} po dobu 24 hodin.',
+      credits:
+        'Zdroje — při sdílení nebo zveřejnění mapy prosím uveďte tento seznam:',
     },
     error: {
       subject: 'Chyba při stahování mapy Freemap',
@@ -74,6 +82,8 @@ const translations: Record<string, Translation> = {
     success: {
       subject: 'Pobranie mapy Freemap',
       body: 'Twoja mapa jest gotowa do pobrania pod adresem {URL} przez 24 godziny.',
+      credits:
+        'Źródła — udostępniając lub publikując mapę, prosimy zachować tę informację:',
     },
     error: {
       subject: 'Błąd pobierania mapy Freemap',
@@ -87,6 +97,8 @@ const translations: Record<string, Translation> = {
     success: {
       subject: 'Freemap térkép letöltése',
       body: 'A térképed készen áll letöltésre a következő címen: {URL} 24 órán keresztül.',
+      credits:
+        'Források — a térkép megosztásakor vagy közzétételekor kérjük, tüntesd fel ezt a listát:',
     },
     error: {
       subject: 'Hiba a Freemap térkép letöltésekor',
@@ -100,6 +112,8 @@ const translations: Record<string, Translation> = {
     success: {
       subject: 'Download mappa Freemap',
       body: 'La tua mappa è pronta per il download a {URL} per 24 ore.',
+      credits:
+        'Fonti — se condividi o pubblichi la mappa, per favore mantieni questa attribuzione:',
     },
     error: {
       subject: 'Errore nel download della mappa Freemap',
@@ -113,6 +127,8 @@ const translations: Record<string, Translation> = {
     success: {
       subject: 'Freemap Karten-Download',
       body: 'Ihre Karte steht zum Download bereit unter {URL} für 24 Stunden.',
+      credits:
+        'Quellen — bitte geben Sie diese Angaben an, wenn Sie die Karte weitergeben oder veröffentlichen:',
     },
     error: {
       subject: 'Fehler beim Freemap Karten-Download',
@@ -126,6 +142,8 @@ const translations: Record<string, Translation> = {
     success: {
       subject: 'Prenos zemljevida Freemap',
       body: 'Vaš zemljevid je pripravljen za prenos na {URL} 24 ur.',
+      credits:
+        'Viri — ob deljenju ali objavi zemljevida prosimo navedite ta seznam:',
     },
     error: {
       subject: 'Napaka pri prenosu zemljevida Freemap',
@@ -139,6 +157,8 @@ const translations: Record<string, Translation> = {
     success: {
       subject: 'Téléchargement de la carte Freemap',
       body: 'Votre carte est prête à être téléchargée sur {URL} pendant 24 heures.',
+      credits:
+        'Sources — merci de conserver cette attribution partout où vous partagez ou publiez la carte :',
     },
     error: {
       subject: 'Erreur lors du téléchargement de la carte Freemap',
@@ -182,15 +202,55 @@ const DownloadBodySchema = z.strictObject({
   boundary: GeoJSONFeatureSchema,
   name: z.string(),
   email: z.email(),
-  scale: z.number().int().min(1).max(3).optional(),
+  scale: z.number().int().min(1).max(4).optional(),
+  // a shading map's, as the web client's `serializeShading` writes it; the
+  // cap is nginx's 8k request line, which the same URL meets on screen
+  shading: z
+    .strictObject({
+      spec: z.string().nonempty().max(8000),
+      opaque: z.boolean(),
+    })
+    .optional(),
 });
 
+const DownloadableMapsSchema = z.array(
+  z.object({ type: z.string(), creditsPerMTile: z.number() }),
+);
+
+const downloadableMapPrices: z.infer<typeof DownloadableMapsSchema> =
+  downloadableMaps.map(({ type, creditsPerMTile }) => ({
+    type,
+    creditsPerMTile,
+  }));
+
 export function attachDownloadMapHandler(router: RouterInstance) {
+  registerPath('/downloadableMaps', {
+    get: {
+      summary:
+        'List the maps an offline package can be made of, with their prices',
+      tags: ['offline-maps'],
+      responses: {
+        200: {
+          content: { 'application/json': { schema: DownloadableMapsSchema } },
+        },
+      },
+    },
+  });
+
+  // The web client offers exactly these, in its export and its offline maps.
+  router.get(
+    '/downloadableMaps',
+    acceptValidator('application/json'),
+    (ctx) => {
+      ctx.body = downloadableMapPrices;
+    },
+  );
+
   registerPath('/downloadMap', {
     post: {
       summary:
         'Request an offline map tile package download (async, costs credits)',
-      tags: ['maps'],
+      tags: ['offline-maps'],
       security: AUTH_REQUIRED,
       responses: { 204: {}, 400: {}, 401: {}, 409: {} },
     },
@@ -214,14 +274,71 @@ export function attachDownloadMapHandler(router: RouterInstance) {
 
     const translation = translations[lang]!;
 
-    const map = downloadableMaps.find(({ type }) => type === body.map);
+    const listed = downloadableMaps.find(({ type }) => type === body.map);
 
-    if (!map) {
+    if (!listed) {
       ctx.throw(400, 'invalid map');
       return;
     }
 
+    if (Boolean(listed.shading) !== Boolean(body.shading)) {
+      ctx.throw(400, 'shading goes with a shading map only');
+      return;
+    }
+
     const { minZoom, maxZoom, boundary, scale, name, email, format } = body;
+
+    // Past its range a map answers 404, which is no tile.
+    if (
+      minZoom > maxZoom ||
+      minZoom < listed.minZoom ||
+      maxZoom > listed.maxNativeZoom
+    ) {
+      ctx.throw(400, 'zoom out of the map range');
+      return;
+    }
+
+    if (scale && scale !== 1 && !listed.extraScales?.includes(scale)) {
+      ctx.throw(400, 'scale not offered by the map');
+      return;
+    }
+
+    // An opaque shading is a base map; one that shows through needs alpha.
+    const shadingFormat = body.shading?.opaque ? 'jpg' : 'png';
+
+    const map: DownloadableMap = body.shading
+      ? {
+          ...listed,
+          url: `${listed.url}?format=${shadingFormat}&shading=${encodeURIComponent(body.shading.spec)}`,
+          overlay: !body.shading.opaque,
+          tileFormat: shadingFormat,
+        }
+      : listed;
+
+    // A shading terrain-tiles can't read fails every tile; refuse it before
+    // charging rather than refund it after.
+    if (body.shading) {
+      const first = calculateTiles(boundary, minZoom, minZoom).next().value;
+
+      if (first) {
+        const [x, y, z] = first;
+
+        const res = await fetch(
+          map.url
+            .replace('{x}', String(x))
+            .replace('{y}', String(y))
+            .replace('{z}', String(z)),
+          { signal: AbortSignal.timeout(30_000) },
+        );
+
+        await res.body?.cancel();
+
+        if (res.status !== 200 && res.status !== 404) {
+          ctx.throw(400, `invalid shading (${res.status})`);
+          return;
+        }
+      }
+    }
 
     let totalTiles = 0;
 
@@ -324,8 +441,15 @@ async function download(
   email: string,
   totalTiles: number,
   logger: Logger,
-  translation: Combo,
+  translation: Translation['success'],
 ) {
+  // Up front, so a renderer that can't say what its tiles credit fails the job
+  // before any file or tile exists rather than after.
+  const licenses =
+    'licensesUrl' in map ? await fetchLicenses(map.licensesUrl) : undefined;
+
+  const collector = licenses && new TileCodeCollector();
+
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
 
   const safeName = name
@@ -365,14 +489,13 @@ async function download(
 
     const combo = sql`INSERT INTO metadata (name, value) VALUES
       ('name', ${name}),
-      ('format', 'jpg'),
+      ('format', ${map.tileFormat ?? 'jpg'}),
       ('type', ${map.overlay ? 'overlay' : 'baselayer'}),
       ('version', '1.0'),
       ('description', 'Downloaded map tiles from www.freemap.sk'),
       ('minzoom', ${minZoom}),
       ('maxzoom', ${maxZoom}),
-      ('bounds', ${bbox(boundary).join(',')}),
-      ('attribution', ${map.attribution})`;
+      ('bounds', ${bbox(boundary).join(',')})`;
 
     db.prepare(combo.sql).run(...combo.values);
   } else if (format === 'sqlitedb') {
@@ -380,6 +503,9 @@ async function download(
       `
         CREATE TABLE tiles (x INTEGER, y INTEGER, z INTEGER, s INTEGER, image BLOB, PRIMARY KEY (x, y, z, s));
         CREATE TABLE info (minzoom INTEGER, maxzoom INTEGER, tilesize INTEGER, center_x DOUBLE, center_y DOUBLE, zooms TEXT, provider INTEGER);
+        -- The format has no place for credits; this borrows MBTiles' shape so
+        -- the file at least carries them.
+        CREATE TABLE metadata (name TEXT PRIMARY KEY, value TEXT);
       `,
     );
 
@@ -414,6 +540,8 @@ async function download(
 
   let client!: ClientHttp2Session;
 
+  let attribution: string;
+
   const handleGoaway = () => {
     if (!closing) {
       client = connect(new URL(map.url).origin);
@@ -426,15 +554,24 @@ async function download(
   async function downloadTile(tile: Tile) {
     const [x, y, z] = tile;
 
+    const [path, query] = map.url
+      .replace('{x}', x.toString())
+      .replace('{y}', y.toString())
+      .replace('{z}', z.toString())
+      .split('?');
+
+    // the scale goes on the path, ahead of any query
     const url = new URL(
-      map.url
-        .replace('{x}', x.toString())
-        .replace('{y}', y.toString())
-        .replace('{z}', z.toString()) +
-        (scale && map.extraScales?.includes(scale) ? `@${scale}x` : ''),
+      path +
+        (scale && map.extraScales?.includes(scale) ? `@${scale}x` : '') +
+        (query === undefined ? '' : `?${query}`),
     );
 
     let buffer: Buffer<ArrayBufferLike>;
+
+    let statusCode = 0;
+
+    let codes: string | undefined;
 
     for (let i = 0; ; i++) {
       try {
@@ -445,7 +582,11 @@ async function download(
           });
 
           req.on('response', (headers) => {
-            const statusCode = Number(headers[':status']);
+            statusCode = Number(headers[':status']);
+
+            const header = headers['x-attribution'];
+
+            codes = Array.isArray(header) ? header.join(' ') : header;
 
             if (statusCode !== 200 && statusCode !== 404) {
               reject(new Error(`Unexpected status code: ${statusCode}`));
@@ -495,10 +636,20 @@ async function download(
 
     downloadedCount++;
 
+    // a 404 paints nothing, so it has nothing to credit
+    if (statusCode === 200) {
+      collector?.add(codes);
+    }
+
     if (Date.now() - logTs > 1_000) {
       logger.info('Downloaded tiles: %d/%d', downloadedCount, totalTiles);
 
       logTs = Date.now();
+    }
+
+    // its body is an error message, not an image
+    if (statusCode === 404) {
+      return;
     }
 
     if (format === 'mbtiles') {
@@ -535,6 +686,15 @@ async function download(
       }
     }
 
+    attribution =
+      'attribution' in map
+        ? map.attribution
+        : collector!.credits(licenses!).join(', ');
+
+    db.prepare(
+      `INSERT INTO metadata (name, value) VALUES ('attribution', ?)`,
+    ).run(attribution);
+
     db.close();
   } catch (err) {
     db.close();
@@ -550,13 +710,15 @@ async function download(
 
   logger.info('Map download successful, sending email notification.');
 
+  // For an export the mail is the only moment the user is present, so it is
+  // the one place the credits are sure to reach them.
   await sendMail(
     email,
     translation.subject,
-    translation.body.replace(
+    `${translation.body.replace(
       '{URL}',
       `${getEnv('MBTILES_URL_PREFIX')}/${encodeURIComponent(dbName)}.${format}`,
-    ),
+    )}\n\n${translation.credits}\n${attribution}`,
   );
 }
 

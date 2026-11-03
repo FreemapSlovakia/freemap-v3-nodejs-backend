@@ -14,6 +14,7 @@ import { createDocument } from 'zod-openapi';
 import { initDatabase } from './database.js';
 import { getEnv, getEnvInteger } from './env.js';
 import { appLogger } from './logger.js';
+import { attachMapCatalogHandler } from './mapCatalog.js';
 import { paths } from './openapi.js';
 import { nanoid } from './randomId.js';
 import { authRouter } from './routers/auth/index.js';
@@ -25,9 +26,13 @@ import { attachPostGarminCourses } from './routers/garminCoursesHandler.js';
 import { attachGeoIp } from './routers/geoip.js';
 import { geotoolsRouter } from './routers/geotools/index.js';
 import { attachGetUsers } from './routers/getUsersHandler.js';
+import { locusRouter, oruxRouter } from './routers/mapApps/index.js';
 import { mapsRouter } from './routers/maps/index.js';
+import { attachOsmGpxHandlers } from './routers/osmGpxHandler.js';
 import { attachStravaHandlers } from './routers/stravaHandler.js';
 import { tracklogsRouter } from './routers/tracklogs/index.js';
+import { attachWmsProxyHandler } from './routers/wmsProxyHandler.js';
+import { attachWmsTileHandler } from './routers/wmsTileHandler.js';
 import { startSocketDeviceTracking } from './socketDeviceTracking.js';
 import { attachWs } from './ws.js';
 
@@ -207,6 +212,10 @@ router.use('/maps', mapsRouter.routes(), mapsRouter.allowedMethods());
 
 router.use('/events', eventsRouter.routes(), eventsRouter.allowedMethods());
 
+router.use('/locus', locusRouter.routes(), locusRouter.allowedMethods());
+
+router.use('/oruxmaps', oruxRouter.routes(), oruxRouter.allowedMethods());
+
 attachDownloadMapHandler(router);
 
 attachGetUsers(router);
@@ -215,7 +224,15 @@ attachGeoIp(router);
 
 attachPostGarminCourses(router);
 
+attachOsmGpxHandlers(router);
+
 attachStravaHandlers(router);
+
+attachMapCatalogHandler(router);
+
+attachWmsProxyHandler(router);
+
+attachWmsTileHandler(router);
 
 router.get('/documentation', (ctx) => {
   ctx.body = createDocument({
@@ -233,8 +250,13 @@ router.get('/documentation', (ctx) => {
       { name: 'auth', description: 'Authentication' },
       { name: 'tracking', description: 'Device location tracking' },
       { name: 'gallery', description: 'Picture gallery' },
-      { name: 'maps', description: 'Map annotations' },
+      { name: 'maps', description: 'My maps: saved map annotations' },
       { name: 'events', description: 'Social shared-trip events' },
+      {
+        name: 'map-library',
+        description: 'The catalog of maps users can install, and its WMS proxy',
+      },
+      { name: 'offline-maps', description: 'Offline map tile packages' },
       { name: 'strava', description: 'Strava activity import' },
     ],
     paths,

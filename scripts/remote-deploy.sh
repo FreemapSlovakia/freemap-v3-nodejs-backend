@@ -19,6 +19,10 @@ fnm use default
 
 cd "${DEPLOY_DIR:-/home/freemap/freemap-v3-nodejs-backend}"
 
+# Before the build, which copies the catalog into build/ where the API reads
+# it: a refused catalog never reaches the running service or its next restart.
+node scripts/check-catalog.mjs
+
 pnpm install --frozen-lockfile
 
 # gdal-async's prebuilt binary bundles a GDAL whose libtiff lacks the ZSTD

@@ -105,6 +105,20 @@ const BBoxQuerySchema = CommonQuerySchema.extend({
     (v) => (Array.isArray(v) ? v : v ? [v] : undefined),
     z.array(z.enum(fieldValues)).optional(),
   ),
+  // Cap applied to each source separately (so gallery + wikimedia can return
+  // up to 2 x limit; the wikimedia arm is additionally capped at
+  // WIKIMEDIA_BBOX_LIMIT). Without it the whole bbox comes back — half a
+  // million rows for Slovakia at z8. With it the gallery rows are picked in
+  // a deterministic pseudo-random order (CRC32 of the id), which yields a
+  // uniform random sample of the matched set: density-proportional, so
+  // clusters keep their shape, and stable while panning, so the same
+  // pictures stay selected instead of flickering between requests.
+  // `ORDER BY lat` truncation, by contrast, would return a band along the
+  // southern edge. The wikimedia arm stays unordered on purpose: its LIMIT
+  // early-exits the spatial scan (~100x cheaper than a full scan + filesort),
+  // at the price of an R-tree-ordered, spatially lumpy subset — accepted for
+  // a secondary overlay that was already capped that way.
+  limit: z.coerce.number().int().min(1).max(50000).optional(),
 }).meta({ title: 'bbox' });
 
 // Safety cap for the wikimedia arm in dense areas; the client also gates it by
@@ -146,7 +160,11 @@ const OrderByQuerySchema = CommonQuerySchema.extend({
 const IdRowSchema = z.array(z.object({ id: z.number() }));
 
 const RadiusRowSchema = z.array(
-  z.object({ id: z.uint32(), distance: z.number() }),
+  z.object({
+    id: z.uint32(),
+    distance: z.number(),
+    takenAt: z.date().nullable(),
+  }),
 );
 
 const BboxRowSchema = z.array(
@@ -308,7 +326,7 @@ export function attachGetPicturesHandler(router: RouterInstance) {
   router.get(
     '/pictures',
     acceptValidator('application/json', 'application/x-protobuf'),
-    authenticator(false),
+    authenticator(false, 'gallery:read'),
     async (ctx) => {
       const method = methods[ctx.query.by as string];
 
@@ -379,7 +397,7 @@ async function byRadius(ctx: ParameterizedContext) {
   const minLon = lon - k;
   const maxLon = lon + k;
 
-  const query = sql`SELECT picture.id,
+  const query = sql`SELECT picture.id, picture.takenAt,
     ST_Distance_Sphere(location, POINT(${lon}, ${lat})) / 1000 AS distance
     ${ratingFrom !== undefined || ratingTo !== undefined ? sql`, ${raw(ratingSubquery)}` : empty}
     FROM picture
@@ -408,13 +426,12 @@ async function byRadius(ctx: ParameterizedContext) {
     HAVING distance <= ${distance}
     ${ratingFrom == null ? empty : sql`AND rating >= ${ratingFrom}`}
     ${ratingTo == null ? empty : sql`AND rating <= ${ratingTo}`}
-    ORDER BY distance
+    ORDER BY distance, picture.takenAt IS NULL, picture.takenAt, picture.id
     LIMIT 1000`;
 
   const galleryRows = includeGallery
     ? RadiusRowSchema.parse(await pool.query<unknown>(query)).map((row) => ({
-        id: row.id,
-        distance: row.distance,
+        ...row,
         source: 0,
       }))
     : [];
@@ -422,7 +439,7 @@ async function byRadius(ctx: ParameterizedContext) {
   const wikimediaRows = includeWikimedia
     ? RadiusRowSchema.parse(
         await pool.query<unknown>(sql`
-          SELECT pageId AS id,
+          SELECT pageId AS id, capturedAt AS takenAt,
             ST_Distance_Sphere(location, POINT(${lon}, ${lat})) / 1000 AS distance
             ${wmRatingConds.length ? raw(`, ${wikimediaRatingSubquery}`) : empty}
           FROM wikimediaPicture
@@ -430,13 +447,22 @@ async function byRadius(ctx: ParameterizedContext) {
           ${wmConds.length ? sql`AND ${join(wmConds, ' AND ')}` : empty}
           HAVING distance <= ${distance}
           ${wmRatingConds.length ? sql`AND ${join(wmRatingConds, ' AND ')}` : empty}
-          ORDER BY distance
+          ORDER BY distance, capturedAt IS NULL, capturedAt, pageId
           LIMIT 1000`),
-      ).map((row) => ({ id: row.id, distance: row.distance, source: 1 }))
+      ).map((row) => ({ ...row, source: 1 }))
     : [];
 
+  // Photos from one spot (e.g. a panorama series) tie on distance; show them
+  // in shooting order, undated last.
   ctx.body = [...galleryRows, ...wikimediaRows]
-    .sort((a, b) => a.distance - b.distance)
+    .sort(
+      (a, b) =>
+        a.distance - b.distance ||
+        Number(a.takenAt === null) - Number(b.takenAt === null) ||
+        (a.takenAt?.getTime() ?? 0) - (b.takenAt?.getTime() ?? 0) ||
+        a.source - b.source ||
+        a.id - b.id,
+    )
     .slice(0, 1000)
     .map((row) => ({ id: row.id, source: row.source }));
 }
@@ -466,6 +492,7 @@ async function byBbox(ctx: ParameterizedContext) {
     license,
     fields,
     sources,
+    limit,
   } = bboxQuery;
 
   const myUserId = ctx.state.user?.id ?? -1;
@@ -545,7 +572,7 @@ async function byBbox(ctx: ParameterizedContext) {
         ? empty
         : sql`${raw(ratingFrom == null ? 'HAVING' : 'AND')} rating <= ${ratingTo}`
     }
-    ORDER BY lat, lon
+    ${limit == null ? raw('ORDER BY lat, lon') : sql`ORDER BY CRC32(picture.id) LIMIT ${limit}`}
   `;
 
   const rows = includeGallery
@@ -629,7 +656,7 @@ async function byBbox(ctx: ParameterizedContext) {
           WHERE MBRContains(ST_GeomFromText(${`LINESTRING(${minLon} ${minLat}, ${maxLon} ${maxLat})`}, 4326), location)
           ${wmConds.length ? sql`AND ${join(wmConds, ' AND ')}` : empty}
           ${wmRatingConds.length ? sql`HAVING ${join(wmRatingConds, ' AND ')}` : empty}
-          LIMIT ${WIKIMEDIA_BBOX_LIMIT}`),
+          LIMIT ${limit == null ? WIKIMEDIA_BBOX_LIMIT : Math.min(limit, WIKIMEDIA_BBOX_LIMIT)}`),
       )
     : [];
 
@@ -662,8 +689,9 @@ async function byBbox(ctx: ParameterizedContext) {
   )[] = [...galleryPictures, ...wikimediaPictures];
 
   // Keep the merged stream ordered so protobuf delta-encoding stays compact
-  // (the gallery arm is already ORDER BY lat, lon; re-sort once merged).
-  if (wikimediaPictures.length > 0) {
+  // (the gallery arm is ORDER BY lat, lon unless capped; re-sort once merged
+  // or sampled).
+  if (wikimediaPictures.length > 0 || limit != null) {
     pictures.sort((a, b) => a.lat - b.lat || a.lon - b.lon);
   }
 
@@ -858,9 +886,12 @@ async function byOrder(ctx: ParameterizedContext) {
 
   const wmConds = wikimediaColumnConds(orderByQuery);
 
-  const wmJoin = wmConds.length
-    ? sql`JOIN wikimediaPicture wp ON wp.pageId = w.pageId WHERE ${join(wmConds, ' AND ')}`
-    : empty;
+  // Joined even with no conditions to filter on: a rating or comment outlives
+  // the photo row the monthly import rebuilds, and listing an id whose detail
+  // endpoint then 404s breaks the viewer.
+  const wmJoin = sql`JOIN wikimediaPicture wp ON wp.pageId = w.pageId ${
+    wmConds.length ? sql`WHERE ${join(wmConds, ' AND ')}` : empty
+  }`;
 
   let wmArm: Sql;
 

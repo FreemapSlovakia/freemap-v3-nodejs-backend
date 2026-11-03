@@ -10,7 +10,8 @@
     "skipLibCheck": true,
     "strict": true,
     "lib": ["ES2024"],
-    "strictNullChecks": true
+    "strictNullChecks": true,
+    "allowJs": true
   },
   "include": ["src/**/*"],
   "exclude": ["build", "node_modules"]

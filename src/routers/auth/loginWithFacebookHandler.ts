@@ -47,6 +47,9 @@ export function attachLoginWithFacebookHandler(router: RouterInstance) {
           content: { 'application/json': { schema: LoginResponseSchema } },
         },
         400: {},
+        409: {
+          description: 'A different remote account than the connected one',
+        },
       },
     },
   });

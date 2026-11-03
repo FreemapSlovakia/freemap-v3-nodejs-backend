@@ -44,7 +44,7 @@ export function attachPostTokenHandler(router: RouterInstance) {
   router.post(
     '/devices/:id/access-tokens',
     acceptValidator('application/json'),
-    authenticator(true),
+    authenticator(true, 'tracking:write'),
     async (ctx) => {
       let body;
 

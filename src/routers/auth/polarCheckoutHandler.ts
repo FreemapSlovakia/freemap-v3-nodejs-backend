@@ -96,7 +96,11 @@ export function attachPolarCheckoutHandler(router: RouterInstance) {
     let prices:
       | Record<
           string,
-          { amountType: 'fixed'; priceAmount: number; priceCurrency: 'eur' }[]
+          {
+            amount_type: 'fixed';
+            price_amount: number;
+            price_currency: 'eur';
+          }[]
         >
       | undefined;
 
@@ -166,9 +170,9 @@ export function attachPolarCheckoutHandler(router: RouterInstance) {
       prices = {
         [productId]: [
           {
-            amountType: 'fixed',
-            priceAmount: body.credits,
-            priceCurrency: 'eur',
+            amount_type: 'fixed',
+            price_amount: body.credits,
+            price_currency: 'eur',
           },
         ],
       };
@@ -181,19 +185,19 @@ export function attachPolarCheckoutHandler(router: RouterInstance) {
     try {
       checkout = await getPolar().checkouts.create({
         products: [productId],
-        externalCustomerId: String(user.id),
+        external_customer_id: String(user.id),
         // Pre-fill the checkout with what we know (email is optional in our app).
-        customerEmail: user.email ?? undefined,
-        customerName: user.name,
-        successUrl,
-        embedOrigin,
+        customer_email: user.email ?? undefined,
+        customer_name: user.name,
+        success_url: successUrl,
+        embed_origin: embedOrigin,
         // Hide the "add discount code" field.
-        allowDiscountCodes: false,
+        allow_discount_codes: false,
         ...(body.lang ? { locale: body.lang } : {}),
         metadata,
         ...(prices === undefined ? {} : { prices }),
         ...(trialDays > 0
-          ? { trialInterval: 'day' as const, trialIntervalCount: trialDays }
+          ? { trial_interval: 'day' as const, trial_interval_count: trialDays }
           : {}),
       });
     } catch (err) {

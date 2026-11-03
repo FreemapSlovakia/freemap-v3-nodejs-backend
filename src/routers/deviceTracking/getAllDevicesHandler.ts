@@ -23,7 +23,7 @@ export function attachGetAllDevicesHandler(router: RouterInstance) {
   router.get(
     '/devices',
     acceptValidator('application/json'),
-    authenticator(true),
+    authenticator(true, 'tracking:read'),
     async (ctx) => {
       ctx.body = DevicesSchema.parse(
         await pool.query<unknown>(sql`

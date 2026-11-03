@@ -36,7 +36,7 @@ export function attachGetDeviceHandler(router: RouterInstance) {
   router.get(
     '/devices/:id',
     acceptValidator('application/json'),
-    authenticator(true),
+    authenticator(true, 'tracking:read'),
     async (ctx) => {
       const [item] = TrackingDeviceSchema.array()
         .max(1)

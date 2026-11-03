@@ -37,7 +37,7 @@ export function attachPutTokenHandler(router: RouterInstance) {
   router.put(
     '/access-tokens/:id',
     acceptValidator('application/json'),
-    authenticator(true),
+    authenticator(true, 'tracking:write'),
     async (ctx) => {
       let body;
 

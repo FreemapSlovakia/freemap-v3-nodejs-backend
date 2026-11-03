@@ -105,7 +105,7 @@ export async function attachGetStatsHandler(router: RouterInstance) {
 
   router.get(
     '/stats',
-    authenticator(false),
+    authenticator(false, 'gallery:read'),
     acceptValidator('application/json'),
     async (ctx) => {
       const period = ctx.query.period;

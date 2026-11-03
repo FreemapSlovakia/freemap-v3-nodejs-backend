@@ -54,7 +54,7 @@ async function urlEncodedHandler(ctx: ParameterizedContext) {
     const [item] = await conn.query<
       { id: number; maxCount: number; maxAge: number }[]
     >(
-      sql`SELECT id, maxCount, maxAge FROM trackingDevice WHERE token = ${ctx.params.token}`,
+      sql`SELECT id, maxCount, maxAge FROM trackingDevice WHERE token = ${ctx.params.token} FOR UPDATE`,
     );
 
     if (!item) {

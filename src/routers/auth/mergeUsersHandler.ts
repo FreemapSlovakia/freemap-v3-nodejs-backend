@@ -4,6 +4,7 @@ import z from 'zod';
 import { authenticator } from '../../authenticator.js';
 import { pool, runInTransaction } from '../../database.js';
 import { AUTH_REQUIRED, registerPath } from '../../openapi.js';
+import { revokeOsmTokenLater } from '../../osm.js';
 import { hasRole } from '../../roles.js';
 import { USER_COLUMNS_SQL, UserRowSchema } from '../../types.js';
 import { MergeConflictError, mergeUserAccounts } from '../../userMerge.js';
@@ -173,7 +174,7 @@ export function attachMergeUsersHandler(router: RouterInstance) {
       return ctx.throw(400, 'targetId and sourceId must differ');
     }
 
-    const merged = await runInTransaction(async (conn) => {
+    const { merged, droppedOsmToken } = await runInTransaction(async (conn) => {
       const [tRow] = await conn.query<unknown[]>(
         sql`SELECT ${raw(USER_COLUMNS_SQL)} FROM user WHERE id = ${targetId} FOR UPDATE`,
       );
@@ -190,13 +191,12 @@ export function attachMergeUsersHandler(router: RouterInstance) {
         return ctx.throw(404, `no user with id ${sourceId} (source)`);
       }
 
+      const source = UserRowSchema.parse(sRow);
+
       try {
-        await mergeUserAccounts(
-          conn,
-          UserRowSchema.parse(tRow),
-          UserRowSchema.parse(sRow),
-          { force },
-        );
+        await mergeUserAccounts(conn, UserRowSchema.parse(tRow), source, {
+          force,
+        });
       } catch (err) {
         if (err instanceof MergeConflictError) {
           return ctx.throw(409, `conflicting ${err.column}`);
@@ -209,8 +209,23 @@ export function attachMergeUsersHandler(router: RouterInstance) {
         sql`SELECT ${raw(USER_COLUMNS_SQL)} FROM user WHERE id = ${targetId}`,
       );
 
-      return summarize(UserRowSchema.parse(row));
+      const target = UserRowSchema.parse(row);
+
+      return {
+        merged: summarize(target),
+        // The source's, when the merged account kept another one (or none).
+        droppedOsmToken:
+          source.osmAccessToken &&
+          source.osmAccessToken !== target.osmAccessToken
+            ? source.osmAccessToken
+            : null,
+      };
     });
+
+    // Gone with the source row, it could never be revoked later.
+    if (droppedOsmToken) {
+      revokeOsmTokenLater(droppedOsmToken, ctx.log);
+    }
 
     ctx.body = merged;
   });
