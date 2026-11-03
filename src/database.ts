@@ -324,26 +324,34 @@ export async function initDatabase() {
       CONSTRAINT mwaMapFk FOREIGN KEY (mapId) REFERENCES map (id) ON DELETE CASCADE
     ) ENGINE=InnoDB`,
 
-    // A map published as an event: at most one per map, owned and edited by
-    // whoever can write the map, and titled by its name. Lat/lon columns rather
-    // than POINT: MariaDB refuses a SPATIAL index on a nullable geometry.
-    sql`CREATE TABLE IF NOT EXISTS mapEvent (
-      mapId CHAR(8) CHARSET ascii PRIMARY KEY,
+    // A shared trip. It may link one of its owner's maps, and keeps a snapshot
+    // of that map's trip stats for filtering; deleting the map only unlinks it.
+    // Lat/lon columns rather than POINT, so a plain index serves the bbox filter.
+    sql`CREATE TABLE IF NOT EXISTS event (
+      id CHAR(8) CHARSET ascii PRIMARY KEY,
+      userId INT UNSIGNED NOT NULL,
+      mapId CHAR(8) CHARSET ascii NULL,
+      title VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
       description TEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL,
       startAt DATETIME NOT NULL,
       endAt DATETIME NULL,
-      startLat DECIMAL(8, 6) NULL,
-      startLon DECIMAL(9, 6) NULL,
-      filterLat DECIMAL(8, 6) NULL,
-      filterLon DECIMAL(9, 6) NULL,
+      startLat DECIMAL(8, 6) NOT NULL,
+      startLon DECIMAL(9, 6) NOT NULL,
       visibility ENUM('public', 'unlisted') CHARSET ascii NOT NULL DEFAULT 'public',
-      activityType VARCHAR(32) CHARSET ascii NULL,
-      difficulty VARCHAR(32) CHARSET ascii NULL,
+      transports VARCHAR(512) CHARSET ascii NULL,
+      difficulty ENUM('easy', 'moderate', 'demanding', 'expert') CHARSET ascii NULL,
+      dogs BIT NULL,
+      children BIT NULL,
+      distance INT UNSIGNED NULL,
+      duration INT UNSIGNED NULL,
+      ascent INT UNSIGNED NULL,
+      descent INT UNSIGNED NULL,
       createdAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
       updatedAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-      CONSTRAINT mapEventMapFk FOREIGN KEY (mapId) REFERENCES map (id) ON DELETE CASCADE,
-      INDEX mapEventTimeIdx (startAt, endAt),
-      INDEX mapEventFilterLocIdx (filterLat, filterLon)
+      CONSTRAINT eventUserFk FOREIGN KEY (userId) REFERENCES user (id) ON DELETE CASCADE,
+      CONSTRAINT eventMapFk FOREIGN KEY (mapId) REFERENCES map (id) ON DELETE SET NULL,
+      INDEX eventTimeIdx (startAt, endAt),
+      INDEX eventLocationIdx (startLat, startLon)
     ) ENGINE=InnoDB`,
 
     // CREATE OR REPLACE (not IF NOT EXISTS) so the trigger is recreated on every

@@ -5,36 +5,51 @@ import { authenticator } from '../../authenticator.js';
 import { runInTransaction } from '../../database.js';
 import { AUTH_REQUIRED, registerPath } from '../../openapi.js';
 import { acceptValidator } from '../../requestValidators.js';
-import { assertMapWritable } from './mapAccess.js';
+import { canWriteEvent } from './types.js';
 
 export function attachDeleteEventHandler(router: RouterInstance) {
-  registerPath('/events/{mapId}', {
+  registerPath('/events/{id}', {
     delete: {
-      summary: 'Stop a map being an event',
+      summary: 'Delete an event (owner only)',
       tags: ['events'],
       security: AUTH_REQUIRED,
       requestParams: {
-        path: z.object({ mapId: z.string().nonempty() }),
+        path: z.object({ id: z.string().nonempty() }),
       },
       responses: {
         204: {},
         401: {},
         403: {},
-        404: { description: 'no such map' },
+        404: { description: 'no such event' },
       },
     },
   });
 
   router.delete(
-    '/:mapId',
+    '/:id',
     acceptValidator('application/json'),
     authenticator(true),
     async (ctx) => {
       await runInTransaction(async (conn) => {
-        await assertMapWritable(ctx, conn, ctx.params.mapId);
+        const [item] = z
+          .array(z.object({ userId: z.uint32() }))
+          .max(1)
+          .parse(
+            await conn.query<unknown>(
+              sql`SELECT userId FROM event WHERE id = ${ctx.params.id} FOR UPDATE`,
+            ),
+          );
+
+        if (!item) {
+          ctx.throw(404, 'no such event');
+        }
+
+        if (!canWriteEvent(ctx.state.user, item)) {
+          ctx.throw(403);
+        }
 
         await conn.query<unknown>(
-          sql`DELETE FROM mapEvent WHERE mapId = ${ctx.params.mapId}`,
+          sql`DELETE FROM event WHERE id = ${ctx.params.id}`,
         );
       });
 

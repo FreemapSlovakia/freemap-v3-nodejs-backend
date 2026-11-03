@@ -1,18 +1,12 @@
 import type { RouterInstance } from '@koa/router';
-import sql, { raw } from 'sql-template-tag';
+import sql from 'sql-template-tag';
 import z from 'zod';
 import { authenticator } from '../../authenticator.js';
 import { pool } from '../../database.js';
 import { AUTH_OPTIONAL, registerPath } from '../../openapi.js';
 import { acceptValidator } from '../../requestValidators.js';
 import { isOwnerOrRole } from '../../roles.js';
-import { zDateToIso } from '../../types.js';
-import {
-  MAP_EVENT_COLUMNS_SQL,
-  MapEventRowSchema,
-  mapEventFields,
-} from '../events/types.js';
-import { MapMetaWithEventSchema } from './types.js';
+import { MapMetaSchema, zDateToIso } from '../../types.js';
 
 const DbRowSchema = z.object({
   id: z.string().nonempty(),
@@ -26,7 +20,7 @@ const DbRowSchema = z.object({
 });
 
 const ResponseSchema = z.strictObject({
-  meta: MapMetaWithEventSchema,
+  meta: MapMetaSchema,
   data: z.record(z.string(), z.unknown()),
 });
 
@@ -77,29 +71,14 @@ export function attachGetMapHandler(router: RouterInstance) {
 
       const { user } = ctx.state;
 
-      const [eventRow] = MapEventRowSchema.array()
-        .max(1)
-        .parse(
-          await pool.query<unknown>(
-            sql`SELECT ${raw(MAP_EVENT_COLUMNS_SQL)} FROM mapEvent e WHERE e.mapId = ${item.id}`,
-          ),
-        );
-
-      // An event publishes its map, so its link has something to open.
-      if (
-        !item.public &&
-        !eventRow &&
-        !isOwnerOrRole(user, item.userId, 'mapModerator')
-      ) {
+      if (!item.public && !isOwnerOrRole(user, item.userId, 'mapModerator')) {
         ctx.throw(403);
       }
 
       const writers = item.writers?.split(',').map((s) => Number(s)) ?? [];
 
       ctx.body = ResponseSchema.parse({
-        // Parsed once, by `ResponseSchema`: its event dates take a `Date`.
-        meta: {
-          event: eventRow ? mapEventFields(eventRow) : null,
+        meta: MapMetaSchema.parse({
           id: item.id,
           createdAt: item.createdAt,
           modifiedAt: item.modifiedAt,
@@ -110,7 +89,7 @@ export function attachGetMapHandler(router: RouterInstance) {
           canWrite: Boolean(
             user && (item.userId === user.id || writers.includes(user.id)),
           ),
-        },
+        }),
         data: JSON.parse(item.data),
       });
     },

@@ -12,118 +12,129 @@ export const PointSchema = z
 
 export const VisibilitySchema = z.enum(['public', 'unlisted']);
 
-/** What a map gains by being an event. */
-export const MapEventSchema = z
+/** A kind of transport (`bike`, `hiking`); no comma, as they are stored joined. */
+export const TransportSchema = z.string().regex(/^[a-z0-9-]{1,20}$/);
+
+/** The transports an event suits; empty where unsaid. Joined, they fit the column. */
+export const TransportsSchema = z.array(TransportSchema).max(16);
+
+/** The trip stats, as typed or filled from the linked map. */
+export const StatsShape = {
+  /** Meters. */
+  distance: z.uint32().nullable(),
+  /** Seconds. */
+  duration: z.uint32().nullable(),
+  /** Meters. */
+  ascent: z.uint32().nullable(),
+  /** Meters. */
+  descent: z.uint32().nullable(),
+};
+
+export const DifficultySchema = z.enum([
+  'easy',
+  'moderate',
+  'demanding',
+  'expert',
+]);
+
+/** Who and what the trip suits; null where the organizer didn't say. */
+export const AttributesShape = {
+  difficulty: DifficultySchema.nullable(),
+  dogs: z.boolean().nullable(),
+  children: z.boolean().nullable(),
+};
+
+/** The organizer, as the app shows a user: avatar, name, premium mark. */
+export const EventUserSchema = z
   .strictObject({
+    id: z.uint32(),
+    name: z.string(),
+    hasPicture: z.boolean(),
+    premium: z.boolean(),
+  })
+  .meta({ id: 'EventUser' });
+
+export const EventSchema = z
+  .strictObject({
+    id: z.string().nonempty(),
+    userId: z.uint32(),
+    user: EventUserSchema,
+    mapId: z.string().nullable(),
+    /** The linked map's name, while it is linked. */
+    mapName: z.string().nullable(),
+    title: z.string(),
     description: z.string().nullable(),
     startAt: zDateToIso,
     endAt: zNullableDateToIso,
-    startPoint: PointSchema.nullable(),
-    filterLocation: PointSchema.nullable(),
+    startPoint: PointSchema,
     visibility: VisibilitySchema,
-    // Reserved; always null for now.
-    activityType: z.string().nullable(),
-    difficulty: z.string().nullable(),
+    transports: TransportsSchema,
+    ...StatsShape,
+    ...AttributesShape,
     createdAt: zDateToIso,
     updatedAt: zDateToIso,
-  })
-  .meta({ id: 'MapEvent' });
-
-/** An event as listed: its map's id, name and owner, and the event itself. */
-export const EventSchema = z
-  .strictObject({
-    mapId: z.string().nonempty(),
-    name: z.string().nullable(),
-    userId: z.uint32(),
     canWrite: z.boolean(),
-    ...MapEventSchema.shape,
   })
   .meta({ id: 'Event' });
 
-export const MapEventRowSchema = z.object({
-  mapId: z.string().nonempty(),
+export const EventRowSchema = z.object({
+  id: z.string().nonempty(),
+  userId: z.uint32(),
+  mapId: z.string().nullable(),
+  mapName: z.string().nullable(),
+  title: z.string(),
   description: z.string().nullable(),
   startAt: z.date(),
   endAt: z.date().nullable(),
-  startLat: z.number().nullable(),
-  startLon: z.number().nullable(),
-  filterLat: z.number().nullable(),
-  filterLon: z.number().nullable(),
+  startLat: z.number(),
+  startLon: z.number(),
   visibility: VisibilitySchema,
-  activityType: z.string().nullable(),
-  difficulty: z.string().nullable(),
-  createdAt: z.date(),
-  updatedAt: z.date(),
-});
-
-export type MapEventRow = z.infer<typeof MapEventRowSchema>;
-
-export const EventRowSchema = z.object({
-  ...MapEventRowSchema.shape,
-  name: z.string().nullable(),
-  userId: z.uint32(),
-  writers: z
+  transports: z
     .string()
     .nullable()
-    .transform((w) => (w ? w.split(',').map(Number) : []))
-    .pipe(z.number().array()),
+    .transform((s) => (s ? s.split(',') : [])),
+  ...StatsShape,
+  ...AttributesShape,
+  createdAt: z.date(),
+  updatedAt: z.date(),
+  userName: z.string(),
+  userHasPicture: z.coerce.boolean(),
+  userPremium: z.coerce.boolean(),
 });
 
-/** Selects a `mapEvent` aliased `e` into {@link MapEventRowSchema}. */
-export const MAP_EVENT_COLUMNS_SQL =
-  'e.mapId, e.description, e.startAt, e.endAt, ' +
-  'e.startLat, e.startLon, e.filterLat, e.filterLon, ' +
-  'e.visibility, e.activityType, e.difficulty, e.createdAt, e.updatedAt';
+export type EventRow = z.infer<typeof EventRowSchema>;
 
-/**
- * Adds the map's name, owner and writers to {@link MAP_EVENT_COLUMNS_SQL}, for
- * `FROM mapEvent e JOIN map ON map.id = e.mapId`.
- */
+/** The tables {@link EVENT_COLUMNS_SQL} reads, for after `FROM`. */
+export const EVENT_FROM_SQL =
+  'event e JOIN user u ON u.id = e.userId LEFT JOIN map ON map.id = e.mapId';
+
 export const EVENT_COLUMNS_SQL =
-  MAP_EVENT_COLUMNS_SQL +
-  ', map.name, map.userId, ' +
-  '(SELECT GROUP_CONCAT(userId) FROM mapWriteAccess WHERE mapId = e.mapId) AS writers';
+  'e.id, e.userId, e.mapId, map.name AS mapName, e.title, e.description, ' +
+  'e.startAt, e.endAt, e.startLat, e.startLon, e.visibility, ' +
+  'e.transports, e.distance, e.duration, e.ascent, e.descent, ' +
+  'e.difficulty, e.dogs, e.children, ' +
+  'e.createdAt, e.updatedAt, ' +
+  'u.name AS userName, u.picture IS NOT NULL AS userHasPicture, ' +
+  '(u.premiumExpiration IS NOT NULL AND u.premiumExpiration > NOW()) AS userPremium';
 
-function toPoint(lat: number | null, lon: number | null) {
-  return lat === null || lon === null ? null : { lat, lon };
-}
-
-/** A row as {@link MapEventSchema} parses it: dates still as `Date`. */
-export function mapEventFields(row: MapEventRow) {
-  return {
-    description: row.description,
-    startAt: row.startAt,
-    endAt: row.endAt,
-    startPoint: toPoint(row.startLat, row.startLon),
-    filterLocation: toPoint(row.filterLat, row.filterLon),
-    visibility: row.visibility,
-    activityType: row.activityType,
-    difficulty: row.difficulty,
-    createdAt: row.createdAt,
-    updatedAt: row.updatedAt,
-  };
-}
-
-export function eventRowToResponse(
-  row: z.infer<typeof EventRowSchema>,
-  canWrite: boolean,
-) {
-  return EventSchema.parse({
-    mapId: row.mapId,
-    name: row.name,
-    userId: row.userId,
-    canWrite,
-    ...mapEventFields(row),
-  });
-}
-
-/** Owner, a map moderator, or one of the map's writers. */
-export function canWriteEvent(
+export const canWriteEvent = (
   user: User | undefined,
-  row: { userId: number; writers: number[] },
-) {
-  return (
-    isOwnerOrRole(user, row.userId, 'mapModerator') ||
-    Boolean(user && row.writers.includes(user.id))
-  );
+  row: { userId: number },
+) => isOwnerOrRole(user, row.userId, 'mapModerator');
+
+export function eventRowToResponse(row: EventRow, user: User | undefined) {
+  const { startLat, startLon, userName, userHasPicture, userPremium, ...rest } =
+    row;
+
+  return EventSchema.parse({
+    ...rest,
+    user: {
+      id: row.userId,
+      name: userName,
+      hasPicture: userHasPicture,
+      premium: userPremium,
+    },
+    startPoint: { lat: startLat, lon: startLon },
+    canWrite: canWriteEvent(user, row),
+  });
 }

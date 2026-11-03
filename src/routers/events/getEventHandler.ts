@@ -6,21 +6,21 @@ import { pool } from '../../database.js';
 import { AUTH_OPTIONAL, registerPath } from '../../openapi.js';
 import { acceptValidator } from '../../requestValidators.js';
 import {
-  canWriteEvent,
   EVENT_COLUMNS_SQL,
+  EVENT_FROM_SQL,
   EventRowSchema,
   EventSchema,
   eventRowToResponse,
 } from './types.js';
 
 export function attachGetEventHandler(router: RouterInstance) {
-  registerPath('/events/{mapId}', {
+  registerPath('/events/{id}', {
     get: {
-      summary: "Get a map's event",
+      summary: 'Get an event by ID',
       tags: ['events'],
       security: AUTH_OPTIONAL,
       requestParams: {
-        path: z.object({ mapId: z.string().nonempty() }),
+        path: z.object({ id: z.string().nonempty() }),
       },
       responses: {
         200: { content: { 'application/json': { schema: EventSchema } } },
@@ -30,7 +30,7 @@ export function attachGetEventHandler(router: RouterInstance) {
   });
 
   router.get(
-    '/:mapId',
+    '/:id',
     acceptValidator('application/json'),
     authenticator(false),
     async (ctx) => {
@@ -39,8 +39,8 @@ export function attachGetEventHandler(router: RouterInstance) {
         .parse(
           await pool.query<unknown>(sql`
             SELECT ${raw(EVENT_COLUMNS_SQL)}
-            FROM mapEvent e JOIN map ON map.id = e.mapId
-            WHERE e.mapId = ${ctx.params.mapId}
+            FROM ${raw(EVENT_FROM_SQL)}
+            WHERE e.id = ${ctx.params.id}
           `),
         );
 
@@ -49,7 +49,7 @@ export function attachGetEventHandler(router: RouterInstance) {
         ctx.throw(404, 'no such event');
       }
 
-      ctx.body = eventRowToResponse(row, canWriteEvent(ctx.state.user, row));
+      ctx.body = eventRowToResponse(row, ctx.state.user);
     },
   );
 }
