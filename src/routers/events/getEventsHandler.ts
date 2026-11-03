@@ -1,12 +1,12 @@
-import { RouterInstance } from '@koa/router';
-import sql, { empty, join, raw } from 'sql-template-tag';
+import type { RouterInstance } from '@koa/router';
+import sql, { join, raw } from 'sql-template-tag';
 import z from 'zod';
 import { authenticator } from '../../authenticator.js';
 import { pool } from '../../database.js';
 import { AUTH_OPTIONAL, registerPath } from '../../openapi.js';
 import { acceptValidator } from '../../requestValidators.js';
-import { isOwnerOrRole } from '../../roles.js';
 import {
+  canWriteEvent,
   EVENT_COLUMNS_SQL,
   EventRowSchema,
   EventSchema,
@@ -26,7 +26,6 @@ const QuerySchema = z.object({
     .pipe(z.number().array().length(4))
     .optional(),
   visibility: VisibilitySchema.optional(),
-  ownerId: z.coerce.number().int().positive().optional(),
 });
 
 export function attachGetEventsHandler(router: RouterInstance) {
@@ -57,53 +56,49 @@ export function attachGetEventsHandler(router: RouterInstance) {
         return ctx.throw(400, err as Error);
       }
 
-      const { from, to, bbox, visibility, ownerId } = query;
+      const { from, to, bbox, visibility } = query;
 
       const myUserId = ctx.state.user?.id ?? -1;
 
       const wh = [
-        // Unlisted events are surfaced in listings only to their owner.
-        sql`(visibility = 'public' OR ownerId = ${myUserId})`,
+        // Unlisted events are listed only to those who can write their map.
+        sql`(e.visibility = 'public' OR map.userId = ${myUserId} OR EXISTS (
+          SELECT 1 FROM mapWriteAccess WHERE mapId = e.mapId AND userId = ${myUserId}
+        ))`,
       ];
 
       if (visibility !== undefined) {
-        wh.push(sql`visibility = ${visibility}`);
-      }
-
-      if (ownerId !== undefined) {
-        wh.push(sql`ownerId = ${ownerId}`);
+        wh.push(sql`e.visibility = ${visibility}`);
       }
 
       if (from) {
-        wh.push(sql`COALESCE(endAt, startAt) >= ${new Date(from)}`);
+        wh.push(sql`COALESCE(e.endAt, e.startAt) >= ${new Date(from)}`);
       }
 
       if (to) {
-        wh.push(sql`startAt <= ${new Date(to)}`);
+        wh.push(sql`e.startAt <= ${new Date(to)}`);
       }
 
       if (bbox) {
         const [minLon, minLat, maxLon, maxLat] = bbox;
 
         wh.push(
-          sql`filterLat BETWEEN ${minLat} AND ${maxLat} AND filterLon BETWEEN ${minLon} AND ${maxLon}`,
+          sql`e.filterLat BETWEEN ${minLat} AND ${maxLat} AND e.filterLon BETWEEN ${minLon} AND ${maxLon}`,
         );
       }
 
       const rows = EventRowSchema.array().parse(
         await pool.query<unknown>(sql`
-          SELECT ${raw(EVENT_COLUMNS_SQL)} FROM event
-          ${wh.length ? sql`WHERE ${join(wh, ' AND ')}` : empty}
-          ORDER BY startAt
+          SELECT ${raw(EVENT_COLUMNS_SQL)}
+          FROM mapEvent e JOIN map ON map.id = e.mapId
+          WHERE ${join(wh, ' AND ')}
+          ORDER BY e.startAt
           LIMIT 1000
         `),
       );
 
       ctx.body = rows.map((row) =>
-        eventRowToResponse(
-          row,
-          isOwnerOrRole(ctx.state.user, row.ownerId, 'mapModerator'),
-        ),
+        eventRowToResponse(row, canWriteEvent(ctx.state.user, row)),
       );
     },
   );

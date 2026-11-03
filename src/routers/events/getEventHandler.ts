@@ -1,12 +1,12 @@
-import { RouterInstance } from '@koa/router';
+import type { RouterInstance } from '@koa/router';
 import sql, { raw } from 'sql-template-tag';
 import z from 'zod';
 import { authenticator } from '../../authenticator.js';
 import { pool } from '../../database.js';
 import { AUTH_OPTIONAL, registerPath } from '../../openapi.js';
 import { acceptValidator } from '../../requestValidators.js';
-import { isOwnerOrRole } from '../../roles.js';
 import {
+  canWriteEvent,
   EVENT_COLUMNS_SQL,
   EventRowSchema,
   EventSchema,
@@ -14,13 +14,13 @@ import {
 } from './types.js';
 
 export function attachGetEventHandler(router: RouterInstance) {
-  registerPath('/events/{id}', {
+  registerPath('/events/{mapId}', {
     get: {
-      summary: 'Get an event by ID',
+      summary: "Get a map's event",
       tags: ['events'],
       security: AUTH_OPTIONAL,
       requestParams: {
-        path: z.object({ id: z.string().nonempty() }),
+        path: z.object({ mapId: z.string().nonempty() }),
       },
       responses: {
         200: { content: { 'application/json': { schema: EventSchema } } },
@@ -30,28 +30,26 @@ export function attachGetEventHandler(router: RouterInstance) {
   });
 
   router.get(
-    '/:id',
+    '/:mapId',
     acceptValidator('application/json'),
     authenticator(false),
     async (ctx) => {
       const [row] = EventRowSchema.array()
         .max(1)
         .parse(
-          await pool.query<unknown>(
-            sql`SELECT ${raw(EVENT_COLUMNS_SQL)} FROM event WHERE id = ${ctx.params.id}`,
-          ),
+          await pool.query<unknown>(sql`
+            SELECT ${raw(EVENT_COLUMNS_SQL)}
+            FROM mapEvent e JOIN map ON map.id = e.mapId
+            WHERE e.mapId = ${ctx.params.mapId}
+          `),
         );
 
-      // Both public and unlisted events are readable by direct id — unlisted
-      // just means "not surfaced in listings".
+      // Unlisted only keeps an event out of listings; its link still works.
       if (!row) {
         ctx.throw(404, 'no such event');
       }
 
-      ctx.body = eventRowToResponse(
-        row,
-        isOwnerOrRole(ctx.state.user, row.ownerId, 'mapModerator'),
-      );
+      ctx.body = eventRowToResponse(row, canWriteEvent(ctx.state.user, row));
     },
   );
 }

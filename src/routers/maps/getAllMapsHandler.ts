@@ -1,11 +1,17 @@
 import type { RouterInstance } from '@koa/router';
-import sql from 'sql-template-tag';
+import sql, { raw } from 'sql-template-tag';
 import z from 'zod';
 import { authenticator } from '../../authenticator.js';
 import { pool } from '../../database.js';
 import { AUTH_REQUIRED, registerPath } from '../../openapi.js';
 import { acceptValidator } from '../../requestValidators.js';
-import { MapMetaSchema, zDateToIso } from '../../types.js';
+import { zDateToIso } from '../../types.js';
+import {
+  MAP_EVENT_COLUMNS_SQL,
+  MapEventRowSchema,
+  mapEventFields,
+} from '../events/types.js';
+import { MapMetaWithEventSchema } from './types.js';
 
 const DbRowSchema = z.object({
   id: z.string().nonempty(),
@@ -29,7 +35,9 @@ export function attachGetAllMapsHandler(router: RouterInstance) {
       security: AUTH_REQUIRED,
       responses: {
         200: {
-          content: { 'application/json': { schema: MapMetaSchema.array() } },
+          content: {
+            'application/json': { schema: MapMetaWithEventSchema.array() },
+          },
         },
         401: {},
       },
@@ -52,8 +60,21 @@ export function attachGetAllMapsHandler(router: RouterInstance) {
         `),
       );
 
+      const events = new Map(
+        MapEventRowSchema.array()
+          .parse(
+            await pool.query<unknown>(sql`
+              SELECT ${raw(MAP_EVENT_COLUMNS_SQL)}
+              FROM mapEvent e JOIN map ON map.id = e.mapId
+              WHERE map.userId = ${user.id}
+            `),
+          )
+          .map((row) => [row.mapId, mapEventFields(row)]),
+      );
+
       ctx.body = items.map((item) => {
-        return MapMetaSchema.parse({
+        return MapMetaWithEventSchema.parse({
+          event: events.get(item.id) ?? null,
           id: item.id,
           createdAt: item.createdAt,
           modifiedAt: item.modifiedAt,

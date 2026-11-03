@@ -324,36 +324,26 @@ export async function initDatabase() {
       CONSTRAINT mwaMapFk FOREIGN KEY (mapId) REFERENCES map (id) ON DELETE CASCADE
     ) ENGINE=InnoDB`,
 
-    // A social "event" (Akcia) references a LIVE saved map: editing that map
-    // changes what participants see. The event owns only its metadata plus two
-    // optional geo points — startPoint (physical meetup, shown on the map layer)
-    // and filterLocation (where the activity happens, used for spatial
-    // filtering). Points are FLOAT lat/lon (not POINT) because MariaDB forbids a
-    // SPATIAL index on a nullable geometry column; the composite (filterLat,
-    // filterLon) BTREE index serves the bbox range filter instead. activityType
-    // and difficulty are reserved for later and unused for now.
-    sql`CREATE TABLE IF NOT EXISTS event (
-      id CHAR(8) PRIMARY KEY,
-      ownerId INT UNSIGNED NOT NULL,
-      mapId CHAR(8) NOT NULL,
-      title VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+    // A map published as an event: at most one per map, owned and edited by
+    // whoever can write the map, and titled by its name. Lat/lon columns rather
+    // than POINT: MariaDB refuses a SPATIAL index on a nullable geometry.
+    sql`CREATE TABLE IF NOT EXISTS mapEvent (
+      mapId CHAR(8) CHARSET ascii PRIMARY KEY,
       description TEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL,
       startAt DATETIME NOT NULL,
       endAt DATETIME NULL,
-      startLat FLOAT(8, 6) NULL,
-      startLon FLOAT(9, 6) NULL,
-      filterLat FLOAT(8, 6) NULL,
-      filterLon FLOAT(9, 6) NULL,
-      visibility ENUM('public', 'unlisted') NOT NULL DEFAULT 'public',
+      startLat DECIMAL(8, 6) NULL,
+      startLon DECIMAL(9, 6) NULL,
+      filterLat DECIMAL(8, 6) NULL,
+      filterLon DECIMAL(9, 6) NULL,
+      visibility ENUM('public', 'unlisted') CHARSET ascii NOT NULL DEFAULT 'public',
       activityType VARCHAR(32) CHARSET ascii NULL,
       difficulty VARCHAR(32) CHARSET ascii NULL,
       createdAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
       updatedAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-      CONSTRAINT eventOwnerFk FOREIGN KEY (ownerId) REFERENCES user (id) ON DELETE CASCADE,
-      CONSTRAINT eventMapFk FOREIGN KEY (mapId) REFERENCES map (id) ON DELETE CASCADE,
-      INDEX eventOwnerIdx (ownerId),
-      INDEX eventTimeIdx (startAt, endAt),
-      INDEX eventFilterLocIdx (filterLat, filterLon)
+      CONSTRAINT mapEventMapFk FOREIGN KEY (mapId) REFERENCES map (id) ON DELETE CASCADE,
+      INDEX mapEventTimeIdx (startAt, endAt),
+      INDEX mapEventFilterLocIdx (filterLat, filterLon)
     ) ENGINE=InnoDB`,
 
     // CREATE OR REPLACE (not IF NOT EXISTS) so the trigger is recreated on every
