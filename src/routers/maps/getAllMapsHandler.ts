@@ -10,7 +10,6 @@ import { MapMetaSchema, zDateToIso } from '../../types.js';
 const DbRowSchema = z.object({
   id: z.string().nonempty(),
   name: z.string().nullable(),
-  public: z.boolean(),
   userId: z.uint32(),
   writers: z
     .string()
@@ -45,10 +44,10 @@ export function attachGetAllMapsHandler(router: RouterInstance) {
 
       const items = DbRowSchema.array().parse(
         await pool.query<unknown>(sql`
-          SELECT id, name, public, createdAt, modifiedAt, map.userId, GROUP_CONCAT(mapWriteAccess.userId) AS writers
+          SELECT id, name, createdAt, modifiedAt, map.userId, GROUP_CONCAT(mapWriteAccess.userId) AS writers
             FROM map LEFT JOIN mapWriteAccess ON (mapWriteAccess.mapId = id)
             WHERE map.userId = ${user.id}
-            GROUP BY id, name, public, createdAt, modifiedAt, map.userId
+            GROUP BY id, name, createdAt, modifiedAt, map.userId
         `),
       );
 
@@ -59,7 +58,7 @@ export function attachGetAllMapsHandler(router: RouterInstance) {
           modifiedAt: item.modifiedAt,
           name: item.name,
           userId: item.userId,
-          public: item.public,
+          public: true,
           writers: item.userId === user.id ? item.writers : undefined,
           canWrite: item.userId === user.id || item.writers.includes(user.id),
         });

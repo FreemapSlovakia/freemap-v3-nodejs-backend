@@ -33,7 +33,6 @@ export function attachPatchEventHandler(router: RouterInstance) {
         401: {},
         403: {},
         404: { description: 'no such event or map' },
-        409: { description: 'the linked map is not public' },
       },
     },
   });

@@ -29,7 +29,6 @@ export function attachPostEventHandler(router: RouterInstance) {
         401: {},
         403: { description: 'the linked map is not the user’s own' },
         404: { description: 'no such map' },
-        409: { description: 'the linked map is not public' },
       },
     },
   });

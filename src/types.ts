@@ -198,7 +198,10 @@ export const MapMetaSchema = z
   .strictObject({
     id: z.string().nonempty(),
     name: z.string().nullable(),
-    public: z.boolean(),
+    public: z.literal(true).meta({
+      deprecated: true,
+      description: 'Always true, for clients that still read it.',
+    }),
     userId: z.uint32(),
     createdAt: z.iso.datetime(),
     modifiedAt: z.iso.datetime(),

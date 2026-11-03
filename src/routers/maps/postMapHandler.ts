@@ -11,7 +11,10 @@ import { MapMetaSchema } from '../../types.js';
 const BodySchema = z.strictObject({
   name: z.string().min(1).max(255),
   data: z.record(z.string(), z.unknown()).optional(),
-  public: z.boolean().optional(),
+  public: z
+    .boolean()
+    .optional()
+    .meta({ deprecated: true, description: 'Ignored.' }),
   writers: z.array(z.uint32()).optional(),
 });
 
@@ -42,7 +45,7 @@ export function attachPostMapHandler(router: RouterInstance) {
         return ctx.throw(400, err as Error);
       }
 
-      const { name, public: pub, data, writers } = body;
+      const { name, data, writers } = body;
 
       const id = nanoid();
 
@@ -54,7 +57,6 @@ export function attachPostMapHandler(router: RouterInstance) {
         INSERT INTO map SET
           id = ${id},
           name = ${name},
-          public = ${pub},
           userId = ${userId},
           createdAt = ${now},
           modifiedAt = ${now},
@@ -71,7 +73,7 @@ export function attachPostMapHandler(router: RouterInstance) {
         id,
         createdAt: now.toISOString(),
         modifiedAt: now.toISOString(),
-        public: Boolean(pub),
+        public: true,
         writers,
         name,
         userId,

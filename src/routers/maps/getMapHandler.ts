@@ -5,13 +5,11 @@ import { authenticator } from '../../authenticator.js';
 import { pool } from '../../database.js';
 import { AUTH_OPTIONAL, registerPath } from '../../openapi.js';
 import { acceptValidator } from '../../requestValidators.js';
-import { isOwnerOrRole } from '../../roles.js';
 import { MapMetaSchema, zDateToIso } from '../../types.js';
 
 const DbRowSchema = z.object({
   id: z.string().nonempty(),
   name: z.string().nullable(),
-  public: z.boolean(),
   userId: z.uint32(),
   writers: z.string().nullable(),
   createdAt: zDateToIso,
@@ -43,7 +41,6 @@ export function attachGetMapHandler(router: RouterInstance) {
             },
           },
         },
-        403: {},
         404: { description: 'no such map' },
       },
     },
@@ -58,10 +55,10 @@ export function attachGetMapHandler(router: RouterInstance) {
         .max(1)
         .parse(
           await pool.query<unknown>(sql`
-          SELECT id, name, public, data, createdAt, modifiedAt, map.userId, GROUP_CONCAT(mapWriteAccess.userId) AS writers
+          SELECT id, name, data, createdAt, modifiedAt, map.userId, GROUP_CONCAT(mapWriteAccess.userId) AS writers
             FROM map LEFT JOIN mapWriteAccess ON (mapWriteAccess.mapId = id)
             WHERE id = ${ctx.params.id}
-            GROUP BY id, name, public, data, createdAt, map.userId
+            GROUP BY id, name, data, createdAt, map.userId
         `),
         );
 
@@ -70,10 +67,6 @@ export function attachGetMapHandler(router: RouterInstance) {
       }
 
       const { user } = ctx.state;
-
-      if (!item.public && !isOwnerOrRole(user, item.userId, 'mapModerator')) {
-        ctx.throw(403);
-      }
 
       const writers = item.writers?.split(',').map((s) => Number(s)) ?? [];
 
@@ -84,7 +77,7 @@ export function attachGetMapHandler(router: RouterInstance) {
           modifiedAt: item.modifiedAt,
           name: item.name,
           userId: item.userId,
-          public: item.public,
+          public: true,
           writers: item.userId === user?.id ? writers : undefined,
           canWrite: Boolean(
             user && (item.userId === user.id || writers.includes(user.id)),

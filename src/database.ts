@@ -310,7 +310,6 @@ export async function initDatabase() {
       modifiedAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
       name VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL,
       userId INT UNSIGNED NOT NULL,
-      public BIT NOT NULL DEFAULT false,
       data MEDIUMTEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL DEFAULT '{}',
       CONSTRAINT umUserFk FOREIGN KEY (userId) REFERENCES user (id) ON DELETE CASCADE,
       INDEX umCreatedAtIdx (createdAt)
@@ -498,6 +497,9 @@ export async function initDatabase() {
     'ALTER TABLE trackingPoint ADD INDEX IF NOT EXISTS tpDeviceIdx (deviceId), ADD INDEX IF NOT EXISTS tpDeviceCreatedAtIdx (deviceId, createdAt), DROP INDEX IF EXISTS tpDeviceIdFk, DROP INDEX IF EXISTS tpCreatedAtIdx',
 
     'ALTER TABLE user ADD COLUMN IF NOT EXISTS osmAccessToken VARCHAR(255) CHARSET ascii COLLATE ascii_bin NULL AFTER appleUserId, ADD INDEX IF NOT EXISTS userOsmAccessTokenIdx (osmAccessToken)',
+
+    // Every map is readable by its link.
+    'ALTER TABLE map DROP COLUMN IF EXISTS public',
   ];
 
   const db = await pool.getConnection();

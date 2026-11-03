@@ -11,7 +11,10 @@ import { MapMetaSchema, zDateToIso } from '../../types.js';
 const BodySchema = z.strictObject({
   name: z.string().min(1).max(255).optional(),
   data: z.record(z.string(), z.unknown()).optional(),
-  public: z.boolean().optional(),
+  public: z
+    .boolean()
+    .optional()
+    .meta({ deprecated: true, description: 'Ignored.' }),
   writers: z.array(z.uint32()).optional().meta({ description: 'User IDs' }),
 });
 
@@ -20,7 +23,6 @@ const DbRowSchema = z.object({
   name: z.string().nullable(),
   createdAt: zDateToIso,
   modifiedAt: z.date(),
-  public: z.boolean(),
 });
 
 export function attachPatchMapHandler(router: RouterInstance) {
@@ -77,7 +79,7 @@ export function attachPatchMapHandler(router: RouterInstance) {
           .max(1)
           .parse(
             await conn.query<unknown>(
-              sql`SELECT userId, name, createdAt, modifiedAt, public FROM map WHERE id = ${id} FOR UPDATE`,
+              sql`SELECT userId, name, createdAt, modifiedAt FROM map WHERE id = ${id} FOR UPDATE`,
             ),
           );
 
@@ -91,7 +93,7 @@ export function attachPatchMapHandler(router: RouterInstance) {
           )
         ).map(({ userId }: { userId: number }) => userId);
 
-        const { name, public: pub, data, writers } = body;
+        const { name, data, writers } = body;
 
         const user = ctx.state.user!;
 
@@ -99,7 +101,6 @@ export function attachPatchMapHandler(router: RouterInstance) {
           !isOwnerOrRole(user, item.userId, 'mapModerator') &&
           (!curWriters.includes(user.id) ||
             writers !== undefined ||
-            pub !== undefined ||
             name !== undefined)
         ) {
           ctx.throw(403);
@@ -117,7 +118,6 @@ export function attachPatchMapHandler(router: RouterInstance) {
 
         await conn.query<unknown>(sql`UPDATE map SET modifiedAt = ${now}
             ${name === undefined ? empty : sql`, name = ${name}`}
-            ${pub === undefined ? empty : sql`, public = ${pub}`}
             ${data === undefined ? empty : sql`, data = ${JSON.stringify(data)}`}
             WHERE id = ${id}
           `);
@@ -138,7 +138,7 @@ export function attachPatchMapHandler(router: RouterInstance) {
           id,
           createdAt: item.createdAt,
           modifiedAt: now.toISOString(),
-          public: pub ?? item.public,
+          public: true,
           writers: writers ?? curWriters,
           name: name ?? item.name,
           userId: item.userId,

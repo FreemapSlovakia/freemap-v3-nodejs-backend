@@ -5,7 +5,7 @@ import type { User } from './koaTypes.js';
 export const ROLES = [
   'userManager', // user administration: patch users, search/get/merge accounts
   'galleryModerator', // see private pictures, edit/delete any picture
-  'mapModerator', // view/patch/delete any non-public map
+  'mapModerator', // patch/delete any map
   'trackingManager', // view/delete/modify any tracking device & token
   'layerPreview', // access to adminOnly (experimental/preview) map layers
 ] as const;
