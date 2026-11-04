@@ -4,6 +4,7 @@ import { appLogger } from './logger.js';
 import {
   liveSubscriptionSql,
   PROVIDER_ID_COLUMNS,
+  type PublicField,
   type UserRow,
 } from './types.js';
 
@@ -197,6 +198,23 @@ export async function mergeUserAccounts(
     ...target.settings,
   });
 
+  // The source's flag goes along only with what the target takes from it.
+  const inherited: Record<PublicField, boolean> = {
+    email:
+      source.email !== null &&
+      (target.email === null || target.email === source.email),
+    osm: target.osmId === null && source.osmId !== null,
+    github: target.githubUserId === null && source.githubUserId !== null,
+    strava: target.stravaUserId === null && source.stravaUserId !== null,
+  };
+
+  const mergedPublicFields = JSON.stringify([
+    ...new Set([
+      ...target.publicFields,
+      ...source.publicFields.filter((f) => inherited[f]),
+    ]),
+  ]);
+
   const mergedRoles = JSON.stringify([
     ...new Set([...target.roles, ...source.roles]),
   ]);
@@ -220,6 +238,7 @@ export async function mergeUserAccounts(
       language = COALESCE(language, ${language}),
       createdAt = LEAST(createdAt, ${createdAt}),
       roles = ${mergedRoles},
+      publicFields = ${mergedPublicFields},
       ${premiumExpiration ? sql`premiumExpiration = COALESCE(GREATEST(premiumExpiration, ${premiumExpiration}), ${premiumExpiration}),` : empty}
       sendGalleryEmails = sendGalleryEmails OR ${sendGalleryEmails},
       settings = ${mergedSettings},

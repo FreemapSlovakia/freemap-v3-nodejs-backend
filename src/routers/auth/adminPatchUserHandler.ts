@@ -77,6 +77,13 @@ export function attachAdminPatchUserHandler(router: RouterInstance) {
             : sql`${raw(key)} = ${value}`,
       );
 
+    // The user published the address they had, not one an admin sets.
+    if (body.email !== undefined) {
+      assignments.push(
+        sql`publicFields = IF(JSON_CONTAINS(publicFields, '"email"'), JSON_REMOVE(publicFields, JSON_UNQUOTE(JSON_SEARCH(publicFields, 'one', 'email'))), publicFields)`,
+      );
+    }
+
     const result = await pool.query<{ affectedRows: number }>(
       sql`UPDATE user SET ${join(assignments)} WHERE id = ${id}`,
     );

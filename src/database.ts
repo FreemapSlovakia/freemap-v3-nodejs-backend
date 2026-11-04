@@ -53,6 +53,8 @@ export async function initDatabase() {
       email VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL,
       description TEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL,
       roles JSON NOT NULL DEFAULT '[]',
+      -- What the public profile may show; see PublicFieldSchema.
+      publicFields JSON NOT NULL DEFAULT '[]',
       createdAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
       lat DECIMAL(8, 6) NULL,
       lon DECIMAL(9, 6) NULL,
@@ -511,6 +513,8 @@ export async function initDatabase() {
 
     // Every map is readable by its link.
     'ALTER TABLE map DROP COLUMN IF EXISTS public',
+
+    "ALTER TABLE user ADD COLUMN IF NOT EXISTS publicFields JSON NOT NULL DEFAULT '[]' AFTER roles",
   ];
 
   const db = await pool.getConnection();

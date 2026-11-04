@@ -63,12 +63,29 @@ export const TokenBodySchema = z
   })
   .meta({ id: 'TokenBody' });
 
+/** What a user lets their public profile show; a provider shows its profile link. */
+export const PublicFieldSchema = z.enum(['email', 'osm', 'github', 'strava']);
+
+export type PublicField = z.infer<typeof PublicFieldSchema>;
+
+/** An array of the enum's values, dropping one stale in the database. */
+export function knownValues<T extends string>(
+  schema: z.ZodEnum<{ [K in T]: K }>,
+) {
+  return z
+    .array(z.string())
+    .transform((values) =>
+      values.filter((v): v is T => schema.safeParse(v).success),
+    );
+}
+
 export const CommonUserSchema = {
   id: z.uint32(),
   name: z.string(),
   email: z.email().nullable(),
   description: z.string().nullable(),
   roles: z.array(RoleSchema),
+  publicFields: z.array(PublicFieldSchema),
   credits: z.number().nonnegative(),
   language: z.string().nullable(),
   sendGalleryEmails: z.boolean(),
@@ -109,6 +126,7 @@ const USER_COLUMN_NAMES = [
   'email',
   'description',
   'roles',
+  'publicFields',
   'createdAt',
   'lat',
   'lon',
@@ -213,6 +231,8 @@ export const MapMetaSchema = z
 export const UserRowSchema = z
   .object({
     ...CommonUserSchema,
+    // A value stale in the database is dropped, not a failed login.
+    publicFields: knownValues(PublicFieldSchema),
     osmId: z.uint32().nullable(),
     facebookUserId: z.string().nullable(),
     googleUserId: z.string().nullable(),

@@ -91,7 +91,13 @@ export function attachDisconnectHandler(router: RouterInstance) {
 
       await conn.query<unknown>(
         sql`UPDATE user SET ${join(
-          columns.map((col) => sql`${raw(col)} = NULL`),
+          [
+            ...columns.map((col) => sql`${raw(col)} = NULL`),
+            // Else connecting another account later would publish it unasked.
+            sql`publicFields = ${JSON.stringify(
+              row.publicFields.filter((f) => f !== ctx.params.provider),
+            )}`,
+          ],
           ',',
         )} WHERE id = ${userId}`,
       );
