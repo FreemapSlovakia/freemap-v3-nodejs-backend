@@ -11,6 +11,9 @@ export const coversDir = getEnv('EVENT_COVERS_DIRECTORY');
 
 export const MAX_COVER_INPUT_BYTES = 20 * 1024 * 1024;
 
+/** Well above a phone's 50 MP camera's own pictures. */
+const MAX_COVER_PIXELS = 100_000_000;
+
 /** The published variants and the width each is fit into. */
 export const COVER_SIZES = { large: 1600, thumb: 480 } as const;
 
@@ -38,15 +41,14 @@ export async function storeCover(filepath: string): Promise<string> {
   await mkdir(dirname(coverPath(name, 'large')), { recursive: true });
 
   try {
-    await Promise.all(
-      Object.entries(COVER_SIZES).map(([size, width]) =>
-        sharp(input)
-          .rotate()
-          .resize({ width, withoutEnlargement: true })
-          .webp({ quality: 82 })
-          .toFile(coverPath(name, size as CoverSize)),
-      ),
-    );
+    // One at a time and capped: a small file can decode to gigabytes.
+    for (const [size, width] of Object.entries(COVER_SIZES)) {
+      await sharp(input, { limitInputPixels: MAX_COVER_PIXELS })
+        .rotate()
+        .resize({ width, withoutEnlargement: true })
+        .webp({ quality: 82 })
+        .toFile(coverPath(name, size as CoverSize));
+    }
   } catch (err) {
     await removeCover(name);
 

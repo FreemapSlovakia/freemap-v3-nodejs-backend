@@ -1,5 +1,5 @@
 import type { RouterInstance } from '@koa/router';
-import sql, { join, raw } from 'sql-template-tag';
+import sql, { join, raw, type Sql } from 'sql-template-tag';
 import z from 'zod';
 import { authenticator } from '../../authenticator.js';
 import { pool } from '../../database.js';
@@ -38,7 +38,8 @@ const QuerySchema = z.object({
     .string()
     .transform((s) => s.split(',').filter(Boolean))
     .optional(),
-  // Trip-stat ranges, inclusive. An event without the stat never matches one.
+  // Trip-stat ranges, inclusive. An event without the stat matches one only
+  // with `unsaid`.
   minDistance: z.coerce.number().nonnegative().optional(),
   maxDistance: z.coerce.number().nonnegative().optional(),
   minDuration: z.coerce.number().nonnegative().optional(),
@@ -55,6 +56,9 @@ const QuerySchema = z.object({
   // matches neither.
   dogs: z.enum(['0', '1']).optional(),
   children: z.enum(['0', '1']).optional(),
+  // `1` lets events that leave transport, difficulty or a ranged stat unsaid
+  // through those filters; dogs and children stay strict.
+  unsaid: z.enum(['0', '1']).optional(),
 });
 
 /** The range conditions on one stat column. */
@@ -63,6 +67,17 @@ function range(column: string, min?: number, max?: number) {
     ...(min === undefined ? [] : [sql`${raw(column)} >= ${min}`]),
     ...(max === undefined ? [] : [sql`${raw(column)} <= ${max}`]),
   ];
+}
+
+/** The condition on one column, or it unset where `unsaid` lets that through. */
+function orUnsaid(column: string, conds: Sql[], unsaid: boolean): Sql[] {
+  if (conds.length === 0) {
+    return [];
+  }
+
+  const all = sql`(${join(conds, ' AND ')})`;
+
+  return [unsaid ? sql`(${raw(column)} IS NULL OR ${all})` : all];
 }
 
 export function attachGetEventsHandler(router: RouterInstance) {
@@ -144,23 +159,47 @@ export function attachGetEventsHandler(router: RouterInstance) {
         );
       }
 
-      if (query.transport?.length) {
-        // Any of them; an event naming none hasn't said, so doesn't match.
-        wh.push(
-          sql`(${join(
-            query.transport.map((t) => sql`FIND_IN_SET(${t}, e.transports)`),
-            ' OR ',
-          )})`,
-        );
-      }
+      const unsaid = query.unsaid === '1';
 
       wh.push(
-        ...range('e.distance', query.minDistance, query.maxDistance),
-        ...range('e.duration', query.minDuration, query.maxDuration),
-        ...range('e.ascent', query.minAscent, query.maxAscent),
-        ...(query.difficulty?.length
-          ? [sql`e.difficulty IN (${join(query.difficulty)})`]
-          : []),
+        // Any of them.
+        ...orUnsaid(
+          'e.transports',
+          query.transport?.length
+            ? [
+                sql`(${join(
+                  query.transport.map(
+                    (t) => sql`FIND_IN_SET(${t}, e.transports)`,
+                  ),
+                  ' OR ',
+                )})`,
+              ]
+            : [],
+          unsaid,
+        ),
+        ...orUnsaid(
+          'e.distance',
+          range('e.distance', query.minDistance, query.maxDistance),
+          unsaid,
+        ),
+        ...orUnsaid(
+          'e.duration',
+          range('e.duration', query.minDuration, query.maxDuration),
+          unsaid,
+        ),
+        ...orUnsaid(
+          'e.ascent',
+          range('e.ascent', query.minAscent, query.maxAscent),
+          unsaid,
+        ),
+        ...orUnsaid(
+          'e.difficulty',
+          query.difficulty?.length
+            ? [sql`e.difficulty IN (${join(query.difficulty)})`]
+            : [],
+          unsaid,
+        ),
+        // A yes or no is asked for, so "not said" never matches here.
         ...(query.dogs ? [sql`e.dogs = ${Number(query.dogs)}`] : []),
         ...(query.children
           ? [sql`e.children = ${Number(query.children)}`]

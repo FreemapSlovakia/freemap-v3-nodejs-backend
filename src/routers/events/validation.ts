@@ -28,7 +28,8 @@ const fields = {
 
 export const EventBodySchema = z
   .strictObject({ ...fields, visibility: fields.visibility.default('public') })
-  .refine((b) => !b.endAt || b.endAt >= b.startAt, {
+  // As instants: the same one may be written with or without milliseconds.
+  .refine((b) => !b.endAt || Date.parse(b.endAt) >= Date.parse(b.startAt), {
     message: 'endAt is before startAt',
     path: ['endAt'],
   })

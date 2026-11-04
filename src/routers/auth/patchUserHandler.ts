@@ -30,7 +30,7 @@ const BodySchema = z
   .refine((data) => Object.values(data).some((v) => v !== undefined), {
     message: 'At least one field must be provided',
   })
-  .refine((data) => (data.lat === undefined) === (data.lon === undefined), {
+  .refine((data) => (data.lat == null) === (data.lon == null), {
     message: 'lat and lon go together',
   });
 
