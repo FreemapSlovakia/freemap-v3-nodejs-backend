@@ -8,6 +8,8 @@ import {
 } from './types.js';
 
 const fields = {
+  /** The owner, when not the caller; an eventManager's to set. */
+  userId: z.uint32().optional(),
   mapId: z.string().min(1).max(8).nullish(),
   title: z.string().trim().min(1).max(255),
   description: z.string().max(16384).nullish(),

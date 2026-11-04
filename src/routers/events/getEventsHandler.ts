@@ -99,7 +99,7 @@ export function attachGetEventsHandler(router: RouterInstance) {
   router.get(
     '/',
     acceptValidator('application/json'),
-    authenticator(false),
+    authenticator(false, 'events:read'),
     async (ctx) => {
       let query;
 

@@ -6,6 +6,7 @@ import { AUTH_REQUIRED, registerPath } from '../../openapi.js';
 import { nanoid } from '../../randomId.js';
 import { acceptValidator } from '../../requestValidators.js';
 import { assertOwnMap } from './mapLink.js';
+import { assertCanOwn } from './organizerHandlers.js';
 import {
   EventRowSchema,
   EventSchema,
@@ -35,7 +36,7 @@ export function attachPostEventHandler(router: RouterInstance) {
   router.post(
     '/',
     acceptValidator('application/json'),
-    authenticator(true),
+    authenticator(true, 'events:write'),
     async (ctx) => {
       let body;
 
@@ -48,14 +49,18 @@ export function attachPostEventHandler(router: RouterInstance) {
       const id = nanoid();
 
       await runInTransaction(async (conn) => {
+        const ownerId = body.userId ?? ctx.state.user!.id;
+
+        await assertCanOwn(ctx, conn, ownerId);
+
         if (body.mapId) {
-          await assertOwnMap(ctx, conn, body.mapId, ctx.state.user!.id);
+          await assertOwnMap(ctx, conn, body.mapId, ownerId);
         }
 
         await conn.query<unknown>(sql`
           INSERT INTO event SET
             id = ${id},
-            userId = ${ctx.state.user!.id},
+            userId = ${ownerId},
             mapId = ${body.mapId ?? null},
             title = ${body.title},
             description = ${body.description ?? null},

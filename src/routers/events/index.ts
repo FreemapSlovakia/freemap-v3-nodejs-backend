@@ -3,6 +3,7 @@ import { attachEventCoverHandlers } from './coverHandlers.js';
 import { attachDeleteEventHandler } from './deleteEventHandler.js';
 import { attachGetEventHandler } from './getEventHandler.js';
 import { attachGetEventsHandler } from './getEventsHandler.js';
+import { attachOrganizerHandlers } from './organizerHandlers.js';
 import { attachParticipationHandlers } from './participationHandlers.js';
 import { attachPatchEventHandler } from './patchEventHandler.js';
 import { attachPostEventHandler } from './postEventHandler.js';
@@ -10,6 +11,7 @@ import { attachPostEventHandler } from './postEventHandler.js';
 const router = new Router();
 
 attachGetEventsHandler(router);
+attachOrganizerHandlers(router);
 attachEventCoverHandlers(router);
 attachParticipationHandlers(router);
 attachPostEventHandler(router);

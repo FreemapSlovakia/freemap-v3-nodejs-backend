@@ -120,7 +120,7 @@ export function attachEventCoverHandlers(router: RouterInstance) {
   router.put(
     '/:id/cover',
     acceptValidator('application/json'),
-    authenticator(true),
+    authenticator(true, 'events:write'),
     async (ctx) => {
       const image = ctx.request.files?.image;
 
@@ -166,7 +166,7 @@ export function attachEventCoverHandlers(router: RouterInstance) {
   router.delete(
     '/:id/cover',
     acceptValidator('application/json'),
-    authenticator(true),
+    authenticator(true, 'events:write'),
     async (ctx) => {
       await setCover(ctx, ctx.params.id, null);
     },

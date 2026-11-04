@@ -11,6 +11,8 @@ export const AppTokenScopeSchema = z
     'gallery:write',
     'maps:read',
     'maps:write',
+    'events:read',
+    'events:write',
     'tracking:read',
     'tracking:write',
     'tiles:outdoor',

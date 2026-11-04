@@ -32,7 +32,7 @@ export function attachDeleteEventHandler(router: RouterInstance) {
   router.delete(
     '/:id',
     acceptValidator('application/json'),
-    authenticator(true),
+    authenticator(true, 'events:write'),
     async (ctx) => {
       const cover = await runInTransaction(async (conn) => {
         const [item] = z

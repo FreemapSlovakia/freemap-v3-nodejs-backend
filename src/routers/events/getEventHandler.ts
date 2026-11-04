@@ -31,7 +31,7 @@ export function attachGetEventHandler(router: RouterInstance) {
   router.get(
     '/:id',
     acceptValidator('application/json'),
-    authenticator(false),
+    authenticator(false, 'events:read'),
     async (ctx) => {
       const [row] = EventRowSchema.array()
         .max(1)

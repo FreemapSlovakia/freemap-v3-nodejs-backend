@@ -6,6 +6,7 @@ import { runInTransaction } from '../../database.js';
 import { AUTH_REQUIRED, registerPath } from '../../openapi.js';
 import { acceptValidator } from '../../requestValidators.js';
 import { assertOwnMap } from './mapLink.js';
+import { assertCanOwn } from './organizerHandlers.js';
 import {
   canWriteEvent,
   EventRowSchema,
@@ -39,7 +40,7 @@ export function attachPatchEventHandler(router: RouterInstance) {
   router.patch(
     '/:id',
     acceptValidator('application/json'),
-    authenticator(true),
+    authenticator(true, 'events:write'),
     async (ctx) => {
       let body;
 
@@ -92,8 +93,20 @@ export function attachPatchEventHandler(router: RouterInstance) {
           ctx.throw(400, 'endAt is before startAt');
         }
 
-        if (body.mapId && body.mapId !== existing.mapId) {
-          await assertOwnMap(ctx, conn, body.mapId, existing.userId);
+        const ownerId = body.userId ?? existing.userId;
+
+        if (ownerId !== existing.userId) {
+          await assertCanOwn(ctx, conn, ownerId);
+        }
+
+        // The linked map must be the owner's — the new one's, if it changes.
+        const mapId = body.mapId === undefined ? existing.mapId : body.mapId;
+
+        if (
+          mapId &&
+          (mapId !== existing.mapId || ownerId !== existing.userId)
+        ) {
+          await assertOwnMap(ctx, conn, mapId, ownerId);
         }
 
         const sets: Sql[] = [];
@@ -102,6 +115,10 @@ export function attachPatchEventHandler(router: RouterInstance) {
           sets.push(sql`${raw(column)} = ${value}`);
 
         const date = (s: string | null | undefined) => (s ? new Date(s) : null);
+
+        if (ownerId !== existing.userId) {
+          set('userId', ownerId);
+        }
 
         if (body.mapId !== undefined) {
           set('mapId', body.mapId);

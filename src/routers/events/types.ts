@@ -139,7 +139,7 @@ export const eventSelect = (user: User | undefined) => sql`
 export const canWriteEvent = (
   user: User | undefined,
   row: { userId: number },
-) => isOwnerOrRole(user, row.userId, 'mapModerator');
+) => isOwnerOrRole(user, row.userId, 'eventManager');
 
 export function eventRowToResponse(row: EventRow, user: User | undefined) {
   const { startLat, startLon, userName, userHasPicture, userPremium, ...rest } =

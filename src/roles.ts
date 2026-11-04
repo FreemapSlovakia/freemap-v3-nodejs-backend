@@ -6,6 +6,7 @@ export const ROLES = [
   'userManager', // user administration: patch users, search/get/merge accounts
   'galleryModerator', // see private pictures, edit/delete any picture
   'mapModerator', // patch/delete any map
+  'eventManager', // edit/delete any event; enter events for other organizers
   'trackingManager', // view/delete/modify any tracking device & token
   'layerPreview', // access to adminOnly (experimental/preview) map layers
 ] as const;

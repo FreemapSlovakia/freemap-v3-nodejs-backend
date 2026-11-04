@@ -91,7 +91,7 @@ export function attachParticipationHandlers(router: RouterInstance) {
   router.put(
     '/:id/participation',
     acceptValidator('application/json'),
-    authenticator(true),
+    authenticator(true, 'events:write'),
     async (ctx) => {
       let body;
 
@@ -108,7 +108,7 @@ export function attachParticipationHandlers(router: RouterInstance) {
   router.delete(
     '/:id/participation',
     acceptValidator('application/json'),
-    authenticator(true),
+    authenticator(true, 'events:write'),
     async (ctx) => {
       await setParticipation(ctx, null);
     },
