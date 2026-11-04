@@ -6,6 +6,7 @@ import z from 'zod';
 import { authenticator } from '../../authenticator.js';
 import { pool } from '../../database.js';
 import { AUTH_REQUIRED, registerPath } from '../../openapi.js';
+import { fetchAndProcessProfilePicture } from '../../profilePicture.js';
 import { acceptValidator } from '../../requestValidators.js';
 import { hasRole } from '../../roles.js';
 
@@ -13,7 +14,11 @@ export const OrganizerSchema = z
   .strictObject({ id: z.uint32(), name: z.string() })
   .meta({ id: 'EventOrganizer' });
 
-const BodySchema = z.strictObject({ name: z.string().trim().min(1).max(255) });
+const BodySchema = z.strictObject({
+  name: z.string().trim().min(1).max(255),
+  /** A logo to fetch as the account's picture, e.g. from the club's website. */
+  pictureUrl: z.url({ protocol: /^https?$/ }).optional(),
+});
 
 export function attachOrganizerHandlers(router: RouterInstance) {
   registerPath('/events/organizers', {
@@ -51,9 +56,14 @@ export function attachOrganizerHandlers(router: RouterInstance) {
         return ctx.throw(400, err as Error);
       }
 
+      // An unreadable logo leaves the account without a picture.
+      const picture = body.pictureUrl
+        ? await fetchAndProcessProfilePicture(body.pictureUrl, 'contain')
+        : null;
+
       const { insertId } = await pool.query<{ insertId: number }>(
         // No login provider: handed over to the real person by a merge.
-        sql`INSERT INTO user SET name = ${body.name}`,
+        sql`INSERT INTO user SET name = ${body.name}, picture = ${picture}`,
       );
 
       ctx.body = OrganizerSchema.parse({ id: insertId, name: body.name });
