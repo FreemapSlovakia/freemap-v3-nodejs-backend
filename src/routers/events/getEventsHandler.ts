@@ -7,11 +7,10 @@ import { AUTH_OPTIONAL, registerPath } from '../../openapi.js';
 import { acceptValidator } from '../../requestValidators.js';
 import {
   DifficultySchema,
-  EVENT_COLUMNS_SQL,
-  EVENT_FROM_SQL,
   EventRowSchema,
   EventSchema,
   eventRowToResponse,
+  eventSelect,
   VisibilitySchema,
 } from './types.js';
 
@@ -170,8 +169,7 @@ export function attachGetEventsHandler(router: RouterInstance) {
 
       const rows = EventRowSchema.array().parse(
         await pool.query<unknown>(sql`
-          SELECT ${raw(EVENT_COLUMNS_SQL)}
-          FROM ${raw(EVENT_FROM_SQL)}
+          ${eventSelect(ctx.state.user)}
           WHERE ${join(wh, ' AND ')}
           ORDER BY e.startAt
           LIMIT 1000

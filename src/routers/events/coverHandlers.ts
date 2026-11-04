@@ -2,7 +2,7 @@ import { createReadStream } from 'node:fs';
 import { stat } from 'node:fs/promises';
 import type { RouterInstance } from '@koa/router';
 import type { ParameterizedContext } from 'koa';
-import sql, { raw } from 'sql-template-tag';
+import sql from 'sql-template-tag';
 import z from 'zod';
 import { authenticator } from '../../authenticator.js';
 import { pool, runInTransaction } from '../../database.js';
@@ -20,11 +20,10 @@ import {
 } from './cover.js';
 import {
   canWriteEvent,
-  EVENT_COLUMNS_SQL,
-  EVENT_FROM_SQL,
   EventRowSchema,
   EventSchema,
   eventRowToResponse,
+  eventSelect,
 } from './types.js';
 
 const logger = appLogger.child({ module: 'eventCover' });
@@ -66,11 +65,9 @@ async function setCover(
     const [row] = EventRowSchema.array()
       .length(1)
       .parse(
-        await conn.query<unknown>(sql`
-          SELECT ${raw(EVENT_COLUMNS_SQL)}
-          FROM ${raw(EVENT_FROM_SQL)}
-          WHERE e.id = ${id}
-        `),
+        await conn.query<unknown>(
+          sql`${eventSelect(ctx.state.user)} WHERE e.id = ${id}`,
+        ),
       );
 
     ctx.body = eventRowToResponse(row, ctx.state.user);

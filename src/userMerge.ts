@@ -41,8 +41,13 @@ const SIMPLE_FK_TABLES = [
 ] as const;
 
 // Tables whose PK contains userId — winner may already have a row for the
-// same parent (picture / map), so UPDATE IGNORE + DELETE handles collisions.
-const COMPOSITE_PK_TABLES = ['pictureRating', 'mapWriteAccess'] as const;
+// same parent (picture / map / event), so UPDATE IGNORE + DELETE handles
+// collisions.
+const COMPOSITE_PK_TABLES = [
+  'pictureRating',
+  'mapWriteAccess',
+  'eventParticipant',
+] as const;
 
 export class MergeConflictError extends Error {
   constructor(public readonly column: (typeof PROVIDER_COLS)[number]) {

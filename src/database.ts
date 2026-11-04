@@ -354,6 +354,17 @@ export async function initDatabase() {
       INDEX eventLocationIdx (startLat, startLon)
     ) ENGINE=InnoDB`,
 
+    sql`CREATE TABLE IF NOT EXISTS eventParticipant (
+      eventId CHAR(8) CHARSET ascii NOT NULL,
+      userId INT UNSIGNED NOT NULL,
+      status ENUM('interested', 'going') CHARSET ascii NOT NULL,
+      createdAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      PRIMARY KEY (eventId, userId),
+      CONSTRAINT epEventFk FOREIGN KEY (eventId) REFERENCES event (id) ON DELETE CASCADE,
+      CONSTRAINT epUserFk FOREIGN KEY (userId) REFERENCES user (id) ON DELETE CASCADE,
+      INDEX epUserIdx (userId)
+    ) ENGINE=InnoDB`,
+
     // CREATE OR REPLACE (not IF NOT EXISTS) so the trigger is recreated on every
     // startup, resetting its DEFINER to the app's current connection user. This
     // self-heals a stale DEFINER (e.g. after restoring the DB onto a new host

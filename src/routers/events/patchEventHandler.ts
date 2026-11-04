@@ -8,11 +8,10 @@ import { acceptValidator } from '../../requestValidators.js';
 import { assertOwnMap } from './mapLink.js';
 import {
   canWriteEvent,
-  EVENT_COLUMNS_SQL,
-  EVENT_FROM_SQL,
   EventRowSchema,
   EventSchema,
   eventRowToResponse,
+  eventSelect,
 } from './types.js';
 import { EventPatchSchema } from './validation.js';
 
@@ -163,11 +162,9 @@ export function attachPatchEventHandler(router: RouterInstance) {
         const [row] = EventRowSchema.array()
           .length(1)
           .parse(
-            await conn.query<unknown>(sql`
-              SELECT ${raw(EVENT_COLUMNS_SQL)}
-              FROM ${raw(EVENT_FROM_SQL)}
-              WHERE e.id = ${id}
-            `),
+            await conn.query<unknown>(
+              sql`${eventSelect(ctx.state.user)} WHERE e.id = ${id}`,
+            ),
           );
 
         ctx.body = eventRowToResponse(row, ctx.state.user);

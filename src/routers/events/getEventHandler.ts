@@ -1,16 +1,15 @@
 import type { RouterInstance } from '@koa/router';
-import sql, { raw } from 'sql-template-tag';
+import sql from 'sql-template-tag';
 import z from 'zod';
 import { authenticator } from '../../authenticator.js';
 import { pool } from '../../database.js';
 import { AUTH_OPTIONAL, registerPath } from '../../openapi.js';
 import { acceptValidator } from '../../requestValidators.js';
 import {
-  EVENT_COLUMNS_SQL,
-  EVENT_FROM_SQL,
   EventRowSchema,
   EventSchema,
   eventRowToResponse,
+  eventSelect,
 } from './types.js';
 
 export function attachGetEventHandler(router: RouterInstance) {
@@ -37,11 +36,9 @@ export function attachGetEventHandler(router: RouterInstance) {
       const [row] = EventRowSchema.array()
         .max(1)
         .parse(
-          await pool.query<unknown>(sql`
-            SELECT ${raw(EVENT_COLUMNS_SQL)}
-            FROM ${raw(EVENT_FROM_SQL)}
-            WHERE e.id = ${ctx.params.id}
-          `),
+          await pool.query<unknown>(
+            sql`${eventSelect(ctx.state.user)} WHERE e.id = ${ctx.params.id}`,
+          ),
         );
 
       // Unlisted only keeps an event out of listings; its link still works.

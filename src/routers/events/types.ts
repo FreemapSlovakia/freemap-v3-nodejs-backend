@@ -1,3 +1,4 @@
+import sql from 'sql-template-tag';
 import z from 'zod';
 import type { User } from '../../koaTypes.js';
 import { isOwnerOrRole } from '../../roles.js';
@@ -11,6 +12,8 @@ export const PointSchema = z
   .meta({ id: 'EventPoint' });
 
 export const VisibilitySchema = z.enum(['public', 'unlisted']);
+
+export const ParticipationSchema = z.enum(['interested', 'going']);
 
 /** A kind of transport (`bike`, `hiking`); no comma, as they are stored joined. */
 export const TransportSchema = z.string().regex(/^[a-z0-9-]{1,20}$/);
@@ -76,6 +79,10 @@ export const EventSchema = z
     createdAt: zDateToIso,
     updatedAt: zDateToIso,
     canWrite: z.boolean(),
+    interestedCount: z.uint32(),
+    goingCount: z.uint32(),
+    /** The caller's own; null when logged out or undecided. */
+    myParticipation: ParticipationSchema.nullable(),
   })
   .meta({ id: 'Event' });
 
@@ -103,22 +110,31 @@ export const EventRowSchema = z.object({
   userName: z.string(),
   userHasPicture: z.coerce.boolean(),
   userPremium: z.coerce.boolean(),
+  interestedCount: z.coerce.number(),
+  goingCount: z.coerce.number(),
+  myParticipation: ParticipationSchema.nullable(),
 });
 
 export type EventRow = z.infer<typeof EventRowSchema>;
 
-/** The tables {@link EVENT_COLUMNS_SQL} reads, for after `FROM`. */
-export const EVENT_FROM_SQL =
-  'event e JOIN user u ON u.id = e.userId LEFT JOIN map ON map.id = e.mapId';
-
-export const EVENT_COLUMNS_SQL =
-  'e.id, e.userId, e.mapId, map.name AS mapName, e.title, e.description, ' +
-  'e.startAt, e.endAt, e.startLat, e.startLon, e.visibility, e.cover, ' +
-  'e.transports, e.distance, e.duration, e.ascent, e.descent, ' +
-  'e.difficulty, e.dogs, e.children, ' +
-  'e.createdAt, e.updatedAt, ' +
-  'u.name AS userName, u.picture IS NOT NULL AS userHasPicture, ' +
-  '(u.premiumExpiration IS NOT NULL AND u.premiumExpiration > NOW()) AS userPremium';
+/**
+ * `SELECT … FROM` the events as {@link EventRowSchema} reads them, the caller's
+ * own participation included; `e` is the event, for a `WHERE` to follow.
+ */
+export const eventSelect = (user: User | undefined) => sql`
+  SELECT e.id, e.userId, e.mapId, map.name AS mapName, e.title, e.description,
+    e.startAt, e.endAt, e.startLat, e.startLon, e.visibility, e.cover,
+    e.transports, e.distance, e.duration, e.ascent, e.descent,
+    e.difficulty, e.dogs, e.children, e.createdAt, e.updatedAt,
+    u.name AS userName, u.picture IS NOT NULL AS userHasPicture,
+    (u.premiumExpiration IS NOT NULL AND u.premiumExpiration > NOW()) AS userPremium,
+    (SELECT COUNT(*) FROM eventParticipant p WHERE p.eventId = e.id AND p.status = 'interested') AS interestedCount,
+    (SELECT COUNT(*) FROM eventParticipant p WHERE p.eventId = e.id AND p.status = 'going') AS goingCount,
+    me.status AS myParticipation
+  FROM event e
+    JOIN user u ON u.id = e.userId
+    LEFT JOIN map ON map.id = e.mapId
+    LEFT JOIN eventParticipant me ON me.eventId = e.id AND me.userId = ${user?.id ?? null}`;
 
 export const canWriteEvent = (
   user: User | undefined,

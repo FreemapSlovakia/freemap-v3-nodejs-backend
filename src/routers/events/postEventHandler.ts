@@ -1,5 +1,5 @@
 import type { RouterInstance } from '@koa/router';
-import sql, { raw } from 'sql-template-tag';
+import sql from 'sql-template-tag';
 import { authenticator } from '../../authenticator.js';
 import { runInTransaction } from '../../database.js';
 import { AUTH_REQUIRED, registerPath } from '../../openapi.js';
@@ -7,11 +7,10 @@ import { nanoid } from '../../randomId.js';
 import { acceptValidator } from '../../requestValidators.js';
 import { assertOwnMap } from './mapLink.js';
 import {
-  EVENT_COLUMNS_SQL,
-  EVENT_FROM_SQL,
   EventRowSchema,
   EventSchema,
   eventRowToResponse,
+  eventSelect,
 } from './types.js';
 import { EventBodySchema } from './validation.js';
 
@@ -78,11 +77,9 @@ export function attachPostEventHandler(router: RouterInstance) {
         const [row] = EventRowSchema.array()
           .length(1)
           .parse(
-            await conn.query<unknown>(sql`
-              SELECT ${raw(EVENT_COLUMNS_SQL)}
-              FROM ${raw(EVENT_FROM_SQL)}
-              WHERE e.id = ${id}
-            `),
+            await conn.query<unknown>(
+              sql`${eventSelect(ctx.state.user)} WHERE e.id = ${id}`,
+            ),
           );
 
         ctx.body = eventRowToResponse(row, ctx.state.user);
