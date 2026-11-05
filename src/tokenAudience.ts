@@ -6,24 +6,15 @@ type Provider = 'google' | 'apple';
 // A provider's token proves who signed in to *some* app. Only one issued to
 // ours may log in: else any app the user signed in to could replay it here.
 const config: Record<Provider, { audiences: Set<string>; enforce: boolean }> = {
+  // The web's and the mobile apps' client IDs. Unset, Apple refuses every
+  // token and Google accepts only the web's.
   google: {
-    // The web's client, and the Android app's.
-    audiences: list(
-      'GOOGLE_CLIENT_IDS',
-      [
-        getEnv('GOOGLE_CLIENT_ID', ''),
-        '177354445918-qlv0e9um253f035ij2b9p5bavvd4h9pf.apps.googleusercontent.com',
-      ].join(','),
-    ),
+    audiences: list('GOOGLE_CLIENT_IDS', getEnv('GOOGLE_CLIENT_ID', '')),
     // Off until the mobile apps' client IDs are known; see the log below.
     enforce: getEnvBoolean('GOOGLE_ENFORCE_AUDIENCE', false),
   },
   apple: {
-    // The web's Services ID, and the iOS app's bundle ID.
-    audiences: list(
-      'APPLE_CLIENT_IDS',
-      'sk.freemap.service,sk.bigware.freemap',
-    ),
+    audiences: list('APPLE_CLIENT_IDS', ''),
     enforce: getEnvBoolean('APPLE_ENFORCE_AUDIENCE', true),
   },
 };

@@ -175,6 +175,14 @@ pnpm start | pnpm exec pino-pretty
 - `OSM_OAUTH2_CLIENT_SECRET` — OAuth 2.0 client secret for OpenStreetMap.
 - `GARMIN_OAUTH_CONSUMER_KEY` — OAuth 1.0a consumer key for Garmin Connect.
 - `GARMIN_OAUTH_CONSUMER_SECRET` — OAuth 1.0a consumer secret for Garmin Connect.
+- `GOOGLE_CLIENT_IDS` — comma-separated Google OAuth client IDs whose tokens may
+  log in (web and mobile apps); defaults to `GOOGLE_CLIENT_ID`.
+- `GOOGLE_ENFORCE_AUDIENCE` — `true` to refuse a Google token issued to another
+  app; otherwise it is only logged and proves no email address.
+- `APPLE_CLIENT_IDS` — comma-separated Apple Services and bundle IDs whose
+  tokens may log in; unset, every Apple login is refused.
+- `APPLE_ENFORCE_AUDIENCE` — `false` to only log an Apple token of another app;
+  defaults to `true`.
 
 ### Mailgun (transactional email)
 
