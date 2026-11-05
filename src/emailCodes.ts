@@ -235,13 +235,14 @@ async function storeAndSend(
       expireAt = NOW() + INTERVAL ${CODE_TTL_MINUTES} MINUTE`,
   );
 
-  // Compared in SQL, against the clock createdAt was stamped with.
+  // Compared in SQL, against the clock createdAt was stamped with. The gap is
+  // between resends of one purpose: a login right after a confirmation is fine.
   const [{ count, recent }] = z
     .array(z.object({ count: z.number(), recent: z.coerce.boolean() }))
     .parse(
       await pool.query<unknown[]>(
         sql`SELECT COUNT(*) AS count,
-            COALESCE(MAX(createdAt) > NOW() - INTERVAL ${MIN_RESEND_SECONDS} SECOND, 0) AS recent
+            COALESCE(MAX(purpose = ${purpose} AND createdAt > NOW() - INTERVAL ${MIN_RESEND_SECONDS} SECOND), 0) AS recent
           FROM emailCode
           WHERE emailKey = ${emailKey} AND id <> ${insertId}
             AND createdAt > NOW() - INTERVAL 1 HOUR`,
