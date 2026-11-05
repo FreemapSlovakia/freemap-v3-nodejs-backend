@@ -313,5 +313,15 @@ export async function mergeUserAccounts(
     WHERE id = ${target.id}
   `);
 
+  // Repointed before the DELETE would cascade them away; one hop resolves all.
+  await conn.query<unknown>(
+    sql`UPDATE userAlias SET userId = ${target.id} WHERE userId = ${source.id}`,
+  );
+
+  await conn.query<unknown>(
+    sql`INSERT INTO userAlias SET oldId = ${source.id}, userId = ${target.id}
+        ON DUPLICATE KEY UPDATE userId = ${target.id}`,
+  );
+
   await conn.query<unknown>(sql`DELETE FROM user WHERE id = ${source.id}`);
 }

@@ -14,6 +14,7 @@ import { getEnv } from '../../env.js';
 import { AUTH_OPTIONAL, registerPath } from '../../openapi.js';
 import { acceptValidator } from '../../requestValidators.js';
 import { hasRole } from '../../roles.js';
+import { withMergedUsers } from '../../userAlias.js';
 import { LicenseSchema } from './licenses.js';
 import {
   bayesM,
@@ -377,7 +378,7 @@ async function byRadius(ctx: ParameterizedContext) {
   } = radiusQuery;
 
   const myUserId = ctx.state.user?.id ?? -1;
-  const userIdArray = userId || [];
+  const userIdArray = await withMergedUsers(userId || []);
   const tagArray = tag || [];
   const licenseArray = license || [];
 
@@ -496,7 +497,7 @@ async function byBbox(ctx: ParameterizedContext) {
   } = bboxQuery;
 
   const myUserId = ctx.state.user?.id ?? -1;
-  const userIdArray = userId || [];
+  const userIdArray = await withMergedUsers(userId || []);
   const tagArray = tag || [];
   const licenseArray = license || [];
 
@@ -776,7 +777,7 @@ async function byOrder(ctx: ParameterizedContext) {
   } = orderByQuery;
 
   const myUserId = ctx.state.user?.id ?? -1;
-  const userIdArray = userId || [];
+  const userIdArray = await withMergedUsers(userId || []);
   const tagArray = tag || [];
   const licenseArray = license || [];
 

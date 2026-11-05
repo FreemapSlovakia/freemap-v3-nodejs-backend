@@ -12,6 +12,7 @@ import {
   PublicFieldSchema,
   zDateToIso,
 } from '../../types.js';
+import { redirectMergedUser } from '../../userAlias.js';
 
 const ProfileDbSchema = z.object({
   id: z.uint32(),
@@ -75,6 +76,7 @@ export function attachGetUserProfileHandler(router: RouterInstance) {
         200: {
           content: { 'application/json': { schema: ProfileSchema } },
         },
+        302: { description: 'The user was merged into another one' },
         404: { description: 'no such user' },
       },
     },
@@ -116,6 +118,10 @@ export function attachGetUserProfileHandler(router: RouterInstance) {
       );
 
       if (!row) {
+        if (await redirectMergedUser(ctx, id)) {
+          return;
+        }
+
         return ctx.throw(404, 'no such user');
       }
 

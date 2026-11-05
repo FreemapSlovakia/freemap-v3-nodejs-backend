@@ -4,6 +4,7 @@ import sql from 'sql-template-tag';
 import z from 'zod';
 import { pool } from '../../database.js';
 import { registerPath } from '../../openapi.js';
+import { redirectMergedUser } from '../../userAlias.js';
 
 export function attachGetUserPictureHandler(router: RouterInstance) {
   registerPath('/auth/users/{id}/picture', {
@@ -21,6 +22,7 @@ export function attachGetUserPictureHandler(router: RouterInstance) {
             'image/webp': {},
           },
         },
+        302: { description: 'The user was merged into another one' },
         404: { description: 'no such user or no picture' },
       },
     },
@@ -36,6 +38,10 @@ export function attachGetUserPictureHandler(router: RouterInstance) {
     const [row] = await pool.query<{ picture: Buffer | null }[]>(
       sql`SELECT picture FROM user WHERE id = ${id}`,
     );
+
+    if (!row && (await redirectMergedUser(ctx, id))) {
+      return;
+    }
 
     const picture = row?.picture;
 

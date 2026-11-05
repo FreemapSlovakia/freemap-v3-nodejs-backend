@@ -107,6 +107,13 @@ export async function initDatabase() {
       INDEX emailCodeCreatedAtIdx (createdAt)
     ) ENGINE=InnoDB`,
 
+    // The ID of an account merged into another, so its links keep working.
+    sql`CREATE TABLE IF NOT EXISTS userAlias (
+      oldId INT UNSIGNED PRIMARY KEY,
+      userId INT UNSIGNED NOT NULL,
+      FOREIGN KEY (userId) REFERENCES user (id) ON DELETE CASCADE
+    ) ENGINE=InnoDB`,
+
     sql`CREATE TABLE IF NOT EXISTS blockedCredit (
       id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
       amount FLOAT NOT NULL,
