@@ -1,5 +1,6 @@
 import type { PoolConnection } from 'mariadb';
 import sql, { empty, join, raw } from 'sql-template-tag';
+import { emailFieldsSql, nextEmail } from './emailAddress.js';
 import { appLogger } from './logger.js';
 import {
   liveSubscriptionSql,
@@ -187,10 +188,12 @@ export async function mergeUserAccounts(
   // Free source's UNIQUE auth-provider IDs before the consolidating UPDATE,
   // otherwise transferring them to target would briefly duplicate the value
   // and trip the UNIQUE constraint. Values are already captured in authData.
+  // Its verified address too, which is unique and may move to the target.
   await conn.query<unknown>(
-    sql`UPDATE user SET ${join(
-      PROVIDER_COLS.map((c) => sql`${raw(c)} = NULL`),
-    )} WHERE id = ${source.id}`,
+    sql`UPDATE user SET ${join([
+      ...PROVIDER_COLS.map((c) => sql`${raw(c)} = NULL`),
+      sql`emailVerified = false`,
+    ])} WHERE id = ${source.id}`,
   );
 
   const mergedSettings = JSON.stringify({
@@ -198,19 +201,41 @@ export async function mergeUserAccounts(
     ...target.settings,
   });
 
-  // The source's flag goes along only with what the target takes from it.
+  // One the target's owner removed isn't brought back.
+  const removedByTarget = target.email === null && target.emailReminderOff;
+
+  // A proven address beats an unproven one: dropping it would lose the
+  // source's email login.
+  const sourceEmailWins =
+    !removedByTarget &&
+    source.email !== null &&
+    (target.email === null || (source.emailVerified && !target.emailVerified));
+
+  const mergedEmail = removedByTarget
+    ? target
+    : nextEmail(target, source.email, {
+        proven: source.emailVerified,
+        keepExisting: !sourceEmailWins,
+      });
+
+  // By mailbox, as changesMailbox compares: a respelling is the same address.
+  const sameMailbox =
+    source.emailKey !== null && target.emailKey === source.emailKey;
+
+  // A flag goes along only with what it published, which the merge keeps.
   const inherited: Record<PublicField, boolean> = {
-    email:
-      source.email !== null &&
-      (target.email === null || target.email === source.email),
+    email: source.email !== null && (sourceEmailWins || sameMailbox),
     osm: target.osmId === null && source.osmId !== null,
     github: target.githubUserId === null && source.githubUserId !== null,
     strava: target.stravaUserId === null && source.stravaUserId !== null,
   };
 
+  const keptByTarget = (f: PublicField) =>
+    f !== 'email' || !sourceEmailWins || sameMailbox;
+
   const mergedPublicFields = JSON.stringify([
     ...new Set([
-      ...target.publicFields,
+      ...target.publicFields.filter(keptByTarget),
       ...source.publicFields.filter((f) => inherited[f]),
     ]),
   ]);
@@ -221,7 +246,6 @@ export async function mergeUserAccounts(
 
   const {
     id: sourceId,
-    email,
     coordinates,
     language,
     createdAt,
@@ -232,7 +256,7 @@ export async function mergeUserAccounts(
 
   await conn.query<unknown>(sql`
     UPDATE user SET
-      email = COALESCE(email, ${email}),
+      ${emailFieldsSql(mergedEmail)},
       lat = COALESCE(lat, ${coordinates?.lat}),
       lon = COALESCE(lon, ${coordinates?.lon}),
       language = COALESCE(language, ${language}),

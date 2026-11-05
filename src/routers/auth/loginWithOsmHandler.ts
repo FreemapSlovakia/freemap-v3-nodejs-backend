@@ -136,22 +136,28 @@ export function attachLoginWithOsmHandler(router: RouterInstance) {
           home?.lon,
           language,
           connect,
-          storesToken ? { osmAccessToken: body.access_token } : undefined,
-          undefined,
-          img?.href ?? null,
-          storesToken
-            ? (previousRows) => {
-                stored = true;
+          {
+            extraUserFields: storesToken
+              ? { osmAccessToken: body.access_token }
+              : undefined,
+            remotePictureUrl: img?.href ?? null,
+            onCommitted: storesToken
+              ? (previousRows) => {
+                  stored = true;
 
-                // The tokens the new one replaced on the rows the login wrote;
-                // no other row can hold them.
-                for (const { osmAccessToken } of previousRows) {
-                  if (osmAccessToken && osmAccessToken !== body.access_token) {
-                    revokeOsmTokenLater(osmAccessToken, ctx.log);
+                  // The tokens the new one replaced on the rows the login
+                  // wrote; no other row can hold them.
+                  for (const { osmAccessToken } of previousRows) {
+                    if (
+                      osmAccessToken &&
+                      osmAccessToken !== body.access_token
+                    ) {
+                      revokeOsmTokenLater(osmAccessToken, ctx.log);
+                    }
                   }
                 }
-              }
-            : undefined,
+              : undefined,
+          },
         );
       } finally {
         // Nothing would revoke these later. A plain login's token is never

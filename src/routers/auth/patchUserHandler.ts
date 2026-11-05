@@ -3,15 +3,22 @@ import sql, { join, raw } from 'sql-template-tag';
 import z from 'zod';
 import { authenticator } from '../../authenticator.js';
 import { pool, runInTransaction } from '../../database.js';
+import {
+  changesMailbox,
+  emailFieldsSql,
+  nextEmail,
+} from '../../emailAddress.js';
 import { AUTH_REQUIRED, registerPath } from '../../openapi.js';
 import {
   MAX_PICTURE_INPUT_BYTES,
   processProfilePicture,
 } from '../../profilePicture.js';
 import {
-  knownValues,
   type PublicField,
   PublicFieldSchema,
+  removesLastWayIn,
+  USER_COLUMNS_SQL,
+  UserRowSchema,
 } from '../../types.js';
 
 // base64 inflates ~33%, so cap the encoded length proportionally.
@@ -27,6 +34,7 @@ const BodySchema = z
     lon: z.number().min(-180).max(180).nullish(),
     settings: z.record(z.string(), z.unknown()).optional(),
     sendGalleryEmails: z.boolean().nullish(),
+    emailReminderOff: z.boolean().optional(),
     language: z.string().min(2).max(2).nullish(),
     publicFields: z.array(PublicFieldSchema).optional(),
     picture: z
@@ -39,15 +47,6 @@ const BodySchema = z
   .refine((data) => (data.lat == null) === (data.lon == null), {
     message: 'lat and lon go together',
   });
-
-const LockedRowSchema = z.object({
-  settings: z.record(z.string(), z.unknown()).nullable(),
-  publicFields: knownValues(PublicFieldSchema),
-  email: z.string().nullable(),
-  osmId: z.uint32().nullable(),
-  githubUserId: z.string().nullable(),
-  stravaUserId: z.string().nullable(),
-});
 
 export function attachPatchUserHandler(router: RouterInstance) {
   registerPath('/auth/settings', {
@@ -94,6 +93,7 @@ export function attachPatchUserHandler(router: RouterInstance) {
         k !== 'picture' &&
         k !== 'settings' &&
         k !== 'publicFields' &&
+        k !== 'email' &&
         body[k] !== undefined,
     );
 
@@ -103,7 +103,8 @@ export function attachPatchUserHandler(router: RouterInstance) {
       keys.length === 0 &&
       processedPicture === undefined &&
       settings === undefined &&
-      publicFields === undefined
+      publicFields === undefined &&
+      body.email === undefined
     ) {
       ctx.status = 204;
 
@@ -138,18 +139,42 @@ export function attachPatchUserHandler(router: RouterInstance) {
     await runInTransaction(async (conn) => {
       // Under the lock, as the disconnect handler reads it.
       const [rawRow] = await conn.query<unknown[]>(
-        sql`SELECT settings, publicFields, email, osmId, githubUserId, stravaUserId
-          FROM user WHERE id = ${userId} FOR UPDATE`,
+        sql`SELECT ${raw(USER_COLUMNS_SQL)} FROM user WHERE id = ${userId} FOR UPDATE`,
       );
 
       if (!rawRow) {
         return ctx.throw(401, 'account gone');
       }
 
-      const row = LockedRowSchema.parse(rawRow);
+      const row = UserRowSchema.parse(rawRow);
 
       // Per attempt: a retried transaction starts again from the row it reads.
       const sets = [...assignments];
+
+      const next =
+        body.email === undefined || body.email === row.email
+          ? undefined
+          : nextEmail(row, body.email);
+
+      // Another mailbox only through PUT /auth/email, which proves it. Skipped,
+      // not refused: older clients send `email` with every save.
+      const applied =
+        next && (body.email === null || !changesMailbox(row, next))
+          ? next
+          : undefined;
+
+      if (applied) {
+        if (removesLastWayIn(row, applied.emailVerified)) {
+          return ctx.throw(409, 'last provider');
+        }
+
+        sets.push(emailFieldsSql(applied));
+
+        // Removing it is the answer to being asked for one.
+        if (body.email === null && body.emailReminderOff === undefined) {
+          sets.push(sql`emailReminderOff = true`);
+        }
+      }
 
       if (settings !== undefined) {
         // Clients each own their top-level keys (the mobile app keeps
@@ -172,9 +197,10 @@ export function attachPatchUserHandler(router: RouterInstance) {
       if (publicFields !== undefined || body.email !== undefined) {
         // Only what there is to show now: a flag set ahead of an email or a
         // login would publish it unasked once it comes.
-        const email = body.email === undefined ? row.email : body.email;
+        const email = applied ? applied.email : row.email;
 
         const present: Record<PublicField, unknown> = {
+          // Kept for an unproven one too, which the profile shows once proven.
           email: email || null,
           osm: row.osmId,
           github: row.githubUserId,

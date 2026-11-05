@@ -4,6 +4,7 @@ import z from 'zod';
 import { authenticator } from '../../authenticator.js';
 import { AUTH_OPTIONAL, registerPath } from '../../openapi.js';
 import { acceptValidator } from '../../requestValidators.js';
+import { checkTokenAudience } from '../../tokenAudience.js';
 import { LoginResponseSchema } from '../../types.js';
 import { login } from './loginProcessor.js';
 
@@ -52,11 +53,8 @@ export function attachLoginWithAppleHandler(router: RouterInstance) {
 
       let appleIdPayload;
       try {
+        // The audience is checked below, to log one this doesn't know.
         appleIdPayload = await appleSignin.verifyIdToken(identityToken, {
-          // You can pass the client_id here to be strictly validated,
-          // but if we accept tokens from multiple bundles (e.g. mobile app bundle ID, and maybe a web service ID),
-          // it's sometimes better to let the library just verify the signature if not explicitly set,
-          // or specify multiple options. We will leave it to verify the signature using Apple's keys.
           ignoreExpiration: false,
         });
       } catch (err) {
@@ -65,7 +63,10 @@ export function attachLoginWithAppleHandler(router: RouterInstance) {
         return ctx.throw(400, 'Invalid Apple identityToken.');
       }
 
-      const { sub, email } = appleIdPayload;
+      // Another app's token (let through while not enforced) proves no address.
+      const ours = checkTokenAudience(ctx, 'apple', [appleIdPayload.aud]);
+
+      const { sub, email, email_verified } = appleIdPayload;
 
       await login(
         ctx,
@@ -77,6 +78,10 @@ export function attachLoginWithAppleHandler(router: RouterInstance) {
         undefined,
         language ?? null,
         connect ?? undefined,
+        {
+          remoteEmailVerified:
+            ours && (email_verified === true || email_verified === 'true'),
+        },
       );
     },
   );

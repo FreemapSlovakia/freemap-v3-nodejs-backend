@@ -89,6 +89,8 @@ export const CommonUserSchema = {
   credits: z.number().nonnegative(),
   language: z.string().nullable(),
   sendGalleryEmails: z.boolean(),
+  // Not to be asked for an address: declined, or removed it.
+  emailReminderOff: z.boolean(),
   hasPicture: z.coerce.boolean(),
   premium: z.coerce.boolean(),
   // Whether premium comes from a Polar subscription rather than a one-time
@@ -113,6 +115,25 @@ export const PROVIDER_ID_COLUMNS = [
   'microsoftUserId',
 ] as const;
 
+/**
+ * Whether the account can still be logged into: a provider, or a verified
+ * email. Every change that may take a way in away checks its outcome here.
+ */
+export function hasWayIn(
+  row: Pick<UserRow, (typeof PROVIDER_ID_COLUMNS)[number]>,
+  emailVerified: boolean,
+): boolean {
+  return emailVerified || PROVIDER_ID_COLUMNS.some((c) => row[c] != null);
+}
+
+/** Whether unverifying the email (to `nextEmailVerified`) locks the account. */
+export function removesLastWayIn(
+  row: Parameters<typeof hasWayIn>[0] & { emailVerified: boolean },
+  nextEmailVerified: boolean,
+): boolean {
+  return hasWayIn(row, row.emailVerified) && !hasWayIn(row, nextEmailVerified);
+}
+
 const USER_COLUMN_NAMES = [
   'id',
   ...PROVIDER_ID_COLUMNS,
@@ -124,6 +145,10 @@ const USER_COLUMN_NAMES = [
   'stravaTokenExpiresAt',
   'name',
   'email',
+  'emailKey',
+  'emailVerified',
+  'mailableEmail',
+  'emailReminderOff',
   'description',
   'roles',
   'publicFields',
@@ -196,6 +221,9 @@ export const UserResponseSchema = z
     ),
     // Whether GPS traces can be uploaded to OSM without authorizing again.
     osmGpxAuthorized: z.boolean(),
+    // Whether `email` is proven, so the account can be logged into by a code
+    // sent there.
+    emailVerified: z.boolean(),
     coordinates: z
       .strictObject({ lat: z.number(), lon: z.number() })
       .nullable(),
@@ -233,6 +261,10 @@ export const UserRowSchema = z
     ...CommonUserSchema,
     // A value stale in the database is dropped, not a failed login.
     publicFields: knownValues(PublicFieldSchema),
+    emailKey: z.string().nullable(),
+    // `email` once verified: the one mail may be sent to.
+    mailableEmail: z.string().nullable(),
+    emailVerified: z.boolean(),
     osmId: z.uint32().nullable(),
     facebookUserId: z.string().nullable(),
     googleUserId: z.string().nullable(),

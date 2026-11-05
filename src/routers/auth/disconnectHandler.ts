@@ -5,11 +5,7 @@ import { authenticator } from '../../authenticator.js';
 import { runInTransaction } from '../../database.js';
 import { AUTH_REQUIRED, registerPath } from '../../openapi.js';
 import { revokeOsmTokenLater } from '../../osm.js';
-import {
-  PROVIDER_ID_COLUMNS,
-  USER_COLUMNS_SQL,
-  UserRowSchema,
-} from '../../types.js';
+import { hasWayIn, USER_COLUMNS_SQL, UserRowSchema } from '../../types.js';
 
 export function attachDisconnectHandler(router: RouterInstance) {
   registerPath('/auth/providers/{provider}', {
@@ -80,12 +76,12 @@ export function attachDisconnectHandler(router: RouterInstance) {
 
       const row = UserRowSchema.parse(rawRow);
 
-      // Without a provider left, nobody could log in to the account again.
-      if (
-        !PROVIDER_ID_COLUMNS.some(
-          (column) => !columns.includes(column) && row[column] != null,
-        )
-      ) {
+      const withoutIt = {
+        ...row,
+        ...Object.fromEntries(columns.map((column) => [column, null])),
+      };
+
+      if (!hasWayIn(withoutIt, row.emailVerified)) {
         return ctx.throw(409, 'last provider');
       }
 

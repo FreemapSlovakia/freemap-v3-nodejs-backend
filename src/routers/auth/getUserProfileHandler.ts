@@ -100,7 +100,8 @@ export function attachGetUserProfileHandler(router: RouterInstance) {
             (premiumExpiration IS NOT NULL AND premiumExpiration > NOW()) AS premium,
             roles,
             publicFields,
-            email,
+            -- Only one its owner has proven is ever shown.
+            mailableEmail AS email,
             osmId,
             githubUserId,
             stravaUserId,

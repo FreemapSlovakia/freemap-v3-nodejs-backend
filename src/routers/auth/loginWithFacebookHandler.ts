@@ -80,9 +80,7 @@ export function attachLoginWithFacebookHandler(router: RouterInstance) {
       undefined,
       language,
       connect,
-      undefined,
-      undefined,
-      pictureUrl,
+      { remotePictureUrl: pictureUrl },
     );
   });
 }

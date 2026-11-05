@@ -1,4 +1,4 @@
-import got from 'got';
+import got, { HTTPError } from 'got';
 import z from 'zod';
 import { getEnv } from '../../env.js';
 import { makeOAuthLoginHandler } from './makeOAuthLoginHandler.js';
@@ -55,25 +55,41 @@ export const attachLoginWithGithubHandler = makeOAuthLoginHandler({
       await got.get('https://api.github.com/user', { headers }).json(),
     );
 
-    let email = user.email ?? null;
+    // Requires the `user:email` scope; without it (403/404) nothing counts as
+    // verified. Another failure fails only a login that needs the list to
+    // find an address at all, as before; else the public one stays unproven.
+    const emails = await got
+      .get('https://api.github.com/user/emails', { headers })
+      .json()
+      .then((json) => EmailsSchema.parse(json))
+      .catch((err: unknown) => {
+        if (
+          user.email ||
+          (err instanceof HTTPError &&
+            [403, 404].includes(err.response.statusCode))
+        ) {
+          return [];
+        }
+
+        throw err;
+      });
 
     // The public profile email may be hidden; fall back to the verified
-    // primary address (requires the `user:email` scope).
-    if (!email) {
-      const emails = EmailsSchema.parse(
-        await got.get('https://api.github.com/user/emails', { headers }).json(),
-      );
-
-      email =
-        emails.find((e) => e.primary && e.verified)?.email ??
-        emails.find((e) => e.verified)?.email ??
-        null;
-    }
+    // primary address.
+    const email =
+      user.email ??
+      emails.find((e) => e.primary && e.verified)?.email ??
+      emails.find((e) => e.verified)?.email ??
+      null;
 
     return {
       remoteUserId: user.id,
       name: user.name ?? user.login,
       email,
+      // Checked, not assumed for the public one.
+      emailVerified: emails.some(
+        (e) => e.verified && e.email.toLowerCase() === email?.toLowerCase(),
+      ),
       pictureUrl: user.avatar_url ?? null,
     };
   },

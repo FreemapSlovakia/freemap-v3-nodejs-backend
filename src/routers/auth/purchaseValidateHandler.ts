@@ -3,6 +3,7 @@ import type { RouterInstance } from '@koa/router';
 import sql from 'sql-template-tag';
 import z from 'zod';
 import { runInTransaction } from '../../database.js';
+import { fillEmailSql } from '../../emailAddress.js';
 import { getEnv, getEnvInteger } from './../../env.js';
 import { registerPath } from '../../openapi.js';
 
@@ -205,7 +206,7 @@ export function attachPurchaseValidateHandler(router: RouterInstance) {
                       THEN NOW()
                       ELSE premiumExpiration
                     END + INTERVAL 1 YEAR,
-                    email = COALESCE(email, ${webhook.email})
+                    ${fillEmailSql(webhook.email)}
                 WHERE
                   id = ${userId}
               `,
@@ -219,7 +220,7 @@ export function attachPurchaseValidateHandler(router: RouterInstance) {
                   user
                 SET
                   credits = credits + ${item.amount},
-                  email = COALESCE(email, ${webhook.email})
+                  ${fillEmailSql(webhook.email)}
                 WHERE
                   id = ${userId}`,
             );
@@ -297,7 +298,7 @@ export function attachPurchaseValidateHandler(router: RouterInstance) {
                     THEN NOW()
                     ELSE premiumExpiration
                   END + INTERVAL 1 YEAR,
-                  email = COALESCE(email, ${legacy.email})
+                  ${fillEmailSql(legacy.email)}
               WHERE
                 id = ${userId}
             `,
@@ -312,7 +313,7 @@ export function attachPurchaseValidateHandler(router: RouterInstance) {
                 user
               SET
                 credits = credits + ${item.amount},
-                email = COALESCE(email, ${legacy.email})
+                ${fillEmailSql(legacy.email)}
               WHERE
                 id = ${userId}
             `,

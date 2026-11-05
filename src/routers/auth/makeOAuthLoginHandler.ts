@@ -13,6 +13,8 @@ export type OAuthProfile = {
   remoteUserId: string | number;
   name?: string;
   email?: string | null;
+  /** The provider vouches for `email`; unset, it proves nothing. */
+  emailVerified?: boolean;
   lat?: number;
   lon?: number;
   pictureUrl?: string | null;
@@ -117,9 +119,11 @@ export function makeOAuthLoginHandler(opts: {
           profile.lon,
           language,
           connect,
-          profile.extraUserFields ?? {},
-          undefined,
-          profile.pictureUrl ?? null,
+          {
+            extraUserFields: profile.extraUserFields,
+            remotePictureUrl: profile.pictureUrl ?? null,
+            remoteEmailVerified: profile.emailVerified,
+          },
         );
       },
     );

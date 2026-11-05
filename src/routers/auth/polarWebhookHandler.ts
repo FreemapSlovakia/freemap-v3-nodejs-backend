@@ -3,6 +3,7 @@ import type { ParameterizedContext } from 'koa';
 import sql from 'sql-template-tag';
 import z from 'zod';
 import { pool, runInTransaction } from '../../database.js';
+import { fillEmailSql } from '../../emailAddress.js';
 import { getEnv } from '../../env.js';
 import { registerPath } from '../../openapi.js';
 import { webhooks } from '../../polar.js';
@@ -282,7 +283,7 @@ export function attachPolarWebhookHandler(router: RouterInstance) {
             await conn.query<unknown>(
               sql`UPDATE user
                   SET credits = credits + ${credits},
-                      email = COALESCE(email, ${order.customer.email})
+                      ${fillEmailSql(order.customer.email)}
                   WHERE id = ${userId}`,
             );
           } else if (isOneTimePremium) {
@@ -293,7 +294,7 @@ export function attachPolarWebhookHandler(router: RouterInstance) {
                   SET premiumExpiration =
                         GREATEST(COALESCE(premiumExpiration, NOW()), NOW())
                           + INTERVAL 1 YEAR,
-                      email = COALESCE(email, ${order.customer.email})
+                      ${fillEmailSql(order.customer.email)}
                   WHERE id = ${userId}`,
             );
           }
@@ -394,7 +395,7 @@ export function attachPolarWebhookHandler(router: RouterInstance) {
               polarSubscriptionId = ${sub.id},
               polarCustomerId = ${sub.customer_id},
               cancelAtPeriodEnd = ${sub.cancel_at_period_end},
-              email = COALESCE(email, ${sub.customer.email})
+              ${fillEmailSql(sub.customer.email)}
               WHERE id = ${userId}`,
         );
 

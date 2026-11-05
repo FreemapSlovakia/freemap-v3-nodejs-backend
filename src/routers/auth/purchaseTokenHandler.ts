@@ -5,6 +5,7 @@ import z from 'zod';
 import { authenticator } from '../../authenticator.js';
 import { pool } from '../../database.js';
 import { getEnv } from '../../env.js';
+import { pickLanguage } from '../../mailer.js';
 import { AUTH_REQUIRED, registerPath } from '../../openapi.js';
 
 type Combo = {
@@ -186,14 +187,11 @@ export function attachPurchaseTokenHandler(router: RouterInstance) {
 
     searchParams.set('expiration', String(expiration));
 
-    if (user.email) {
-      searchParams.set('email', user.email);
+    if (user.mailableEmail) {
+      searchParams.set('email', user.mailableEmail);
     }
 
-    const lang =
-      user.language && user.language in translations
-        ? user.language
-        : ctx.acceptsLanguages(Object.keys(translations)) || 'en';
+    const lang = pickLanguage(ctx, user.language, translations);
 
     searchParams.set('lang', lang);
 

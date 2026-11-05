@@ -1,11 +1,10 @@
 import type { PoolConnection } from 'mariadb';
 import { createPool } from 'mariadb';
-import sql, { raw } from 'sql-template-tag';
+import sql, { join, raw } from 'sql-template-tag';
 import z from 'zod';
-import { getEnv, getEnvBoolean, getEnvInteger } from './env.js';
+import { normalizeEmail } from './emailAddress.js';
+import { getEnv, getEnvInteger } from './env.js';
 import { appLogger } from './logger.js';
-import { USER_COLUMNS_SQL, UserRowSchema } from './types.js';
-import { MergeConflictError, mergeUserAccounts } from './userMerge.js';
 
 export const pool = createPool({
   host: getEnv('MARIADB_HOST'),
@@ -20,6 +19,15 @@ export const pool = createPool({
 });
 
 const logger = appLogger.child({ module: 'db' });
+
+// UNIQUE: at most one account has an address verified, so a concurrent second
+// verification fails (and its transaction is retried, see isVerifiedEmailTaken).
+const VERIFIED_EMAIL_KEY_COLUMN =
+  'verifiedEmailKey VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin AS (IF(emailVerified, emailKey, NULL)) PERSISTENT';
+
+// The address mail may go to; mail senders read this, never `email`.
+const MAILABLE_EMAIL_COLUMN =
+  'mailableEmail VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci AS (IF(emailVerified, email, NULL)) VIRTUAL';
 
 /**
  * Delete a session this long after its last use. Generous because the gallery
@@ -51,6 +59,14 @@ export async function initDatabase() {
       name VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
       picture MEDIUMBLOB NULL,
       email VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL,
+      -- normalizeEmail(email); not UNIQUE, older accounts share addresses.
+      emailKey VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NULL,
+      -- Whether the owner proved receiving mail there; email login needs it.
+      emailVerified BIT NOT NULL DEFAULT false,
+      ${raw(VERIFIED_EMAIL_KEY_COLUMN)},
+      ${raw(MAILABLE_EMAIL_COLUMN)},
+      -- Declined being asked for an address (or removed it).
+      emailReminderOff BIT NOT NULL DEFAULT false,
       description TEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL,
       roles JSON NOT NULL DEFAULT '[]',
       -- What the public profile may show; see PublicFieldSchema.
@@ -67,7 +83,28 @@ export async function initDatabase() {
       polarSubscriptionId VARCHAR(64) CHARSET ascii NULL,
       cancelAtPeriodEnd BIT NOT NULL DEFAULT false,
       -- Whether any account still holds a token, before revoking it.
-      INDEX userOsmAccessTokenIdx (osmAccessToken)
+      INDEX userOsmAccessTokenIdx (osmAccessToken),
+      INDEX userEmailKeyIdx (emailKey),
+      UNIQUE INDEX userVerifiedEmailKeyIdx (verifiedEmailKey)
+    ) ENGINE=InnoDB`,
+
+    // One-time codes proving an address: to log in, or (with userId) to set it
+    // as that account's email. Rows outlive expiry for the hourly send limit.
+    sql`CREATE TABLE IF NOT EXISTS emailCode (
+      id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+      purpose ENUM('login', 'change') CHARSET ascii NOT NULL,
+      userId INT UNSIGNED NULL,
+      email VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+      emailKey VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL,
+      codeHash BINARY(32) NOT NULL,
+      -- Whose resend voids this one: the same requester's, not another's.
+      requestIp VARCHAR(45) CHARSET ascii NOT NULL DEFAULT '',
+      attempts TINYINT UNSIGNED NOT NULL DEFAULT 0,
+      createdAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      expireAt TIMESTAMP NOT NULL,
+      FOREIGN KEY (userId) REFERENCES user (id) ON DELETE CASCADE,
+      INDEX emailCodeKeyIdx (emailKey, createdAt),
+      INDEX emailCodeCreatedAtIdx (createdAt)
     ) ENGINE=InnoDB`,
 
     sql`CREATE TABLE IF NOT EXISTS blockedCredit (
@@ -515,6 +552,18 @@ export async function initDatabase() {
     'ALTER TABLE map DROP COLUMN IF EXISTS public',
 
     "ALTER TABLE user ADD COLUMN IF NOT EXISTS publicFields JSON NOT NULL DEFAULT '[]' AFTER roles",
+
+    // Existing addresses start unproven; a login whose provider vouches for the
+    // same one proves it.
+    [
+      'ALTER TABLE user ADD COLUMN IF NOT EXISTS emailKey VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NULL AFTER email, ADD COLUMN IF NOT EXISTS emailVerified BIT NOT NULL DEFAULT false AFTER emailKey, ADD INDEX IF NOT EXISTS userEmailKeyIdx (emailKey)',
+      // Plain ADD COLUMN: fails once applied, so the index isn't rebuilt.
+      `ALTER TABLE user ADD COLUMN ${VERIFIED_EMAIL_KEY_COLUMN} AFTER emailVerified, ADD COLUMN ${MAILABLE_EMAIL_COLUMN} AFTER verifiedEmailKey, ADD UNIQUE INDEX userVerifiedEmailKeyIdx (verifiedEmailKey)`,
+    ],
+
+    'ALTER TABLE user ADD COLUMN IF NOT EXISTS emailReminderOff BIT NOT NULL DEFAULT false',
+
+    "ALTER TABLE emailCode ADD COLUMN IF NOT EXISTS requestIp VARCHAR(45) CHARSET ascii NOT NULL DEFAULT '' AFTER codeHash",
   ];
 
   const db = await pool.getConnection();
@@ -543,15 +592,7 @@ export async function initDatabase() {
     db.release();
   }
 
-  if (getEnvBoolean('ALLOW_EMAIL_ACCOUNT_LINKING', false)) {
-    const dedup = await mergeDuplicateUsers();
-
-    if (dedup.merged || dedup.conflicts || dedup.missing) {
-      logger.info(
-        `User dedup: merged=${dedup.merged}, conflicts=${dedup.conflicts}, missing=${dedup.missing}`,
-      );
-    }
-  }
+  await backfillEmailKeys();
 
   async function cleanup() {
     await pool.query<unknown>(
@@ -568,6 +609,10 @@ export async function initDatabase() {
 
     await pool.query<unknown>(
       sql`DELETE FROM locusInstall WHERE expireAt < NOW()`,
+    );
+
+    await pool.query<unknown>(
+      sql`DELETE FROM emailCode WHERE createdAt < NOW() - INTERVAL 1 DAY`,
     );
 
     await runInTransaction(async (conn) => {
@@ -631,18 +676,34 @@ function isRetryableTxError(err: unknown): boolean {
   return z.object({ sqlState: z.literal('40001') }).safeParse(err).success;
 }
 
+/**
+ * Another transaction verified the address first. For `retryOn` in the
+ * transactions that verify one: a retry reads that account.
+ */
+export function isVerifiedEmailTaken(err: unknown): boolean {
+  return z
+    .object({
+      errno: z.literal(1062),
+      sqlMessage: z.string().includes('userVerifiedEmailKeyIdx'),
+    })
+    .safeParse(err).success;
+}
+
 export async function runInTransaction<T>(
   fn: (conn: PoolConnection) => Promise<T>,
   opts: {
     maxAttempts?: number;
     baseDelay?: number;
     maxDelay?: number;
+    /** More errors a retry can resolve, besides deadlocks. */
+    retryOn?: (err: unknown) => boolean;
   } = {},
 ): Promise<T> {
   const {
     maxAttempts = MAX_ATTEMPTS,
     baseDelay = BASE_DELAY_MS,
     maxDelay = MAX_DELAY_MS,
+    retryOn,
   } = opts;
 
   let attempt = 0;
@@ -665,7 +726,7 @@ export async function runInTransaction<T>(
         // ignore rollback errors
       }
 
-      if (!isRetryableTxError(err)) {
+      if (!isRetryableTxError(err) && !retryOn?.(err)) {
         throw err;
       }
 
@@ -687,84 +748,30 @@ export async function runInTransaction<T>(
   }
 }
 
-const DuplicateGroupSchema = z.object({
-  ids: z
-    .string()
-    .transform((s) => s.split(',').map((x) => Number.parseInt(x, 10))),
-});
+/** Keys the addresses stored before `emailKey` existed; a no-op afterwards. */
+async function backfillEmailKeys() {
+  const rows = z
+    .array(z.object({ id: z.uint32(), email: z.string() }))
+    .parse(
+      await pool.query<unknown[]>(
+        sql`SELECT id, email FROM user WHERE email IS NOT NULL AND emailKey IS NULL`,
+      ),
+    );
 
-/**
- * Merges users that share `(name, email)`. Winner is the oldest by
- * `createdAt`. Each merge runs in its own transaction. Groups with
- * conflicting UNIQUE auth-provider IDs are skipped and counted.
- */
-async function mergeDuplicateUsers(): Promise<{
-  merged: number;
-  conflicts: number;
-  missing: number;
-}> {
-  const rows = await pool.query<unknown[]>(
-    sql`SELECT GROUP_CONCAT(id ORDER BY createdAt, id) AS ids
-        FROM user
-        WHERE email IS NOT NULL
-        GROUP BY name, email
-        HAVING COUNT(*) > 1`,
-  );
+  for (let i = 0; i < rows.length; i += 500) {
+    const chunk = rows.slice(i, i + 500);
 
-  const groups = z
-    .array(DuplicateGroupSchema)
-    .parse(rows)
-    .map((r) => r.ids);
-
-  let merged = 0;
-  let conflicts = 0;
-  let missing = 0;
-
-  for (const ids of groups) {
-    const [targetId, ...sourceIds] = ids;
-
-    for (const sourceId of sourceIds) {
-      await runInTransaction(async (conn) => {
-        const [tRow] = await conn.query<unknown[]>(
-          sql`SELECT ${raw(USER_COLUMNS_SQL)} FROM user WHERE id = ${targetId} FOR UPDATE`,
-        );
-
-        const [sRow] = await conn.query<unknown[]>(
-          sql`SELECT ${raw(USER_COLUMNS_SQL)} FROM user WHERE id = ${sourceId} FOR UPDATE`,
-        );
-
-        if (!tRow || !sRow) {
-          missing++;
-
-          return;
-        }
-
-        try {
-          await mergeUserAccounts(
-            conn,
-            UserRowSchema.parse(tRow),
-            UserRowSchema.parse(sRow),
-          );
-
-          logger.info(`Merged user ${sourceId} into ${targetId}`);
-
-          merged++;
-        } catch (err) {
-          if (err instanceof MergeConflictError) {
-            logger.warn(
-              `Conflict merging user ${sourceId} into ${targetId}: ${err.column}`,
-            );
-
-            conflicts++;
-
-            return;
-          }
-
-          throw err;
-        }
-      });
-    }
+    await pool.query<unknown>(
+      sql`UPDATE user SET emailKey = CASE id ${join(
+        chunk.map(
+          ({ id, email }) => sql`WHEN ${id} THEN ${normalizeEmail(email)}`,
+        ),
+        ' ',
+      )} END WHERE id IN (${join(chunk.map(({ id }) => id))})`,
+    );
   }
 
-  return { merged, conflicts, missing };
+  if (rows.length > 0) {
+    logger.info(`Keyed ${rows.length} stored email addresses.`);
+  }
 }

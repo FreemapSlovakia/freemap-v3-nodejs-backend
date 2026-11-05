@@ -113,10 +113,10 @@ export function attachPostPictureCommentHandler(router: RouterInstance) {
                     conn.query<
                       { email: string; language: string | null }[]
                     >(sql`
-                    SELECT DISTINCT email, sendGalleryEmails, language
+                    SELECT DISTINCT mailableEmail AS email, sendGalleryEmails, language
                       FROM user
                       JOIN wikimediaComment ON userId = user.id
-                      WHERE sendGalleryEmails AND pageId = ${ref.pageId} AND userId <> ${user.id} AND email IS NOT NULL
+                      WHERE sendGalleryEmails AND pageId = ${ref.pageId} AND userId <> ${user.id} AND mailableEmail IS NOT NULL
                   `),
                   ]
                 : ([undefined] as const)),
@@ -191,16 +191,16 @@ export function attachPostPictureCommentHandler(router: RouterInstance) {
                       language: string | null;
                     }[]
                   >(sql`
-                    SELECT IF(sendGalleryEmails, email, NULL) AS email, language, title, userId
+                    SELECT IF(sendGalleryEmails, mailableEmail, NULL) AS email, language, title, userId
                       FROM user
                       JOIN picture ON userId = user.id
                       WHERE picture.id = ${ref.id}
                   `),
                   conn.query<{ email: string; language: string | null }[]>(sql`
-                    SELECT DISTINCT email, sendGalleryEmails, language
+                    SELECT DISTINCT mailableEmail AS email, sendGalleryEmails, language
                       FROM user
                       JOIN pictureComment ON userId = user.id
-                      WHERE sendGalleryEmails AND pictureId = ${ref.id} AND userId <> ${user.id} AND email IS NOT NULL
+                      WHERE sendGalleryEmails AND pictureId = ${ref.id} AND userId <> ${user.id} AND mailableEmail IS NOT NULL
                   `),
                 ]
               : ([undefined, undefined] as const)),

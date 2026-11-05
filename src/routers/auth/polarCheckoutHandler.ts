@@ -187,7 +187,7 @@ export function attachPolarCheckoutHandler(router: RouterInstance) {
         products: [productId],
         external_customer_id: String(user.id),
         // Pre-fill the checkout with what we know (email is optional in our app).
-        customer_email: user.email ?? undefined,
+        customer_email: user.mailableEmail ?? undefined,
         customer_name: user.name,
         success_url: successUrl,
         embed_origin: embedOrigin,

@@ -15,7 +15,7 @@ import { runInTransaction } from '../database.js';
 import { type DownloadableMap, downloadableMaps } from '../downloadableMaps.js';
 import { getEnv } from '../env.js';
 import { appLogger } from '../logger.js';
-import { sendMail } from '../mailer.js';
+import { pickLanguage, sendMail } from '../mailer.js';
 import { AUTH_REQUIRED, registerPath } from '../openapi.js';
 import { acceptValidator } from '../requestValidators.js';
 import { fetchLicenses, TileCodeCollector } from '../tileAttribution.js';
@@ -201,7 +201,9 @@ const DownloadBodySchema = z.strictObject({
   maxZoom: z.number().int().min(0).max(20),
   boundary: GeoJSONFeatureSchema,
   name: z.string(),
-  email: z.email(),
+  // Ignored, for clients that still send it: the link goes to the account's
+  // verified address.
+  email: z.unknown().optional(),
   scale: z.number().int().min(1).max(4).optional(),
   // a shading map's, as the web client's `serializeShading` writes it; the
   // cap is nginx's 8k request line, which the same URL meets on screen
@@ -252,7 +254,13 @@ export function attachDownloadMapHandler(router: RouterInstance) {
         'Request an offline map tile package download (async, costs credits)',
       tags: ['offline-maps'],
       security: AUTH_REQUIRED,
-      responses: { 204: {}, 400: {}, 401: {}, 409: {} },
+      responses: {
+        204: {},
+        400: {},
+        401: {},
+        403: { description: 'The account has no verified email' },
+        409: {},
+      },
     },
   });
 
@@ -267,12 +275,8 @@ export function attachDownloadMapHandler(router: RouterInstance) {
 
     const user = ctx.state.user!;
 
-    const lang =
-      user.language && user.language in translations
-        ? user.language
-        : ctx.acceptsLanguages(Object.keys(translations)) || 'en';
-
-    const translation = translations[lang]!;
+    const translation =
+      translations[pickLanguage(ctx, user.language, translations)]!;
 
     const listed = downloadableMaps.find(({ type }) => type === body.map);
 
@@ -286,7 +290,14 @@ export function attachDownloadMapHandler(router: RouterInstance) {
       return;
     }
 
-    const { minZoom, maxZoom, boundary, scale, name, email, format } = body;
+    const { minZoom, maxZoom, boundary, scale, name, format } = body;
+
+    const email = user.mailableEmail;
+
+    if (!email) {
+      ctx.throw(403, 'no verified email');
+      return;
+    }
 
     // Past its range a map answers 404, which is no tile.
     if (

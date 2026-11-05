@@ -170,10 +170,12 @@ export function attachLoginWithGarmin2Handler(router: RouterInstance) {
         language,
         session.connect,
         {
-          garminAccessToken: authToken,
-          garminAccessTokenSecret: authTokenSecret,
+          extraUserFields: {
+            garminAccessToken: authToken,
+            garminAccessTokenSecret: authTokenSecret,
+          },
+          clientData: session.clientData,
         },
-        session.clientData,
       );
     },
   );

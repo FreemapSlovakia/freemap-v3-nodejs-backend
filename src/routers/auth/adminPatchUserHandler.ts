@@ -2,11 +2,13 @@ import type { RouterInstance } from '@koa/router';
 import sql, { join, raw } from 'sql-template-tag';
 import z from 'zod';
 import { authenticator } from '../../authenticator.js';
-import { pool } from '../../database.js';
+import { pool, runInTransaction } from '../../database.js';
+import { emailFieldsSql, nextEmail } from '../../emailAddress.js';
 import { AUTH_REQUIRED, registerPath } from '../../openapi.js';
 import { hasRole } from '../../roles.js';
 import {
   CommonUserSchema,
+  removesLastWayIn,
   USER_COLUMNS_SQL,
   UserRowSchema,
 } from '../../types.js';
@@ -48,6 +50,7 @@ export function attachAdminPatchUserHandler(router: RouterInstance) {
         401: {},
         403: {},
         404: {},
+        409: { description: "The email is the account's only way in" },
       },
     },
   });
@@ -68,7 +71,7 @@ export function attachAdminPatchUserHandler(router: RouterInstance) {
     const id = Number(ctx.params.id);
 
     const assignments = Object.entries(body)
-      .filter(([, value]) => value !== undefined)
+      .filter(([key, value]) => key !== 'email' && value !== undefined)
       .map(([key, value]) =>
         key === 'premiumExpiration'
           ? sql`premiumExpiration = ${value ? new Date(value as string) : null}`
@@ -77,22 +80,42 @@ export function attachAdminPatchUserHandler(router: RouterInstance) {
             : sql`${raw(key)} = ${value}`,
       );
 
-    // The user published the address they had, not one an admin sets.
-    if (body.email !== undefined) {
-      assignments.push(
-        sql`publicFields = IF(JSON_CONTAINS(publicFields, '"email"'), JSON_REMOVE(publicFields, JSON_UNQUOTE(JSON_SEARCH(publicFields, 'one', 'email'))), publicFields)`,
+    await runInTransaction(async (conn) => {
+      // Under the lock, as the disconnect handler reads it.
+      const [found] = await conn.query<unknown[]>(
+        sql`SELECT ${raw(USER_COLUMNS_SQL)} FROM user WHERE id = ${id} FOR UPDATE`,
       );
-    }
 
-    const result = await pool.query<{ affectedRows: number }>(
-      sql`UPDATE user SET ${join(assignments)} WHERE id = ${id}`,
-    );
+      if (!found) {
+        return ctx.throw(404);
+      }
 
-    // foundRows defaults to true, so affectedRows counts matched (not just
-    // changed) rows — 0 means no such user.
-    if (result.affectedRows === 0) {
-      return ctx.throw(404);
-    }
+      const row = UserRowSchema.parse(found);
+
+      // Per attempt: a retried transaction starts again from the row it reads.
+      const sets = [...assignments];
+
+      if (body.email !== undefined) {
+        // Unproven: an admin doesn't receive the owner's mail.
+        const next = nextEmail(row, body.email);
+
+        if (removesLastWayIn(row, next.emailVerified)) {
+          return ctx.throw(409, 'last provider');
+        }
+
+        // The user published the address they had, not one an admin sets.
+        sets.push(
+          emailFieldsSql(next),
+          sql`publicFields = ${JSON.stringify(row.publicFields.filter((f) => f !== 'email'))}`,
+        );
+      }
+
+      if (sets.length > 0) {
+        await conn.query<unknown>(
+          sql`UPDATE user SET ${join(sets)} WHERE id = ${id}`,
+        );
+      }
+    });
 
     const [row] = await pool.query<unknown[]>(
       sql`SELECT ${raw(USER_COLUMNS_SQL)} FROM user WHERE id = ${id}`,

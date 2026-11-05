@@ -1,5 +1,20 @@
 import got from 'got';
+import type { ParameterizedContext } from 'koa';
 import { getEnv, getEnvBoolean } from './env.js';
+
+/**
+ * The language to write in: `preferred` (the user's) if `available` has it,
+ * else the browser's best among them, else English.
+ */
+export function pickLanguage(
+  ctx: ParameterizedContext,
+  preferred: string | null | undefined,
+  available: Record<string, unknown>,
+): string {
+  return preferred && Object.hasOwn(available, preferred)
+    ? preferred
+    : ctx.acceptsLanguages(Object.keys(available)) || 'en';
+}
 
 export async function sendMail(
   to: string,
