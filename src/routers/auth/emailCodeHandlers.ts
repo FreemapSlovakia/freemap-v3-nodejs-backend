@@ -18,11 +18,16 @@ import {
   UserResponseSchema,
   UserRowSchema,
 } from '../../types.js';
-import { MergeConflictError, mergeUserAccounts } from '../../userMerge.js';
+import {
+  MergeConflictError,
+  mergeUserAccounts,
+  olderFirst,
+} from '../../userMerge.js';
 import {
   findByVerifiedEmail,
   LoginSettingsSchema,
   loginWithEmail,
+  startSession,
   VERIFIED_EMAIL_RETRY,
 } from './loginProcessor.js';
 
@@ -199,11 +204,10 @@ export function attachEmailCodeHandlers(router: RouterInstance) {
 
       // One verifying the address elsewhere meanwhile makes this fail on the
       // unique index; the retry merges that account too.
-      const row = await runInTransaction(async (conn) => {
-        // The target first, then the other, as the login's connect locks them.
-        const lockTarget = async () => {
+      const { row, token } = await runInTransaction(async (conn) => {
+        const lock = async (id: number) => {
           const [found] = await conn.query<unknown[]>(
-            sql`SELECT ${raw(USER_COLUMNS_SQL)} FROM user WHERE id = ${userId} FOR UPDATE`,
+            sql`SELECT ${raw(USER_COLUMNS_SQL)} FROM user WHERE id = ${id} FOR UPDATE`,
           );
 
           if (!found) {
@@ -213,13 +217,19 @@ export function attachEmailCodeHandlers(router: RouterInstance) {
           return UserRowSchema.parse(found);
         };
 
-        let target = await lockTarget();
+        // This account first, then the other, as the login's connect locks them.
+        const current = await lock(userId);
 
         // The code proves the mailbox, which already opens the account that has
-        // it verified: that is the same person's, so it joins this one.
-        const source = await findByVerifiedEmail(conn, emailKey, userId);
+        // it verified: that is the same person's, so the two are joined, into
+        // the older one.
+        const other = await findByVerifiedEmail(conn, emailKey, userId);
 
-        if (source) {
+        let keptId = userId;
+
+        if (other) {
+          const [target, source] = olderFirst(current, other);
+
           try {
             await mergeUserAccounts(conn, target, source);
           } catch (err) {
@@ -230,18 +240,27 @@ export function attachEmailCodeHandlers(router: RouterInstance) {
             throw err;
           }
 
-          target = await lockTarget();
+          keptId = target.id;
         }
 
+        const kept = await lock(keptId);
+
         await conn.query<unknown>(
-          sql`UPDATE user SET ${emailChangeSql(target, nextEmail(target, email, { proven: true }))}
-          WHERE id = ${userId}`,
+          sql`UPDATE user SET ${emailChangeSql(kept, nextEmail(kept, email, { proven: true }))}
+          WHERE id = ${keptId}`,
         );
 
-        return lockTarget();
+        return {
+          row: await lock(keptId),
+          // Merged into the older one, this account's sessions are gone.
+          token:
+            keptId === userId
+              ? authToken
+              : await startSession(conn, keptId, new Date()),
+        };
       }, VERIFIED_EMAIL_RETRY);
 
-      ctx.body = UserResponseSchema.parse(rowToUser(row, authToken));
+      ctx.body = UserResponseSchema.parse(rowToUser(row, token));
     },
   );
 }

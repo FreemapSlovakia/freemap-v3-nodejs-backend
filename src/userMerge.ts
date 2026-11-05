@@ -2,6 +2,7 @@ import type { PoolConnection } from 'mariadb';
 import sql, { empty, join, raw } from 'sql-template-tag';
 import { emailFieldsSql, nextEmail } from './emailAddress.js';
 import { appLogger } from './logger.js';
+import { isPlaceholderName } from './newUserNames.js';
 import {
   liveSubscriptionSql,
   PROVIDER_ID_COLUMNS,
@@ -56,6 +57,18 @@ export class MergeConflictError extends Error {
     super(`conflicting ${column}`);
     this.name = 'MergeConflictError';
   }
+}
+
+/**
+ * The two accounts as [target, source]: the older one stays, with its ID —
+ * whichever of them the user happens to be logged into.
+ */
+export function olderFirst(a: UserRow, b: UserRow): [UserRow, UserRow] {
+  const aFirst =
+    a.createdAt.getTime() < b.createdAt.getTime() ||
+    (a.createdAt.getTime() === b.createdAt.getTime() && a.id < b.id);
+
+  return aFirst ? [a, b] : [b, a];
 }
 
 /**
@@ -244,6 +257,22 @@ export async function mergeUserAccounts(
     ...new Set([...target.roles, ...source.roles]),
   ]);
 
+  // A real name over one given for want of it.
+  const mergedName =
+    isPlaceholderName(target.name) && !isPlaceholderName(source.name)
+      ? source.name
+      : target.name;
+
+  // Both, when they differ: neither is the user's to lose.
+  const mergedDescription =
+    [
+      ...new Set(
+        [target.description, source.description]
+          .map((d) => d?.trim())
+          .filter((d) => d),
+      ),
+    ].join('\n\n') || null;
+
   const {
     id: sourceId,
     coordinates,
@@ -257,6 +286,8 @@ export async function mergeUserAccounts(
   await conn.query<unknown>(sql`
     UPDATE user SET
       ${emailFieldsSql(mergedEmail)},
+      name = ${mergedName},
+      description = ${mergedDescription},
       lat = COALESCE(lat, ${coordinates?.lat}),
       lon = COALESCE(lon, ${coordinates?.lon}),
       language = COALESCE(language, ${language}),

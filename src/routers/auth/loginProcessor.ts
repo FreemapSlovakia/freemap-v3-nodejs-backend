@@ -17,6 +17,7 @@ import {
   normalizeEmail,
 } from '../../emailAddress.js';
 import { pickLanguage } from '../../mailer.js';
+import { NEW_USER_NAMES } from '../../newUserNames.js';
 import { fetchAndProcessProfilePicture } from '../../profilePicture.js';
 import {
   LoginResponseSchema,
@@ -24,7 +25,11 @@ import {
   type UserRow,
   UserRowSchema,
 } from '../../types.js';
-import { MergeConflictError, mergeUserAccounts } from '../../userMerge.js';
+import {
+  MergeConflictError,
+  mergeUserAccounts,
+  olderFirst,
+} from '../../userMerge.js';
 
 // Their addresses are verified by the provider. Not Microsoft (an Entra tenant
 // can set any `mail` it likes), nor Facebook (no promise its `email` is
@@ -34,20 +39,6 @@ const EMAIL_PROVING_PROVIDERS = new Set<keyof typeof authProviderToColumn>([
   'apple',
   'github',
 ]);
-
-// For a new account with no name of its own. Not the address's local part:
-// the name is public, the address is not.
-const NEW_USER_NAMES: Record<string, string> = {
-  en: 'Freemap user',
-  sk: 'Používateľ Freemap',
-  cs: 'Uživatel Freemap',
-  de: 'Freemap-Nutzer',
-  fr: 'Utilisateur Freemap',
-  hu: 'Freemap-felhasználó',
-  it: 'Utente Freemap',
-  pl: 'Użytkownik Freemap',
-  sl: 'Uporabnik Freemap',
-};
 
 /** For a transaction that may verify an address another one verifies too. */
 export const VERIFIED_EMAIL_RETRY = { retryOn: isVerifiedEmailTaken };
@@ -83,7 +74,7 @@ async function insertUser(
   ).insertId;
 }
 
-async function startSession(
+export async function startSession(
   conn: PoolConnection,
   userId: number,
   now: Date,
@@ -326,8 +317,14 @@ export async function login(
         // Connecting the provider the account already has re-authorizes it (e.g.
         // for a wider OSM scope), so only its extra fields are updated below.
         if (current && current.id !== user.id) {
+          // The older account stays, even when it isn't the logged-in one;
+          // the session then moves to it, below.
+          const [target, source] = olderFirst(current, user);
+
+          userId = target.id;
+
           try {
-            await mergeUserAccounts(conn, current, user, {
+            await mergeUserAccounts(conn, target, source, {
               extraTargetFields: {
                 [authProviderToColumn[authProvider]]: remoteUserId,
                 ...extraUserFields,
@@ -344,11 +341,11 @@ export async function login(
 
           // The provider may vouch for the address the merged account has.
           const [merged] = await conn.query<unknown[]>(
-            sql`SELECT ${raw(USER_COLUMNS_SQL)} FROM user WHERE id = ${current.id} FOR UPDATE`,
+            sql`SELECT ${raw(USER_COLUMNS_SQL)} FROM user WHERE id = ${target.id} FOR UPDATE`,
           );
 
           await conn.query<unknown>(
-            sql`UPDATE user SET ${await emailAfterSql(UserRowSchema.parse(merged))} WHERE id = ${current.id}`,
+            sql`UPDATE user SET ${await emailAfterSql(UserRowSchema.parse(merged))} WHERE id = ${target.id}`,
           );
         } else if (matchedByEmail) {
           await conn.query<unknown>(sql`UPDATE user SET
@@ -439,7 +436,9 @@ export async function login(
 
       let authToken;
 
-      if (currentUser) {
+      // A fresh one also when a connect merged the logged-in account into an
+      // older one: the merge deleted its sessions.
+      if (currentUser && userId === currentUser.id) {
         authToken = currentUser.authToken;
       } else {
         authToken = await startSession(conn, userId!, now);
