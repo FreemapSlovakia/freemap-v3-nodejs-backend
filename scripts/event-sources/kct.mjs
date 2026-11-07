@@ -6,6 +6,7 @@ import {
   assertAllowed,
   decodeEntities,
   geocode,
+  md,
   politeFetch,
   text,
   zonedToIso,
@@ -297,20 +298,20 @@ async function eventOf(entry, block) {
       .join(', ');
 
   const description = [
-    note || null,
+    note ? md(note) : null,
     [
-      edition ? `${edition}.` : null,
+      edition ? md(`${edition}.`) : null,
       start.place || start.county
-        ? `**Start:** ${[startTime, start.place, start.county && `okres ${start.county}`].filter(Boolean).join(', ')}`
+        ? `**Start:** ${md([startTime, start.place, start.county && `okres ${start.county}`].filter(Boolean).join(', '))}`
         : null,
-      where(finish) ? `**Cíl:** ${where(finish)}` : null,
+      where(finish) ? `**Cíl:** ${md(where(finish))}` : null,
     ]
       .filter(Boolean)
       .join('\n\n'),
     types.length
-      ? `**Typ akce:**\n${types.map((t) => `- ${t}`).join('\n')}`
+      ? `**Typ akce:**\n${types.map((t) => `- ${md(t)}`).join('\n')}`
       : null,
-    `**Pořadatel:** ${text(rows['Pořadatel'] ?? entry.poradatel ?? '')}${webUrl ? ` ([${web.replace(/^https?:?\/\//, '')}](${webUrl}))` : ''}`,
+    `**Pořadatel:** ${md(text(rows['Pořadatel'] ?? entry.poradatel ?? ''))}${webUrl ? ` ([${md(web.replace(/^https?:?\/\//, ''))}](${webUrl}))` : ''}`,
     `**Zdroj:** ${entry.url}`,
   ]
     .filter(Boolean)

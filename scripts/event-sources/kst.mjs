@@ -10,6 +10,7 @@ import { join } from 'node:path';
 import {
   assertAllowed,
   decodeEntities,
+  md,
   placeOf,
   politeFetchFile,
   zonedToIso,
@@ -439,18 +440,18 @@ async function eventOf(lines, { year, url, cacheDir }) {
   const sourceKey = sourceKeyOf(lines, year);
 
   const description = [
-    aside ?? null,
-    edition ? `${edition}. ročník.` : null,
+    aside ? md(aside) : null,
+    edition ? md(`${edition}. ročník.`) : null,
     atSummit
-      ? `Miesto stretnutia ročenka neuvádza; na mape je cieľ, ${atSummit}.`
+      ? `Miesto stretnutia ročenka neuvádza; na mape je cieľ, ${md(atSummit)}.`
       : null,
     mode && !modeInFields(mode.letters, mode.text, kms)
-      ? `**Druh turistiky:** ${kinds.map(([label]) => label).join(', ')} – ${mode.text}`
+      ? `**Druh turistiky:** ${kinds.map(([label]) => label).join(', ')} – ${md(mode.text)}`
       : null,
     club
-      ? `**Organizátor:** ${club}${web ? ` ([${web.replace(/^https?:\/\//, '')}](${/^https?:/.test(web) ? web : `https://${web}`}))` : ''}`
+      ? `**Organizátor:** ${md(club)}${web ? ` ([${md(web.replace(/^https?:\/\//, ''))}](${/^https?:/.test(web) ? web : `https://${web}`}))` : ''}`
       : null,
-    kept.join(' ') || null,
+    kept.length ? md(kept.join(' ')) : null,
     `**Zdroj:** Ročenka a kalendár KST ${year}, ${url}`,
   ]
     .filter(Boolean)

@@ -3,7 +3,7 @@
 // the date of its update). Its API, the "Rambling" events, one event per day
 // it is held. A free key, DATATOURISME_API_KEY. No LLM.
 
-import { assertAllowed, politeFetch, zonedToIso } from './fetch.mjs';
+import { assertAllowed, md, politeFetch, zonedToIso } from './fetch.mjs';
 
 const API = 'https://api.datatourisme.fr/v1/entertainmentAndEvent';
 
@@ -125,12 +125,12 @@ function eventsOf(poi, { from, to }) {
   const producer = poi.hasBeenCreatedBy?.legalName;
 
   const description = [
-    text || null,
-    place ? `**Lieu :** ${place}` : null,
+    text ? md(text) : null,
+    place ? `**Lieu :** ${md(place)}` : null,
     organizer
-      ? `**Organisateur :** ${organizer.legalName}${web ? ` ([${web.replace(/^https?:\/\//, '').replace(/\/$/, '')}](${web}))` : ''}`
+      ? `**Organisateur :** ${md(organizer.legalName)}${web ? ` ([${md(web.replace(/^https?:\/\//, '').replace(/\/$/, ''))}](${web}))` : ''}`
       : null,
-    `**Source :** DATAtourisme${producer ? `, ${producer}` : ''}${poi.lastUpdate ? `, mise à jour le ${dateFr(poi.lastUpdate)}` : ''}, ${poi.uri}`,
+    `**Source :** DATAtourisme${producer ? `, ${md(producer)}` : ''}${poi.lastUpdate ? `, mise à jour le ${dateFr(poi.lastUpdate)}` : ''}, ${poi.uri}`,
   ]
     .filter(Boolean)
     .join('\n\n');

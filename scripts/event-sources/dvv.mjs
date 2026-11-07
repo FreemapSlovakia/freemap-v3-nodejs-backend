@@ -6,6 +6,7 @@ import {
   assertAllowed,
   decodeEntities,
   geocode,
+  md,
   placeOf,
   politeFetch,
   text,
@@ -168,20 +169,20 @@ async function eventOf(entry, today, from, to) {
 
   const description = [
     [
-      type ? `**Art:** ${type}` : null,
-      kmText ? `**Strecken:** ${kmText}` : null,
+      type ? `**Art:** ${md(type)}` : null,
+      kmText ? `**Strecken:** ${md(kmText)}` : null,
     ]
       .filter(Boolean)
       .join(' · ') || null,
     times || location
-      ? `**Start:** ${[times?.replace(/^Start:\s*/, ''), location].filter(Boolean).join(', ')}`
+      ? `**Start:** ${md([times?.replace(/^Start:\s*/, ''), location].filter(Boolean).join(', '))}`
       : null,
     atTown
-      ? `Der genaue Startort ist auf der Karte nicht verzeichnet; der Punkt liegt in ${town}.`
+      ? `Der genaue Startort ist auf der Karte nicht verzeichnet; der Punkt liegt in ${md(town)}.`
       : null,
-    train ? `**Bahnstation:** ${train}` : null,
-    sights ? `**Sehenswert:** ${text(sights)}` : null,
-    club ? `**Veranstalter:** ${club}` : null,
+    train ? `**Bahnstation:** ${md(train)}` : null,
+    sights ? `**Sehenswert:** ${md(text(sights))}` : null,
+    club ? `**Veranstalter:** ${md(club)}` : null,
     pdfUrl ? `**Ausschreibung:** ${pdfUrl}` : null,
     `**Quelle:** Deutscher Volkssportverband, ${LIST_URL}`,
   ]

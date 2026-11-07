@@ -2,7 +2,7 @@
 // tourist offices feed: the events with a hiking word in the title or text,
 // CC0 only, one event per date it lists. No key, no LLM.
 
-import { assertAllowed, politeFetch, text, zonedToIso } from './fetch.mjs';
+import { assertAllowed, md, politeFetch, text, zonedToIso } from './fetch.mjs';
 
 const API = 'https://tourism.api.opendatahub.com/v1/Event';
 
@@ -93,13 +93,13 @@ function eventsOf(e, { from, to }) {
     e.LocationInfo?.TvInfo?.Name?.de;
 
   const description = [
-    body || null,
+    body ? md(body) : null,
     it.Title && it.Title.trim() !== title
-      ? `**Italiano:** ${it.Title.trim()}`
+      ? `**Italiano:** ${md(it.Title.trim())}`
       : null,
-    municipality ? `**Ort:** ${municipality}` : null,
+    municipality ? `**Ort:** ${md(municipality)}` : null,
     organizer || web
-      ? `**Veranstalter:** ${organizer ?? web.replace(/^https?:\/\//, '').replace(/\/$/, '')}${organizer && web ? ` ([${web.replace(/^https?:\/\//, '').replace(/\/$/, '')}](${web}))` : ''}`
+      ? `**Veranstalter:** ${md(organizer ?? web.replace(/^https?:\/\//, '').replace(/\/$/, ''))}${organizer && web ? ` ([${md(web.replace(/^https?:\/\//, '').replace(/\/$/, ''))}](${web}))` : ''}`
       : null,
     `**Quelle:** Open Data Hub Südtirol (CC0), ${API}/${e.Id}`,
   ]

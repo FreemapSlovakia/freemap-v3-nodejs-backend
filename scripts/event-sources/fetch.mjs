@@ -171,6 +171,16 @@ export const text = (html) =>
     .replace(/\s+/g, ' ')
     .trim();
 
+/**
+ * Source text set into a Markdown description, taken literally: "45. ročník."
+ * opening a paragraph would otherwise be a list numbered from 45. Not for URLs.
+ */
+export const md = (s) =>
+  String(s ?? '')
+    .replace(/[\\`*_~[\]]/g, '\\$&')
+    .replace(/^(\s*)(\d+)([.)])(?=\s|$)/gm, '$1$2\\$3')
+    .replace(/^(\s*)([-+#>|=])/gm, '$1\\$2');
+
 /** A wall-clock time in `timeZone` as an instant. */
 export function zonedToIso(date, time, timeZone) {
   const wall = Date.parse(`${date}T${time}:00Z`);

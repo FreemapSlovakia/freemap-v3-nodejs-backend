@@ -4,7 +4,7 @@
 
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { assertAllowed, politeFetch, text, zonedToIso } from './fetch.mjs';
+import { assertAllowed, md, politeFetch, text, zonedToIso } from './fetch.mjs';
 
 const API = 'https://tturak.hu/api';
 
@@ -52,18 +52,18 @@ function routeLine(route, typeNames) {
     .filter((t) => t && t !== typeNames[1]);
 
   return [
-    `**${route.name}**`,
+    `**${md(route.name)}**`,
     // Unless its name says it, as "Rövid táv: 13 km".
     route.distance && !/\d\s*km/i.test(route.name)
       ? `${(route.distance / 1000).toLocaleString('hu-HU')} km`
       : null,
     route.ascent ? `↗ ${route.ascent} m` : null,
-    types.length ? types.join(', ') : null,
+    types.length ? md(types.join(', ')) : null,
     start ? `rajt ${start}` : null,
-    route.startPlace?.name,
+    route.startPlace?.name && md(route.startPlace.name),
     route.round
       ? 'körtúra'
-      : route.finishPlace?.name && `cél: ${route.finishPlace.name}`,
+      : route.finishPlace?.name && `cél: ${md(route.finishPlace.name)}`,
     route.price ? `${route.price} ${route.currency}` : null,
   ]
     .filter(Boolean)
@@ -177,12 +177,12 @@ function eventOf(detail, typeNames) {
   const webUrl = web && (/^https?:\/\//.test(web) ? web : `https://${web}`);
 
   const description = [
-    note || null,
+    note ? md(note) : null,
     routes.length
       ? `**Távok:**\n${routes.map((r) => `- ${routeLine(r, typeNames)}`).join('\n')}`
       : null,
     detail.organizer?.name
-      ? `**Rendező:** ${detail.organizer.name}${webUrl ? ` ([${web.replace(/^https?:\/\//, '').replace(/\/$/, '')}](${webUrl}))` : ''}`
+      ? `**Rendező:** ${md(detail.organizer.name)}${webUrl ? ` ([${md(web.replace(/^https?:\/\//, '').replace(/\/$/, ''))}](${webUrl}))` : ''}`
       : null,
     `**Forrás:** TTT Teljesítménytúra Naptár, ${url}`,
   ]
