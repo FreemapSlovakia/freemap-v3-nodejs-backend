@@ -377,14 +377,18 @@ async function eventOf(lines, { year, url, cacheDir }) {
   let atSummit = null;
 
   if (answer) {
-    // The club's home, to tell a summit from its namesakes.
-    const home = answer.organizerTown
-      ? (
-          await placeOf(
-            { place: null, municipality: answer.organizerTown },
-            'SK',
-          )
-        ).point
+    // The club's home, to tell a summit from its namesakes; else its region's
+    // seat ("R KST Žilina"), which the LLM may not give.
+    const homeTown =
+      answer.organizerTown ??
+      /\bR KST ([^,(]+)/
+        .exec(club)?.[1]
+        .split(/\s*-\s*/)[0]
+        .trim() ??
+      null;
+
+    const home = homeTown
+      ? (await placeOf({ place: null, municipality: homeTown }, 'SK')).point
       : null;
 
     const placed = await placeOf(answer, 'SK', home);
