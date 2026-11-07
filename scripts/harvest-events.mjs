@@ -220,22 +220,24 @@ async function markDuplicates(results) {
 
     const words = titleWords(r.body.title);
 
-    // Nearby within a day (sources disagree by one), sharing half the shorter
-    // title's words: a club may run two events from one place, and
-    // "Novoroční výstup" is everywhere.
+    // Within a day (sources disagree by one): within 10 km sharing half the
+    // shorter title's words, as a club may run two events from one place and
+    // "Novoroční výstup" is everywhere; or within 30 km by the same title, as
+    // a source may place the start elsewhere.
     const dup = existing.find((e) => {
-      if (
-        Math.abs(Date.parse(startDay(e)) - Date.parse(day)) > 86_400_000 ||
-        distanceKm(e.startPoint, r.body.startPoint) >= 10
-      ) {
+      if (Math.abs(Date.parse(startDay(e)) - Date.parse(day)) > 86_400_000) {
         return false;
       }
 
+      const km = distanceKm(e.startPoint, r.body.startPoint);
+
       const other = titleWords(e.title);
 
-      return (
-        other.intersection(words).size * 2 >= Math.min(other.size, words.size)
-      );
+      const shared = other.intersection(words).size;
+
+      return km < 10
+        ? shared * 2 >= Math.min(other.size, words.size)
+        : km < 30 && shared === Math.max(other.size, words.size);
     });
 
     if (dup) {

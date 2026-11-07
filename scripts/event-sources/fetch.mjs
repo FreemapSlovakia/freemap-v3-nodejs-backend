@@ -223,7 +223,7 @@ export async function geocodeAll(query, countrycode) {
   const { features } = JSON.parse(await politeFetch(url.href));
 
   return features
-    .filter((f) => f.properties.countrycode === countrycode)
+    .filter((f) => !countrycode || f.properties.countrycode === countrycode)
     .map((f) => ({
       name: f.properties.name ?? '',
       type: f.properties.osm_key === 'place' ? f.properties.osm_value : null,
@@ -267,10 +267,11 @@ const wordsOf = (s) =>
  * A place as `{ place, municipality }` (nominative, either may be null) on the
  * map, strictly: the municipality must be found as one, by its name; the place
  * by a word of its own name, within 10 km of it, or without a municipality a
- * summit by its whole name. Else at the municipality, or
- * nothing. `{ point, note }`.
+ * summit by its whole name — the only one so named, or with `home` the nearest
+ * within 30 km of it, of any country. Else at the municipality, or nothing.
+ * `{ point, note }`.
  */
-export async function placeOf({ place, municipality }, countrycode) {
+export async function placeOf({ place, municipality }, countrycode, home) {
   const town = municipality
     ? (await geocodeAll(municipality, countrycode)).find(
         (h) =>
@@ -281,15 +282,56 @@ export async function placeOf({ place, municipality }, countrycode) {
   const own = place ? wordsOf(place).filter((w) => !GENERIC_WORDS.has(w)) : [];
 
   if (own.length) {
-    const hit = (
-      await geocodeAll(town ? `${place}, ${town.name}` : place, countrycode)
-    ).find((h) =>
-      town
-        ? distanceKm(h.point, town.point) <= 10 &&
-          wordsOf(h.name).some((w) => own.includes(w))
-        : // Nothing to tell a namesake apart: only a summit, by its whole name.
-          h.peak && plain(h.name) === plain(place),
+    // A border summit near the organizer may be filed under the neighbour.
+    const hits = await geocodeAll(
+      town ? `${place}, ${town.name}` : place,
+      !town && home ? null : countrycode,
     );
+
+    let hit;
+
+    if (town) {
+      hit = hits.find(
+        (h) =>
+          distanceKm(h.point, town.point) <= 10 &&
+          wordsOf(h.name).some((w) => own.includes(w)),
+      );
+    } else {
+      // Nothing to tell a namesake apart: a summit, and the only one so named.
+      const summits = hits.filter(
+        (h) => h.peak && plain(h.name) === plain(place),
+      );
+
+      if (home) {
+        // Namesakes told apart by the organizer's home.
+        hit = summits
+          .filter((h) => distanceKm(h.point, home) <= 30)
+          .toSorted(
+            (a, b) => distanceKm(a.point, home) - distanceKm(b.point, home),
+          )[0];
+
+        if (!hit && summits.length) {
+          return {
+            point: null,
+            note: `no summit "${place}" within 30 km of the organizer`,
+          };
+        }
+      } else {
+        // One summit mapped twice is not a namesake.
+        const elsewhere = summits.filter(
+          (h) => distanceKm(h.point, summits[0].point) > 2,
+        );
+
+        if (elsewhere.length) {
+          return {
+            point: null,
+            note: `${elsewhere.length + 1} summits named "${place}"`,
+          };
+        }
+
+        hit = summits[0];
+      }
+    }
 
     if (hit) {
       return {

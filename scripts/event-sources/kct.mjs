@@ -447,7 +447,7 @@ export default {
     name: 'Klub českých turistů',
     pictureUrl: 'https://kct.cz/wp-content/uploads/2025/02/logo_kct_web.png',
   },
-  /** The account the events are entered for; null until created. */
-  organizerId: null,
+  /** The account the events are entered for, on www.freemap.sk. */
+  organizerId: 10878,
   harvest,
 };

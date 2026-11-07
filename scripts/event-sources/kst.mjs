@@ -361,12 +361,43 @@ async function eventOf(lines, { year, url, cacheDir }) {
 
   let startPoint = null;
 
+  // Shown on the map at its summit when the yearbook says no meeting place.
+  let atSummit = null;
+
   if (answer) {
-    const placed = await placeOf(answer, 'SK');
+    // The club's home, to tell a summit from its namesakes.
+    const home = answer.organizerTown
+      ? (
+          await placeOf(
+            { place: null, municipality: answer.organizerTown },
+            'SK',
+          )
+        ).point
+      : null;
+
+    const placed = await placeOf(answer, 'SK', home);
 
     startPoint = placed.point;
 
     notes.push(placed.note);
+
+    if (!startPoint && answer.summit) {
+      const summit = await placeOf(
+        { place: answer.summit, municipality: null },
+        'SK',
+        home,
+      );
+
+      startPoint = summit.point;
+
+      if (startPoint) {
+        atSummit = answer.summit;
+
+        notes.push(`placed at the summit: ${summit.note}`);
+      } else {
+        notes.push(`summit: ${summit.note}`);
+      }
+    }
   } else {
     notes.push('no place: no ANTHROPIC_API_KEY');
   }
@@ -394,6 +425,9 @@ async function eventOf(lines, { year, url, cacheDir }) {
   const description = [
     aside ?? null,
     edition ? `${edition}. ročník.` : null,
+    atSummit
+      ? `Miesto stretnutia ročenka neuvádza; na mape je cieľ, ${atSummit}.`
+      : null,
     mode
       ? `**Druh turistiky:** ${kinds.map(([label]) => label).join(', ')} – ${mode.text}`
       : null,
@@ -554,7 +588,7 @@ export default {
     pictureUrl:
       'https://www.kst.sk/wp-content/uploads/2024/11/logoKST1024x1024.png',
   },
-  /** The account the events are entered for; null until created. */
-  organizerId: null,
+  /** The account the events are entered for, on www.freemap.sk. */
+  organizerId: 10879,
   harvest,
 };
