@@ -9,6 +9,7 @@ import {
   DifficultySchema,
   EventRowSchema,
   EventSchema,
+  eventEndSql,
   eventRowToResponse,
   eventSelect,
   VisibilitySchema,
@@ -16,9 +17,14 @@ import {
 
 const QuerySchema = z.object({
   // Time window; an event matches when its [startAt, endAt] span overlaps it
-  // (endAt defaults to startAt for instant events).
+  // (one without an end, or a date-only one, lasts its last day through).
   from: z.iso.datetime().optional(),
   to: z.iso.datetime().optional(),
+  // Only events harvested from this source, the part of `sourceKey` before ':'.
+  source: z
+    .string()
+    .regex(/^[a-z0-9-]{1,32}$/)
+    .optional(),
   // minLon,minLat,maxLon,maxLat — matched against the start point.
   bbox: z
     .string()
@@ -123,7 +129,11 @@ export function attachGetEventsHandler(router: RouterInstance) {
       }
 
       if (from) {
-        wh.push(sql`COALESCE(e.endAt, e.startAt) >= ${new Date(from)}`);
+        wh.push(sql`${eventEndSql} >= ${new Date(from)}`);
+      }
+
+      if (query.source) {
+        wh.push(sql`e.sourceKey LIKE ${`${query.source}:%`}`);
       }
 
       if (to) {

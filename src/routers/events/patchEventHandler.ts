@@ -9,6 +9,7 @@ import { assertOwnMap } from './mapLink.js';
 import { assertCanOwn } from './organizerHandlers.js';
 import {
   canWriteEvent,
+  datesFitDateOnly,
   EventRowSchema,
   EventSchema,
   eventRowToResponse,
@@ -60,12 +61,13 @@ export function attachPatchEventHandler(router: RouterInstance) {
               mapId: z.string().nullable(),
               startAt: z.date(),
               endAt: z.date().nullable(),
+              dateOnly: z.boolean(),
             }),
           )
           .max(1)
           .parse(
             await conn.query<unknown>(
-              sql`SELECT userId, mapId, startAt, endAt FROM event WHERE id = ${id} FOR UPDATE`,
+              sql`SELECT userId, mapId, startAt, endAt, dateOnly FROM event WHERE id = ${id} FOR UPDATE`,
             ),
           );
 
@@ -91,6 +93,13 @@ export function attachPatchEventHandler(router: RouterInstance) {
 
         if (endAt && endAt < startAt) {
           ctx.throw(400, 'endAt is before startAt');
+        }
+
+        if (
+          (body.dateOnly ?? existing.dateOnly) &&
+          !datesFitDateOnly([startAt, endAt])
+        ) {
+          ctx.throw(400, 'a dateOnly event’s times must be UTC midnights');
         }
 
         const ownerId = body.userId ?? existing.userId;
@@ -157,6 +166,7 @@ export function attachPatchEventHandler(router: RouterInstance) {
         }
 
         for (const key of [
+          'dateOnly',
           'distance',
           'duration',
           'ascent',

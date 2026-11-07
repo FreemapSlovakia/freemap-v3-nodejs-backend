@@ -69,8 +69,12 @@ export const EventSchema = z
     description: z.string().nullable(),
     startAt: zDateToIso,
     endAt: zNullableDateToIso,
+    /** No time was given: `startAt` and `endAt` are UTC midnights of their days. */
+    dateOnly: z.boolean(),
     startPoint: PointSchema,
     visibility: VisibilitySchema,
+    /** A harvested event's `<source>:<id there>`; null for one entered by hand. */
+    sourceKey: z.string().nullable(),
     /** The cover image's name, for `/events/covers/{name}`. */
     cover: z.string().nullable(),
     transports: TransportsSchema,
@@ -95,9 +99,11 @@ export const EventRowSchema = z.object({
   description: z.string().nullable(),
   startAt: z.date(),
   endAt: z.date().nullable(),
+  dateOnly: z.boolean(),
   startLat: z.number(),
   startLon: z.number(),
   visibility: VisibilitySchema,
+  sourceKey: z.string().nullable(),
   cover: z.string().nullable(),
   transports: z
     .string()
@@ -118,12 +124,33 @@ export const EventRowSchema = z.object({
 export type EventRow = z.infer<typeof EventRowSchema>;
 
 /**
+ * When an event is over, as SQL, generously: the viewer's zone is unknown. A
+ * date-only one lasts its last day through wherever that day still is (until
+ * it ends at UTC−12); a timed one without an end, the rest of its day.
+ */
+export const eventEndSql = sql`CASE
+  WHEN e.dateOnly THEN COALESCE(e.endAt, e.startAt) + INTERVAL 36 HOUR
+  WHEN e.endAt IS NULL THEN e.startAt + INTERVAL 24 HOUR
+  ELSE e.endAt
+END`;
+
+/** A date-only event's bounds are UTC midnights, read as the same day in every zone. */
+export const datesFitDateOnly = (dates: (Date | null)[]) =>
+  dates.every((d) => !d || d.getTime() % 86_400_000 === 0);
+
+/** A harvested event's key: `<source>:<id there>`. */
+export const SourceKeySchema = z
+  .string()
+  .regex(/^[a-z0-9-]{1,32}:[\x21-\x7e]{1,200}$/);
+
+/**
  * `SELECT … FROM` the events as {@link EventRowSchema} reads them, the caller's
  * own participation included; `e` is the event, for a `WHERE` to follow.
  */
 export const eventSelect = (user: User | undefined) => sql`
   SELECT e.id, e.userId, e.mapId, map.name AS mapName, e.title, e.description,
-    e.startAt, e.endAt, e.startLat, e.startLon, e.visibility, e.cover,
+    e.startAt, e.endAt, e.dateOnly, e.startLat, e.startLon, e.visibility,
+    e.sourceKey, e.cover,
     e.transports, e.distance, e.duration, e.ascent, e.descent,
     e.difficulty, e.dogs, e.children, e.createdAt, e.updatedAt,
     u.name AS userName, u.picture IS NOT NULL AS userHasPicture,

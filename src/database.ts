@@ -380,9 +380,13 @@ export async function initDatabase() {
       description TEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL,
       startAt DATETIME NOT NULL,
       endAt DATETIME NULL,
+      -- No time was given: startAt and endAt are UTC midnights of their days.
+      dateOnly BIT NOT NULL DEFAULT false,
       startLat DECIMAL(8, 6) NOT NULL,
       startLon DECIMAL(9, 6) NOT NULL,
       visibility ENUM('public', 'unlisted') CHARSET ascii NOT NULL DEFAULT 'public',
+      -- A harvested event's "<source>:<id there>", which a re-harvest updates by.
+      sourceKey VARCHAR(255) CHARSET ascii COLLATE ascii_bin NULL,
       cover VARCHAR(24) CHARSET ascii NULL,
       transports VARCHAR(512) CHARSET ascii NULL,
       difficulty ENUM('easy', 'moderate', 'demanding', 'expert') CHARSET ascii NULL,
@@ -396,6 +400,7 @@ export async function initDatabase() {
       updatedAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
       CONSTRAINT eventUserFk FOREIGN KEY (userId) REFERENCES user (id) ON DELETE CASCADE,
       CONSTRAINT eventMapFk FOREIGN KEY (mapId) REFERENCES map (id) ON DELETE SET NULL,
+      UNIQUE INDEX eventSourceKeyIdx (sourceKey),
       INDEX eventTimeIdx (startAt, endAt),
       INDEX eventLocationIdx (startLat, startLon)
     ) ENGINE=InnoDB`,
@@ -571,6 +576,8 @@ export async function initDatabase() {
     'ALTER TABLE user ADD COLUMN IF NOT EXISTS emailReminderOff BIT NOT NULL DEFAULT false',
 
     "ALTER TABLE emailCode ADD COLUMN IF NOT EXISTS requestIp VARCHAR(45) CHARSET ascii NOT NULL DEFAULT '' AFTER codeHash",
+
+    'ALTER TABLE event ADD COLUMN IF NOT EXISTS dateOnly BIT NOT NULL DEFAULT false AFTER endAt, ADD COLUMN IF NOT EXISTS sourceKey VARCHAR(255) CHARSET ascii COLLATE ascii_bin NULL AFTER visibility, ADD UNIQUE INDEX IF NOT EXISTS eventSourceKeyIdx (sourceKey)',
   ];
 
   const db = await pool.getConnection();
