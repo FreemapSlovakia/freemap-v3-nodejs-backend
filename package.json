@@ -39,6 +39,7 @@
     "lint:fix": "biome check --write --error-on-warnings"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^1.6.0",
     "@koa/router": "^15.7.0",
     "@mapbox/node-pre-gyp": "^2.0.3",
     "@mapbox/tilebelt": "^2.0.3",

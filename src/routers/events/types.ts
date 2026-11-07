@@ -188,10 +188,15 @@ END`;
 export const datesFitDateOnly = (dates: (Date | null)[]) =>
   dates.every((d) => !d || d.getTime() % 86_400_000 === 0);
 
+/** A source events are harvested from, e.g. `kct`. */
+const SOURCE = '[a-z0-9-]{1,32}';
+
+export const SourceSchema = z.string().regex(new RegExp(`^${SOURCE}$`));
+
 /** A harvested event's key: `<source>:<id there>`. */
 export const SourceKeySchema = z
   .string()
-  .regex(/^[a-z0-9-]{1,32}:[\x21-\x7e]{1,200}$/);
+  .regex(new RegExp(`^${SOURCE}:[\\x21-\\x7e]{1,200}$`));
 
 /**
  * `SELECT … FROM` the events as {@link EventRowSchema} reads them, the caller's

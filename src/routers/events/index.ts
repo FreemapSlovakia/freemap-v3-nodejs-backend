@@ -8,11 +8,13 @@ import { attachParticipantsHandler } from './participantsHandler.js';
 import { attachParticipationHandlers } from './participationHandlers.js';
 import { attachPatchEventHandler } from './patchEventHandler.js';
 import { attachPostEventHandler } from './postEventHandler.js';
+import { attachSourceHandler } from './sourceHandler.js';
 
 const router = new Router();
 
 attachGetEventsHandler(router);
 attachOrganizerHandlers(router);
+attachSourceHandler(router);
 attachEventCoverHandlers(router);
 attachParticipationHandlers(router);
 attachParticipantsHandler(router);

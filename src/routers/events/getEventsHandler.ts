@@ -27,11 +27,6 @@ const QuerySchema = z.object({
   // `1` lists summaries (no description, cover, organizer or counts; up to
   // 10000), the full event by its id.
   summary: z.enum(['1']).optional(),
-  // Only events harvested from this source, the part of `sourceKey` before ':'.
-  source: z
-    .string()
-    .regex(/^[a-z0-9-]{1,32}$/)
-    .optional(),
   // minLon,minLat,maxLon,maxLat — matched against the start point.
   bbox: z
     .string()
@@ -145,10 +140,6 @@ export function attachGetEventsHandler(router: RouterInstance) {
 
       if (from) {
         wh.push(sql`${eventEndSql} >= ${new Date(from)}`);
-      }
-
-      if (query.source) {
-        wh.push(sql`e.sourceKey LIKE ${`${query.source}:%`}`);
       }
 
       if (to) {
