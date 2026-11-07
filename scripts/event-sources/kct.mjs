@@ -44,7 +44,10 @@ function parseKm(type) {
     ? [body.replace(',', '.')]
     : body.split(/,|\ba\b|\baž\b|–|-|\bnebo\b/);
 
-  return tokens.map((t) => Number.parseFloat(t)).filter(Number.isFinite);
+  // Not a source's typo, as "(5,17012 km)".
+  return tokens
+    .map((t) => Number.parseFloat(t))
+    .filter((n) => Number.isFinite(n) && n > 0 && n < 1000);
 }
 
 /** The rows of the detail tables as label → cell HTML. */

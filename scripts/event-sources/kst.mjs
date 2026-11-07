@@ -238,6 +238,18 @@ function parseMode(text) {
   return { kms, ascent: Number.isFinite(ascent) ? ascent : null };
 }
 
+/**
+ * Whether the event's own fields say all the mode does: kinds with a transport
+ * of their own (vysokohorská isn't just hiking), one distance, an ascent.
+ */
+const modeInFields = (letters, text, kms) =>
+  letters.every((l) => l === 'P' || l === 'C') &&
+  kms.length <= 1 &&
+  text
+    .replace(/[\d,.\s]+km/i, '')
+    .replace(/\d+\s*m\s*(?:prevýšen|stúpan)\S*|prevýšen\S*\s*\d+\s*m/i, '')
+    .replace(/[\s,;./–-]+/g, '') === '';
+
 const sentencesOf = (text) =>
   text
     .split(/(?<=[.!?;])\s+(?=\p{Lu})/u)
@@ -428,7 +440,7 @@ async function eventOf(lines, { year, url, cacheDir }) {
     atSummit
       ? `Miesto stretnutia ročenka neuvádza; na mape je cieľ, ${atSummit}.`
       : null,
-    mode
+    mode && !modeInFields(mode.letters, mode.text, kms)
       ? `**Druh turistiky:** ${kinds.map(([label]) => label).join(', ')} – ${mode.text}`
       : null,
     club
