@@ -45,8 +45,9 @@ async function politeResponse(url, headers = {}) {
   return res;
 }
 
-export async function politeFetch(url) {
-  return (await politeResponse(url)).text();
+/** `headers` for an API key, kept out of the URL and so out of the logs. */
+export async function politeFetch(url, headers = {}) {
+  return (await politeResponse(url, headers)).text();
 }
 
 /**

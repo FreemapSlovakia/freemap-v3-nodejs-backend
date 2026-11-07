@@ -51,6 +51,7 @@ jobs:
         env:
           FREEMAP_API_TOKEN: ${{ secrets.FREEMAP_API_TOKEN }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          DATATOURISME_API_KEY: ${{ secrets.DATATOURISME_API_KEY }}
         run: |
           export HARVEST_CACHE_DIR="$HOME/.cache/freemap-harvest/events"
           node scripts/harvest-events.mjs --post --out="$RUNNER_TEMP/events.json"
