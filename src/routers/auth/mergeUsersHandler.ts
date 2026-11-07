@@ -1,6 +1,7 @@
 import type { RouterInstance } from '@koa/router';
 import sql, { join, raw } from 'sql-template-tag';
 import z from 'zod';
+import { refuseRoleHolderForToken } from '../../appTokens.js';
 import { authenticator } from '../../authenticator.js';
 import { pool, runInTransaction } from '../../database.js';
 import { AUTH_REQUIRED, registerPath } from '../../openapi.js';
@@ -31,6 +32,15 @@ function likeContains(term: string) {
   return `%${term.replace(/[\\%_]/g, '\\$&')}%`;
 }
 
+const asReader = authenticator(true, 'users:read');
+
+const asWriter = authenticator(true, 'users:write');
+
+const FORBIDDEN = {
+  description:
+    'Not a userManager, or an app token without users:read (search, get) or users:write (merge), or merging an account holding roles',
+};
+
 export function attachMergeUsersHandler(router: RouterInstance) {
   registerPath('/auth/users', {
     get: {
@@ -49,12 +59,12 @@ export function attachMergeUsersHandler(router: RouterInstance) {
         },
         400: {},
         401: {},
-        403: {},
+        403: FORBIDDEN,
       },
     },
   });
 
-  router.get('/users', authenticator(true), async (ctx) => {
+  router.get('/users', asReader, async (ctx) => {
     if (!hasRole(ctx.state.user, 'userManager')) {
       return ctx.throw(403);
     }
@@ -103,13 +113,13 @@ export function attachMergeUsersHandler(router: RouterInstance) {
           content: { 'application/json': { schema: UserSummarySchema } },
         },
         401: {},
-        403: {},
+        403: FORBIDDEN,
         404: {},
       },
     },
   });
 
-  router.get('/users/:id', authenticator(true), async (ctx) => {
+  router.get('/users/:id', asReader, async (ctx) => {
     if (!hasRole(ctx.state.user, 'userManager')) {
       return ctx.throw(403);
     }
@@ -147,14 +157,14 @@ export function attachMergeUsersHandler(router: RouterInstance) {
         },
         400: {},
         401: {},
-        403: {},
+        403: FORBIDDEN,
         404: {},
         409: {},
       },
     },
   });
 
-  router.post('/users/:targetId/merge', authenticator(true), async (ctx) => {
+  router.post('/users/:targetId/merge', asWriter, async (ctx) => {
     if (!hasRole(ctx.state.user, 'userManager')) {
       return ctx.throw(403);
     }
@@ -193,8 +203,13 @@ export function attachMergeUsersHandler(router: RouterInstance) {
 
       const source = UserRowSchema.parse(sRow);
 
+      const target = UserRowSchema.parse(tRow);
+
+      // Either way the merge would put a login or roles where they outlast it.
+      refuseRoleHolderForToken(ctx, source, target);
+
       try {
-        await mergeUserAccounts(conn, UserRowSchema.parse(tRow), source, {
+        await mergeUserAccounts(conn, target, source, {
           force,
         });
       } catch (err) {
@@ -209,14 +224,14 @@ export function attachMergeUsersHandler(router: RouterInstance) {
         sql`SELECT ${raw(USER_COLUMNS_SQL)} FROM user WHERE id = ${targetId}`,
       );
 
-      const target = UserRowSchema.parse(row);
+      const merged = UserRowSchema.parse(row);
 
       return {
-        merged: summarize(target),
+        merged: summarize(merged),
         // The source's, when the merged account kept another one (or none).
         droppedOsmToken:
           source.osmAccessToken &&
-          source.osmAccessToken !== target.osmAccessToken
+          source.osmAccessToken !== merged.osmAccessToken
             ? source.osmAccessToken
             : null,
       };

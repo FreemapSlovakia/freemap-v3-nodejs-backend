@@ -8,6 +8,7 @@ import {
   generateAppToken,
   hashAppToken,
   isValidExpiresAt,
+  scopesRefusal,
 } from '../../appTokens.js';
 import { authenticator } from '../../authenticator.js';
 import { runInTransaction } from '../../database.js';
@@ -48,8 +49,12 @@ export function attachPostAppTokenHandler(router: RouterInstance) {
         200: {
           content: { 'application/json': { schema: ResponseSchema } },
         },
-        400: {},
+        400: {
+          description:
+            'Also when a token with a role scope (users:*) expires later than 7 days after its creation',
+        },
         401: {},
+        403: { description: 'A scope needs a role the user lacks' },
       },
     },
   });
@@ -71,6 +76,12 @@ export function attachPostAppTokenHandler(router: RouterInstance) {
 
       if (expiresAt && !isValidExpiresAt(expiresAt)) {
         ctx.throw(400, 'expiresAt must be in the future and before 2038');
+      }
+
+      const refusal = scopesRefusal(ctx.state.user, body.scopes, expiresAt);
+
+      if (refusal) {
+        ctx.throw(refusal.status, refusal.message);
       }
 
       const token = generateAppToken();

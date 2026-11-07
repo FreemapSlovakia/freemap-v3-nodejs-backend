@@ -1,6 +1,7 @@
 import type { RouterInstance } from '@koa/router';
 import sql, { join, raw } from 'sql-template-tag';
 import z from 'zod';
+import { deleteRoleTokens, refuseRoleHolderForToken } from '../../appTokens.js';
 import { authenticator } from '../../authenticator.js';
 import { pool, runInTransaction } from '../../database.js';
 import { emailFieldsSql, nextEmail } from '../../emailAddress.js';
@@ -32,6 +33,8 @@ const BodySchema = z
     message: 'At least one field must be provided',
   });
 
+const asWriter = authenticator(true, 'users:write');
+
 export function attachAdminPatchUserHandler(router: RouterInstance) {
   registerPath('/auth/users/{id}', {
     patch: {
@@ -48,14 +51,17 @@ export function attachAdminPatchUserHandler(router: RouterInstance) {
         },
         400: {},
         401: {},
-        403: {},
+        403: {
+          description:
+            'Not a userManager, or an app token without users:write, changing roles or email, or changing an account holding roles',
+        },
         404: {},
         409: { description: "The email is the account's only way in" },
       },
     },
   });
 
-  router.patch('/users/:id', authenticator(true), async (ctx) => {
+  router.patch('/users/:id', asWriter, async (ctx) => {
     if (!hasRole(ctx.state.user, 'userManager')) {
       return ctx.throw(403);
     }
@@ -66,6 +72,14 @@ export function attachAdminPatchUserHandler(router: RouterInstance) {
       body = BodySchema.parse(ctx.request.body);
     } catch (err) {
       return ctx.throw(400, err as Error);
+    }
+
+    // Either outlasts the token: a role mints more, an email logs in.
+    if (
+      ctx.state.user!.appToken &&
+      (body.roles !== undefined || body.email !== undefined)
+    ) {
+      return ctx.throw(403, 'roles and email change only in a login session');
     }
 
     const id = Number(ctx.params.id);
@@ -92,6 +106,8 @@ export function attachAdminPatchUserHandler(router: RouterInstance) {
 
       const row = UserRowSchema.parse(found);
 
+      refuseRoleHolderForToken(ctx, row);
+
       // Per attempt: a retried transaction starts again from the row it reads.
       const sets = [...assignments];
 
@@ -114,6 +130,11 @@ export function attachAdminPatchUserHandler(router: RouterInstance) {
         await conn.query<unknown>(
           sql`UPDATE user SET ${join(sets)} WHERE id = ${id}`,
         );
+      }
+
+      // A role taken away takes its tokens, so granting it again won't revive them.
+      if (body.roles) {
+        await deleteRoleTokens(conn, id, body.roles);
       }
     });
 

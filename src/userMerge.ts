@@ -1,5 +1,6 @@
 import type { PoolConnection } from 'mariadb';
 import sql, { empty, join, raw } from 'sql-template-tag';
+import { deleteRoleTokens } from './appTokens.js';
 import { emailFieldsSql, nextEmail } from './emailAddress.js';
 import { appLogger } from './logger.js';
 import { isPlaceholderName } from './newUserNames.js';
@@ -124,6 +125,9 @@ export async function mergeUserAccounts(
   }
 
   await conn.query<unknown>(sql`DELETE FROM auth WHERE userId = ${source.id}`);
+
+  // Admin tokens stay with the account their owner minted them on.
+  await deleteRoleTokens(conn, source.id, []);
 
   for (const table of SIMPLE_FK_TABLES) {
     await conn.query<unknown>(
