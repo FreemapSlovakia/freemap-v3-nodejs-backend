@@ -157,6 +157,27 @@ function eventsOf(poi, { from, to }) {
 
       const endClock = p.endTime?.slice(0, 5);
 
+      const startAt = dateOnly
+        ? `${p.startDate}T00:00:00.000Z`
+        : zonedToIso(p.startDate, clock, 'Europe/Paris');
+
+      let endAt = dateOnly
+        ? p.endDate !== p.startDate
+          ? `${p.endDate}T00:00:00.000Z`
+          : null
+        : endClock
+          ? zonedToIso(p.endDate, endClock, 'Europe/Paris')
+          : null;
+
+      // An end at or before the start the same day is past midnight, as a
+      // night trail's "00:00"; any other is a slip, and dropped.
+      if (endAt && !dateOnly && Date.parse(endAt) <= Date.parse(startAt)) {
+        endAt =
+          p.endDate === p.startDate
+            ? new Date(Date.parse(endAt) + 86_400_000).toISOString()
+            : null;
+      }
+
       return {
         url: poi.uri,
         sourceKey,
@@ -166,16 +187,8 @@ function eventsOf(poi, { from, to }) {
               sourceKey,
               title: label,
               description,
-              startAt: dateOnly
-                ? `${p.startDate}T00:00:00.000Z`
-                : zonedToIso(p.startDate, clock, 'Europe/Paris'),
-              endAt: dateOnly
-                ? p.endDate !== p.startDate
-                  ? `${p.endDate}T00:00:00.000Z`
-                  : null
-                : endClock
-                  ? zonedToIso(p.endDate, endClock, 'Europe/Paris')
-                  : null,
+              startAt,
+              endAt,
               dateOnly,
               startPoint: { lat, lon },
               visibility: 'public',
