@@ -123,6 +123,56 @@ export const EventRowSchema = z.object({
 
 export type EventRow = z.infer<typeof EventRowSchema>;
 
+const summaryFields = {
+  id: true,
+  userId: true,
+  title: true,
+  startAt: true,
+  endAt: true,
+  dateOnly: true,
+  transports: true,
+  distance: true,
+  duration: true,
+  ascent: true,
+  difficulty: true,
+  dogs: true,
+  children: true,
+  myParticipation: true,
+} as const;
+
+/** What the layer needs for a marker, its colour and its list row; the rest by the event's id. */
+export const EventSummarySchema = z
+  .strictObject({
+    ...EventSchema.pick(summaryFields).shape,
+    startPoint: PointSchema,
+  })
+  .meta({ id: 'EventSummary' });
+
+export const EventSummaryRowSchema = z.object({
+  ...EventRowSchema.pick(summaryFields).shape,
+  startLat: z.number(),
+  startLon: z.number(),
+});
+
+/** `SELECT … FROM` the events as {@link EventSummaryRowSchema} reads them. */
+export const eventSummarySelect = (user: User | undefined) => sql`
+  SELECT e.id, e.userId, e.title, e.startAt, e.endAt, e.dateOnly, e.startLat,
+    e.startLon, e.transports, e.distance, e.duration, e.ascent, e.difficulty,
+    e.dogs, e.children, me.status AS myParticipation
+  FROM event e
+    LEFT JOIN eventParticipant me ON me.eventId = e.id AND me.userId = ${user?.id ?? null}`;
+
+export function eventSummaryRowToResponse(
+  row: z.infer<typeof EventSummaryRowSchema>,
+) {
+  const { startLat, startLon, ...rest } = row;
+
+  return EventSummarySchema.parse({
+    ...rest,
+    startPoint: { lat: startLat, lon: startLon },
+  });
+}
+
 /**
  * When an event is over, as SQL, generously: the viewer's zone is unknown. A
  * date-only one lasts its last day through wherever that day still is (until

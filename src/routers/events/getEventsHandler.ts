@@ -9,9 +9,13 @@ import {
   DifficultySchema,
   EventRowSchema,
   EventSchema,
+  EventSummaryRowSchema,
+  EventSummarySchema,
   eventEndSql,
   eventRowToResponse,
   eventSelect,
+  eventSummaryRowToResponse,
+  eventSummarySelect,
   VisibilitySchema,
 } from './types.js';
 
@@ -20,6 +24,9 @@ const QuerySchema = z.object({
   // (one without an end, or a date-only one, lasts its last day through).
   from: z.iso.datetime().optional(),
   to: z.iso.datetime().optional(),
+  // `1` lists summaries (no description, cover, organizer or counts; up to
+  // 10000), the full event by its id.
+  summary: z.enum(['1']).optional(),
   // Only events harvested from this source, the part of `sourceKey` before ':'.
   source: z
     .string()
@@ -96,7 +103,15 @@ export function attachGetEventsHandler(router: RouterInstance) {
       requestParams: { query: QuerySchema },
       responses: {
         200: {
-          content: { 'application/json': { schema: EventSchema.array() } },
+          description: 'Events, or with `summary=1` event summaries',
+          content: {
+            'application/json': {
+              schema: z.union([
+                EventSchema.array(),
+                EventSummarySchema.array(),
+              ]),
+            },
+          },
         },
       },
     },
@@ -215,6 +230,21 @@ export function attachGetEventsHandler(router: RouterInstance) {
           ? [sql`e.children = ${Number(query.children)}`]
           : []),
       );
+
+      if (query.summary === '1') {
+        const rows = EventSummaryRowSchema.array().parse(
+          await pool.query<unknown>(sql`
+            ${eventSummarySelect(ctx.state.user)}
+            WHERE ${join(wh, ' AND ')}
+            ORDER BY e.startAt
+            LIMIT 10000
+          `),
+        );
+
+        ctx.body = rows.map(eventSummaryRowToResponse);
+
+        return;
+      }
 
       const rows = EventRowSchema.array().parse(
         await pool.query<unknown>(sql`
