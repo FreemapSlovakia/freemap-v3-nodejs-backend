@@ -1,0 +1,65 @@
+name: Events harvest
+
+# Club calendars (scripts/event-sources/) → events, nightly: new and changed
+# posted, those gone from a source deleted. See "Harvester" in
+# freemap-v3-react's doc/events-plan.md.
+on:
+  schedule:
+    # Nightly, UTC.
+    - cron: '30 2 * * *'
+  workflow_dispatch: {}
+
+concurrency:
+  group: events-harvest
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  harvest:
+    # Where the pages and LLM answers stay cached between runs; an empty cache
+    # reads all of KČT's pages, about 40 minutes.
+    runs-on: [self-hosted, fm5]
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 11.5.0
+
+      # No `cache: pnpm`: on a self-hosted runner the store is already on the box.
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+
+      # The harvester needs only the Anthropic SDK and zod: no native builds.
+      - run: pnpm install --frozen-lockfile --ignore-scripts
+
+      # The KST yearbook is read with poppler-utils.
+      - name: Check pdftotext
+        run: |
+          command -v pdftotext || {
+            echo '::error::pdftotext missing on the runner: apt install poppler-utils'
+            exit 1
+          }
+
+      - name: Harvest
+        env:
+          FREEMAP_API_TOKEN: ${{ secrets.FREEMAP_API_TOKEN }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          export HARVEST_CACHE_DIR="$HOME/.cache/freemap-harvest/events"
+          node scripts/harvest-events.mjs --post --out="$RUNNER_TEMP/events.json"
+
+      # What was harvested, with each event's notes, for when a run needs a look.
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: events
+          path: ${{ runner.temp }}/events.json
+          retention-days: 14
+          if-no-files-found: ignore
