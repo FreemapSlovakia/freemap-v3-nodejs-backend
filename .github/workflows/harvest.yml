@@ -32,14 +32,14 @@ jobs:
         with:
           persist-credentials: false
 
-      - uses: pnpm/action-setup@v6
-        with:
-          version: 11.5.0
-
       # No `cache: pnpm`: on a self-hosted runner the store is already on the box.
       - uses: actions/setup-node@v6
         with:
           node-version: 24
+
+      # Not pnpm/action-setup: it installs with the runner's bundled npm, which
+      # the runner's self-updates ship broken.
+      - run: npm install -g pnpm@11.5.0
 
       # The probe record outlives a run on fm5's disk: a week with no catalog
       # change commits nothing, and the failingSince dates must still count.
