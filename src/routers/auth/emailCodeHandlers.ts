@@ -3,7 +3,7 @@ import type { ParameterizedContext } from 'koa';
 import sql, { raw } from 'sql-template-tag';
 import z from 'zod';
 import { authenticator, rowToUser } from '../../authenticator.js';
-import { runInTransaction } from '../../database.js';
+import { pool, runInTransaction } from '../../database.js';
 import {
   emailChangeSql,
   nextEmail,
@@ -54,6 +54,20 @@ const ChangeBodySchema = z.strictObject({
   code: CodeSchema,
 });
 
+/**
+ * Whether an account but `exceptId` has `email` verified: findByVerifiedEmail's
+ * match, read without its lock, for a mail's note.
+ */
+async function verifiedElsewhere(email: string, exceptId = 0) {
+  const rows = await pool.query<unknown[]>(
+    sql`SELECT 1 FROM user
+      WHERE verifiedEmailKey = ${normalizeEmail(email)} AND id <> ${exceptId}
+      LIMIT 1`,
+  );
+
+  return rows.length > 0;
+}
+
 function parse<T extends z.ZodType>(
   schema: T,
   ctx: ParameterizedContext,
@@ -84,7 +98,9 @@ export function attachEmailCodeHandlers(router: RouterInstance) {
     async (ctx) => {
       const { email, language } = parse(SendBodySchema, ctx);
 
-      await sendEmailCode(ctx, 'login', email, language);
+      await sendEmailCode(ctx, 'login', email, language, null, async () =>
+        (await verifiedElsewhere(email)) ? undefined : 'newAccount',
+      );
 
       ctx.status = 204;
     },
@@ -149,14 +165,16 @@ export function attachEmailCodeHandlers(router: RouterInstance) {
 
       const user = ctx.state.user!;
 
-      // Whether another account has it is told only at PUT /auth/email, to
-      // the one who got the code: here it would reveal who is registered.
+      // Whether another account has it is told only in the mail, to the one
+      // who gets the code: the response would reveal who is registered.
       await sendEmailCode(
         ctx,
         'change',
         email,
         language ?? user.language,
         user.id,
+        async () =>
+          (await verifiedElsewhere(email, user.id)) ? 'joins' : undefined,
       );
 
       ctx.status = 204;
