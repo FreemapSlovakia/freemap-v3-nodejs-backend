@@ -17,9 +17,10 @@ import dvv from './event-sources/dvv.mjs';
 import { USER_AGENT } from './event-sources/fetch.mjs';
 import kct from './event-sources/kct.mjs';
 import kst from './event-sources/kst.mjs';
+import suedtirol from './event-sources/suedtirol.mjs';
 import ttt from './event-sources/ttt.mjs';
 
-const SOURCES = [kct, kst, ttt, datatourisme, dvv];
+const SOURCES = [kct, kst, ttt, datatourisme, dvv, suedtirol];
 
 const API_URL = process.env.API_URL ?? 'https://backend.freemap.sk';
 
