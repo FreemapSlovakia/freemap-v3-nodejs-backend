@@ -16,6 +16,7 @@ import {
   eventSelect,
   eventSummaryRowToResponse,
   eventSummarySelect,
+  importedSql,
   VisibilitySchema,
 } from './types.js';
 
@@ -64,6 +65,8 @@ const QuerySchema = z.object({
   // matches neither.
   dogs: z.enum(['0', '1']).optional(),
   children: z.enum(['0', '1']).optional(),
+  // `1` only imported events (`imported` on Event), `0` only the others.
+  imported: z.enum(['0', '1']).optional(),
   // `1` lets events that leave transport, difficulty or a ranged stat unsaid
   // through those filters; dogs and children stay strict.
   unsaid: z.enum(['0', '1']).optional(),
@@ -219,6 +222,9 @@ export function attachGetEventsHandler(router: RouterInstance) {
         ...(query.dogs ? [sql`e.dogs = ${Number(query.dogs)}`] : []),
         ...(query.children
           ? [sql`e.children = ${Number(query.children)}`]
+          : []),
+        ...(query.imported
+          ? [query.imported === '1' ? importedSql : sql`NOT ${importedSql}`]
           : []),
       );
 

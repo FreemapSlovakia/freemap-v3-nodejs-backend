@@ -1,8 +1,12 @@
-import sql from 'sql-template-tag';
+import sql, { raw } from 'sql-template-tag';
 import z from 'zod';
 import type { User } from '../../koaTypes.js';
 import { isOwnerOrRole } from '../../roles.js';
-import { zDateToIso, zNullableDateToIso } from '../../types.js';
+import {
+  PROVIDER_ID_COLUMNS,
+  zDateToIso,
+  zNullableDateToIso,
+} from '../../types.js';
 
 export const PointSchema = z
   .strictObject({
@@ -75,6 +79,9 @@ export const EventSchema = z
     visibility: VisibilitySchema,
     /** A harvested event's `<source>:<id there>`; null for one entered by hand. */
     sourceKey: z.string().nullable(),
+    /** Harvested and still on the source's account, which nobody logs into:
+     * no organizer here reads its discussion or sees who comes. */
+    imported: z.boolean(),
     /** The cover image's name, for `/events/covers/{name}`. */
     cover: z.string().nullable(),
     transports: TransportsSchema,
@@ -104,6 +111,7 @@ export const EventRowSchema = z.object({
   startLon: z.number(),
   visibility: VisibilitySchema,
   sourceKey: z.string().nullable(),
+  imported: z.coerce.boolean(),
   cover: z.string().nullable(),
   transports: z
     .string()
@@ -137,6 +145,7 @@ const summaryFields = {
   difficulty: true,
   dogs: true,
   children: true,
+  imported: true,
   myParticipation: true,
 } as const;
 
@@ -154,12 +163,21 @@ export const EventSummaryRowSchema = z.object({
   startLon: z.number(),
 });
 
+/**
+ * {@link EventSchema}'s `imported`, as SQL on `e` and its owner `u`: harvested
+ * and owned by an account with no way in (`hasWayIn`), as harvests' are.
+ */
+export const importedSql = sql`(e.sourceKey IS NOT NULL AND u.emailVerified = 0 AND ${raw(
+  PROVIDER_ID_COLUMNS.map((c) => `u.${c} IS NULL`).join(' AND '),
+)})`;
+
 /** `SELECT … FROM` the events as {@link EventSummaryRowSchema} reads them. */
 export const eventSummarySelect = (user: User | undefined) => sql`
   SELECT e.id, e.userId, e.title, e.startAt, e.endAt, e.dateOnly, e.startLat,
     e.startLon, e.transports, e.distance, e.duration, e.ascent, e.difficulty,
-    e.dogs, e.children, me.status AS myParticipation
+    e.dogs, e.children, ${importedSql} AS imported, me.status AS myParticipation
   FROM event e
+    JOIN user u ON u.id = e.userId
     LEFT JOIN eventParticipant me ON me.eventId = e.id AND me.userId = ${user?.id ?? null}`;
 
 export function eventSummaryRowToResponse(
@@ -205,7 +223,7 @@ export const SourceKeySchema = z
 export const eventSelect = (user: User | undefined) => sql`
   SELECT e.id, e.userId, e.mapId, map.name AS mapName, e.title, e.description,
     e.startAt, e.endAt, e.dateOnly, e.startLat, e.startLon, e.visibility,
-    e.sourceKey, e.cover,
+    e.sourceKey, ${importedSql} AS imported, e.cover,
     e.transports, e.distance, e.duration, e.ascent, e.descent,
     e.difficulty, e.dogs, e.children, e.createdAt, e.updatedAt,
     u.name AS userName, u.picture IS NOT NULL AS userHasPicture,
