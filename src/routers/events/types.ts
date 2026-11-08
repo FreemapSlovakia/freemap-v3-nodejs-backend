@@ -146,19 +146,26 @@ const summaryFields = {
   dogs: true,
   children: true,
   imported: true,
+  interestedCount: true,
+  goingCount: true,
   myParticipation: true,
 } as const;
 
 /** What the layer needs for a marker, its colour and its list row; the rest by the event's id. */
 export const EventSummarySchema = z
   .strictObject({
-    ...EventSchema.pick(summaryFields).shape,
+    ...EventSchema.pick({ ...summaryFields, user: true }).shape,
     startPoint: PointSchema,
   })
   .meta({ id: 'EventSummary' });
 
 export const EventSummaryRowSchema = z.object({
-  ...EventRowSchema.pick(summaryFields).shape,
+  ...EventRowSchema.pick({
+    ...summaryFields,
+    userName: true,
+    userHasPicture: true,
+    userPremium: true,
+  }).shape,
   startLat: z.number(),
   startLon: z.number(),
 });
@@ -171,11 +178,41 @@ export const importedSql = sql`(e.sourceKey IS NOT NULL AND u.emailVerified = 0 
   PROVIDER_ID_COLUMNS.map((c) => `u.${c} IS NULL`).join(' AND '),
 )})`;
 
+/** The organizer's columns and the participant counts, on `e` and its owner `u`. */
+const organizerAndCountsSql = sql`
+    u.name AS userName, u.picture IS NOT NULL AS userHasPicture,
+    (u.premiumExpiration IS NOT NULL AND u.premiumExpiration > NOW()) AS userPremium,
+    (SELECT COUNT(*) FROM eventParticipant p WHERE p.eventId = e.id AND p.status = 'interested') AS interestedCount,
+    (SELECT COUNT(*) FROM eventParticipant p WHERE p.eventId = e.id AND p.status = 'going') AS goingCount`;
+
+/** A row's organizer columns as {@link EventSchema}'s `user`, and the rest. */
+function splitOrganizer<
+  R extends {
+    userId: number;
+    userName: string;
+    userHasPicture: boolean;
+    userPremium: boolean;
+  },
+>(row: R) {
+  const { userName, userHasPicture, userPremium, ...rest } = row;
+
+  return {
+    rest,
+    user: {
+      id: row.userId,
+      name: userName,
+      hasPicture: userHasPicture,
+      premium: userPremium,
+    },
+  };
+}
+
 /** `SELECT … FROM` the events as {@link EventSummaryRowSchema} reads them. */
 export const eventSummarySelect = (user: User | undefined) => sql`
   SELECT e.id, e.userId, e.title, e.startAt, e.endAt, e.dateOnly, e.startLat,
     e.startLon, e.transports, e.distance, e.duration, e.ascent, e.difficulty,
-    e.dogs, e.children, ${importedSql} AS imported, me.status AS myParticipation
+    e.dogs, e.children, ${importedSql} AS imported, ${organizerAndCountsSql},
+    me.status AS myParticipation
   FROM event e
     JOIN user u ON u.id = e.userId
     LEFT JOIN eventParticipant me ON me.eventId = e.id AND me.userId = ${user?.id ?? null}`;
@@ -183,10 +220,14 @@ export const eventSummarySelect = (user: User | undefined) => sql`
 export function eventSummaryRowToResponse(
   row: z.infer<typeof EventSummaryRowSchema>,
 ) {
-  const { startLat, startLon, ...rest } = row;
+  const {
+    rest: { startLat, startLon, ...rest },
+    user,
+  } = splitOrganizer(row);
 
   return EventSummarySchema.parse({
     ...rest,
+    user,
     startPoint: { lat: startLat, lon: startLon },
   });
 }
@@ -226,10 +267,7 @@ export const eventSelect = (user: User | undefined) => sql`
     e.sourceKey, ${importedSql} AS imported, e.cover,
     e.transports, e.distance, e.duration, e.ascent, e.descent,
     e.difficulty, e.dogs, e.children, e.createdAt, e.updatedAt,
-    u.name AS userName, u.picture IS NOT NULL AS userHasPicture,
-    (u.premiumExpiration IS NOT NULL AND u.premiumExpiration > NOW()) AS userPremium,
-    (SELECT COUNT(*) FROM eventParticipant p WHERE p.eventId = e.id AND p.status = 'interested') AS interestedCount,
-    (SELECT COUNT(*) FROM eventParticipant p WHERE p.eventId = e.id AND p.status = 'going') AS goingCount,
+    ${organizerAndCountsSql},
     me.status AS myParticipation
   FROM event e
     JOIN user u ON u.id = e.userId
@@ -242,17 +280,14 @@ export const canWriteEvent = (
 ) => isOwnerOrRole(user, row.userId, 'eventManager');
 
 export function eventRowToResponse(row: EventRow, user: User | undefined) {
-  const { startLat, startLon, userName, userHasPicture, userPremium, ...rest } =
-    row;
+  const {
+    rest: { startLat, startLon, ...rest },
+    user: organizer,
+  } = splitOrganizer(row);
 
   return EventSchema.parse({
     ...rest,
-    user: {
-      id: row.userId,
-      name: userName,
-      hasPicture: userHasPicture,
-      premium: userPremium,
-    },
+    user: organizer,
     startPoint: { lat: startLat, lon: startLon },
     canWrite: canWriteEvent(user, row),
   });

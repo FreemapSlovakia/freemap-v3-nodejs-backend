@@ -25,8 +25,8 @@ const QuerySchema = z.object({
   // (one without an end, or a date-only one, lasts its last day through).
   from: z.iso.datetime().optional(),
   to: z.iso.datetime().optional(),
-  // `1` lists summaries (no description, cover, organizer or counts; up to
-  // 10000), the full event by its id.
+  // `1` lists summaries (`EventSummarySchema`, up to 10000), the full event by
+  // its id.
   summary: z.enum(['1']).optional(),
   // minLon,minLat,maxLon,maxLat — matched against the start point.
   bbox: z
