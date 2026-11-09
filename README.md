@@ -57,8 +57,8 @@ pnpm install
 pnpm run dev
 ```
 
-This rebuilds on file changes via `tsc-watch` and restarts the server through
-`dotenvx`, piping logs through `pino-pretty`.
+This rebuilds on file changes via `tsc-watch` and restarts the server, `.env`
+taking precedence over the environment, piping logs through `pino-pretty`.
 
 ## Running in production mode
 

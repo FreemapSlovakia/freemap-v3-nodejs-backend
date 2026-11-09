@@ -5,9 +5,6 @@ allowBuilds:
 ignoredBuiltDependencies:
   - protobufjs
 minimumReleaseAgeExclude:
-  - '@dotenvx/dotenvx@2.14.0'
-  - '@dotenvx/primitives@2.1.0'
-  - '@dotenvx/dotenvx@2.18.0'
   - '@biomejs/biome@2.5.7'
   - '@biomejs/cli-darwin-arm64@2.5.7'
   - '@biomejs/cli-darwin-x64@2.5.7'
