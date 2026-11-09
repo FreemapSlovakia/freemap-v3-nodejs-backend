@@ -1,3 +1,4 @@
+import { setTimeout as sleep } from 'node:timers/promises';
 import type { PoolConnection } from 'mariadb';
 import { createPool } from 'mariadb';
 import sql, { join, raw } from 'sql-template-tag';
@@ -673,10 +674,6 @@ export async function initDatabase() {
 const MAX_ATTEMPTS = 5;
 const BASE_DELAY_MS = 50;
 const MAX_DELAY_MS = 1500;
-
-function sleep(ms: number) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
 
 function withJitter(ms: number) {
   return ms + Math.floor(Math.random() * ms);

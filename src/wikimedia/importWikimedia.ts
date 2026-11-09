@@ -1,4 +1,5 @@
 import { createInterface } from 'node:readline';
+import { setTimeout as sleep } from 'node:timers/promises';
 import { createGunzip } from 'node:zlib';
 import got from 'got';
 import sql, { raw } from 'sql-template-tag';
@@ -629,7 +630,7 @@ async function loadPass(
 
       await pool.query(sql`TRUNCATE TABLE ${raw(table)}`);
 
-      await new Promise((resolve) => setTimeout(resolve, 5000 * attempt));
+      await sleep(5000 * attempt);
     }
   }
 }

@@ -10,6 +10,7 @@ import {
   writeFile,
 } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
+import { setTimeout as sleep } from 'node:timers/promises';
 import type { RouterInstance } from '@koa/router';
 import sharp from 'sharp';
 import z from 'zod';
@@ -442,9 +443,7 @@ const TRANSIENT_CODES = new Set([
 async function fetchRetrying(url: URL, gate: Gate): Promise<Buffer> {
   for (let attempt = 0; ; attempt++) {
     if (attempt > 0) {
-      await new Promise((resolve) =>
-        setTimeout(resolve, RETRY_DELAYS[attempt - 1]),
-      );
+      await sleep(RETRY_DELAYS[attempt - 1]);
 
       checkReachable(url);
 

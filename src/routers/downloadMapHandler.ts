@@ -1,11 +1,12 @@
 import { unlink } from 'node:fs/promises';
 import { type ClientHttp2Session, connect } from 'node:http2';
+import { DatabaseSync, type SQLInputValue } from 'node:sqlite';
+import { setTimeout as sleep } from 'node:timers/promises';
 import type { RouterInstance } from '@koa/router';
 import { pointToTile, type Tile, tileToGeoJSON } from '@mapbox/tilebelt';
 import { bbox } from '@turf/bbox';
 import booleanIntersects from '@turf/boolean-intersects';
 import center from '@turf/center';
-import Database from 'better-sqlite3';
 import type { Feature, MultiPolygon, Polygon } from 'geojson';
 import type { Logger } from 'pino';
 import sql from 'sql-template-tag';
@@ -471,7 +472,16 @@ async function download(
 
   const filename = `${getEnv('MBTILES_DIR')}/${dbName}.${format}`;
 
-  const db = new Database(filename);
+  const db = new DatabaseSync(filename);
+
+  // The partial file goes unless the download completes, closed first: the
+  // stack runs last in, first out; disposing a closed database is a no-op.
+  await using discard = new AsyncDisposableStack();
+
+  // Failing, it would bury the download's own error in a SuppressedError.
+  discard.defer(() => unlink(filename).catch(() => undefined));
+
+  discard.use(db);
 
   db.exec(`
     PRAGMA journal_mode = WAL;
@@ -508,7 +518,8 @@ async function download(
       ('maxzoom', ${maxZoom}),
       ('bounds', ${bbox(boundary).join(',')})`;
 
-    db.prepare(combo.sql).run(...combo.values);
+    // Text, as the column is: node:sqlite binds every number as REAL, "8.0".
+    db.prepare(combo.sql).run(...combo.values.map(String));
   } else if (format === 'sqlitedb') {
     db.exec(
       `
@@ -532,7 +543,7 @@ async function download(
         VALUES (${max}, ${min}, ${256 * (scale ?? 1)}, ${cntr.geometry.coordinates[1]}, ${cntr.geometry.coordinates[0]}, ${zooms}, 0)
     `;
 
-    db.prepare(combo.sql).run(...combo.values);
+    db.prepare(combo.sql).run(...(combo.values as SQLInputValue[]));
   } else {
     throw new Error(`Unsupported format: ${format}`);
   }
@@ -638,7 +649,7 @@ async function download(
             `${err.code}; retrying download (${i + 1}/5)`,
           );
 
-          await new Promise((resolve) => setTimeout(resolve, i * 100));
+          await sleep(i * 100);
         } else {
           throw err;
         }
@@ -707,12 +718,8 @@ async function download(
     ).run(attribution);
 
     db.close();
-  } catch (err) {
-    db.close();
 
-    await unlink(filename);
-
-    throw err;
+    discard.move();
   } finally {
     closing = true;
 

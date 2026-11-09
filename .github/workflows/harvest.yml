@@ -35,7 +35,7 @@ jobs:
       # No `cache: pnpm`: on a self-hosted runner the store is already on the box.
       - uses: actions/setup-node@v6
         with:
-          node-version: 24
+          node-version: 26
 
       # Not pnpm/action-setup: it installs with the runner's bundled npm, which
       # the runner's self-updates ship broken.

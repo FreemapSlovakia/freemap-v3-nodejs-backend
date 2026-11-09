@@ -4,7 +4,7 @@ Backend API server for the [Freemap](https://www.freemap.sk) web map application
 
 ## Requirements
 
-- Node 22+
+- Node 26+
 - pnpm
 - MariaDB Database Server
 - exiftran (for lossless rotation of uploaded JPEGs)

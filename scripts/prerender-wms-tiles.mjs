@@ -9,6 +9,7 @@
 //     [--max-zoom 13] [--concurrency 8] FSK18 FSK19 …
 //
 // Each map's own layers are rendered, within its bbox.
+import { setTimeout as sleep } from 'node:timers/promises';
 import { parseArgs } from 'node:util';
 
 const { values, positionals } = parseArgs({
@@ -133,7 +134,7 @@ async function worker() {
         break;
       }
 
-      await new Promise((resolve) => setTimeout(resolve, attempt * 10_000));
+      await sleep(attempt * 10_000);
     }
 
     if (++done % 500 === 0 || done === total) {

@@ -1,6 +1,8 @@
 // What every event source fetches and parses with: politely, as robots.txt
 // allows, and Photon for places without coordinates.
 
+import { setTimeout as sleep } from 'node:timers/promises';
+
 export const USER_AGENT =
   'FreemapEventsHarvester/0.1 (+https://www.freemap.sk)';
 
@@ -27,7 +29,7 @@ async function politeResponse(url, headers = {}) {
   const wait = (lastRequest.get(host) ?? 0) + delay - Date.now();
 
   if (wait > 0) {
-    await new Promise((resolve) => setTimeout(resolve, wait));
+    await sleep(wait);
   }
 
   lastRequest.set(host, Date.now());
@@ -73,8 +75,9 @@ const robotsPattern = (value) =>
   new RegExp(
     `^${value
       .replace(/\$$/, '')
-      .replace(/[.+?^{}()|[\]\\]/g, '\\$&')
-      .replaceAll('*', '.*')}${value.endsWith('$') ? '$' : ''}`,
+      .split('*')
+      .map(RegExp.escape)
+      .join('.*')}${value.endsWith('$') ? '$' : ''}`,
   );
 
 /**

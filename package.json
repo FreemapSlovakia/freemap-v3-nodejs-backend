@@ -4,7 +4,7 @@
   "description": "",
   "main": "index.js",
   "engines": {
-    "node": ">=22.0.0"
+    "node": ">=26.0.0"
   },
   "type": "module",
   "repository": {
@@ -49,7 +49,6 @@
     "@turf/boolean-intersects": "^7.4.0",
     "@turf/center": "^7.4.0",
     "apple-signin-auth": "^2.1.0",
-    "better-sqlite3": "^13.0.3",
     "etag": "^1.8.1",
     "exifreader": "^4.52.0",
     "gdal-async": "^3.13.0",
@@ -65,11 +64,9 @@
     "oauth-1.0a": "^2.2.6",
     "pino": "^10.4.0",
     "pino-http": "^11.0.0",
-    "process-nextick-args": "^2.0.1",
     "protobufjs": "^8.8.1",
     "sharp": "0.35.5",
     "short-uuid": "^6.0.3",
-    "source-map-support": "^0.5.21",
     "sql-template-tag": "^5.2.1",
     "tsc-watch": "^7.2.1",
     "ws": "^8.22.0",
@@ -80,7 +77,6 @@
   "devDependencies": {
     "@biomejs/biome": "^2.6.4",
     "@dotenvx/dotenvx": "^2.38.2",
-    "@types/better-sqlite3": "^9.6.0",
     "@types/etag": "^1.8.4",
     "@types/geojson": "^7946.0.16",
     "@types/heic-convert": "^2.1.1",

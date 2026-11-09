@@ -101,9 +101,7 @@ const eli = read('eli/eliCatalog.json');
 const byType = new Map<string, CatalogMap>();
 
 for (const map of [...curated.maps, ...eli.maps]) {
-  if (!byType.has(map.type)) {
-    byType.set(map.type, map);
-  }
+  byType.getOrInsert(map.type, map);
 }
 
 export const catalogMaps: CatalogMap[] = [...byType.values()];
