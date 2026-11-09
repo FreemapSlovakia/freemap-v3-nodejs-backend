@@ -45,6 +45,12 @@ const QuerySchema = z.object({
     .pipe(z.tuple([z.number().min(-90).max(90), z.number().min(-180).max(180)]))
     .optional(),
   radius: z.coerce.number().positive().max(1000).optional(),
+  // Words the title holds all of, case and accents ignored.
+  q: z.string().trim().min(2).max(100).optional(),
+  // `near` orders by distance from `near`, which then needs no `radius`.
+  sort: z.enum(['start', 'near']).optional(),
+  // At most this many; by default 1000, or 10000 summaries.
+  limit: z.coerce.number().int().min(1).max(10000).optional(),
   visibility: VisibilitySchema.optional(),
   // Comma-separated transport types; any of them matches.
   transport: z
@@ -108,7 +114,7 @@ export function attachGetEventsHandler(router: RouterInstance) {
   registerPath('/events', {
     get: {
       summary:
-        'List events by time window, area, visibility, transport and trip stats',
+        'List events by time window, area, title words, visibility, transport and trip stats',
       tags: ['events'],
       security: AUTH_OPTIONAL,
       requestParams: { query: QuerySchema },
@@ -185,11 +191,22 @@ export function attachGetEventsHandler(router: RouterInstance) {
         );
       }
 
-      if (near) {
-        if (radius === undefined) {
-          return ctx.throw(400, 'near needs a radius');
-        }
+      if (query.sort === 'near' && !near) {
+        return ctx.throw(400, 'sort=near needs near');
+      }
 
+      if (query.q) {
+        // `\` escapes LIKE's wildcards.
+        for (const word of query.q.split(/\s+/)) {
+          wh.push(sql`e.title LIKE ${`%${word.replace(/[\\%_]/g, '\\$&')}%`}`);
+        }
+      }
+
+      if (near && radius === undefined && query.sort !== 'near') {
+        return ctx.throw(400, 'near needs a radius');
+      }
+
+      if (near && radius !== undefined) {
         const [lat, lon] = near;
 
         // The box first, which the start point's index serves; the exact
@@ -256,13 +273,18 @@ export function attachGetEventsHandler(router: RouterInstance) {
           : []),
       );
 
+      const orderBy =
+        query.sort === 'near' && near
+          ? sql`ST_Distance_Sphere(POINT(e.startLon, e.startLat), POINT(${near[1]}, ${near[0]})), e.startAt`
+          : sql`e.startAt`;
+
       if (query.summary === '1') {
         const rows = EventSummaryRowSchema.array().parse(
           await pool.query<unknown>(sql`
             ${eventSummarySelect(ctx.state.user)}
             WHERE ${join(wh, ' AND ')}
-            ORDER BY e.startAt
-            LIMIT 10000
+            ORDER BY ${orderBy}
+            LIMIT ${Math.min(query.limit ?? 10000, 10000)}
           `),
         );
 
@@ -275,8 +297,8 @@ export function attachGetEventsHandler(router: RouterInstance) {
         await pool.query<unknown>(sql`
           ${eventSelect(ctx.state.user)}
           WHERE ${join(wh, ' AND ')}
-          ORDER BY e.startAt
-          LIMIT 1000
+          ORDER BY ${orderBy}
+          LIMIT ${Math.min(query.limit ?? 1000, 1000)}
         `),
       );
 
