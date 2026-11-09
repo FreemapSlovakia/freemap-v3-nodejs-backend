@@ -193,9 +193,10 @@ async function handEnteredEvents(results) {
       throw new Error(`/events?${query}: 1000 events or more, some unseen`);
     }
 
-    // Windows overlap by the events spanning their bounds.
+    // Windows overlap by the events spanning their bounds. `manual:` ones were
+    // imported by hand, from no source a harvest syncs.
     for (const e of page) {
-      if (!e.sourceKey) {
+      if (!e.sourceKey || e.sourceKey.startsWith('manual:')) {
         events.set(e.id, e);
       }
     }
