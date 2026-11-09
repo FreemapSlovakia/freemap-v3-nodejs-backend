@@ -3,9 +3,11 @@
 // entries. Placed by the start address on Photon, else the town. No LLM.
 
 import {
+  addDays,
   assertAllowed,
   decodeEntities,
   geocode,
+  isDate,
   md,
   placeOf,
   politeFetch,
@@ -54,12 +56,12 @@ function daysOf(date, today) {
     `${y}-${month.padStart(2, '0')}-${String(d).padStart(2, '0')}`;
 
   // The list runs three months ahead: a date two months back is next year's.
-  const y =
-    Date.parse(iso(year, d1)) < Date.parse(today) - 60 * 86_400_000
-      ? year + 1
-      : year;
+  const y = iso(year, d1) < addDays(today, -60) ? year + 1 : year;
 
-  return [d1, d2].filter(Boolean).map((d) => iso(y, d));
+  const days = [d1, d2].filter(Boolean).map((d) => iso(y, d));
+
+  // "31.4." names no day.
+  return days.every(isDate) ? days : [];
 }
 
 async function eventOf(entry, today, from, to) {

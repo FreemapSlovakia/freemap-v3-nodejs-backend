@@ -3,7 +3,15 @@
 // the date of its update). Its API, the "Rambling" events, one event per day
 // it is held. A free key, DATATOURISME_API_KEY. No LLM.
 
-import { assertAllowed, md, politeFetch, zonedToIso } from './fetch.mjs';
+import {
+  addDays,
+  assertAllowed,
+  daysBetween,
+  isDate,
+  md,
+  politeFetch,
+  zonedToIso,
+} from './fetch.mjs';
 
 const API = 'https://api.datatourisme.fr/v1/entertainmentAndEvent';
 
@@ -42,8 +50,6 @@ const ORGANIZATION_RE =
 
 const fr = (value) => value?.['@fr'] ?? Object.values(value ?? {})[0] ?? '';
 
-const days = (from, to) => (Date.parse(to) - Date.parse(from)) / 86_400_000;
-
 const dateFr = (d) => d.split('-').reverse().map(Number).join('/');
 
 function eventsOf(poi, { from, to }) {
@@ -56,12 +62,11 @@ function eventsOf(poi, { from, to }) {
     return [];
   }
 
-  const periods = poi.takesPlaceAt.map((p) => ({
-    ...p,
-    endDate: p.endDate ?? p.startDate,
-  }));
+  const periods = poi.takesPlaceAt
+    .map((p) => ({ ...p, endDate: p.endDate ?? p.startDate }))
+    .filter((p) => isDate(p.startDate) && isDate(p.endDate));
 
-  if (periods.some((p) => days(p.startDate, p.endDate) > MAX_DAYS)) {
+  if (periods.some((p) => daysBetween(p.startDate, p.endDate) > MAX_DAYS)) {
     return [];
   }
 
@@ -174,7 +179,7 @@ function eventsOf(poi, { from, to }) {
       if (endAt && !dateOnly && Date.parse(endAt) <= Date.parse(startAt)) {
         endAt =
           p.endDate === p.startDate
-            ? new Date(Date.parse(endAt) + 86_400_000).toISOString()
+            ? zonedToIso(addDays(p.endDate, 1), endClock, 'Europe/Paris')
             : null;
       }
 

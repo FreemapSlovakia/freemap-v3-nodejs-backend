@@ -3,6 +3,7 @@
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
+  addDays,
   assertAllowed,
   decodeEntities,
   geocode,
@@ -166,13 +167,9 @@ async function eventOf(entry, block) {
     // A night march's "do 02:00" without a date ends the next morning; a
     // later time is a source error, not a day-long march.
     // Without a finish date its time is relative to the start's day.
-    const nextDate = new Date(Date.parse(`${startDate}T00:00:00Z`) + 86_400_000)
-      .toISOString()
-      .slice(0, 10);
-
     const rolled =
       !finish.date && finish.time && finish.time <= '06:00'
-        ? zonedToIso(nextDate, finish.time, 'Europe/Prague')
+        ? zonedToIso(addDays(startDate, 1), finish.time, 'Europe/Prague')
         : null;
 
     endAt = rolled && rolled >= startAt ? rolled : null;

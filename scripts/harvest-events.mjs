@@ -14,7 +14,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import datatourisme from './event-sources/datatourisme.mjs';
 import dvv from './event-sources/dvv.mjs';
-import { USER_AGENT } from './event-sources/fetch.mjs';
+import { daysBetween, isDate, USER_AGENT } from './event-sources/fetch.mjs';
 import kct from './event-sources/kct.mjs';
 import kst from './event-sources/kst.mjs';
 import suedtirol from './event-sources/suedtirol.mjs';
@@ -38,16 +38,13 @@ const args = Object.fromEntries(
     .map(([, key, value]) => [key, value ?? true]),
 );
 
-const today = new Date().toISOString().slice(0, 10);
+// The sources' own day, not UTC's, which lags it past midnight.
+const today = Temporal.Now.plainDateISO('Europe/Prague').toString();
 
 const date = (name, fallback) => {
   const value = args[name] ?? fallback;
 
-  // The round trip catches 2026-02-30.
-  if (
-    !/^\d{4}-\d{2}-\d{2}$/.test(value) ||
-    (value < '9999' && new Date(value).toISOString().slice(0, 10) !== value)
-  ) {
+  if (!isDate(value)) {
     throw new Error(`--${name} takes a YYYY-MM-DD date`);
   }
 
@@ -209,12 +206,16 @@ async function handEnteredEvents(results) {
 const startDay = (e) =>
   e.dateOnly
     ? e.startAt.slice(0, 10)
-    : new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Prague' }).format(
-        new Date(e.startAt),
-      );
+    : Temporal.Instant.from(e.startAt)
+        .toZonedDateTimeISO('Europe/Prague')
+        .toPlainDate()
+        .toString();
 
 async function markDuplicates(results) {
-  const existing = await handEnteredEvents(results);
+  const existing = (await handEnteredEvents(results)).map((e) => ({
+    ...e,
+    day: startDay(e),
+  }));
 
   for (const r of results) {
     if (!r.body) {
@@ -230,7 +231,7 @@ async function markDuplicates(results) {
     // "Novoroční výstup" is everywhere; or within 30 km by the same title, as
     // a source may place the start elsewhere.
     const dup = existing.find((e) => {
-      if (Math.abs(Date.parse(startDay(e)) - Date.parse(day)) > 86_400_000) {
+      if (Math.abs(daysBetween(e.day, day)) > 1) {
         return false;
       }
 

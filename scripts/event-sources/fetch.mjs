@@ -185,35 +185,31 @@ export const md = (s) =>
     .replace(/^(\s*)([-+#>|=])/gm, '$1\\$2');
 
 /** A wall-clock time in `timeZone` as an instant. */
-export function zonedToIso(date, time, timeZone) {
-  const wall = Date.parse(`${date}T${time}:00Z`);
+export const zonedToIso = (date, time, timeZone) =>
+  time === '24:00'
+    ? zonedToIso(addDays(date, 1), '00:00', timeZone)
+    : // The hour repeated as DST ends: its second, winter-time pass.
+      Temporal.PlainDateTime.from(`${date}T${time}`)
+        .toZonedDateTime(timeZone, { disambiguation: 'later' })
+        .toInstant()
+        .toString({ fractionalSecondDigits: 3 });
 
-  const format = new Intl.DateTimeFormat('en-CA', {
-    timeZone,
-    hourCycle: 'h23',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-
-  /** The zone's offset at instant `t`, in ms. */
-  const offsetAt = (t) => {
-    const p = Object.fromEntries(
-      format.formatToParts(t).map((part) => [part.type, part.value]),
-    );
-
-    return (
-      Date.parse(`${p.year}-${p.month}-${p.day}T${p.hour}:${p.minute}:00Z`) - t
-    );
-  };
-
-  // Twice: the offset at the first guess may differ across a DST switch.
-  const first = wall - offsetAt(wall);
-
-  return new Date(wall - offsetAt(first)).toISOString();
+/** Whether a YYYY-MM-DD date exists: not 2026-02-30. */
+export function isDate(s) {
+  try {
+    return /^\d{4}-\d{2}-\d{2}$/.test(s) && Boolean(Temporal.PlainDate.from(s));
+  } catch {
+    return false;
+  }
 }
+
+/** A YYYY-MM-DD date `n` days on. */
+export const addDays = (date, n) =>
+  Temporal.PlainDate.from(date).add({ days: n }).toString();
+
+/** Days from one YYYY-MM-DD date to another. */
+export const daysBetween = (from, to) =>
+  Temporal.PlainDate.from(from).until(to).days;
 
 export const distanceKm = (a, b) => {
   const rad = Math.PI / 180;

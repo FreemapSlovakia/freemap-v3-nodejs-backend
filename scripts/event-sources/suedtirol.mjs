@@ -2,7 +2,16 @@
 // tourist offices feed: the events with a hiking word in the title or text,
 // CC0 only, one event per date it lists. No key, no LLM.
 
-import { assertAllowed, md, politeFetch, text, zonedToIso } from './fetch.mjs';
+import {
+  addDays,
+  assertAllowed,
+  daysBetween,
+  isDate,
+  md,
+  politeFetch,
+  text,
+  zonedToIso,
+} from './fetch.mjs';
 
 const API = 'https://tourism.api.opendatahub.com/v1/Event';
 
@@ -39,8 +48,6 @@ const SERIES_DAYS = 42;
 // A sentence giving a contact: an email, a phone number, words introducing one.
 const CONTACT_RE =
   /[\w.+-]+(@|\(at\))[\w-]+(\.[\w-]+)+|\+39|\b0\d{2,3}[\s/-]?\d{5,7}\b|\btel\.|telefon|e-?mail|mobil|cellulare/i;
-
-const days = (from, to) => (Date.parse(to) - Date.parse(from)) / 86_400_000;
 
 function eventsOf(e, { from, to }) {
   if (e.LicenseInfo?.License !== 'CC0' || e.LicenseInfo?.ClosedData) {
@@ -115,23 +122,24 @@ function eventsOf(e, { from, to }) {
     }))
     .filter(
       (d) =>
-        days(d.fromDay, d.toDay) <= MAX_DAYS &&
+        isDate(d.fromDay) &&
+        isDate(d.toDay) &&
+        daysBetween(d.fromDay, d.toDay) <= MAX_DAYS &&
         d.toDay >= from &&
         d.fromDay <= to,
     )
     .toSorted((a, b) => a.fromDay.localeCompare(b.fromDay));
 
   if (dates.length > 1) {
-    const weeks = Math.max(days(dates[0].fromDay, dates.at(-1).fromDay), 7) / 7;
+    const weeks =
+      Math.max(daysBetween(dates[0].fromDay, dates.at(-1).fromDay), 7) / 7;
 
     if (dates.length / weeks > MAX_PER_WEEK) {
       return [];
     }
   }
 
-  const horizon = new Date(Date.parse(from) + SERIES_DAYS * 86_400_000)
-    .toISOString()
-    .slice(0, 10);
+  const horizon = addDays(from, SERIES_DAYS);
 
   return dates
     .filter((d, i) => i === 0 || d.fromDay <= horizon)

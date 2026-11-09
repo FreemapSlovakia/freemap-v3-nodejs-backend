@@ -17,15 +17,17 @@ const KINDS = { 1: 'hiking', 3: 'bike', 4: 'mtb' };
 const CONTACT_RE =
   /[\w.+-]+(@|\(at\))[\w-]+(\.[\w-]+)+|\+?36[\s/-]*\d|\b\d{2}[\s/-]\d{3}[\s/-]?\d{3,4}\b|telefon|\btel\.|e-?mail|mobil/i;
 
-const clock = new Intl.DateTimeFormat('hu-HU', {
-  timeZone: 'Europe/Budapest',
-  hour: '2-digit',
-  minute: '2-digit',
-});
-
-const day = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Budapest' });
+const TZ = 'Europe/Budapest';
 
 const at = (seconds) => new Date(seconds * 1000);
+
+const zoned = (seconds) =>
+  Temporal.Instant.fromEpochMilliseconds(seconds * 1000).toZonedDateTimeISO(TZ);
+
+const dayOf = (seconds) => zoned(seconds).toPlainDate().toString();
+
+const clockOf = (seconds) =>
+  zoned(seconds).toPlainTime().toString({ smallestUnit: 'minute' });
 
 const pageOf = (id) => `https://tturak.hu/hikeOccasion/${id}/details`;
 
@@ -42,7 +44,7 @@ function routeLine(route, typeNames) {
   const start = route.startTimeFrom
     ? [route.startTimeFrom, route.startTimeTo]
         .filter(Boolean)
-        .map((s) => clock.format(at(s)))
+        .map(clockOf)
         .filter((t, i, all) => all.indexOf(t) === i)
         .join('–')
     : null;
@@ -77,12 +79,9 @@ function eventOf(detail, typeNames) {
 
   const notes = [];
 
-  const days = [detail.date, detail.dateTo ?? detail.date].map((s) =>
-    day.format(at(s)),
-  );
+  const days = [detail.date, detail.dateTo ?? detail.date].map(dayOf);
 
-  const onto = (date, s) =>
-    Date.parse(zonedToIso(date, clock.format(at(s)), 'Europe/Budapest')) / 1000;
+  const onto = (date, s) => Date.parse(zonedToIso(date, clockOf(s), TZ)) / 1000;
 
   // The occasion's date wins: a route's times may keep a day it moved from,
   // or last year's. A cutoff past midnight, of a night hike, is no such slip.
@@ -91,8 +90,7 @@ function eventOf(detail, typeNames) {
       return r;
     }
 
-    const outside = (s) =>
-      day.format(at(s)) < days[0] || day.format(at(s)) > days[1];
+    const outside = (s) => dayOf(s) < days[0] || dayOf(s) > days[1];
 
     const from = outside(r.startTimeFrom)
       ? onto(days[0], r.startTimeFrom)
@@ -100,13 +98,13 @@ function eventOf(detail, typeNames) {
 
     const to =
       r.startTimeTo && outside(r.startTimeTo)
-        ? onto(day.format(at(from)), r.startTimeTo)
+        ? onto(dayOf(from), r.startTimeTo)
         : r.startTimeTo;
 
     let cutoff = r.cutoffTime;
 
     if (cutoff && (cutoff < from || cutoff > from + 2 * 86_400)) {
-      cutoff = onto(day.format(at(from)), cutoff);
+      cutoff = onto(dayOf(from), cutoff);
 
       if (cutoff < from) {
         cutoff += 86_400;
@@ -118,7 +116,7 @@ function eventOf(detail, typeNames) {
       to !== r.startTimeTo ||
       cutoff !== r.cutoffTime
     ) {
-      notes.push(`route ${r.id}: times moved onto ${day.format(at(from))}`);
+      notes.push(`route ${r.id}: times moved onto ${dayOf(from)}`);
     }
 
     return { ...r, startTimeFrom: from, startTimeTo: to, cutoffTime: cutoff };
@@ -149,12 +147,12 @@ function eventOf(detail, typeNames) {
   const dateOnly = starts.length === 0;
 
   const startAt = dateOnly
-    ? `${day.format(at(detail.date))}T00:00:00.000Z`
+    ? `${dayOf(detail.date)}T00:00:00.000Z`
     : at(Math.min(...starts)).toISOString();
 
   const endAt = dateOnly
     ? detail.dateTo && detail.dateTo !== detail.date
-      ? `${day.format(at(detail.dateTo))}T00:00:00.000Z`
+      ? `${dayOf(detail.dateTo)}T00:00:00.000Z`
       : null
     : cutoffs.length && Math.max(...cutoffs) > Math.min(...starts)
       ? at(Math.max(...cutoffs)).toISOString()
