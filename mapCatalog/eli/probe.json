@@ -121,9 +121,10 @@
   },
   "Allen_OH_2021": {
     "v": 3,
-    "status": 200,
+    "status": "error",
     "cors": true,
-    "scales": []
+    "scales": [],
+    "failingSince": "2026-11-02"
   },
   "American-1966_Aerial": {
     "v": 3,
@@ -488,25 +489,27 @@
   "Cadastre": {
     "v": 3,
     "status": 200,
-    "cors": false,
+    "cors": true,
     "scales": []
   },
   "Calaveras_CA_2022": {
     "v": 3,
-    "status": 200,
-    "cors": true,
-    "scales": []
+    "status": "error",
+    "cors": false,
+    "scales": [],
+    "failingSince": "2026-11-09"
   },
   "Calaveras_CA_2024": {
     "v": 3,
-    "status": 200,
-    "cors": true,
-    "scales": []
+    "status": "error",
+    "cors": false,
+    "scales": [],
+    "failingSince": "2026-11-09"
   },
   "Catastro-Spain": {
     "v": 3,
-    "status": "error",
-    "cors": false,
+    "status": "not an image",
+    "cors": true,
     "scales": []
   },
   "CityOfLaunceston_2011": {
@@ -715,15 +718,17 @@
   },
   "Czech_RUIAN-budovy": {
     "v": 3,
-    "status": 200,
+    "status": "error",
     "cors": true,
-    "scales": []
+    "scales": [],
+    "failingSince": "2026-11-02"
   },
   "Czech_RUIAN-parcely": {
     "v": 3,
-    "status": 200,
+    "status": "error",
     "cors": true,
-    "scales": []
+    "scales": [],
+    "failingSince": "2026-11-02"
   },
   "Czech_pLPIS": {
     "v": 3,
@@ -745,20 +750,20 @@
   },
   "DC_From_Above_Ortho_2021": {
     "v": 3,
-    "status": 500,
-    "cors": false,
+    "status": 200,
+    "cors": true,
     "scales": []
   },
   "DC_From_Above_Ortho_2023": {
     "v": 3,
-    "status": 500,
-    "cors": false,
+    "status": 200,
+    "cors": true,
     "scales": []
   },
   "DC_From_Above_Ortho_2025": {
     "v": 3,
-    "status": 500,
-    "cors": false,
+    "status": 200,
+    "cors": true,
     "scales": []
   },
   "DE_Orthophotography_2017_NC": {
@@ -774,12 +779,6 @@
     "scales": []
   },
   "DVRPC_2020_BucksPA": {
-    "v": 3,
-    "status": 200,
-    "cors": true,
-    "scales": []
-  },
-  "DVRPC_2020_CamdenNJ": {
     "v": 3,
     "status": 200,
     "cors": true,
@@ -911,10 +910,10 @@
     "cors": true,
     "scales": []
   },
-  "Dourados_Ortofotos": {
+  "Duna_2013": {
     "v": 3,
-    "status": "error",
-    "cors": false,
+    "status": 200,
+    "cors": true,
     "scales": []
   },
   "EA_LIDAR_DSM_1m_2022": {
@@ -943,8 +942,8 @@
   },
   "ETCOG24_NC_6in": {
     "v": 3,
-    "status": "error",
-    "cors": false,
+    "status": 200,
+    "cors": true,
     "scales": []
   },
   "Erlangen-2016": {
@@ -1021,8 +1020,8 @@
   },
   "FOMI_2015_leafoff_20cm": {
     "v": 3,
-    "status": 404,
-    "cors": false,
+    "status": 200,
+    "cors": true,
     "scales": []
   },
   "FOMI_2016": {
@@ -1033,8 +1032,8 @@
   },
   "FOMI_2016_leafoff_20cm": {
     "v": 3,
-    "status": 404,
-    "cors": false,
+    "status": 200,
+    "cors": true,
     "scales": []
   },
   "Fortaleza_Base_Map": {
@@ -1205,6 +1204,18 @@
     "cors": true,
     "scales": []
   },
+  "GSGS3906": {
+    "v": 3,
+    "status": 403,
+    "cors": false,
+    "scales": []
+  },
+  "GSGS4136": {
+    "v": 3,
+    "status": 404,
+    "cors": true,
+    "scales": []
+  },
   "GURS-DOF025": {
     "v": 3,
     "status": 200,
@@ -1321,9 +1332,10 @@
   },
   "GeoPortal_DF_2015": {
     "v": 3,
-    "status": 200,
+    "status": "not an image",
     "cors": true,
-    "scales": []
+    "scales": [],
+    "failingSince": "2026-11-09"
   },
   "GeoPortal_DF_2016": {
     "v": 3,
@@ -1339,14 +1351,21 @@
   },
   "GeoPortal_DF_2021_50cm": {
     "v": 3,
+    "status": "not an image",
+    "cors": true,
+    "scales": [],
+    "failingSince": "2026-11-09"
+  },
+  "Geodata-Gov-2016-2020-2021_Ortofoto_Moldova": {
+    "v": 3,
     "status": 200,
     "cors": true,
     "scales": []
   },
   "Geodata-Gov-2026_Ortofoto_Moldova_Satellite": {
     "v": 3,
-    "status": "error",
-    "cors": false,
+    "status": 200,
+    "cors": true,
     "scales": []
   },
   "Geodatastyrelsen_Cadastral_Parcels_INSPIRE": {
@@ -1674,6 +1693,12 @@
     "scales": []
   },
   "IGEAR-ortofoto": {
+    "v": 3,
+    "status": 200,
+    "cors": true,
+    "scales": []
+  },
+  "KTBASELSTADT2015": {
     "v": 3,
     "status": 200,
     "cors": true,
@@ -2021,11 +2046,24 @@
     "cors": true,
     "scales": []
   },
-  "Loire_Atlantique-Orthophotos-2016": {
+  "Lodz-2015": {
     "v": 3,
     "status": 200,
     "cors": true,
     "scales": []
+  },
+  "Lodz-2017": {
+    "v": 3,
+    "status": 200,
+    "cors": true,
+    "scales": []
+  },
+  "Loire_Atlantique-Orthophotos-2016": {
+    "v": 3,
+    "status": "error",
+    "cors": false,
+    "scales": [],
+    "failingSince": "2026-11-09"
   },
   "Lombardia-Italy-CTR": {
     "v": 3,
@@ -2047,14 +2085,14 @@
   },
   "Ludwigshafen-2019": {
     "v": 3,
-    "status": 503,
-    "cors": false,
+    "status": 200,
+    "cors": true,
     "scales": []
   },
   "Ludwigshafen-2022": {
     "v": 3,
-    "status": 503,
-    "cors": false,
+    "status": 404,
+    "cors": true,
     "scales": []
   },
   "MDT2M_LITORAL_2014_15": {
@@ -2551,8 +2589,8 @@
   },
   "NSW_DCS_SS_HAPE_Imagery_1980": {
     "v": 3,
-    "status": 404,
-    "cors": false,
+    "status": 200,
+    "cors": true,
     "scales": []
   },
   "NSW_DCS_SS_HAPE_Imagery_1982": {
@@ -2587,8 +2625,8 @@
   },
   "NSW_DCS_SS_HAPE_Imagery_1990": {
     "v": 3,
-    "status": 404,
-    "cors": false,
+    "status": 200,
+    "cors": true,
     "scales": []
   },
   "NSW_DCS_SS_HAPE_Imagery_1991": {
@@ -2617,8 +2655,8 @@
   },
   "NSW_DCS_SS_HAPE_Imagery_1998": {
     "v": 3,
-    "status": 404,
-    "cors": false,
+    "status": 200,
+    "cors": true,
     "scales": []
   },
   "NSW_DCS_SS_HAPE_Imagery_2001": {
@@ -2683,7 +2721,7 @@
   },
   "Nassau_Ortho_2023": {
     "v": 3,
-    "status": 404,
+    "status": 200,
     "cors": true,
     "scales": []
   },
@@ -2717,7 +2755,7 @@
     "cors": true,
     "scales": []
   },
-  "OGDLidarZH-DOM": {
+  "OGDLidarZH-DOM-2014": {
     "v": 3,
     "status": 200,
     "cors": true,
@@ -2729,13 +2767,25 @@
     "cors": true,
     "scales": []
   },
-  "OGDLidarZH-DTM": {
+  "OGDLidarZH-DOM-2022": {
+    "v": 3,
+    "status": 200,
+    "cors": true,
+    "scales": []
+  },
+  "OGDLidarZH-DTM-2014": {
     "v": 3,
     "status": 200,
     "cors": true,
     "scales": []
   },
   "OGDLidarZH-DTM-2017": {
+    "v": 3,
+    "status": 200,
+    "cors": true,
+    "scales": []
+  },
+  "OGDLidarZH-DTM-2022": {
     "v": 3,
     "status": 200,
     "cors": true,
@@ -2755,7 +2805,7 @@
   },
   "OGDOrthoZH2018": {
     "v": 3,
-    "status": "not an image",
+    "status": 200,
     "cors": true,
     "scales": []
   },
@@ -2875,15 +2925,17 @@
   },
   "Osceola_Ortho_2025": {
     "v": 3,
-    "status": 200,
-    "cors": true,
-    "scales": []
+    "status": 403,
+    "cors": false,
+    "scales": [],
+    "failingSince": "2026-11-09"
   },
   "Osceola_Ortho_2026": {
     "v": 3,
-    "status": 200,
-    "cors": true,
-    "scales": []
+    "status": 403,
+    "cors": false,
+    "scales": [],
+    "failingSince": "2026-11-09"
   },
   "PAgis_Ortho_2018": {
     "v": 3,
@@ -3215,6 +3267,12 @@
     "cors": true,
     "scales": []
   },
+  "SP_Itu_-_Eixos": {
+    "v": 3,
+    "status": 404,
+    "cors": false,
+    "scales": []
+  },
   "Saarland-DOP20": {
     "v": 3,
     "status": 200,
@@ -3229,56 +3287,56 @@
   },
   "Saint_Johns_Basemap": {
     "v": 3,
-    "status": "error",
-    "cors": false,
+    "status": 200,
+    "cors": true,
     "scales": []
   },
   "Saint_Johns_Ortho_2021": {
     "v": 3,
-    "status": "error",
-    "cors": false,
+    "status": 200,
+    "cors": true,
     "scales": []
   },
   "Saint_Johns_Ortho_2024": {
     "v": 3,
-    "status": "error",
-    "cors": false,
+    "status": 200,
+    "cors": true,
     "scales": []
   },
   "Saint_Johns_Ortho_2025": {
     "v": 3,
-    "status": "error",
-    "cors": false,
+    "status": 200,
+    "cors": true,
     "scales": []
   },
   "Saint_Johns_Ortho_2026": {
     "v": 3,
-    "status": "error",
-    "cors": false,
+    "status": 200,
+    "cors": true,
     "scales": []
   },
   "Saint_Johns_Ortho_CIR_2021": {
     "v": 3,
-    "status": "error",
-    "cors": false,
+    "status": 200,
+    "cors": true,
     "scales": []
   },
   "Saint_Johns_Ortho_CIR_2024": {
     "v": 3,
-    "status": "error",
-    "cors": false,
+    "status": 200,
+    "cors": true,
     "scales": []
   },
   "Saint_Johns_Ortho_CIR_2025": {
     "v": 3,
-    "status": "error",
-    "cors": false,
+    "status": 200,
+    "cors": true,
     "scales": []
   },
   "Saint_Johns_Ortho_CIR_2026": {
     "v": 3,
-    "status": "error",
-    "cors": false,
+    "status": 200,
+    "cors": true,
     "scales": []
   },
   "Saint_Lucie_Ortho_2021": {
@@ -3647,6 +3705,12 @@
     "cors": true,
     "scales": []
   },
+  "Szeged_2011": {
+    "v": 3,
+    "status": 200,
+    "cors": true,
+    "scales": []
+  },
   "TEClines": {
     "v": 3,
     "status": 403,
@@ -3847,7 +3911,7 @@
   },
   "UkraineVinnytsiaTG2021": {
     "v": 3,
-    "status": "error",
+    "status": 200,
     "cors": false,
     "scales": []
   },
@@ -4111,38 +4175,38 @@
   },
   "Zug-2011": {
     "v": 3,
-    "status": 500,
-    "cors": false,
+    "status": 200,
+    "cors": true,
     "scales": []
   },
   "Zug-2016": {
     "v": 3,
-    "status": 500,
-    "cors": false,
+    "status": 200,
+    "cors": true,
     "scales": []
   },
   "Zug-2018": {
     "v": 3,
-    "status": 500,
-    "cors": false,
+    "status": 200,
+    "cors": true,
     "scales": []
   },
   "Zug-2019-wms": {
     "v": 3,
-    "status": 500,
-    "cors": false,
+    "status": 200,
+    "cors": true,
     "scales": []
   },
   "Zug-2020-wms": {
     "v": 3,
-    "status": 500,
-    "cors": false,
+    "status": 200,
+    "cors": true,
     "scales": []
   },
   "Zug-2021-wms": {
     "v": 3,
-    "status": 500,
-    "cors": false,
+    "status": 200,
+    "cors": true,
     "scales": []
   },
   "aachen_alkis_wms": {
@@ -4155,6 +4219,18 @@
     "v": 3,
     "status": 200,
     "cors": false,
+    "scales": []
+  },
+  "antrimnuig": {
+    "v": 3,
+    "status": 403,
+    "cors": false,
+    "scales": []
+  },
+  "bartholomew_qi1940": {
+    "v": 3,
+    "status": 404,
+    "cors": true,
     "scales": []
   },
   "basemap.at": {
@@ -4202,7 +4278,7 @@
   "brazos_county_2019_wms": {
     "v": 3,
     "status": 200,
-    "cors": false,
+    "cors": true,
     "scales": []
   },
   "caparea_2019_wms": {
@@ -4297,9 +4373,10 @@
   },
   "fm:at-bfw-forest-development-plan": {
     "v": 3,
-    "status": 200,
+    "status": "not an image",
     "cors": true,
-    "scales": []
+    "scales": [],
+    "failingSince": "2026-11-09"
   },
   "fm:at-geosphere-geofast-50": {
     "v": 3,
@@ -4513,9 +4590,10 @@
   },
   "fm:at-vlbg-ortho-2006": {
     "v": 3,
-    "status": 200,
+    "status": "not an image",
     "cors": true,
-    "scales": []
+    "scales": [],
+    "failingSince": "2026-11-02"
   },
   "fm:at-vlbg-ortho-2009": {
     "v": 3,
@@ -6043,9 +6121,10 @@
   },
   "fm:fr-ign-plan-hd": {
     "v": 3,
-    "status": 200,
+    "status": 400,
     "cors": true,
-    "scales": []
+    "scales": [],
+    "failingSince": "2026-11-09"
   },
   "fm:fr-ign-plans-eau": {
     "v": 3,
@@ -6277,9 +6356,10 @@
   },
   "fm:hr-bioportal-pa-zoning": {
     "v": 3,
-    "status": 200,
+    "status": "not an image",
     "cors": true,
-    "scales": []
+    "scales": [],
+    "failingSince": "2026-11-02"
   },
   "fm:hr-bioportal-protected-areas": {
     "v": 3,
@@ -6410,25 +6490,25 @@
   "fm:it-fvg-avalanche-sites": {
     "v": 3,
     "status": 200,
-    "cors": false,
+    "cors": true,
     "scales": []
   },
   "fm:it-fvg-ctrn-5000": {
     "v": 3,
     "status": 200,
-    "cors": false,
+    "cors": true,
     "scales": []
   },
   "fm:it-fvg-natura2000": {
     "v": 3,
     "status": 200,
-    "cors": false,
+    "cors": true,
     "scales": []
   },
   "fm:it-fvg-parks-reserves": {
     "v": 3,
     "status": 200,
-    "cors": false,
+    "cors": true,
     "scales": []
   },
   "fm:it-igm-100000": {
@@ -6613,111 +6693,129 @@
   },
   "fm:si-arso-bear-habitat": {
     "v": 3,
-    "status": 200,
+    "status": "not an image",
     "cors": false,
-    "scales": []
+    "scales": [],
+    "failingSince": "2026-11-02"
   },
   "fm:si-arso-ecologically-important-areas": {
     "v": 3,
-    "status": 200,
+    "status": "not an image",
     "cors": false,
-    "scales": []
+    "scales": [],
+    "failingSince": "2026-11-02"
   },
   "fm:si-arso-natura2000": {
     "v": 3,
-    "status": 200,
+    "status": "not an image",
     "cors": false,
-    "scales": []
+    "scales": [],
+    "failingSince": "2026-11-02"
   },
   "fm:si-arso-natural-values": {
     "v": 3,
-    "status": 200,
+    "status": "not an image",
     "cors": false,
-    "scales": []
+    "scales": [],
+    "failingSince": "2026-11-02"
   },
   "fm:si-arso-precipitation": {
     "v": 3,
-    "status": 200,
+    "status": "not an image",
     "cors": false,
-    "scales": []
+    "scales": [],
+    "failingSince": "2026-11-02"
   },
   "fm:si-arso-protected-areas": {
     "v": 3,
-    "status": 200,
+    "status": "not an image",
     "cors": false,
-    "scales": []
+    "scales": [],
+    "failingSince": "2026-11-02"
   },
   "fm:si-arso-seismic-hazard": {
     "v": 3,
-    "status": 200,
+    "status": "not an image",
     "cors": false,
-    "scales": []
+    "scales": [],
+    "failingSince": "2026-11-02"
   },
   "fm:si-arso-snow-cover-days": {
     "v": 3,
-    "status": 200,
+    "status": "not an image",
     "cors": false,
-    "scales": []
+    "scales": [],
+    "failingSince": "2026-11-02"
   },
   "fm:si-arso-temperature": {
     "v": 3,
-    "status": 200,
+    "status": "not an image",
     "cors": false,
-    "scales": []
+    "scales": [],
+    "failingSince": "2026-11-02"
   },
   "fm:si-arso-wind-50m": {
     "v": 3,
-    "status": 200,
+    "status": "not an image",
     "cors": false,
-    "scales": []
+    "scales": [],
+    "failingSince": "2026-11-02"
   },
   "fm:si-gurs-dpk250": {
     "v": 3,
-    "status": 200,
+    "status": 403,
     "cors": true,
-    "scales": []
+    "scales": [],
+    "failingSince": "2026-11-09"
   },
   "fm:si-gurs-dtk50": {
     "v": 3,
-    "status": 200,
+    "status": 403,
     "cors": true,
-    "scales": []
+    "scales": [],
+    "failingSince": "2026-11-02"
   },
   "fm:si-gurs-forest-management-areas": {
     "v": 3,
-    "status": 200,
+    "status": 403,
     "cors": true,
-    "scales": []
+    "scales": [],
+    "failingSince": "2026-11-09"
   },
   "fm:si-gurs-lidar-hillshade": {
     "v": 3,
-    "status": 200,
+    "status": 403,
     "cors": true,
-    "scales": []
+    "scales": [],
+    "failingSince": "2026-11-09"
   },
   "fm:si-gurs-municipalities": {
     "v": 3,
-    "status": 200,
+    "status": 403,
     "cors": true,
-    "scales": []
+    "scales": [],
+    "failingSince": "2026-11-09"
   },
   "fm:si-gurs-parcels": {
     "v": 3,
-    "status": 200,
+    "status": 403,
     "cors": true,
-    "scales": []
+    "scales": [],
+    "failingSince": "2026-11-09"
   },
   "fm:si-gurs-settlements": {
     "v": 3,
-    "status": 200,
+    "status": 403,
     "cors": true,
-    "scales": []
+    "scales": [],
+    "failingSince": "2026-11-09"
   },
   "fm:si-mnvp-land-use-plans": {
     "v": 3,
-    "status": 200,
+    "status": 403,
     "cors": true,
-    "scales": []
+    "scales": [],
+    "failingSince": "2026-11-09"
   },
   "fm:sk-sgudz-old-mines": {
     "v": 3,
@@ -6767,6 +6865,12 @@
     "cors": true,
     "scales": []
   },
+  "fr.ign.bdtopo": {
+    "v": 3,
+    "status": 200,
+    "cors": true,
+    "scales": []
+  },
   "fr.ign.mnslidarhd": {
     "v": 3,
     "status": 200,
@@ -6805,13 +6909,13 @@
   },
   "fr.orthohr": {
     "v": 3,
-    "status": 404,
+    "status": 200,
     "cors": true,
     "scales": []
   },
   "fr.orthohr.2013": {
     "v": 3,
-    "status": 404,
+    "status": 200,
     "cors": true,
     "scales": []
   },
@@ -6823,25 +6927,25 @@
   },
   "fr.orthohr.2015": {
     "v": 3,
-    "status": 404,
+    "status": 200,
     "cors": true,
     "scales": []
   },
   "fr.orthohr.2016": {
     "v": 3,
-    "status": 404,
+    "status": 200,
     "cors": true,
     "scales": []
   },
   "fr.orthohr.2017": {
     "v": 3,
-    "status": 404,
+    "status": 200,
     "cors": true,
     "scales": []
   },
   "fr.orthohr.2018": {
     "v": 3,
-    "status": 404,
+    "status": 200,
     "cors": true,
     "scales": []
   },
@@ -6859,25 +6963,25 @@
   },
   "fr.orthohr.2021": {
     "v": 3,
-    "status": 404,
+    "status": 200,
     "cors": true,
     "scales": []
   },
   "fr.orthohr.2022": {
     "v": 3,
-    "status": 404,
+    "status": 200,
     "cors": true,
     "scales": []
   },
   "fr.orthohr.2023": {
     "v": 3,
-    "status": 404,
+    "status": 200,
     "cors": true,
     "scales": []
   },
   "fr.orthohr.2024": {
     "v": 3,
-    "status": 404,
+    "status": 200,
     "cors": true,
     "scales": []
   },
@@ -6955,19 +7059,19 @@
   },
   "gsi.go.jp_airphoto_2019": {
     "v": 3,
-    "status": 200,
+    "status": 404,
     "cors": true,
     "scales": []
   },
   "gsi.go.jp_airphoto_2020": {
     "v": 3,
-    "status": 404,
+    "status": 200,
     "cors": true,
     "scales": []
   },
   "gsi.go.jp_airphoto_2021": {
     "v": 3,
-    "status": 404,
+    "status": 200,
     "cors": true,
     "scales": []
   },
@@ -7015,9 +7119,10 @@
   },
   "ign-bl-slope": {
     "v": 3,
-    "status": 200,
+    "status": "error",
     "cors": false,
-    "scales": []
+    "scales": [],
+    "failingSince": "2026-11-09"
   },
   "ign-cartas-100k": {
     "v": 3,
@@ -7279,9 +7384,10 @@
   },
   "mainzlatestaerialimagery": {
     "v": 3,
-    "status": 200,
+    "status": "not an image",
     "cors": true,
-    "scales": []
+    "scales": [],
+    "failingSince": "2026-11-02"
   },
   "miljodirektoratet-friluftsomrader": {
     "v": 3,
@@ -8935,13 +9041,13 @@
   },
   "rio2019": {
     "v": 3,
-    "status": "not an image",
+    "status": 200,
     "cors": true,
     "scales": []
   },
   "rio2022": {
     "v": 3,
-    "status": "not an image",
+    "status": 200,
     "cors": true,
     "scales": []
   },
@@ -8978,7 +9084,7 @@
   "smith_county_2019_wms": {
     "v": 3,
     "status": 200,
-    "cors": false,
+    "cors": true,
     "scales": []
   },
   "sollentuna-orto": {
@@ -9109,9 +9215,10 @@
   },
   "us-pr-slope": {
     "v": 3,
-    "status": 200,
+    "status": "error",
     "cors": false,
-    "scales": []
+    "scales": [],
+    "failingSince": "2026-11-09"
   },
   "viersen_alkis_wms": {
     "v": 3,
