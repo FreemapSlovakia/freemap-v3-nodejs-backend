@@ -29,9 +29,6 @@ const QuerySchema = z.object({
   // date-only event matches by its last date, one without an end by starting
   // on `from`'s day there or later.
   tz: z.string().refine(isTimeZone, 'not an IANA time zone').optional(),
-  // Deprecated, use `tz`: `from`'s day as the client's local start with its
-  // offset, e.g. `2026-11-09T00:00:00+01:00`.
-  fromDay: z.iso.datetime({ offset: true }).optional(),
   // `1` lists summaries (`EventSummarySchema`, up to 10000), the full event by
   // its id.
   summary: z.enum(['1']).optional(),
@@ -86,25 +83,6 @@ function isTimeZone(tz: string) {
   } catch {
     return false;
   }
-}
-
-/** `from`'s day where the viewer is, YYYY-MM-DD, and the instant it starts. */
-function viewerDay(from: string, tz?: string, fromDay?: string) {
-  if (tz) {
-    // Not `Instant.from`, which refuses more than 9 fractional digits.
-    const start = Temporal.Instant.fromEpochMilliseconds(Date.parse(from))
-      .toZonedDateTimeISO(tz)
-      .startOfDay();
-
-    return {
-      day: start.toPlainDate().toString(),
-      start: new Date(start.epochMilliseconds),
-    };
-  }
-
-  return fromDay
-    ? { day: fromDay.slice(0, 10), start: new Date(fromDay) }
-    : undefined;
 }
 
 /** The range conditions on one stat column. */
@@ -163,7 +141,7 @@ export function attachGetEventsHandler(router: RouterInstance) {
         return ctx.throw(400, err as Error);
       }
 
-      const { from, to, tz, fromDay, bbox, near, radius, visibility } = query;
+      const { from, to, tz, bbox, near, radius, visibility } = query;
 
       const myUserId = ctx.state.user?.id ?? -1;
 
@@ -176,19 +154,23 @@ export function attachGetEventsHandler(router: RouterInstance) {
         wh.push(sql`e.visibility = ${visibility}`);
       }
 
-      if (from) {
-        const viewer = viewerDay(from, tz, fromDay);
+      if (from && tz) {
+        // `from`'s day where the viewer is. Not `Instant.from`, which refuses
+        // more than 9 fractional digits.
+        const dayStart = Temporal.Instant.fromEpochMilliseconds(
+          Date.parse(from),
+        )
+          .toZonedDateTimeISO(tz)
+          .startOfDay();
 
         // A date-only event's dates are UTC midnights.
-        wh.push(
-          viewer
-            ? sql`CASE
-                WHEN e.dateOnly THEN COALESCE(e.endAt, e.startAt) >= ${new Date(`${viewer.day}T00:00:00Z`)}
-                WHEN e.endAt IS NULL THEN e.startAt >= ${viewer.start}
-                ELSE e.endAt >= ${new Date(from)}
-              END`
-            : sql`${eventEndSql} >= ${new Date(from)}`,
-        );
+        wh.push(sql`CASE
+          WHEN e.dateOnly THEN COALESCE(e.endAt, e.startAt) >= ${new Date(`${dayStart.toPlainDate()}T00:00:00Z`)}
+          WHEN e.endAt IS NULL THEN e.startAt >= ${new Date(dayStart.epochMilliseconds)}
+          ELSE e.endAt >= ${new Date(from)}
+        END`);
+      } else if (from) {
+        wh.push(sql`${eventEndSql} >= ${new Date(from)}`);
       }
 
       if (to) {
