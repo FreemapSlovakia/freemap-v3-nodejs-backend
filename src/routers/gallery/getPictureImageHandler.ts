@@ -126,9 +126,13 @@ export function attachGetPictureImageHandler(router: RouterInstance) {
       // The width is part of what the body is, so it has to be part of the
       // validator too. Keying only on the file's stats made every width share
       // one ETag, letting a cache answer a full-size request with a thumbnail.
-      ctx.response.etag = calculate(`${stats.size}-${stats.mtimeMs}-${width}`, {
-        weak: true,
-      });
+      // `icc` invalidates resized copies cached before the ICC profile was kept.
+      ctx.response.etag = calculate(
+        `${stats.size}-${stats.mtimeMs}-${width}-icc`,
+        {
+          weak: true,
+        },
+      );
 
       if (ctx.fresh) {
         ctx.status = 304;
@@ -141,8 +145,12 @@ export function attachGetPictureImageHandler(router: RouterInstance) {
       // rotate() applies the EXIF orientation up front, because sharp drops the
       // tag when re-encoding - without it a resized photo that relies on the tag
       // comes out sideways while the unresized URL renders upright.
+      // keepIccProfile() keeps a wide-gamut (e.g. Display P3) photo from being
+      // converted to sRGB, so the resized copy matches the original.
       ctx.body = width
-        ? fileStream.pipe(sharp().rotate().resize(width).jpeg())
+        ? fileStream.pipe(
+            sharp().rotate().resize(width).keepIccProfile().jpeg(),
+          )
         : fileStream;
     },
   );
