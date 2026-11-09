@@ -25,6 +25,10 @@ const QuerySchema = z.object({
   // (one without an end, or a date-only one, lasts its last day through).
   from: z.iso.datetime().optional(),
   to: z.iso.datetime().optional(),
+  // `from`'s day as the client's local start with its offset, e.g.
+  // `2026-11-09T00:00:00+01:00`. A date-only event then matches by its last
+  // date, one without an end by starting that day or later.
+  fromDay: z.iso.datetime({ offset: true }).optional(),
   // `1` lists summaries (`EventSummarySchema`, up to 10000), the full event by
   // its id.
   summary: z.enum(['1']).optional(),
@@ -128,7 +132,7 @@ export function attachGetEventsHandler(router: RouterInstance) {
         return ctx.throw(400, err as Error);
       }
 
-      const { from, to, bbox, near, radius, visibility } = query;
+      const { from, to, fromDay, bbox, near, radius, visibility } = query;
 
       const myUserId = ctx.state.user?.id ?? -1;
 
@@ -141,7 +145,14 @@ export function attachGetEventsHandler(router: RouterInstance) {
         wh.push(sql`e.visibility = ${visibility}`);
       }
 
-      if (from) {
+      if (from && fromDay) {
+        // A date-only event's dates are UTC midnights.
+        wh.push(sql`CASE
+          WHEN e.dateOnly THEN COALESCE(e.endAt, e.startAt) >= ${new Date(`${fromDay.slice(0, 10)}T00:00:00Z`)}
+          WHEN e.endAt IS NULL THEN e.startAt >= ${new Date(fromDay)}
+          ELSE e.endAt >= ${new Date(from)}
+        END`);
+      } else if (from) {
         wh.push(sql`${eventEndSql} >= ${new Date(from)}`);
       }
 
