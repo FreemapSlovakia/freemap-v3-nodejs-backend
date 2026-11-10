@@ -196,7 +196,6 @@ function eventsOf(poi, { from, to }) {
               endAt,
               dateOnly,
               startPoint: { lat, lon },
-              visibility: 'public',
               transports: mtb ? ['mtb'] : ['hiking'],
               distance: kms.length === 1 ? Math.round(kms[0] * 1000) : null,
               ascent: Number.isFinite(ascent) ? ascent : null,

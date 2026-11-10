@@ -182,7 +182,6 @@ function eventsOf(e, { from, to }) {
               endAt,
               dateOnly: !timed,
               startPoint: { lat, lon },
-              visibility: 'public',
               transports: ['hiking'],
             }
           : null,

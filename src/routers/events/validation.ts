@@ -6,7 +6,6 @@ import {
   SourceKeySchema,
   StatsShape,
   TransportsSchema,
-  VisibilitySchema,
 } from './types.js';
 
 const fields = {
@@ -20,7 +19,8 @@ const fields = {
   dateOnly: z.boolean().optional(),
   // Where the event is shown and filtered by area.
   startPoint: PointSchema,
-  visibility: VisibilitySchema,
+  // Every event is public; still taken from clients that send it.
+  visibility: z.literal('public').optional(),
   transports: TransportsSchema.optional(),
   distance: StatsShape.distance.optional(),
   duration: StatsShape.duration.optional(),
@@ -34,7 +34,6 @@ const fields = {
 export const EventBodySchema = z
   .strictObject({
     ...fields,
-    visibility: fields.visibility.default('public'),
     /** Creates the event, or updates the one harvested under this key; an eventManager's. */
     sourceKey: SourceKeySchema.optional(),
   })

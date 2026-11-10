@@ -327,7 +327,6 @@ async function eventOf(entry, block) {
           endAt,
           dateOnly,
           startPoint,
-          visibility: 'public',
           transports,
           distance: kms.length ? Math.round(Math.max(...kms) * 1000) : null,
           children: types.includes('Rodinná turistika') ? true : null,

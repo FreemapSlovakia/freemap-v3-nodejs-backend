@@ -154,10 +154,6 @@ export function attachPatchEventHandler(router: RouterInstance) {
           set('startLon', body.startPoint.lon);
         }
 
-        if (body.visibility !== undefined) {
-          set('visibility', body.visibility);
-        }
-
         if (body.transports !== undefined) {
           set(
             'transports',

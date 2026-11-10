@@ -17,7 +17,6 @@ import {
   eventSummaryRowToResponse,
   eventSummarySelect,
   importedSql,
-  VisibilitySchema,
 } from './types.js';
 
 const QuerySchema = z.object({
@@ -51,7 +50,6 @@ const QuerySchema = z.object({
   sort: z.enum(['start', 'near']).optional(),
   // At most this many; by default 1000, or 10000 summaries.
   limit: z.coerce.number().int().min(1).max(10000).optional(),
-  visibility: VisibilitySchema.optional(),
   // Comma-separated transport types; any of them matches.
   transport: z
     .string()
@@ -114,7 +112,7 @@ export function attachGetEventsHandler(router: RouterInstance) {
   registerPath('/events', {
     get: {
       summary:
-        'List events by time window, area, title words, visibility, transport and trip stats',
+        'List events by time window, area, title words, transport and trip stats',
       tags: ['events'],
       security: AUTH_OPTIONAL,
       requestParams: { query: QuerySchema },
@@ -147,18 +145,9 @@ export function attachGetEventsHandler(router: RouterInstance) {
         return ctx.throw(400, err as Error);
       }
 
-      const { from, to, tz, bbox, near, radius, visibility } = query;
+      const { from, to, tz, bbox, near, radius } = query;
 
-      const myUserId = ctx.state.user?.id ?? -1;
-
-      const wh = [
-        // Unlisted events are listed only to their owner.
-        sql`(e.visibility = 'public' OR e.userId = ${myUserId})`,
-      ];
-
-      if (visibility !== undefined) {
-        wh.push(sql`e.visibility = ${visibility}`);
-      }
+      const wh = [sql`TRUE`];
 
       if (from && tz) {
         // `from`'s day where the viewer is. Not `Instant.from`, which refuses

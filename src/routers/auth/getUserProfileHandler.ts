@@ -111,7 +111,7 @@ export function attachGetUserProfileHandler(router: RouterInstance) {
             (SELECT COUNT(*) FROM pictureComment WHERE userId = ${id})
               + (SELECT COUNT(*) FROM wikimediaComment WHERE userId = ${id})
               AS commentCount,
-            (SELECT COUNT(*) FROM event WHERE userId = ${id} AND visibility = 'public')
+            (SELECT COUNT(*) FROM event WHERE userId = ${id})
               AS eventCount
           FROM user
           WHERE id = ${id}`,

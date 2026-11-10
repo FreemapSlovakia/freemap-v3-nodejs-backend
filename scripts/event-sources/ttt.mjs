@@ -207,7 +207,6 @@ function eventOf(detail, typeNames) {
             lat: main.startPlace.latitude,
             lon: main.startPlace.longitude,
           },
-          visibility: 'public',
           transports: [
             ...new Set(routes.flatMap((r) => r.params.map((p) => KINDS[p]))),
           ].filter(Boolean),

@@ -385,7 +385,6 @@ export async function initDatabase() {
       dateOnly BIT NOT NULL DEFAULT false,
       startLat DECIMAL(8, 6) NOT NULL,
       startLon DECIMAL(9, 6) NOT NULL,
-      visibility ENUM('public', 'unlisted') CHARSET ascii NOT NULL DEFAULT 'public',
       -- A harvested event's "<source>:<id there>", which a re-harvest updates by.
       sourceKey VARCHAR(255) CHARSET ascii COLLATE ascii_bin NULL,
       cover VARCHAR(24) CHARSET ascii NULL,
@@ -578,7 +577,10 @@ export async function initDatabase() {
 
     "ALTER TABLE emailCode ADD COLUMN IF NOT EXISTS requestIp VARCHAR(45) CHARSET ascii NOT NULL DEFAULT '' AFTER codeHash",
 
-    'ALTER TABLE event ADD COLUMN IF NOT EXISTS dateOnly BIT NOT NULL DEFAULT false AFTER endAt, ADD COLUMN IF NOT EXISTS sourceKey VARCHAR(255) CHARSET ascii COLLATE ascii_bin NULL AFTER visibility, ADD UNIQUE INDEX IF NOT EXISTS eventSourceKeyIdx (sourceKey)',
+    'ALTER TABLE event ADD COLUMN IF NOT EXISTS dateOnly BIT NOT NULL DEFAULT false AFTER endAt, ADD COLUMN IF NOT EXISTS sourceKey VARCHAR(255) CHARSET ascii COLLATE ascii_bin NULL AFTER startLon, ADD UNIQUE INDEX IF NOT EXISTS eventSourceKeyIdx (sourceKey)',
+
+    // Every event is public.
+    'ALTER TABLE event DROP COLUMN IF EXISTS visibility',
   ];
 
   const db = await pool.getConnection();

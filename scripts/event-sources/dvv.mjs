@@ -211,7 +211,6 @@ async function eventOf(entry, today, from, to) {
               endAt: null,
               dateOnly: !clock,
               startPoint,
-              visibility: 'public',
               transports: ['hiking'],
               distance: kms.length ? Math.round(Math.max(...kms) * 1000) : null,
             }

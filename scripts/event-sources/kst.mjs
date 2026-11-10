@@ -470,7 +470,6 @@ async function eventOf(lines, { year, url, cacheDir }) {
           endAt,
           dateOnly,
           startPoint,
-          visibility: 'public',
           transports: [
             ...new Set(kinds.map(([, kind]) => kind).filter(Boolean)),
           ],

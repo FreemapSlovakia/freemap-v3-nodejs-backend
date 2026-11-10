@@ -15,8 +15,6 @@ export const PointSchema = z
   })
   .meta({ id: 'EventPoint' });
 
-export const VisibilitySchema = z.enum(['public', 'unlisted']);
-
 export const ParticipationSchema = z.enum(['interested', 'going']);
 
 /** A kind of transport (`bike`, `hiking`); no comma, as they are stored joined. */
@@ -76,7 +74,8 @@ export const EventSchema = z
     /** No time was given: `startAt` and `endAt` are UTC midnights of their days. */
     dateOnly: z.boolean(),
     startPoint: PointSchema,
-    visibility: VisibilitySchema,
+    /** Every event is public; still sent for clients that read it. */
+    visibility: z.literal('public').default('public'),
     /** A harvested event's `<source>:<id there>`; null for one entered by hand. */
     sourceKey: z.string().nullable(),
     /** Harvested and still on the source's account, which nobody logs into:
@@ -109,7 +108,6 @@ export const EventRowSchema = z.object({
   dateOnly: z.boolean(),
   startLat: z.number(),
   startLon: z.number(),
-  visibility: VisibilitySchema,
   sourceKey: z.string().nullable(),
   imported: z.coerce.boolean(),
   cover: z.string().nullable(),
@@ -263,7 +261,7 @@ export const SourceKeySchema = z
  */
 export const eventSelect = (user: User | undefined) => sql`
   SELECT e.id, e.userId, e.mapId, map.name AS mapName, e.title, e.description,
-    e.startAt, e.endAt, e.dateOnly, e.startLat, e.startLon, e.visibility,
+    e.startAt, e.endAt, e.dateOnly, e.startLat, e.startLon,
     e.sourceKey, ${importedSql} AS imported, e.cover,
     e.transports, e.distance, e.duration, e.ascent, e.descent,
     e.difficulty, e.dogs, e.children, e.createdAt, e.updatedAt,

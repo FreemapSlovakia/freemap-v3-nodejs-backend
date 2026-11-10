@@ -16,7 +16,7 @@ export function attachSourceHandler(router: RouterInstance) {
   registerPath('/events/sources/{source}', {
     get: {
       summary:
-        'The events harvested from a source that have not started yet, whatever their visibility (eventManager only)',
+        'The events harvested from a source that have not started yet (eventManager only)',
       tags: ['events'],
       security: AUTH_REQUIRED,
       requestParams: { path: z.object({ source: SourceSchema }) },

@@ -65,8 +65,8 @@ export function attachPostEventHandler(router: RouterInstance) {
           ctx.throw(403, 'only an eventManager can enter a harvested event');
         }
 
-        // What a re-harvest updates; the owner, linked map and visibility stay as
-        // a manager set them, e.g. on handing the event to the club.
+        // What a re-harvest updates; the owner and linked map stay as a manager
+        // set them, e.g. on handing the event to the club.
         const fields = sql`
           title = ${body.title},
           description = ${body.description ?? null},
@@ -92,7 +92,6 @@ export function attachPostEventHandler(router: RouterInstance) {
             sourceKey = ${body.sourceKey ?? null},
             userId = ${ownerId},
             mapId = ${body.mapId ?? null},
-            visibility = ${body.visibility},
             ${fields}
           ${body.sourceKey ? sql`ON DUPLICATE KEY UPDATE ${fields}` : empty}
         `);
