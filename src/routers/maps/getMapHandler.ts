@@ -6,6 +6,8 @@ import { pool } from '../../database.js';
 import { AUTH_OPTIONAL, registerPath } from '../../openapi.js';
 import { acceptValidator } from '../../requestValidators.js';
 import { MapMetaSchema, zDateToIso } from '../../types.js';
+import { canWriteEvent } from '../events/types.js';
+import { eventOfMap } from './eventMap.js';
 
 const DbRowSchema = z.object({
   id: z.string().nonempty(),
@@ -15,6 +17,7 @@ const DbRowSchema = z.object({
   createdAt: zDateToIso,
   modifiedAt: zDateToIso,
   data: z.string(),
+  forEvent: z.coerce.boolean(),
 });
 
 const ResponseSchema = z.strictObject({
@@ -55,10 +58,10 @@ export function attachGetMapHandler(router: RouterInstance) {
         .max(1)
         .parse(
           await pool.query<unknown>(sql`
-          SELECT id, name, data, createdAt, modifiedAt, map.userId, GROUP_CONCAT(mapWriteAccess.userId) AS writers
+          SELECT id, name, data, createdAt, modifiedAt, forEvent, map.userId, GROUP_CONCAT(mapWriteAccess.userId) AS writers
             FROM map LEFT JOIN mapWriteAccess ON (mapWriteAccess.mapId = id)
             WHERE id = ${ctx.params.id}
-            GROUP BY id, name, data, createdAt, map.userId
+            GROUP BY id, name, data, createdAt, forEvent, map.userId
         `),
         );
 
@@ -70,6 +73,8 @@ export function attachGetMapHandler(router: RouterInstance) {
 
       const writers = item.writers?.split(',').map((s) => Number(s)) ?? [];
 
+      const event = item.forEvent ? await eventOfMap(pool, item.id) : undefined;
+
       ctx.body = ResponseSchema.parse({
         meta: MapMetaSchema.parse({
           id: item.id,
@@ -79,9 +84,15 @@ export function attachGetMapHandler(router: RouterInstance) {
           userId: item.userId,
           public: true,
           writers: item.userId === user?.id ? writers : undefined,
+          // As a save is allowed: a linked event's own map by the event.
           canWrite: Boolean(
-            user && (item.userId === user.id || writers.includes(user.id)),
+            user &&
+              (event
+                ? canWriteEvent(user, event)
+                : item.userId === user.id || writers.includes(user.id)),
           ),
+          forEvent: item.forEvent,
+          eventId: event?.id ?? null,
         }),
         data: JSON.parse(item.data),
       });

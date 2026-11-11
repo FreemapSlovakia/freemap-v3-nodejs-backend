@@ -255,6 +255,10 @@ export const MapMetaSchema = z
     modifiedAt: z.iso.datetime(),
     writers: z.array(z.uint32()).optional().meta({ description: 'User IDs' }),
     canWrite: z.boolean(),
+    /** An event's own map, kept out of its creator's list. */
+    forEvent: z.boolean().optional(),
+    /** The event whose own map it is, written by whoever may write the event. */
+    eventId: z.string().nullable().optional(),
   })
   .meta({ id: 'MapMeta' });
 

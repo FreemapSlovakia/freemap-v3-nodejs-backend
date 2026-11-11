@@ -360,6 +360,8 @@ export async function initDatabase() {
       name VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL,
       userId INT UNSIGNED NOT NULL,
       data MEDIUMTEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL DEFAULT '{}',
+      -- The event's own, not listed among its creator's maps; see eventMap.ts.
+      forEvent BIT NOT NULL DEFAULT false,
       CONSTRAINT umUserFk FOREIGN KEY (userId) REFERENCES user (id) ON DELETE CASCADE,
       INDEX umCreatedAtIdx (createdAt)
     ) ENGINE=InnoDB`,
@@ -673,6 +675,8 @@ export async function initDatabase() {
 
     // The saved filters' mail reads the last day's events every minute.
     'ALTER TABLE event ADD INDEX IF NOT EXISTS eventCreatedIdx (createdAt)',
+
+    'ALTER TABLE map ADD COLUMN IF NOT EXISTS forEvent BIT NOT NULL DEFAULT false AFTER data',
   ];
 
   const db = await pool.getConnection();

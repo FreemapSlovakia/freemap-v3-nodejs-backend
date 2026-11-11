@@ -67,6 +67,8 @@ export const EventSchema = z
     mapId: z.string().nullable(),
     /** The linked map's name, while it is linked. */
     mapName: z.string().nullable(),
+    /** The linked map is the event's own, made for it and kept out of My maps. */
+    mapForEvent: z.boolean(),
     title: z.string(),
     description: z.string().nullable(),
     startAt: zDateToIso,
@@ -101,6 +103,7 @@ export const EventRowSchema = z.object({
   userId: z.uint32(),
   mapId: z.string().nullable(),
   mapName: z.string().nullable(),
+  mapForEvent: z.coerce.boolean(),
   title: z.string(),
   description: z.string().nullable(),
   startAt: z.date(),
@@ -260,7 +263,8 @@ export const SourceKeySchema = z
  * own participation included; `e` is the event, for a `WHERE` to follow.
  */
 export const eventSelect = (user: User | undefined) => sql`
-  SELECT e.id, e.userId, e.mapId, map.name AS mapName, e.title, e.description,
+  SELECT e.id, e.userId, e.mapId, map.name AS mapName,
+    COALESCE(map.forEvent, false) AS mapForEvent, e.title, e.description,
     e.startAt, e.endAt, e.dateOnly, e.startLat, e.startLon,
     e.sourceKey, ${importedSql} AS imported, e.cover,
     e.transports, e.distance, e.duration, e.ascent, e.descent,

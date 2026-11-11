@@ -44,6 +44,8 @@ const QuerySchema = z.object({
     .pipe(z.tuple([z.number().min(-90).max(90), z.number().min(-180).max(180)]))
     .optional(),
   radius: z.coerce.number().positive().max(1000).optional(),
+  // The events linking this map.
+  mapId: z.string().min(1).max(8).optional(),
   // Words the title holds all of, case and accents ignored.
   q: z.string().trim().min(2).max(100).optional(),
   // `near` orders by distance from `near`, which then needs no `radius`.
@@ -159,6 +161,10 @@ export function attachGetEventsHandler(router: RouterInstance) {
         wh.push(
           sql`e.startLat BETWEEN ${minLat} AND ${maxLat} AND e.startLon BETWEEN ${minLon} AND ${maxLon}`,
         );
+      }
+
+      if (query.mapId) {
+        wh.push(sql`e.mapId = ${query.mapId}`);
       }
 
       if (query.sort === 'near' && !near) {

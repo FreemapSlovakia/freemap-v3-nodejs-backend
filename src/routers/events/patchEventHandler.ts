@@ -6,6 +6,7 @@ import { runInTransaction } from '../../database.js';
 import { appLogger } from '../../logger.js';
 import { AUTH_REQUIRED, registerPath } from '../../openapi.js';
 import { acceptValidator } from '../../requestValidators.js';
+import { dropEventMap, nameEventMap } from '../maps/eventMap.js';
 import { mailEventChange, readEventWhen } from './eventMail.js';
 import { assertOwnMap } from './mapLink.js';
 import { assertCanOwn } from './organizerHandlers.js';
@@ -112,14 +113,18 @@ export function attachPatchEventHandler(router: RouterInstance) {
           await assertCanOwn(ctx, conn, ownerId);
         }
 
-        // The linked map must be the owner's — the new one's, if it changes.
+        // The linked map must be the owner's — the new one's, if it changes —
+        // or the event's own.
         const mapId = body.mapId === undefined ? existing.mapId : body.mapId;
 
         if (
           mapId &&
           (mapId !== existing.mapId || ownerId !== existing.userId)
         ) {
-          await assertOwnMap(ctx, conn, mapId, ownerId);
+          await assertOwnMap(ctx, conn, mapId, ownerId, {
+            id,
+            links: mapId === existing.mapId,
+          });
         }
 
         const sets: Sql[] = [];
@@ -196,6 +201,14 @@ export function attachPatchEventHandler(router: RouterInstance) {
               actorId: ctx.state.user!.id,
             });
           }
+        }
+
+        if (existing.mapId && existing.mapId !== mapId) {
+          await dropEventMap(conn, existing.mapId);
+        }
+
+        if (body.title !== undefined || mapId !== existing.mapId) {
+          await nameEventMap(conn, id);
         }
 
         const [row] = EventRowSchema.array()

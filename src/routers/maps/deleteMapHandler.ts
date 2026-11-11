@@ -6,6 +6,7 @@ import { runInTransaction } from '../../database.js';
 import { AUTH_REQUIRED, registerPath } from '../../openapi.js';
 import { acceptValidator } from '../../requestValidators.js';
 import { isOwnerOrRole } from '../../roles.js';
+import { eventOfMap } from './eventMap.js';
 
 export function attachDeleteMapHandler(router: RouterInstance) {
   registerPath('/maps/{id}', {
@@ -43,6 +44,11 @@ export function attachDeleteMapHandler(router: RouterInstance) {
 
         if (!isOwnerOrRole(ctx.state.user, item.userId, 'mapModerator')) {
           ctx.throw(403);
+        }
+
+        // It goes with its event, or when the event links another map.
+        if (await eventOfMap(conn, ctx.params.id)) {
+          ctx.throw(409, 'an event’s own map goes with the event');
         }
 
         await conn.query<unknown>(

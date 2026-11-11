@@ -16,6 +16,8 @@ const BodySchema = z.strictObject({
     .optional()
     .meta({ deprecated: true, description: 'Ignored.' }),
   writers: z.array(z.uint32()).optional(),
+  // For an event to link as its own; see eventMap.ts.
+  forEvent: z.boolean().optional(),
 });
 
 export function attachPostMapHandler(router: RouterInstance) {
@@ -45,7 +47,7 @@ export function attachPostMapHandler(router: RouterInstance) {
         return ctx.throw(400, err as Error);
       }
 
-      const { name, data, writers } = body;
+      const { name, data, writers, forEvent = false } = body;
 
       const id = nanoid();
 
@@ -60,8 +62,20 @@ export function attachPostMapHandler(router: RouterInstance) {
           userId = ${userId},
           createdAt = ${now},
           modifiedAt = ${now},
-          data = ${JSON.stringify(data)}
+          data = ${JSON.stringify(data)},
+          forEvent = ${forEvent}
       `);
+
+      // An event's own map is linked as the event is saved; one left unlinked
+      // for a week by a save that failed and was never retried is dropped.
+      if (forEvent) {
+        await pool.query<unknown>(sql`
+          DELETE FROM map
+            WHERE userId = ${userId} AND forEvent
+              AND createdAt < ${new Date(now.getTime() - 7 * 86_400_000)}
+              AND NOT EXISTS (SELECT 1 FROM event WHERE mapId = map.id)
+        `);
+      }
 
       if (writers?.length) {
         await pool.query<unknown>(
@@ -78,6 +92,8 @@ export function attachPostMapHandler(router: RouterInstance) {
         name,
         userId,
         canWrite: true,
+        forEvent,
+        eventId: null,
       });
     },
   );

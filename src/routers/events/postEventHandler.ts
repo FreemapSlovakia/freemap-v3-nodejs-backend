@@ -7,6 +7,7 @@ import { AUTH_REQUIRED, registerPath } from '../../openapi.js';
 import { nanoid } from '../../randomId.js';
 import { acceptValidator } from '../../requestValidators.js';
 import { hasRole } from '../../roles.js';
+import { nameEventMap } from '../maps/eventMap.js';
 import { mailEventChange, readEventWhen } from './eventMail.js';
 import { assertOwnMap } from './mapLink.js';
 import { assertCanOwn } from './organizerHandlers.js';
@@ -104,6 +105,10 @@ export function attachPostEventHandler(router: RouterInstance) {
             ${fields}
           ${body.sourceKey ? sql`ON DUPLICATE KEY UPDATE ${fields}` : empty}
         `);
+
+        if (body.mapId && !body.sourceKey) {
+          await nameEventMap(conn, id);
+        }
 
         const [row] = EventRowSchema.array()
           .length(1)

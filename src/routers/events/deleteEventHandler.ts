@@ -7,6 +7,7 @@ import { appLogger } from '../../logger.js';
 import { forgetTarget } from '../../mailWatch.js';
 import { AUTH_REQUIRED, registerPath } from '../../openapi.js';
 import { acceptValidator } from '../../requestValidators.js';
+import { dropEventMap } from '../maps/eventMap.js';
 import { removeCover } from './cover.js';
 import { mailEventDeleted } from './eventMail.js';
 import { canWriteEvent } from './types.js';
@@ -38,11 +39,17 @@ export function attachDeleteEventHandler(router: RouterInstance) {
     async (ctx) => {
       const cover = await runInTransaction(async (conn) => {
         const [item] = z
-          .array(z.object({ userId: z.uint32(), cover: z.string().nullable() }))
+          .array(
+            z.object({
+              userId: z.uint32(),
+              cover: z.string().nullable(),
+              mapId: z.string().nullable(),
+            }),
+          )
           .max(1)
           .parse(
             await conn.query<unknown>(
-              sql`SELECT userId, cover FROM event WHERE id = ${ctx.params.id} FOR UPDATE`,
+              sql`SELECT userId, cover, mapId FROM event WHERE id = ${ctx.params.id} FOR UPDATE`,
             ),
           );
 
@@ -64,6 +71,10 @@ export function attachDeleteEventHandler(router: RouterInstance) {
         );
 
         await forgetTarget(conn, 'event', ctx.params.id);
+
+        if (item.mapId) {
+          await dropEventMap(conn, item.mapId);
+        }
 
         return item.cover;
       });

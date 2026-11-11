@@ -5,8 +5,10 @@ import { authenticator } from '../../authenticator.js';
 import { runInTransaction } from '../../database.js';
 import { AUTH_REQUIRED, registerPath } from '../../openapi.js';
 import { acceptValidator } from '../../requestValidators.js';
-import { isOwnerOrRole } from '../../roles.js';
+import { hasRole, isOwnerOrRole } from '../../roles.js';
 import { MapMetaSchema, zDateToIso } from '../../types.js';
+import { canWriteEvent } from '../events/types.js';
+import { eventOfMap } from './eventMap.js';
 
 const BodySchema = z.strictObject({
   name: z.string().min(1).max(255).optional(),
@@ -23,6 +25,7 @@ const DbRowSchema = z.object({
   name: z.string().nullable(),
   createdAt: zDateToIso,
   modifiedAt: z.date(),
+  forEvent: z.coerce.boolean(),
 });
 
 export function attachPatchMapHandler(router: RouterInstance) {
@@ -79,7 +82,7 @@ export function attachPatchMapHandler(router: RouterInstance) {
           .max(1)
           .parse(
             await conn.query<unknown>(
-              sql`SELECT userId, name, createdAt, modifiedAt FROM map WHERE id = ${id} FOR UPDATE`,
+              sql`SELECT userId, name, createdAt, modifiedAt, forEvent FROM map WHERE id = ${id} FOR UPDATE`,
             ),
           );
 
@@ -97,12 +100,24 @@ export function attachPatchMapHandler(router: RouterInstance) {
 
         const user = ctx.state.user!;
 
-        if (
-          !isOwnerOrRole(user, item.userId, 'mapModerator') &&
-          (!curWriters.includes(user.id) ||
-            writers !== undefined ||
-            name !== undefined)
-        ) {
+        const event = item.forEvent ? await eventOfMap(conn, id) : undefined;
+
+        const moderator = hasRole(user, 'mapModerator');
+
+        // A linked event's own map is written by whoever may write the event,
+        // not by its creator, who may have handed the event on; its content
+        // only, as it is named after the event. Unlinked, it is its creator's.
+        const allowed = event
+          ? moderator ||
+            (canWriteEvent(user, event) &&
+              writers === undefined &&
+              name === undefined)
+          : isOwnerOrRole(user, item.userId, 'mapModerator') ||
+            (curWriters.includes(user.id) &&
+              writers === undefined &&
+              name === undefined);
+
+        if (!allowed) {
           ctx.throw(403);
         }
 
@@ -139,10 +154,14 @@ export function attachPatchMapHandler(router: RouterInstance) {
           createdAt: item.createdAt,
           modifiedAt: now.toISOString(),
           public: true,
-          writers: writers ?? curWriters,
+          // To the owner only, as a read gives them.
+          writers:
+            item.userId === user.id ? (writers ?? curWriters) : undefined,
           name: name ?? item.name,
           userId: item.userId,
           canWrite: true,
+          forEvent: item.forEvent,
+          eventId: event?.id ?? null,
         });
       });
     },

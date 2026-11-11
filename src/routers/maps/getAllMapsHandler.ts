@@ -46,7 +46,7 @@ export function attachGetAllMapsHandler(router: RouterInstance) {
         await pool.query<unknown>(sql`
           SELECT id, name, createdAt, modifiedAt, map.userId, GROUP_CONCAT(mapWriteAccess.userId) AS writers
             FROM map LEFT JOIN mapWriteAccess ON (mapWriteAccess.mapId = id)
-            WHERE map.userId = ${user.id}
+            WHERE map.userId = ${user.id} AND NOT map.forEvent
             GROUP BY id, name, createdAt, modifiedAt, map.userId
         `),
       );
