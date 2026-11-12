@@ -80,6 +80,18 @@ if (httpsPort) {
   });
 }
 
+// A streamed response legitimately carries 11 `close` listeners: Sentry's
+// request span, pino-http, Koa's finish tracking and seven from the
+// `Stream.pipeline` Koa pipes the body through. That trips Node's default
+// limit of 10 and logged a MaxListenersExceededWarning every few seconds. It
+// is no leak — each listener goes with its response — so raise the limit per
+// response, first, before any middleware adds one.
+app.use((ctx, next) => {
+  ctx.res.setMaxListeners(20);
+
+  return next();
+});
+
 app.use(
   koaPinoLogger({
     base: { module: 'koa' },
