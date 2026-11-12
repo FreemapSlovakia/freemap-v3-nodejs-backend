@@ -1,5 +1,5 @@
 import * as Sentry from '@sentry/node';
-import { isClientError } from './clientError.js';
+import { isClientError, isHangUp } from './clientError.js';
 import { getEnv } from './env.js';
 
 const dsn = getEnv('SENTRY_DSN', '');
@@ -15,13 +15,13 @@ if (dsn) {
     tracesSampleRate: Number(getEnv('SENTRY_TRACES_SAMPLE_RATE', '0')),
     // Don't report expected client errors (4xx) thrown via ctx.throw().
     beforeSend(event, hint) {
-      // A client that hung up mid-response, reported by Koa's body pipeline
-      // (Koa sets headerSent on errors raised after the response started).
+      // A client that hung up mid-response: Koa sets headerSent once the
+      // response has started or can no longer be written; see isHangUp.
       const ex = hint?.originalException as
-        | { code?: string; headerSent?: boolean }
+        | { headerSent?: boolean }
         | undefined;
 
-      if (ex?.code === 'ERR_STREAM_PREMATURE_CLOSE' && ex.headerSent) {
+      if (ex?.headerSent && isHangUp(ex)) {
         return null;
       }
 

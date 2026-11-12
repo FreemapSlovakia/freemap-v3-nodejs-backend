@@ -4,7 +4,7 @@ import { Writable } from 'node:stream';
 import test from 'node:test';
 import Koa from 'koa';
 import { pino } from 'pino';
-import { isClientError } from './clientError.js';
+import { isClientError, isHangUp } from './clientError.js';
 import { requestLogger } from './requestLogger.js';
 
 type Line = { level: number; msg: string; err?: { message: string } };
@@ -234,4 +234,15 @@ test('isClientError: only exposed 4xx', () => {
   assert.equal(isClientError(thrown(500, true)), false);
   assert.equal(isClientError(null), false);
   assert.equal(isClientError('404'), false);
+});
+
+test('isHangUp: a dead client socket, not other failures', () => {
+  const thrown = (code: string) => Object.assign(new Error('x'), { code });
+
+  assert.equal(isHangUp(thrown('EPIPE')), true);
+  assert.equal(isHangUp(thrown('ERR_STREAM_PREMATURE_CLOSE')), true);
+  assert.equal(isHangUp(thrown('ECONNRESET')), false);
+  assert.equal(isHangUp(thrown('ENOENT')), false);
+  assert.equal(isHangUp(new Error('no code')), false);
+  assert.equal(isHangUp(null), false);
 });
