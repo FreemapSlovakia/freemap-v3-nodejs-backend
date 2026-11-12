@@ -62,9 +62,6 @@ importers:
       koa-body:
         specifier: ^8.0.1
         version: 8.0.1
-      koa-pino-logger:
-        specifier: ^5.0.0
-        version: 5.0.0
       koa-websocket:
         specifier: ^7.0.0
         version: 7.0.0
@@ -1301,9 +1298,6 @@ packages:
 
   koa-compose@4.1.0:
     resolution: {integrity: sha512-8ODW8TrDuMYvXRwra/Kh7/rJo9BtOfPc6qO8eAfC80CnCvSjSl0bkRM24X6/XBBEyj0v1nRUQ1LyOy3dbqOWXw==}
-
-  koa-pino-logger@5.0.0:
-    resolution: {integrity: sha512-iGx5P6CwsSsQ4a8B9rx6EMkmUKvM5toJjPPX4gXfx+l+Ikd+Ih6Akps4EQo/du+bVjHNGVKNMBETEVHYxDMM0g==}
 
   koa-websocket@7.0.0:
     resolution: {integrity: sha512-MsHUFKqA4+j+0dpPKWtsvZfnpQ1NcgF+AaTZQZ4B3Xj/cWK31qqmKx9HnA5Gw1LV2aIDzqwy0IDBsZYRurTUAg==}
@@ -2849,10 +2843,6 @@ snapshots:
       zod: 4.6.7
 
   koa-compose@4.1.0: {}
-
-  koa-pino-logger@5.0.0:
-    dependencies:
-      pino-http: 11.0.0
 
   koa-websocket@7.0.0:
     dependencies:

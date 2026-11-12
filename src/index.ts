@@ -6,7 +6,6 @@ import Router from '@koa/router';
 import cors from 'kcors';
 import Koa from 'koa';
 import koaBody from 'koa-body';
-import koaPinoLogger from 'koa-pino-logger';
 import websockify from 'koa-websocket';
 import { createDocument } from 'zod-openapi';
 import { initDatabase } from './database.js';
@@ -16,6 +15,7 @@ import { appLogger } from './logger.js';
 import { attachMapCatalogHandler } from './mapCatalog.js';
 import { paths } from './openapi.js';
 import { nanoid } from './randomId.js';
+import { requestLogger } from './requestLogger.js';
 import { authRouter } from './routers/auth/index.js';
 import { trackingRouter } from './routers/deviceTracking/index.js';
 import { attachDownloadMapHandler } from './routers/downloadMapHandler.js';
@@ -41,8 +41,9 @@ const logger = appLogger.child({ module: 'app' });
 
 const app = new Koa();
 
-// Forwards errors emitted by Koa (rethrown by koa-pino-logger after logging)
-// to Sentry. No-op when SENTRY_DSN is unset. 4xx are filtered in beforeSend.
+// Forwards errors emitted by Koa (rethrown by requestLogger after logging)
+// to Sentry. No-op when SENTRY_DSN is unset. Client errors (ctx.throw's 4xx)
+// are filtered in beforeSend.
 Sentry.setupKoaErrorHandler(app);
 
 const wsApp = websockify(app);
@@ -85,7 +86,8 @@ if (httpsPort) {
 // `Stream.pipeline` Koa pipes the body through. That trips Node's default
 // limit of 10 and logged a MaxListenersExceededWarning every few seconds. It
 // is no leak — each listener goes with its response — so raise the limit per
-// response, first, before any middleware adds one.
+// response. Node checks it as each listener is added, so this only has to run
+// before the 11th; Sentry's own listeners come earlier and stay well below.
 app.use((ctx, next) => {
   ctx.res.setMaxListeners(20);
 
@@ -93,7 +95,7 @@ app.use((ctx, next) => {
 });
 
 app.use(
-  koaPinoLogger({
+  requestLogger({
     base: { module: 'koa' },
     // Default is a per-process counter, which repeats across restarts and
     // workers; a random id keeps `req.id` unique so a single request can be
@@ -126,7 +128,7 @@ app.use(
   }),
 );
 
-// koa-pino-logger only exposes `ctx.log`; surface the request id it generated
+// requestLogger only exposes `ctx.log`; surface the request id it generated
 // so handlers that build their own logger for detached work (downloadMap,
 // deleteUser, postPictureComment) can correlate it back to the request.
 app.use((ctx, next) => {
@@ -168,7 +170,7 @@ app.use(
     // These are client errors — bots probing /cgi-bin/... paths, truncated
     // uploads — not server faults, so surface the parser's own httpCode
     // (400 for these) instead of letting them bubble up as unhandled 500s
-    // that flood Sentry (4xx are filtered in beforeSend).
+    // that flood Sentry (ctx.throw's 4xx are filtered in beforeSend).
     onError(err, ctx) {
       const httpCode = (err as { httpCode?: number }).httpCode;
 
