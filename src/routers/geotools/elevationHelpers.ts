@@ -2,8 +2,36 @@ import { lstatSync, readdirSync, readFileSync } from 'node:fs';
 import { basename, join } from 'node:path';
 import gdal from 'gdal-async';
 
-// WGS84 built from proj4 to force traditional lon/lat axis order (GDAL 3 would
-// otherwise use lat/lon for EPSG:4326).
+// GDAL settings the projection below depends on. They are process-wide, but
+// nothing else in the backend uses GDAL, and they live here rather than in the
+// router so that whatever imports these helpers — the tests included — reads
+// rasters exactly as production does.
+//
+// Reading the SRS of some GeoTIFFs (e.g. EPSG:8353 / S-JTSK [JTSK03]) throws
+// unless GDAL trusts the EPSG registry over the embedded GeoTIFF keys.
+gdal.config.set('GTIFF_SRS_SOURCE', 'EPSG');
+
+// Every SRS GDAL builds takes and returns easting/longitude first, whatever
+// order its authority declares (EPSG:2180 Poland, 3035 LAEA, 5845 SWEREF99
+// northing first; plain 4326 latitude first) — i.e. the order of a raster's
+// geotransform. A VRT that states its own `dataAxisToSRSAxisMapping` keeps it,
+// but its geotransform is then in that order too, so it still reads right.
+//
+// Without it the order of `dataset.srs` depended on the binding version:
+// gdal-async up to 3.12 rebuilt it from WKT, which leaves the authority order,
+// while 3.13 clones the dataset's own SRS, which keeps GDAL's traditional
+// mapping. Code that swapped for the one broke silently on the other — after
+// the 3.13 upgrade every such source was double-swapped, Poland and Luxembourg
+// reading a pixel hundreds of km away, the rest falling outside their raster
+// and through to a lower-priority source. This option fixes the order for
+// every SRS at construction, so neither the binding nor the CRS matters.
+//
+// Must be set before any SRS is built, including `wgs84` just below.
+gdal.config.set('OSR_DEFAULT_AXIS_MAPPING_STRATEGY', 'TRADITIONAL_GIS_ORDER');
+
+// From proj4 rather than EPSG:4326: lon/lat order even without the option, and
+// it keeps the WGS84 -> dataset transformation the one PROJ has always picked
+// here (the OSGB36 datum shift below was validated against it).
 const wgs84 = gdal.SpatialReference.fromProj4(
   '+proj=longlat +datum=WGS84 +no_defs',
 );
@@ -12,30 +40,17 @@ const wgs84 = gdal.SpatialReference.fromProj4(
 export type Projector = (lon: number, lat: number) => { x: number; y: number };
 
 /**
- * Build the WGS84 -> dataset projection, or null when the dataset is already
- * geographic lon/lat (SRTM) and no projection is needed.
+ * Build the WGS84 -> dataset projection from the dataset's SRS, or null when
+ * it carries none. A dataset that does declare one — GEDTM30's EPSG:4326 included — gets a
+ * real, if near-identity, transformation. (SRTM tiles never come through here:
+ * their reader hard-codes a null projector.)
  *
  * Uses the dataset's SRS as-is. Rebuilding it from `toProj4()` would be lossy:
  * a proj4 string carries no datum transformation, so a dataset on a datum that
- * differs from WGS84 — OSGB36 / EPSG:27700 is the one that bites, the British
- * national grid — would be read ~100 m off target, silently returning the
- * elevation of a neighbouring hillside.
- *
- * Axis order needs no handling, but only because `srs` must come from an
- * opened dataset (`dataset.srs`): GDAL hands that out with the traditional GIS
- * axis mapping, so `transformPoint` returns (easting, northing) / (lon, lat)
- * even for CRSs whose authority declares northing or latitude first (EPSG:2180
- * Poland, 3035 LAEA, 5845 SWEREF99, plain 4326). A bare
- * `SpatialReference.fromEPSG()` is authority-compliant instead and would come
- * back swapped.
- *
- * This relies on gdal-async >= 3.13, whose `ds.srs` keeps the dataset's axis
- * mapping. Up to 3.12 the getter round-tripped through WKT and lost it, so the
- * SRS was authority-ordered and this code used to swap on
- * `EPSGTreatsAsNorthingEasting()` / `EPSGTreatsAsLatLong()`. After the upgrade
- * that swap double-swapped every such dataset: Poland and Luxembourg read a
- * pixel hundreds of km away, the others fell outside their raster and silently
- * dropped to a lower-priority source.
+ * differs from WGS84 — OSGB36 / EPSG:27700, the British national grid — would
+ * be read ~100 m off target, silently returning a neighbouring hillside's
+ * elevation. Axis order needs no handling; see OSR_DEFAULT_AXIS_MAPPING_STRATEGY
+ * above.
  */
 export function createProjector(
   srs: gdal.SpatialReference | null,
@@ -57,8 +72,7 @@ export type InverseProjector = (
 
 /**
  * The reverse of {@link createProjector}, used to work out a dataset's footprint
- * in WGS84 without hard-coding one. Same contract: `srs` is a dataset's, so its
- * axes are already in (x, y) order.
+ * in WGS84 without hard-coding one.
  */
 export function createInverseProjector(
   srs: gdal.SpatialReference | null,

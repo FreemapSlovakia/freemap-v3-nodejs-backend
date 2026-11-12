@@ -30,10 +30,6 @@ import {
 // covered by a local source return null.
 const elevationDataDir = getEnv('ELEVATION_DATA_DIRECTORY', '');
 
-// Reading the SRS of some GeoTIFFs (e.g. EPSG:8353 / S-JTSK [JTSK03]) throws
-// unless we tell GDAL to trust the EPSG registry over the embedded GeoTIFF keys.
-gdal.config.set('GTIFF_SRS_SOURCE', 'EPSG');
-
 const fetching = new Map<string, Promise<void>>();
 
 type DatasetInfo = {
@@ -42,8 +38,9 @@ type DatasetInfo = {
   geoTransform: number[];
   width: number;
   height: number;
-  // transform from WGS84 lon/lat into the dataset CRS; null when the dataset is
-  // already geographic lon/lat (SRTM).
+  // transform from WGS84 lon/lat into the dataset CRS; null for SRTM tiles,
+  // read as lon/lat without one. A geographic local source (GEDTM30, 4326)
+  // still gets a projector.
   project: Projector | null;
 };
 
@@ -130,32 +127,42 @@ function openLocalSource(src: LocalSource): LocalDatasetInfo {
 
   const dataset = gdal.open(src.path);
 
-  const geoTransform = dataset.geoTransform;
+  try {
+    const geoTransform = dataset.geoTransform;
 
-  if (!geoTransform) {
-    throw new Error(`Invalid geotransform for ${src.path}`);
+    if (!geoTransform) {
+      throw new Error(`Invalid geotransform for ${src.path}`);
+    }
+
+    const width = dataset.rasterSize.x;
+
+    const height = dataset.rasterSize.y;
+
+    // read once: each `dataset.srs` is a fresh clone
+    const srs = dataset.srs;
+
+    src.info = {
+      dataset,
+      band: dataset.bands.get(1),
+      geoTransform,
+      width,
+      height,
+      project: createProjector(srs),
+      bbox:
+        src.bbox ??
+        datasetBbox(geoTransform, width, height, createInverseProjector(srs)),
+    };
+  } catch (err) {
+    // the source stays `broken` and is never retried, so nothing else would
+    // ever close this; a failing close must not mask why the open failed
+    try {
+      dataset.close();
+    } catch {
+      // the original error is the one worth reporting
+    }
+
+    throw err;
   }
-
-  const width = dataset.rasterSize.x;
-
-  const height = dataset.rasterSize.y;
-
-  src.info = {
-    dataset,
-    band: dataset.bands.get(1),
-    geoTransform,
-    width,
-    height,
-    project: createProjector(dataset.srs),
-    bbox:
-      src.bbox ??
-      datasetBbox(
-        geoTransform,
-        width,
-        height,
-        createInverseProjector(dataset.srs),
-      ),
-  };
 
   src.broken = false;
 

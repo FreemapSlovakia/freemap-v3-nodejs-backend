@@ -25,23 +25,56 @@ import {
 } from './elevationHelpers.js';
 
 /**
- * The SRS as production sees it: read back from a dataset, which GDAL hands
- * out in traditional GIS axis order. A bare `fromEPSG()` is authority-ordered
- * instead, and testing against it is what hid the double swap.
+ * The SRS of a 1x1 raster in `epsg`, written to disk and reopened the way production
+ * opens its sources: as a GeoTIFF, or through a VRT over one, with the GDAL
+ * settings the helpers module applies on import. Testing against a bare
+ * `fromEPSG()` is what hid the gdal-async 3.13 double swap.
  */
-function datasetSrs(epsg: number) {
-  const ds = gdal.open('srs', 'w', 'MEM', 1, 1, 1, gdal.GDT_Byte);
+function raster(
+  t: TestContext,
+  epsg: number,
+  format: 'GTiff' | 'VRT' = 'GTiff',
+) {
+  const dir = mkdtempSync(join(tmpdir(), 'elevation-srs-'));
 
-  ds.srs = gdal.SpatialReference.fromEPSG(epsg);
+  let dataset: gdal.Dataset | undefined;
 
-  return ds.srs;
+  // registered before any GDAL call, so a failing one still cleans up
+  t.after(() => {
+    dataset?.close();
+
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  const tif = join(dir, 'raster.tif');
+
+  const created = gdal.open(tif, 'w', 'GTiff', 1, 1, 1, gdal.GDT_Float32);
+
+  created.srs = gdal.SpatialReference.fromEPSG(epsg);
+
+  created.geoTransform = [0, 1, 0, 0, 0, -1];
+
+  created.close();
+
+  let path = tif;
+
+  if (format === 'VRT') {
+    path = join(dir, 'raster.vrt');
+
+    gdal.buildVRT(path, [tif]).close();
+  }
+
+  dataset = gdal.open(path);
+
+  // the SRS as production reads it from an opened source
+  return dataset.srs;
 }
 
-test('createProjector: applies the datum shift a proj4 string would drop', () => {
+test('createProjector: applies the datum shift a proj4 string would drop', (t) => {
   // Charing Cross in OSGB36 / British National Grid. Going through
   // `toProj4()` loses the OSGB36 datum transformation and lands ~113 m west,
   // near 529916 — which is what silently misread every English sample.
-  const project = createProjector(datasetSrs(27700));
+  const project = createProjector(raster(t, 27700));
 
   assert.ok(project);
 
@@ -58,10 +91,10 @@ test('createProjector: applies the datum shift a proj4 string would drop', () =>
   );
 });
 
-test('createProjector: easting first for a northing-first CRS', () => {
+test('createProjector: easting first for a northing-first CRS', (t) => {
   // EPSG:3035 (ETRS89-LAEA) declares northing first; the projector must still
   // report (x, y) for a dataset in it.
-  const project = createProjector(datasetSrs(3035));
+  const project = createProjector(raster(t, 3035));
 
   assert.ok(project);
 
@@ -71,35 +104,73 @@ test('createProjector: easting first for a northing-first CRS', () => {
   assert.ok(Math.abs(y - 2987511) < 25, `northing ${y} looks like an easting`);
 });
 
-test('createProjector: Poland (EPSG:2180, northing first) reads the right pixel', () => {
-  // The point that came back as 93.8 m instead of ~200 m: a double swap moved
-  // the read ~144 km across the PL raster to (381812, 525816).
-  const project = createProjector(datasetSrs(2180));
+for (const format of ['GTiff', 'VRT'] as const) {
+  test(`createProjector: Poland (EPSG:2180, northing first), ${format}`, (t) => {
+    // The point that came back as 93.8 m instead of ~200 m: a double swap moved
+    // the read ~144 km across the PL raster to (381812, 525816). The PL source
+    // is a VRT, so that path is pinned too.
+    const project = createProjector(raster(t, 2180, format));
 
-  assert.ok(project);
+    assert.ok(project);
 
-  const { x, y } = project(19.37044143676758, 51.302393994424605);
+    const { x, y } = project(19.37044143676758, 51.302393994424605);
 
-  assert.ok(Math.abs(x - 525816.6) < 1, `easting ${x}`);
-  assert.ok(Math.abs(y - 381812.5) < 1, `northing ${y}`);
-});
+    assert.ok(Math.abs(x - 525816.6) < 1, `easting ${x}`);
+    assert.ok(Math.abs(y - 381812.5) < 1, `northing ${y}`);
+  });
 
-test('createProjector: lon first for geographic EPSG:4326', () => {
-  // GEDTM30 carries a plain EPSG:4326 SRS, whose authority axis order is
-  // lat/lon. A lat/lon pair fed to the geotransform reads the wrong continent
-  // (Fruska Gora came back as 702 m, an Arabian plateau).
-  const project = createProjector(datasetSrs(4326));
+  test(`createProjector: lon first for geographic EPSG:4326, ${format}`, (t) => {
+    // GEDTM30 carries a plain EPSG:4326 SRS, whose authority axis order is
+    // lat/lon. A lat/lon pair fed to the geotransform reads the wrong
+    // continent (Fruska Gora came back as 702 m, an Arabian plateau).
+    const project = createProjector(raster(t, 4326, format));
 
-  assert.ok(project);
+    assert.ok(project);
 
-  const { x, y } = project(19.851715564727787, 45.16161498912903);
+    const { x, y } = project(19.851715564727787, 45.16161498912903);
 
-  assert.ok(Math.abs(x - 19.851715564727787) < 1e-9, `x ${x} is a latitude`);
-  assert.ok(Math.abs(y - 45.16161498912903) < 1e-9, `y ${y} is a longitude`);
-});
+    assert.ok(Math.abs(x - 19.851715564727787) < 1e-9, `x ${x} is a latitude`);
+    assert.ok(Math.abs(y - 45.16161498912903) < 1e-9, `y ${y} is a longitude`);
+  });
+}
 
-test('createProjector: null for a dataset already in lon/lat', () => {
+for (const [label, rebuild] of [
+  // what gdal-async up to 3.12 handed out as `dataset.srs`
+  [
+    'rebuilt from WKT',
+    (srs: gdal.SpatialReference) => gdal.SpatialReference.fromWKT(srs.toWKT()),
+  ],
+  ['bare fromEPSG', () => gdal.SpatialReference.fromEPSG(2180)],
+] as const) {
+  // Without OSR_DEFAULT_AXIS_MAPPING_STRATEGY these come back in the
+  // authority's order, northing first — the 3.12 behaviour. Under 3.13 a
+  // dataset's own SRS is easting-first regardless, so only these pin the
+  // option itself.
+  test(`createProjector: easting first for an SRS ${label}`, (t) => {
+    const srs = rebuild(raster(t, 2180) as gdal.SpatialReference);
+
+    const project = createProjector(srs);
+
+    const unproject = createInverseProjector(srs);
+
+    assert.ok(project);
+    assert.ok(unproject);
+
+    const { x, y } = project(19.37044143676758, 51.302393994424605);
+
+    assert.ok(Math.abs(x - 525816.6) < 1, `easting ${x}`);
+    assert.ok(Math.abs(y - 381812.5) < 1, `northing ${y}`);
+
+    const { lon, lat } = unproject(525816.6, 381812.5);
+
+    assert.ok(Math.abs(lon - 19.370441) < 1e-5, `lon ${lon}`);
+    assert.ok(Math.abs(lat - 51.302394) < 1e-5, `lat ${lat}`);
+  });
+}
+
+test('createProjector: null without an SRS', () => {
   assert.equal(createProjector(null), null);
+  assert.equal(createInverseProjector(null), null);
 });
 
 test('srtmKey: northern/eastern coordinates', () => {
@@ -359,14 +430,12 @@ test('datasetBbox: identity for a geographic raster', () => {
   assert.ok(Math.abs(bbox[3] - 49.01) < 1e-6, `maxLat ${bbox[3]}`);
 });
 
-test('datasetBbox: captures the bulge the corners miss', () => {
+test('datasetBbox: captures the bulge the corners miss', (t) => {
   // EPSG:3035 (ETRS89-LAEA) over a wide European sheet. The projection curves,
   // so the north edge reaches higher latitudes between the corners than at
   // them; a corner-only extent would clip that off and leave the source
   // unconsulted for points it holds.
-  const srs = datasetSrs(3035);
-
-  const unproject = createInverseProjector(srs);
+  const unproject = createInverseProjector(raster(t, 3035));
 
   assert.ok(unproject);
 
@@ -389,8 +458,8 @@ test('datasetBbox: captures the bulge the corners miss', () => {
   );
 });
 
-test('createInverseProjector: round-trips through the dataset CRS', () => {
-  const srs = datasetSrs(32632);
+test('createInverseProjector: round-trips through the dataset CRS', (t) => {
+  const srs = raster(t, 32632);
 
   const project = createProjector(srs);
 
@@ -407,21 +476,29 @@ test('createInverseProjector: round-trips through the dataset CRS', () => {
   assert.ok(Math.abs(back.lat - 52.52) < 1e-6, `lat ${back.lat}`);
 });
 
-test('createInverseProjector: round-trips a lat-first CRS too', () => {
-  // The mirror of the GEDTM30 case: lon/lat in, lon/lat back out.
-  const srs = datasetSrs(4326);
+for (const format of ['GTiff', 'VRT'] as const) {
+  // Fixed expectations rather than a round trip: a round trip passes even when
+  // both directions are swapped, and the inverse alone decides the footprint
+  // a source is consulted for, cached for the life of the process.
+  test(`createInverseProjector: Poland (EPSG:2180) easting first, ${format}`, (t) => {
+    const unproject = createInverseProjector(raster(t, 2180, format));
 
-  const project = createProjector(srs);
+    assert.ok(unproject);
 
-  const unproject = createInverseProjector(srs);
+    const { lon, lat } = unproject(525816.6, 381812.5);
 
-  assert.ok(project);
-  assert.ok(unproject);
+    assert.ok(Math.abs(lon - 19.370441) < 1e-5, `lon ${lon}`);
+    assert.ok(Math.abs(lat - 51.302394) < 1e-5, `lat ${lat}`);
+  });
 
-  const { x, y } = project(19.8517, 45.1616);
+  test(`createInverseProjector: EPSG:4326 lon first, ${format}`, (t) => {
+    const unproject = createInverseProjector(raster(t, 4326, format));
 
-  const back = unproject(x, y);
+    assert.ok(unproject);
 
-  assert.ok(Math.abs(back.lon - 19.8517) < 1e-9, `lon ${back.lon}`);
-  assert.ok(Math.abs(back.lat - 45.1616) < 1e-9, `lat ${back.lat}`);
-});
+    const { lon, lat } = unproject(19.8517, 45.1616);
+
+    assert.ok(Math.abs(lon - 19.8517) < 1e-9, `lon ${lon}`);
+    assert.ok(Math.abs(lat - 45.1616) < 1e-9, `lat ${lat}`);
+  });
+}
