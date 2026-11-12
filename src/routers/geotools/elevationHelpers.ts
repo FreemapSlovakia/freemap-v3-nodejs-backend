@@ -21,14 +21,21 @@ export type Projector = (lon: number, lat: number) => { x: number; y: number };
  * national grid — would be read ~100 m off target, silently returning the
  * elevation of a neighbouring hillside.
  *
- * The catch is axis order: some CRSs declare the northing/latitude first, and
- * GDAL honours that for an SRS carrying an EPSG authority, so `transformPoint`
- * hands back (y, x). That covers both projected CRSs (EPSG:5845 SWEREF99 TM,
- * EPSG:3035 LAEA) and — the one that bit GEDTM30 — plain geographic EPSG:4326,
- * whose official axis order is lat/lon; a swapped lon/lat still lands inside
- * the raster of a global dataset, so it reads the wrong continent instead of
- * failing. gdal-async 3.12 exposes no setAxisMappingStrategy to override it,
- * so detect both cases and swap.
+ * Axis order needs no handling, but only because `srs` must come from an
+ * opened dataset (`dataset.srs`): GDAL hands that out with the traditional GIS
+ * axis mapping, so `transformPoint` returns (easting, northing) / (lon, lat)
+ * even for CRSs whose authority declares northing or latitude first (EPSG:2180
+ * Poland, 3035 LAEA, 5845 SWEREF99, plain 4326). A bare
+ * `SpatialReference.fromEPSG()` is authority-compliant instead and would come
+ * back swapped.
+ *
+ * This relies on gdal-async >= 3.13, whose `ds.srs` keeps the dataset's axis
+ * mapping. Up to 3.12 the getter round-tripped through WKT and lost it, so the
+ * SRS was authority-ordered and this code used to swap on
+ * `EPSGTreatsAsNorthingEasting()` / `EPSGTreatsAsLatLong()`. After the upgrade
+ * that swap double-swapped every such dataset: Poland and Luxembourg read a
+ * pixel hundreds of km away, the others fell outside their raster and silently
+ * dropped to a lower-priority source.
  */
 export function createProjector(
   srs: gdal.SpatialReference | null,
@@ -39,15 +46,7 @@ export function createProjector(
 
   const ct = new gdal.CoordinateTransformation(wgs84, srs);
 
-  if (!srs.EPSGTreatsAsNorthingEasting() && !srs.EPSGTreatsAsLatLong()) {
-    return (lon, lat) => ct.transformPoint(lon, lat);
-  }
-
-  return (lon, lat) => {
-    const { x, y } = ct.transformPoint(lon, lat);
-
-    return { x: y, y: x };
-  };
+  return (lon, lat) => ct.transformPoint(lon, lat);
 }
 
 /** Projects a dataset's own (x, y) back to WGS84 lon/lat. */
@@ -58,9 +57,8 @@ export type InverseProjector = (
 
 /**
  * The reverse of {@link createProjector}, used to work out a dataset's footprint
- * in WGS84 without hard-coding one. Same axis-order caveat, mirrored: where the
- * dataset's CRS declares the northing/latitude first, GDAL wants the *input*
- * pair in that order, so the swap moves to the arguments.
+ * in WGS84 without hard-coding one. Same contract: `srs` is a dataset's, so its
+ * axes are already in (x, y) order.
  */
 export function createInverseProjector(
   srs: gdal.SpatialReference | null,
@@ -71,11 +69,8 @@ export function createInverseProjector(
 
   const ct = new gdal.CoordinateTransformation(srs, wgs84);
 
-  const swapped =
-    srs.EPSGTreatsAsNorthingEasting() || srs.EPSGTreatsAsLatLong();
-
   return (x, y) => {
-    const p = ct.transformPoint(swapped ? y : x, swapped ? x : y);
+    const p = ct.transformPoint(x, y);
 
     return { lon: p.x, lat: p.y };
   };

@@ -24,11 +24,24 @@ import {
   srtmKey,
 } from './elevationHelpers.js';
 
+/**
+ * The SRS as production sees it: read back from a dataset, which GDAL hands
+ * out in traditional GIS axis order. A bare `fromEPSG()` is authority-ordered
+ * instead, and testing against it is what hid the double swap.
+ */
+function datasetSrs(epsg: number) {
+  const ds = gdal.open('srs', 'w', 'MEM', 1, 1, 1, gdal.GDT_Byte);
+
+  ds.srs = gdal.SpatialReference.fromEPSG(epsg);
+
+  return ds.srs;
+}
+
 test('createProjector: applies the datum shift a proj4 string would drop', () => {
   // Charing Cross in OSGB36 / British National Grid. Going through
   // `toProj4()` loses the OSGB36 datum transformation and lands ~113 m west,
   // near 529916 — which is what silently misread every English sample.
-  const project = createProjector(gdal.SpatialReference.fromEPSG(27700));
+  const project = createProjector(datasetSrs(27700));
 
   assert.ok(project);
 
@@ -45,10 +58,10 @@ test('createProjector: applies the datum shift a proj4 string would drop', () =>
   );
 });
 
-test('createProjector: undoes northing-first axis order', () => {
-  // EPSG:3035 (ETRS89-LAEA) declares northing first, so the raw
-  // transformPoint hands back (y, x); the projector must report (x, y).
-  const project = createProjector(gdal.SpatialReference.fromEPSG(3035));
+test('createProjector: easting first for a northing-first CRS', () => {
+  // EPSG:3035 (ETRS89-LAEA) declares northing first; the projector must still
+  // report (x, y) for a dataset in it.
+  const project = createProjector(datasetSrs(3035));
 
   assert.ok(project);
 
@@ -58,11 +71,24 @@ test('createProjector: undoes northing-first axis order', () => {
   assert.ok(Math.abs(y - 2987511) < 25, `northing ${y} looks like an easting`);
 });
 
-test('createProjector: undoes lat-first axis order of geographic EPSG:4326', () => {
+test('createProjector: Poland (EPSG:2180, northing first) reads the right pixel', () => {
+  // The point that came back as 93.8 m instead of ~200 m: a double swap moved
+  // the read ~144 km across the PL raster to (381812, 525816).
+  const project = createProjector(datasetSrs(2180));
+
+  assert.ok(project);
+
+  const { x, y } = project(19.37044143676758, 51.302393994424605);
+
+  assert.ok(Math.abs(x - 525816.6) < 1, `easting ${x}`);
+  assert.ok(Math.abs(y - 381812.5) < 1, `northing ${y}`);
+});
+
+test('createProjector: lon first for geographic EPSG:4326', () => {
   // GEDTM30 carries a plain EPSG:4326 SRS, whose authority axis order is
-  // lat/lon. Feeding the raw transformPoint output to the geotransform read
-  // the wrong continent (Fruska Gora came back as 702 m, an Arabian plateau).
-  const project = createProjector(gdal.SpatialReference.fromEPSG(4326));
+  // lat/lon. A lat/lon pair fed to the geotransform reads the wrong continent
+  // (Fruska Gora came back as 702 m, an Arabian plateau).
+  const project = createProjector(datasetSrs(4326));
 
   assert.ok(project);
 
@@ -338,7 +364,7 @@ test('datasetBbox: captures the bulge the corners miss', () => {
   // so the north edge reaches higher latitudes between the corners than at
   // them; a corner-only extent would clip that off and leave the source
   // unconsulted for points it holds.
-  const srs = gdal.SpatialReference.fromEPSG(3035);
+  const srs = datasetSrs(3035);
 
   const unproject = createInverseProjector(srs);
 
@@ -364,7 +390,7 @@ test('datasetBbox: captures the bulge the corners miss', () => {
 });
 
 test('createInverseProjector: round-trips through the dataset CRS', () => {
-  const srs = gdal.SpatialReference.fromEPSG(32632);
+  const srs = datasetSrs(32632);
 
   const project = createProjector(srs);
 
@@ -382,9 +408,8 @@ test('createInverseProjector: round-trips through the dataset CRS', () => {
 });
 
 test('createInverseProjector: round-trips a lat-first CRS too', () => {
-  // The mirror of the GEDTM30 bug: geographic EPSG:4326 wants its input pair
-  // lat-first, so the swap has to move to the arguments on the way back.
-  const srs = gdal.SpatialReference.fromEPSG(4326);
+  // The mirror of the GEDTM30 case: lon/lat in, lon/lat back out.
+  const srs = datasetSrs(4326);
 
   const project = createProjector(srs);
 
