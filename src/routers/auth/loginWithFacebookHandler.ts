@@ -23,8 +23,12 @@ const FacebookUserSchema = z.object({
 async function getUserData(accessToken: string) {
   return FacebookUserSchema.parse(
     await got(
-      'https://graph.facebook.com/v20.0/me?fields=id,name,email,picture.width(256).height(256)&access_token=' +
-        encodeURIComponent(accessToken),
+      'https://graph.facebook.com/v20.0/me?fields=id,name,email,picture.width(256).height(256)',
+      {
+        // In a header, not the query string: got puts the URL into its
+        // HTTPError message, which put the user's whole token into Sentry.
+        headers: { authorization: `Bearer ${accessToken}` },
+      },
     ).json(),
   );
 }
