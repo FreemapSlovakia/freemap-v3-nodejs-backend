@@ -4,16 +4,17 @@ import type WebSocket from 'ws';
 import z from 'zod';
 import { authenticator } from './authenticator.js';
 import { pingHandler } from './rpcHandlers/pingHandler.js';
-import {
-  SubscribeParamsSchema,
-  trackingSubscribeHandler,
-} from './rpcHandlers/trackingSubscribeHandler.js';
+import { trackingSubscribeHandler } from './rpcHandlers/trackingSubscribeHandler.js';
 import {
   trackingUnsubscribeHandler,
   UnsubscribeParamsSchema,
 } from './rpcHandlers/trackingUnsubscribeHandler.js';
 import type { RpcContext } from './rpcHandlerTypes.js';
-import { trackRegister } from './trackRegister.js';
+import { SubscribeParamsSchema } from './trackingSubscription.js';
+import {
+  removeTrackListenerEverywhere,
+  type TrackPointListener,
+} from './trackRegister.js';
 
 export function attachWs(app: KoaWebsocket.App) {
   const wsRouter = new Router();
@@ -24,6 +25,18 @@ export function attachWs(app: KoaWebsocket.App) {
     const { pingInterval } = ctx.query;
 
     const ws = ctx.websocket as WebSocket;
+
+    const listener: TrackPointListener = (params) => {
+      if (ws.readyState === 1) {
+        ws.send(
+          JSON.stringify({
+            jsonrpc: '2.0',
+            method: 'tracking.addPoint',
+            params,
+          }),
+        );
+      }
+    };
 
     const pinger = !pingInterval
       ? null
@@ -141,6 +154,7 @@ export function attachWs(app: KoaWebsocket.App) {
         respondResult,
         respondError,
         ctx,
+        listener,
       };
 
       switch (msg.method) {
@@ -160,9 +174,7 @@ export function attachWs(app: KoaWebsocket.App) {
       if (pinger) {
         clearTimeout(pinger);
       }
-      for (const websockets of trackRegister.values()) {
-        websockets.delete(ws);
-      }
+      removeTrackListenerEverywhere(listener);
     };
 
     ws.on('close', handleCloseOrError);

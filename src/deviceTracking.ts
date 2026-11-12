@@ -1,6 +1,7 @@
 import type { PoolConnection } from 'mariadb';
 import sql from 'sql-template-tag';
-import { trackRegister } from './trackRegister.js';
+import { afterCommit } from './database.js';
+import { notifyTrackListeners } from './trackRegister.js';
 
 // Both deletes are index range scans over the device's pruned points only.
 // Callers hold the trackingDevice row FOR UPDATE, so one device's inserts and
@@ -76,10 +77,6 @@ export async function storeTrackPoint(
     throw new Error('invalid param');
   }
 
-  const now = new Date();
-
-  // const { id, maxAge, maxCount } = item;
-
   const speed = typeof speedKmh === 'number' ? speedKmh / 3.6 : speedMs;
 
   const { insertId } = await conn.query<{ insertId: number }>(sql`
@@ -102,47 +99,31 @@ export async function storeTrackPoint(
 
   const rows = await conn.query<{ token: string }[]>(sql`
     SELECT token FROM trackingAccessToken
-      WHERE deviceId = ${id} AND (timeFrom IS NULL OR timeFrom < ${now}) AND (timeTo IS NULL OR timeTo > ${now})
+      WHERE deviceId = ${id} AND (timeFrom IS NULL OR timeFrom <= ${time}) AND (timeTo IS NULL OR timeTo > ${time})
   `);
 
-  const notify = (type: string, key: string | number) => {
-    const websockets = trackRegister.get(key);
-
-    if (websockets) {
-      for (const ws of websockets) {
-        if (ws.readyState === 1) {
-          ws.send(
-            JSON.stringify({
-              jsonrpc: '2.0',
-              method: 'tracking.addPoint',
-              params: {
-                // TODO validate if time matches limits
-                id: insertId,
-                lat,
-                lon,
-                altitude,
-                speed,
-                accuracy,
-                hdop,
-                bearing,
-                battery,
-                gsmSignal,
-                message,
-                [type]: key,
-                ts: time.toISOString(),
-              },
-            }),
-          );
-        }
-      }
-    }
+  const point = {
+    id: insertId,
+    ts: time,
+    lat,
+    lon,
+    altitude,
+    speed,
+    accuracy,
+    hdop,
+    bearing,
+    battery,
+    gsmSignal,
+    message,
   };
 
-  for (const { token } of rows) {
-    notify('token', token);
-  }
+  afterCommit(conn, () => {
+    for (const { token } of rows) {
+      notifyTrackListeners(token, { ...point, token });
+    }
 
-  notify('deviceId', id);
+    notifyTrackListeners(id, { ...point, deviceId: id });
+  });
 
   return insertId;
 }

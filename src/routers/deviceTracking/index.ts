@@ -10,6 +10,7 @@ import { attachPostDeviceHandler } from './postDeviceHandler.js';
 import { attachPostTokenHandler } from './postTokenHandler.js';
 import { attachPutDeviceHandler } from './putDeviceHandler.js';
 import { attachPutTokenHandler } from './putTokenHandler.js';
+import { attachTrackingStreamHandler } from './streamHandler.js';
 import { attachTrackDeviceJsonHandler } from './trackDeviceHandlerJson.js';
 import { attachTrackDeviceTraccarHandler } from './trackDeviceHandlerTraccar.js';
 import { attachTrackDeviceUrlEncodedHandler } from './trackDeviceHandlerUrlEncoded.js';
@@ -30,5 +31,6 @@ attachGetPublicTokensHandler(router);
 attachGetTokenHandler(router);
 attachPostTokenHandler(router);
 attachPutTokenHandler(router);
+attachTrackingStreamHandler(router);
 
 export const trackingRouter = router;

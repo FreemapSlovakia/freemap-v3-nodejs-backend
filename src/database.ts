@@ -702,6 +702,22 @@ export function isVerifiedEmailTaken(err: unknown): boolean {
     .safeParse(err).success;
 }
 
+const commitHooks = new WeakMap<PoolConnection, (() => void)[]>();
+
+/**
+ * Runs `fn` once the transaction on `conn` commits, or never if it rolls back.
+ * Outside `runInTransaction`, runs it at once.
+ */
+export function afterCommit(conn: PoolConnection, fn: () => void) {
+  const hooks = commitHooks.get(conn);
+
+  if (hooks) {
+    hooks.push(fn);
+  } else {
+    fn();
+  }
+}
+
 export async function runInTransaction<T>(
   fn: (conn: PoolConnection) => Promise<T>,
   opts: {
@@ -724,6 +740,10 @@ export async function runInTransaction<T>(
   while (true) {
     const conn = await pool.getConnection();
 
+    const hooks: (() => void)[] = [];
+
+    commitHooks.set(conn, hooks);
+
     try {
       await conn.beginTransaction();
 
@@ -731,8 +751,21 @@ export async function runInTransaction<T>(
 
       await conn.commit();
 
+      commitHooks.delete(conn);
+
+      // A throw must not reach the catch, which would run the transaction again.
+      for (const hook of hooks) {
+        try {
+          hook();
+        } catch (err) {
+          logger.error({ err }, 'after-commit hook failed');
+        }
+      }
+
       return res;
     } catch (err: unknown) {
+      commitHooks.delete(conn);
+
       try {
         await conn.rollback();
       } catch {

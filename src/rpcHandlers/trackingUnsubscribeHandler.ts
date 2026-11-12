@@ -1,6 +1,6 @@
 import z from 'zod';
 import type { RpcContext } from '../rpcHandlerTypes.js';
-import { trackRegister } from '../trackRegister.js';
+import { removeTrackListener } from '../trackRegister.js';
 
 export const UnsubscribeParamsSchema = z.union([
   z.strictObject({ token: z.string() }),
@@ -13,17 +13,10 @@ export function trackingUnsubscribeHandler(
   ctx: RpcContext,
   params: UnsubscribeParams,
 ) {
-  const key = 'token' in params ? params.token : params.deviceId;
-
-  const websockets = trackRegister.get(key);
-
-  if (websockets) {
-    websockets.delete(ctx.ctx.websocket);
-
-    if (websockets.size === 0) {
-      trackRegister.delete(key);
-    }
-  }
+  removeTrackListener(
+    'token' in params ? params.token : params.deviceId,
+    ctx.listener,
+  );
 
   ctx.respondResult(null);
 }
