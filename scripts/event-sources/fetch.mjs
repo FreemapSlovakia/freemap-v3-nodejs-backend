@@ -11,6 +11,11 @@ const PHOTON_URL = process.env.PHOTON_URL ?? 'https://photon.freemap.sk';
 // Between two requests to the same host.
 const DELAY_MS = 2000;
 
+// Answers that may pass: a busy or restarting server. Retried after these.
+const TRANSIENT = new Set([429, 502, 503, 504]);
+
+const RETRY_MS = [30_000, 60_000];
+
 const lastRequest = new Map();
 
 const robotsRules = new Map();
@@ -18,6 +23,43 @@ const robotsRules = new Map();
 const crawlDelays = new Map();
 
 async function politeResponse(url, headers = {}) {
+  for (let attempt = 0; ; attempt++) {
+    let res;
+
+    try {
+      res = await politeRequest(url, headers);
+    } catch (err) {
+      // A network failure: the connection refused, reset or timed out.
+      if (attempt >= RETRY_MS.length) {
+        throw err;
+      }
+
+      await sleep(RETRY_MS[attempt]);
+
+      continue;
+    }
+
+    if (!TRANSIENT.has(res.status) || attempt >= RETRY_MS.length) {
+      if (!res.ok && res.status !== 304) {
+        throw Object.assign(new Error(`${url}: HTTP ${res.status}`), {
+          status: res.status,
+        });
+      }
+
+      return res;
+    }
+
+    const after = Number(res.headers.get('Retry-After'));
+
+    await res.body?.cancel();
+
+    await sleep(
+      after > 0 ? Math.min(after * 1000, 300_000) : RETRY_MS[attempt],
+    );
+  }
+}
+
+async function politeRequest(url, headers) {
   const { host } = new URL(url);
 
   // A robots.txt Crawl-delay, when longer, wins; our own Photon needs less.
@@ -34,17 +76,9 @@ async function politeResponse(url, headers = {}) {
 
   lastRequest.set(host, Date.now());
 
-  const res = await fetch(url, {
+  return fetch(url, {
     headers: { 'User-Agent': USER_AGENT, ...headers },
   });
-
-  if (!res.ok && res.status !== 304) {
-    throw Object.assign(new Error(`${url}: HTTP ${res.status}`), {
-      status: res.status,
-    });
-  }
-
-  return res;
 }
 
 /** `headers` for an API key, kept out of the URL and so out of the logs. */
