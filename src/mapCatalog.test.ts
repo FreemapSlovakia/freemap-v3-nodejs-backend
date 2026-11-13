@@ -199,6 +199,18 @@ test('the rules refuse what the proxy must not fetch', () => {
       .length,
   );
 
+  const credited = (url: string) =>
+    entryProblems({
+      ...entry,
+      body: { ...entry.body, attribution: [{ type: 'map', name: 'X', url }] },
+    });
+
+  assert.deepEqual(credited('https://example.com/'), []);
+
+  assert.deepEqual(credited('javascript:alert(1)'), [
+    'attribution link not http(s)',
+  ]);
+
   const tiled = {
     ...entry,
     body: {

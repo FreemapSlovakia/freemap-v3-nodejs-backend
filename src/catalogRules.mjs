@@ -243,6 +243,16 @@ export function entryProblems(map) {
 
   if (isObject(map.body) && !Array.isArray(map.body.attribution)) {
     problems.push('no attribution list');
+  } else if (
+    // A credit is rendered as a link: `javascript:` and the like would run.
+    map.body?.attribution?.some(
+      (credit) =>
+        isObject(credit) &&
+        credit.url !== undefined &&
+        !/^https?:\/\//i.test(String(credit.url)),
+    )
+  ) {
+    problems.push('attribution link not http(s)');
   }
 
   return problems;
