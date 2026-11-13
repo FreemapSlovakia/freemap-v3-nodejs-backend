@@ -39,12 +39,12 @@
     "lint:fix": "biome check --write --error-on-warnings"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^1.6.0",
+    "@anthropic-ai/sdk": "^1.8.0",
     "@koa/router": "^15.7.1",
     "@mapbox/node-pre-gyp": "^2.0.3",
     "@mapbox/tilebelt": "^2.0.3",
-    "@polar-sh/sdk": "^1.0.2",
-    "@sentry/node": "^11.11.0",
+    "@polar-sh/sdk": "^1.1.0",
+    "@sentry/node": "^11.12.0",
     "@turf/bbox": "^7.4.0",
     "@turf/boolean-intersects": "^7.4.0",
     "@turf/center": "^7.4.0",
@@ -74,7 +74,7 @@
     "zod-openapi": "^6.0.2"
   },
   "devDependencies": {
-    "@biomejs/biome": "^2.6.6",
+    "@biomejs/biome": "^2.6.7",
     "@types/etag": "^1.8.4",
     "@types/geojson": "^7946.0.16",
     "@types/heic-convert": "^2.1.1",
