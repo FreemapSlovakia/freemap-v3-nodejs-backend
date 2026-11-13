@@ -10,16 +10,14 @@ const config: Record<Provider, { audiences: Set<string>; enforce: boolean }> = {
   // token and Google accepts only the web's.
   google: {
     audiences: list('GOOGLE_CLIENT_IDS', getEnv('GOOGLE_CLIENT_ID', '')),
-    // Off until the mobile apps' client IDs are known; see the log below.
-    enforce: getEnvBoolean('GOOGLE_ENFORCE_AUDIENCE', false),
+    enforce: getEnvBoolean('GOOGLE_ENFORCE_AUDIENCE', true),
   },
   apple: {
     audiences: list('APPLE_CLIENT_IDS', ''),
     enforce: getEnvBoolean('APPLE_ENFORCE_AUDIENCE', true),
   },
-  // Limited Login tokens only, for now: a Graph access token's app would take
-  // a /debug_token call, not made yet. The web and the iOS app share one
-  // Facebook app.
+  // Graph access tokens (their app from Graph's /app) and Limited Login
+  // tokens alike. The web and the iOS app share one Facebook app.
   facebook: {
     audiences: list('FACEBOOK_APP_IDS', '171410630094006'),
     enforce: getEnvBoolean('FACEBOOK_ENFORCE_AUDIENCE', true),

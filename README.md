@@ -176,17 +176,17 @@ pnpm start | pnpm exec pino-pretty
 - `GARMIN_OAUTH_CONSUMER_SECRET` — OAuth 1.0a consumer secret for Garmin Connect.
 - `GOOGLE_CLIENT_IDS` — comma-separated Google OAuth client IDs whose tokens may
   log in (web and mobile apps); defaults to `GOOGLE_CLIENT_ID`.
-- `GOOGLE_ENFORCE_AUDIENCE` — `true` to refuse a Google token issued to another
-  app; otherwise it is only logged and proves no email address.
+- `GOOGLE_ENFORCE_AUDIENCE` — `false` to only log a Google token of another
+  app, which then proves no email address; defaults to `true`.
 - `APPLE_CLIENT_IDS` — comma-separated Apple Services and bundle IDs whose
   tokens may log in; unset, every Apple login is refused.
 - `APPLE_ENFORCE_AUDIENCE` — `false` to only log an Apple token of another app;
   defaults to `true`.
-- `FACEBOOK_APP_IDS` — comma-separated Facebook app IDs whose Limited Login
-  tokens (the iOS app, tracking not allowed) may log in; defaults to
-  `171410630094006`, the app the web and the iOS app share.
-- `FACEBOOK_ENFORCE_AUDIENCE` — `false` to only log a Limited Login token of
-  another app; defaults to `true`.
+- `FACEBOOK_APP_IDS` — comma-separated Facebook app IDs whose tokens (Graph
+  access tokens, and Limited Login ones from the iOS app) may log in; defaults
+  to `171410630094006`, the app the web and the iOS app share.
+- `FACEBOOK_ENFORCE_AUDIENCE` — `false` to only log a Facebook token of another
+  app; defaults to `true`.
 
 ### Mailgun (transactional email)
 

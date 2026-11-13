@@ -35,43 +35,64 @@ type FacebookUser = {
   pictureUrl: string | null;
 };
 
-/** A classic access token: Graph says whose it is. */
+const AppSchema = z.object({ id: z.string().nonempty() });
+
+/** A classic access token: Graph says whose it is, and for which app. */
 async function graphUser(
   ctx: ParameterizedContext,
   accessToken: string,
 ): Promise<FacebookUser> {
-  let user;
+  // In a header, not the query string: got puts the URL into its HTTPError
+  // message, which put the user's whole token into Sentry.
+  const graph = (path: string) =>
+    got(`https://graph.facebook.com/v20.0/${path}`, {
+      headers: { authorization: `Bearer ${accessToken}` },
+    }).json();
 
-  try {
-    user = FacebookUserSchema.parse(
-      await got(
-        'https://graph.facebook.com/v20.0/me?fields=id,name,email,picture.width(256).height(256)',
-        {
-          // In a header, not the query string: got puts the URL into its
-          // HTTPError message, which put the user's whole token into Sentry.
-          headers: { authorization: `Bearer ${accessToken}` },
-        },
-      ).json(),
-    );
-  } catch (err) {
-    // 4xx: Facebook refuses the token — expired or revoked. Anything else is
-    // Facebook failing or unreachable. Either way not our 500.
-    if (err instanceof HTTPError) {
-      const { statusCode } = err.response;
+  const [user, app] = await Promise.allSettled([
+    graph('me?fields=id,name,email,picture.width(256).height(256)').then(
+      (body) => FacebookUserSchema.parse(body),
+    ),
+    // The app the token was issued to: else a token any other app got from
+    // the user would log in here as them.
+    graph('app?fields=id').then((body) => AppSchema.parse(body)),
+  ]);
 
-      return statusCode >= 400 && statusCode < 500
-        ? ctx.throw(401, 'invalid Facebook token')
-        : ctx.throw(502, 'Facebook unavailable');
-    }
+  // Both settled, so a refused token is a 401 whichever answer came first.
+  // 4xx: Facebook refuses the token — expired or revoked. Anything else is
+  // Facebook failing or unreachable. Either way not our 500.
+  const failures = [user, app].flatMap((result) =>
+    result.status === 'rejected' ? [result.reason as unknown] : [],
+  );
 
-    if (err instanceof RequestError) {
-      return ctx.throw(502, 'Facebook unavailable');
-    }
-
-    throw err;
+  if (
+    failures.some(
+      (err) =>
+        err instanceof HTTPError &&
+        err.response.statusCode >= 400 &&
+        err.response.statusCode < 500,
+    )
+  ) {
+    return ctx.throw(401, 'invalid Facebook token');
   }
 
-  const { id, name, email, picture } = user;
+  for (const err of failures) {
+    if (err instanceof HTTPError || err instanceof RequestError) {
+      return ctx.throw(502, 'Facebook unavailable');
+    }
+  }
+
+  if (user.status === 'rejected') {
+    throw user.reason;
+  }
+
+  if (app.status === 'rejected') {
+    throw app.reason;
+  }
+
+  checkTokenAudience(ctx, 'facebook', [app.value.id]);
+
+  const { id, name, email, picture } = user.value;
 
   return {
     id,
