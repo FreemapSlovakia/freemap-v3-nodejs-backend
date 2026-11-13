@@ -11,7 +11,32 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # Nothing else runs the tests before production: fm6 only installs, builds
+  # and restarts. A dependency bump (gdal-async 3.13 flipped the elevation axis
+  # order) would otherwise reach users first.
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 26
+
+      # The pnpm fm6 deploys with. Not pnpm/action-setup: see harvest.yml.
+      - run: npm install -g pnpm@11.9.0
+
+      - run: pnpm install --frozen-lockfile
+
+      - run: pnpm test
+
   deploy:
+    needs: test
+    # A manual run on another branch tests it without deploying (the server
+    # deploys main regardless of the branch the run came from).
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:
       - name: Deploy over SSH
