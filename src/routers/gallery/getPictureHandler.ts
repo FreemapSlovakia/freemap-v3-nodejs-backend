@@ -12,7 +12,7 @@ import { AUTH_OPTIONAL, registerPath } from '../../openapi.js';
 import { acceptValidator } from '../../requestValidators.js';
 import { zDateToIso, zNullableDateToIso } from '../../types.js';
 import { picturesDir } from './constants.js';
-import { parsePictureId } from './pictureId.js';
+import { PictureIdParamSchema, parsePictureId } from './pictureId.js';
 import { ratingExp, ratingSubquery } from './ratingConstants.js';
 
 const secret = getEnv('PREMIUM_PHOTO_SECRET', '');
@@ -95,9 +95,7 @@ export function attachGetPictureHandler(router: RouterInstance) {
       tags: ['gallery'],
       security: AUTH_OPTIONAL,
       requestParams: {
-        path: z.object({
-          id: z.uint32(),
-        }),
+        path: z.object({ id: PictureIdParamSchema }),
       },
       responses: {
         200: {
@@ -155,7 +153,7 @@ export function attachGetPictureHandler(router: RouterInstance) {
                   : empty
               }
             FROM picture LEFT JOIN user ON userId = user.id
-            WHERE picture.id = ${ctx.params.id}`),
+            WHERE picture.id = ${ref.id}`),
         );
 
       if (!row) {
@@ -173,7 +171,7 @@ export function attachGetPictureHandler(router: RouterInstance) {
             user.picture IS NOT NULL AS hasPicture,
             (user.premiumExpiration IS NOT NULL AND user.premiumExpiration > NOW()) AS premium
           FROM pictureComment JOIN user ON (userId = user.id)
-          WHERE pictureId = ${ctx.params.id}
+          WHERE pictureId = ${ref.id}
           ORDER BY pictureComment.createdAt
         `),
       );

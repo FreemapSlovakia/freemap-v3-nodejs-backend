@@ -6,6 +6,7 @@ import { runInTransaction } from '../../database.js';
 import { AUTH_REQUIRED, registerPath } from '../../openapi.js';
 import { isOwnerOrRole } from '../../roles.js';
 import { LicenseSchema } from './licenses.js';
+import { galleryPictureId, PictureIdParamSchema } from './pictureId.js';
 
 const BodySchema = z.strictObject({
   position: z.strictObject({
@@ -28,9 +29,7 @@ export function attachPutPictureHandler(router: RouterInstance) {
       tags: ['gallery'],
       security: AUTH_REQUIRED,
       requestParams: {
-        path: z.object({
-          id: z.uint32(),
-        }),
+        path: z.object({ id: PictureIdParamSchema }),
       },
       requestBody: {
         content: {
@@ -45,6 +44,7 @@ export function attachPutPictureHandler(router: RouterInstance) {
         401: {},
         403: {},
         404: { description: 'no such picture' },
+        405: { description: 'a Wikimedia Commons photo' },
       },
     },
   });
@@ -53,6 +53,8 @@ export function attachPutPictureHandler(router: RouterInstance) {
     '/pictures/:id',
     authenticator(true, 'gallery:write'),
     async (ctx) => {
+      const id = galleryPictureId(ctx, true);
+
       let body;
 
       try {
@@ -74,7 +76,7 @@ export function attachPutPictureHandler(router: RouterInstance) {
 
       await runInTransaction(async (conn) => {
         const rows = await conn.query<{ userId: number; license: string }[]>(
-          sql`SELECT userId, license FROM picture WHERE id = ${ctx.params.id} FOR UPDATE`,
+          sql`SELECT userId, license FROM picture WHERE id = ${id} FOR UPDATE`,
         );
 
         if (rows.length === 0) {
@@ -100,20 +102,20 @@ export function attachPutPictureHandler(router: RouterInstance) {
             azimuth = ${azimuth}
             ${premium === undefined ? empty : sql`, premium = ${premium}`}
             ${license === undefined ? empty : sql`, license = ${license}`}
-            WHERE id = ${ctx.params.id}
+            WHERE id = ${id}
         `),
 
           // delete missing tags
           conn.query<unknown>(
-            sql`DELETE FROM pictureTag WHERE pictureId = ${ctx.params.id}
-            ${tags?.length ? ` AND name NOT IN (${join(tags)})` : empty}`,
+            sql`DELETE FROM pictureTag WHERE pictureId = ${id}
+            ${tags?.length ? sql` AND name NOT IN (${join(tags)})` : empty}`,
           ),
         ];
 
         if (licenseChanged) {
           queries.push(
             conn.query<unknown>(
-              sql`INSERT INTO pictureLicenseHistory (pictureId, license) VALUES (${ctx.params.id}, ${license})`,
+              sql`INSERT INTO pictureLicenseHistory (pictureId, license) VALUES (${id}, ${license})`,
             ),
           );
         }
@@ -122,7 +124,7 @@ export function attachPutPictureHandler(router: RouterInstance) {
           queries.push(
             conn.query<unknown>(
               sql`INSERT INTO pictureTag (name, pictureId)
-                  VALUES ${bulk(tags.map((tag: string) => [tag, ctx.params.id]))}
+                  VALUES ${bulk(tags.map((tag: string) => [tag, id]))}
                   ON DUPLICATE KEY UPDATE name = name`,
             ),
           );

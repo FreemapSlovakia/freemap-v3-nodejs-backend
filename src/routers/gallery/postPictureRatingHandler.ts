@@ -4,7 +4,7 @@ import z from 'zod';
 import { authenticator } from '../../authenticator.js';
 import { runInTransaction } from '../../database.js';
 import { AUTH_REQUIRED, registerPath } from '../../openapi.js';
-import { parsePictureId } from './pictureId.js';
+import { PictureIdParamSchema, parsePictureId } from './pictureId.js';
 
 const BodySchema = z.strictObject({ stars: z.uint32().min(1).max(5) });
 
@@ -15,9 +15,7 @@ export function attachPostPictureRatingHandler(router: RouterInstance) {
       tags: ['gallery'],
       security: AUTH_REQUIRED,
       requestParams: {
-        path: z.object({
-          id: z.uint32(),
-        }),
+        path: z.object({ id: PictureIdParamSchema }),
       },
       requestBody: {
         content: {
@@ -83,7 +81,7 @@ export function attachPostPictureRatingHandler(router: RouterInstance) {
 
       await runInTransaction(async (conn) => {
         const [row] = await conn.query<{ userId: number; premium: boolean }[]>(
-          sql`SELECT userId, premium FROM picture WHERE id = ${ctx.params.id} FOR UPDATE`,
+          sql`SELECT userId, premium FROM picture WHERE id = ${ref.id} FOR UPDATE`,
         );
 
         if (!row) {
@@ -104,7 +102,7 @@ export function attachPostPictureRatingHandler(router: RouterInstance) {
 
         await conn.query<unknown>(sql`
           INSERT INTO pictureRating SET
-              pictureId = ${ctx.params.id},
+              pictureId = ${ref.id},
               userId = ${user.id},
               stars = ${stars},
               ratedAt = ${new Date()}

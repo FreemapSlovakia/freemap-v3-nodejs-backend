@@ -12,6 +12,7 @@ import { getEnv } from '../../env.js';
 import { AUTH_OPTIONAL, registerPath } from '../../openapi.js';
 import { acceptValidator } from '../../requestValidators.js';
 import { picturesDir } from '../../routers/gallery/constants.js';
+import { galleryPictureId } from './pictureId.js';
 
 const secret = getEnv('PREMIUM_PHOTO_SECRET', '');
 
@@ -43,6 +44,8 @@ export function attachGetPictureImageHandler(router: RouterInstance) {
     acceptValidator('image/jpeg'),
     authenticator(false, 'gallery:read'),
     async (ctx) => {
+      const id = galleryPictureId(ctx);
+
       const [row] = await pool.query<
         {
           userId: number;
@@ -50,7 +53,7 @@ export function attachGetPictureImageHandler(router: RouterInstance) {
           premium: boolean;
         }[]
       >(
-        sql`SELECT userId, pathname, premium FROM picture WHERE picture.id = ${ctx.params.id}`,
+        sql`SELECT userId, pathname, premium FROM picture WHERE picture.id = ${id}`,
       );
 
       if (!row) {
@@ -65,7 +68,7 @@ export function attachGetPictureImageHandler(router: RouterInstance) {
       ) {
         if (secret && typeof ctx.request.query.hmac === 'string') {
           if (
-            createHmac('sha256', secret).update(ctx.params.id).digest('hex') !==
+            createHmac('sha256', secret).update(String(id)).digest('hex') !==
             ctx.request.query.hmac
           ) {
             return ctx.throw(403, 'invalid hmac');

@@ -8,7 +8,7 @@ import { appLogger } from '../../logger.js';
 import { AUTH_REQUIRED, registerPath } from '../../openapi.js';
 import { acceptValidator } from '../../requestValidators.js';
 import { COMMENT_MAIL_LANGS, sendCommentMail } from './commentMail.js';
-import { parsePictureId } from './pictureId.js';
+import { PictureIdParamSchema, parsePictureId } from './pictureId.js';
 
 const webBaseUrls = getEnv('WEB_BASE_URL').split(',').filter(Boolean);
 
@@ -26,9 +26,7 @@ export function attachPostPictureCommentHandler(router: RouterInstance) {
       tags: ['gallery'],
       security: AUTH_REQUIRED,
       requestParams: {
-        path: z.object({
-          id: z.uint32(),
-        }),
+        path: z.object({ id: PictureIdParamSchema }),
       },
       requestBody: { content: { 'application/json': { schema: BodySchema } } },
       responses: {
@@ -80,7 +78,7 @@ export function attachPostPictureCommentHandler(router: RouterInstance) {
 
       const acceptLang = ctx.acceptsLanguages([...COMMENT_MAIL_LANGS]) || 'en';
 
-      const picUrl = `${webBaseUrl}/?image=${ctx.params.id}`;
+      const picUrl = `${webBaseUrl}/?image=${ref.source === 'gallery' ? ref.id : `w${ref.pageId}`}`;
 
       const logger = appLogger.child({
         module: 'postPictureComment',
