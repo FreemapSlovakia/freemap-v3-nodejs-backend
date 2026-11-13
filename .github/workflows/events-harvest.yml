@@ -28,7 +28,7 @@ jobs:
           persist-credentials: false
 
       # No `cache: pnpm`: on a self-hosted runner the store is already on the box.
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v7
         with:
           node-version: 26
 
@@ -57,7 +57,7 @@ jobs:
           node scripts/harvest-events.mjs --post --out="$RUNNER_TEMP/events.json"
 
       # What was harvested, with each event's notes, for when a run needs a look.
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: events
