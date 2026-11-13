@@ -142,7 +142,6 @@ pnpm start | pnpm exec pino-pretty
 
   The raster is the directory's `source.vrt` or `source.tif`, normally a link
   to one that stays where it is.
-
   - `attributions` (optional) is how the source wants crediting, served straight
     to clients so a new dataset needs no web or mobile release. A country
     stitched from two licensed datasets carries two entries.
@@ -183,6 +182,11 @@ pnpm start | pnpm exec pino-pretty
   tokens may log in; unset, every Apple login is refused.
 - `APPLE_ENFORCE_AUDIENCE` — `false` to only log an Apple token of another app;
   defaults to `true`.
+- `FACEBOOK_APP_IDS` — comma-separated Facebook app IDs whose Limited Login
+  tokens (the iOS app, tracking not allowed) may log in; defaults to
+  `171410630094006`, the app the web and the iOS app share.
+- `FACEBOOK_ENFORCE_AUDIENCE` — `false` to only log a Limited Login token of
+  another app; defaults to `true`.
 
 ### Mailgun (transactional email)
 
@@ -231,7 +235,7 @@ request. Polar releases a new version in the first week of January, April, July
 and October and keeps three alive (current, deprecated, next); unpinned
 requests silently follow whatever is current. `2026-10` is deprecated at the
 January 2027 release and removed at the April 2027 release. The webhook
-payload version is *not* covered by the pin — it is a per-endpoint setting in
+payload version is _not_ covered by the pin — it is a per-endpoint setting in
 the Polar dashboard and has to be moved there in step.
 
 Endpoints: `POST /auth/polar/checkout` (auth required) returns a hosted
