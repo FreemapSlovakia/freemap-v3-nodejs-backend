@@ -6,6 +6,7 @@ import { registerPath } from '../../openapi.js';
 import { providerProfile } from '../../providerProfiles.js';
 import { acceptValidator } from '../../requestValidators.js';
 import { RoleSchema } from '../../roles.js';
+import { idParam } from '../../routeParams.js';
 import {
   knownValues,
   type PublicField,
@@ -86,11 +87,7 @@ export function attachGetUserProfileHandler(router: RouterInstance) {
     '/users/:id/profile',
     acceptValidator('application/json'),
     async (ctx) => {
-      const id = Number(ctx.params.id);
-
-      if (!Number.isInteger(id) || id <= 0) {
-        ctx.throw(404, 'no such user');
-      }
+      const id = idParam(ctx, 'no such user');
 
       const [row] = await pool.query<unknown[]>(
         sql`SELECT

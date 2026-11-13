@@ -7,6 +7,7 @@ import { pool, runInTransaction } from '../../database.js';
 import { AUTH_REQUIRED, registerPath } from '../../openapi.js';
 import { revokeOsmTokenLater } from '../../osm.js';
 import { hasRole } from '../../roles.js';
+import { idParam } from '../../routeParams.js';
 import { USER_COLUMNS_SQL, UserRowSchema } from '../../types.js';
 import { MergeConflictError, mergeUserAccounts } from '../../userMerge.js';
 import { summarize, UserSummarySchema } from './userSummary.js';
@@ -124,7 +125,7 @@ export function attachMergeUsersHandler(router: RouterInstance) {
       return ctx.throw(403);
     }
 
-    const id = Number(ctx.params.id);
+    const id = idParam(ctx, 'no such user');
 
     const [row] = await pool.query<unknown[]>(
       sql`SELECT ${raw(USER_COLUMNS_SQL)} FROM user WHERE id = ${id}`,
@@ -177,7 +178,7 @@ export function attachMergeUsersHandler(router: RouterInstance) {
       return ctx.throw(400, err as Error);
     }
 
-    const targetId = Number(ctx.params.targetId);
+    const targetId = idParam(ctx, 'no such user', 'targetId');
     const { sourceId, force } = body;
 
     if (targetId === sourceId) {

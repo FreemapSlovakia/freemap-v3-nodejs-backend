@@ -7,6 +7,7 @@ import { pool, runInTransaction } from '../../database.js';
 import { emailFieldsSql, nextEmail } from '../../emailAddress.js';
 import { AUTH_REQUIRED, registerPath } from '../../openapi.js';
 import { hasRole } from '../../roles.js';
+import { idParam } from '../../routeParams.js';
 import {
   CommonUserSchema,
   removesLastWayIn,
@@ -82,7 +83,7 @@ export function attachAdminPatchUserHandler(router: RouterInstance) {
       return ctx.throw(403, 'roles and email change only in a login session');
     }
 
-    const id = Number(ctx.params.id);
+    const id = idParam(ctx, 'no such user');
 
     const assignments = Object.entries(body)
       .filter(([key, value]) => key !== 'email' && value !== undefined)

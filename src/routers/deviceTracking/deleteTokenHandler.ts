@@ -6,6 +6,7 @@ import { runInTransaction } from '../../database.js';
 import { AUTH_REQUIRED, registerPath } from '../../openapi.js';
 import { acceptValidator } from '../../requestValidators.js';
 import { isOwnerOrRole } from '../../roles.js';
+import { idParam } from '../../routeParams.js';
 
 export function attachDeleteTokenHandler(router: RouterInstance) {
   registerPath('/tracking/access-tokens/{id}', {
@@ -31,11 +32,13 @@ export function attachDeleteTokenHandler(router: RouterInstance) {
     acceptValidator('application/json'),
     authenticator(true, 'tracking:write'),
     async (ctx) => {
+      const id = idParam(ctx, 'no such tracking access token');
+
       await runInTransaction(async (conn) => {
         const [item] = await conn.query<{ userId: number }[]>(sql`
           SELECT userId FROM trackingAccessToken
             JOIN trackingDevice ON (deviceId = trackingDevice.id)
-            WHERE trackingAccessToken.id = ${ctx.params.id} FOR UPDATE
+            WHERE trackingAccessToken.id = ${id} FOR UPDATE
         `);
 
         if (!item) {
@@ -47,7 +50,7 @@ export function attachDeleteTokenHandler(router: RouterInstance) {
         }
 
         await conn.query<unknown>(
-          sql`DELETE FROM trackingAccessToken WHERE id = ${ctx.params.id}`,
+          sql`DELETE FROM trackingAccessToken WHERE id = ${id}`,
         );
       });
 

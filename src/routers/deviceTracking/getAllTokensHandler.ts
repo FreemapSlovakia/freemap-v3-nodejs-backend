@@ -6,6 +6,7 @@ import { pool } from '../../database.js';
 import { AUTH_REQUIRED, registerPath } from '../../openapi.js';
 import { acceptValidator } from '../../requestValidators.js';
 import { isOwnerOrRole } from '../../roles.js';
+import { idParam } from '../../routeParams.js';
 import { zDateToIso, zNullableDateToIso } from '../../types.js';
 
 const AccessTokensSchema = z
@@ -46,8 +47,10 @@ export function attachGetAllTokensHandler(router: RouterInstance) {
     acceptValidator('application/json'),
     authenticator(true, 'tracking:read'),
     async (ctx) => {
+      const id = idParam(ctx, 'no such tracking device');
+
       const [device] = await pool.query<{ userId: number }[]>(
-        sql`SELECT userId FROM trackingDevice WHERE id = ${ctx.params.id}`,
+        sql`SELECT userId FROM trackingDevice WHERE id = ${id}`,
       );
 
       if (!device) {
@@ -62,7 +65,7 @@ export function attachGetAllTokensHandler(router: RouterInstance) {
         await pool.query<unknown>(sql`
             SELECT id, token, createdAt, timeFrom, timeTo, note, listingLabel
             FROM trackingAccessToken
-            WHERE deviceId = ${ctx.params.id}
+            WHERE deviceId = ${id}
         `),
       );
     },

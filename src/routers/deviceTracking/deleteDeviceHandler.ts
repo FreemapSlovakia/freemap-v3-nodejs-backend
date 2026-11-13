@@ -6,6 +6,7 @@ import { runInTransaction } from '../../database.js';
 import { AUTH_REQUIRED, registerPath } from '../../openapi.js';
 import { acceptValidator } from '../../requestValidators.js';
 import { isOwnerOrRole } from '../../roles.js';
+import { idParam } from '../../routeParams.js';
 
 export function attachDeleteDeviceHandler(router: RouterInstance) {
   registerPath('/tracking/devices/{id}', {
@@ -31,9 +32,11 @@ export function attachDeleteDeviceHandler(router: RouterInstance) {
     acceptValidator('application/json'),
     authenticator(true, 'tracking:write'),
     async (ctx) => {
+      const id = idParam(ctx, 'no such tracking device');
+
       await runInTransaction(async (conn) => {
         const [item] = await conn.query<{ userId: number }[]>(
-          sql`SELECT userId FROM trackingDevice WHERE id = ${ctx.params.id} FOR UPDATE`,
+          sql`SELECT userId FROM trackingDevice WHERE id = ${id} FOR UPDATE`,
         );
 
         if (!item) {
@@ -45,7 +48,7 @@ export function attachDeleteDeviceHandler(router: RouterInstance) {
         }
 
         await conn.query<unknown>(
-          sql`DELETE FROM trackingDevice WHERE id = ${ctx.params.id}`,
+          sql`DELETE FROM trackingDevice WHERE id = ${id}`,
         );
       });
 

@@ -6,6 +6,7 @@ import { runInTransaction } from '../../database.js';
 import { AUTH_REQUIRED, registerPath } from '../../openapi.js';
 import { acceptValidator } from '../../requestValidators.js';
 import { isOwnerOrRole } from '../../roles.js';
+import { idParam } from '../../routeParams.js';
 import { TokenBodySchema } from '../../types.js';
 
 export function attachPutTokenHandler(router: RouterInstance) {
@@ -39,6 +40,8 @@ export function attachPutTokenHandler(router: RouterInstance) {
     acceptValidator('application/json'),
     authenticator(true, 'tracking:write'),
     async (ctx) => {
+      const id = idParam(ctx, 'no such tracking access token');
+
       let body;
 
       try {
@@ -52,7 +55,7 @@ export function attachPutTokenHandler(router: RouterInstance) {
           SELECT userId
             FROM trackingAccessToken
             JOIN trackingDevice ON (deviceId = trackingDevice.id)
-            WHERE trackingAccessToken.id = ${ctx.params.id}
+            WHERE trackingAccessToken.id = ${id}
             FOR UPDATE
         `);
 
@@ -72,7 +75,7 @@ export function attachPutTokenHandler(router: RouterInstance) {
               timeFrom = ${timeFrom && new Date(timeFrom)},
               timeTo = ${timeTo && new Date(timeTo)},
               listingLabel = ${listingLabel}
-              WHERE id = ${ctx.params.id}
+              WHERE id = ${id}
           `);
       });
 

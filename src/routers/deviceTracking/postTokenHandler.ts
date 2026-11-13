@@ -8,6 +8,7 @@ import { AUTH_REQUIRED, registerPath } from '../../openapi.js';
 import { nanoid } from '../../randomId.js';
 import { acceptValidator } from '../../requestValidators.js';
 import { isOwnerOrRole } from '../../roles.js';
+import { idParam } from '../../routeParams.js';
 import { TokenBodySchema } from '../../types.js';
 
 const ResponseBodySchema = z.strictObject({
@@ -46,6 +47,8 @@ export function attachPostTokenHandler(router: RouterInstance) {
     acceptValidator('application/json'),
     authenticator(true, 'tracking:write'),
     async (ctx) => {
+      const id = idParam(ctx, 'no such tracking device');
+
       let body;
 
       try {
@@ -60,7 +63,7 @@ export function attachPostTokenHandler(router: RouterInstance) {
         .max(1)
         .parse(
           await pool.query<unknown>(
-            sql`SELECT userId FROM trackingDevice WHERE id = ${ctx.params.id}`,
+            sql`SELECT userId FROM trackingDevice WHERE id = ${id}`,
           ),
         );
 
@@ -78,7 +81,7 @@ export function attachPostTokenHandler(router: RouterInstance) {
 
       const { insertId } = await pool.query<{ insertId: number }>(sql`
         INSERT INTO trackingAccessToken SET
-          deviceId = ${ctx.params.id},
+          deviceId = ${id},
           token = ${token},
           timeFrom = ${timeFrom && new Date(timeFrom)},
           timeTo = ${timeTo && new Date(timeTo)},

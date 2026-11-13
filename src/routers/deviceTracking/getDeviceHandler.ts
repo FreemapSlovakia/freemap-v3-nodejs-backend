@@ -6,6 +6,7 @@ import { pool } from '../../database.js';
 import { AUTH_REQUIRED, registerPath } from '../../openapi.js';
 import { acceptValidator } from '../../requestValidators.js';
 import { isOwnerOrRole } from '../../roles.js';
+import { idParam } from '../../routeParams.js';
 import { TrackingDeviceSchema } from '../../types.js';
 
 export function attachGetDeviceHandler(router: RouterInstance) {
@@ -38,13 +39,15 @@ export function attachGetDeviceHandler(router: RouterInstance) {
     acceptValidator('application/json'),
     authenticator(true, 'tracking:read'),
     async (ctx) => {
+      const id = idParam(ctx, 'no such tracking device');
+
       const [item] = TrackingDeviceSchema.array()
         .max(1)
         .parse(
           await pool.query<unknown>(sql`
             SELECT id, name, token, createdAt, maxCount, maxAge, userId
               FROM trackingDevice
-              WHERE id = ${ctx.params.id}
+              WHERE id = ${id}
           `),
         );
 

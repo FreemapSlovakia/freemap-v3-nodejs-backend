@@ -135,6 +135,11 @@ export function attachStravaHandlers(router: RouterInstance) {
 
       const id = ctx.params.id;
 
+      // Goes into Strava's URL: a decoded `../athlete` would reach another endpoint.
+      if (!/^\d{1,20}$/.test(id ?? '')) {
+        return ctx.throw(404, 'no such activity');
+      }
+
       const headers = { authorization: `Bearer ${accessToken}` };
 
       const [detail, streams] = await Promise.all([

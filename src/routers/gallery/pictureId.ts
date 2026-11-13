@@ -1,5 +1,5 @@
-import type { ParameterizedContext } from 'koa';
 import z from 'zod';
+import { type ParamsContext, parseId } from '../../routeParams.js';
 
 /**
  * A picture id from the `/gallery/pictures/:id` routes. A plain number refers to
@@ -18,24 +18,17 @@ export const PictureIdParamSchema = z
     'An own photo by its id, or a Wikimedia Commons one as `w<pageId>`',
   );
 
-// Both columns are `int unsigned`: a longer number is no picture, not Infinity.
-const MAX_ID = 0xffff_ffff;
-
 export function parsePictureId(raw: string): PictureRef | null {
-  const [, w, digits] = /^(w?)(\d{1,10})$/.exec(raw) ?? [];
+  const w = raw.startsWith('w');
 
-  const id = Number(digits);
+  const id = parseId(w ? raw.slice(1) : raw);
 
-  if (digits === undefined || id > MAX_ID) {
+  if (id === null) {
     return null;
   }
 
   return w ? { source: 'wikimedia', pageId: id } : { source: 'gallery', id };
 }
-
-type PictureContext = Pick<ParameterizedContext, 'throw'> & {
-  params: Record<string, string | undefined>;
-};
 
 /**
  * The own gallery photo a route that serves or changes only those is asked
@@ -43,7 +36,7 @@ type PictureContext = Pick<ParameterizedContext, 'throw'> & {
  * for it (`methodNotFor`), else 404; anything else is no picture.
  */
 export function galleryPictureId(
-  ctx: PictureContext,
+  ctx: ParamsContext,
   methodNotFor = false,
 ): number {
   const ref = parsePictureId(ctx.params.id ?? '');

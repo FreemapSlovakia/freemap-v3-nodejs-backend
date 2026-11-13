@@ -4,6 +4,7 @@ import sql from 'sql-template-tag';
 import z from 'zod';
 import { pool } from '../../database.js';
 import { registerPath } from '../../openapi.js';
+import { idParam } from '../../routeParams.js';
 import { redirectMergedUser } from '../../userAlias.js';
 
 export function attachGetUserPictureHandler(router: RouterInstance) {
@@ -29,11 +30,7 @@ export function attachGetUserPictureHandler(router: RouterInstance) {
   });
 
   router.get('/users/:id/picture', async (ctx) => {
-    const id = Number(ctx.params.id);
-
-    if (!Number.isInteger(id) || id <= 0) {
-      ctx.throw(404, 'no such user');
-    }
+    const id = idParam(ctx, 'no such user');
 
     const [row] = await pool.query<{ picture: Buffer | null }[]>(
       sql`SELECT picture FROM user WHERE id = ${id}`,

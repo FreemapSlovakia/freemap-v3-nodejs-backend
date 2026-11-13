@@ -9,6 +9,7 @@ import { AUTH_REQUIRED, registerPath } from '../../openapi.js';
 import { nanoid } from '../../randomId.js';
 import { acceptValidator } from '../../requestValidators.js';
 import { isOwnerOrRole } from '../../roles.js';
+import { idParam } from '../../routeParams.js';
 import { DeviceBodySchema } from '../../types.js';
 
 const ResponseBodySchema = z.strictObject({ token: z.string() });
@@ -55,11 +56,7 @@ export function attachPutDeviceHandler(router: RouterInstance) {
         return ctx.throw(400, err as Error);
       }
 
-      const id = Number(ctx.params.id);
-
-      if (!Number.isSafeInteger(id) || id < 0) {
-        return ctx.throw(400, 'invalid id');
-      }
+      const id = idParam(ctx, 'no such tracking device');
 
       const { name, maxCount, maxAge, token = nanoid() } = body;
 

@@ -4,6 +4,7 @@ import z from 'zod';
 import { authenticator } from '../../authenticator.js';
 import { pool } from '../../database.js';
 import { AUTH_REQUIRED, registerPath } from '../../openapi.js';
+import { idParam } from '../../routeParams.js';
 
 export function attachDeleteAppTokenHandler(router: RouterInstance) {
   registerPath('/auth/app-tokens/{id}', {
@@ -23,8 +24,10 @@ export function attachDeleteAppTokenHandler(router: RouterInstance) {
   });
 
   router.delete('/app-tokens/:id', authenticator(true), async (ctx) => {
+    const id = idParam(ctx, 'no such app token');
+
     const { affectedRows } = await pool.query<{ affectedRows: number }>(
-      sql`DELETE FROM appToken WHERE id = ${ctx.params.id} AND userId = ${ctx.state.user!.id}`,
+      sql`DELETE FROM appToken WHERE id = ${id} AND userId = ${ctx.state.user!.id}`,
     );
 
     if (!affectedRows) {
