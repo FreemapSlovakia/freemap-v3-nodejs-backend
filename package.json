@@ -20,10 +20,7 @@
     "url": "https://github.com/FreemapSlovakia/freemap-v3-nodejs-backend/issues"
   },
   "lint-staged": {
-    "*.{js,mjs,ts}": [
-      "biome check --error-on-warnings",
-      "git add"
-    ]
+    "*.{js,mjs,ts}": ["biome check --error-on-warnings", "git add"]
   },
   "scripts": {
     "start": "node --enable-source-maps --import ./build/instrument.js build/index.js",

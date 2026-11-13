@@ -9,7 +9,12 @@
     "outDir": "build",
     "skipLibCheck": true,
     "strict": true,
-    "lib": ["ES2025", "ESNext.Collection", "ESNext.Disposable", "ESNext.Temporal"],
+    "lib": [
+      "ES2025",
+      "ESNext.Collection",
+      "ESNext.Disposable",
+      "ESNext.Temporal"
+    ],
     "strictNullChecks": true,
     "allowJs": true
   },

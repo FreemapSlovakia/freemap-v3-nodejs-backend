@@ -6,7 +6,7 @@ name: Map library harvest
 on:
   schedule:
     # Weekly, Monday, UTC.
-    - cron: '0 4 * * 1'
+    - cron: "0 4 * * 1"
   workflow_dispatch: {}
 
 concurrency:
@@ -21,7 +21,7 @@ jobs:
   harvest:
     # Probed from Europe, where the users are: European servers refuse GitHub's
     # US runners (and some US ones refuse Europe), which reads as dead maps.
-    runs-on: [self-hosted, fm5]
+    runs-on: [ self-hosted, fm5 ]
     timeout-minutes: 30
     env:
       BRANCH: harvest/map-library

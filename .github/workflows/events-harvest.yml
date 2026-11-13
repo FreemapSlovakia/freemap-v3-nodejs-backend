@@ -6,7 +6,7 @@ name: Events harvest
 on:
   schedule:
     # Nightly, UTC.
-    - cron: '30 2 * * *'
+    - cron: "30 2 * * *"
   workflow_dispatch: {}
 
 concurrency:
@@ -20,7 +20,7 @@ jobs:
   harvest:
     # Where the pages and LLM answers stay cached between runs; an empty cache
     # reads all of KČT's pages, about 40 minutes.
-    runs-on: [self-hosted, fm5]
+    runs-on: [ self-hosted, fm5 ]
     timeout-minutes: 120
     steps:
       - uses: actions/checkout@v7
