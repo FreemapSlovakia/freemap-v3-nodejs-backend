@@ -8,6 +8,7 @@ import z from 'zod';
 import { authenticator } from '../../authenticator.js';
 import { pool } from '../../database.js';
 import { getEnv } from '../../env.js';
+import { appLogger } from '../../logger.js';
 import { AUTH_OPTIONAL, registerPath } from '../../openapi.js';
 import { acceptValidator } from '../../requestValidators.js';
 import { zDateToIso, zNullableDateToIso } from '../../types.js';
@@ -42,6 +43,7 @@ const PictureDbRowSchema = z.object({
     .pipe(z.array(z.string())),
   rating: z.number(),
   myStars: z.number().nullish(),
+  viewCount: z.number(),
 });
 
 const CommentDbRowSchema = z.object({
@@ -96,6 +98,14 @@ export function attachGetPictureHandler(router: RouterInstance) {
       security: AUTH_OPTIONAL,
       requestParams: {
         path: z.object({ id: PictureIdParamSchema }),
+        query: z.object({
+          countView: z
+            .literal('1')
+            .optional()
+            .describe(
+              'Count this request as a view (not by the author); omitted when re-fetching a shown picture',
+            ),
+        }),
       },
       responses: {
         200: {
@@ -141,6 +151,7 @@ export function attachGetPictureHandler(router: RouterInstance) {
               pano,
               premium,
               license,
+              viewCount,
               (SELECT MAX(changedAt) FROM pictureLicenseHistory WHERE pictureId = picture.id) AS licenseSince,
               user.id as userId,
               user.name,
@@ -158,6 +169,31 @@ export function attachGetPictureHandler(router: RouterInstance) {
 
       if (!row) {
         ctx.throw(404, 'no such picture');
+      }
+
+      let { viewCount } = row;
+
+      const { user } = ctx.state;
+
+      // Not by the author, and not of a premium photo the viewer can't see.
+      if (
+        ctx.query.countView === '1' &&
+        row.userId !== user?.id &&
+        (!row.premium ||
+          (!!user?.premiumExpiration && user.premiumExpiration > new Date()))
+      ) {
+        try {
+          await pool.query<unknown>(
+            sql`UPDATE picture SET viewCount = viewCount + 1 WHERE id = ${ref.id}`,
+          );
+
+          viewCount++;
+        } catch (err) {
+          // A cosmetic counter must not keep the photo from opening.
+          appLogger
+            .child({ module: 'getPicture', reqId: ctx.reqId })
+            .warn({ err }, 'counting a view failed');
+        }
       }
 
       const commentRows = CommentDbRowSchema.array().parse(
@@ -247,6 +283,7 @@ export function attachGetPictureHandler(router: RouterInstance) {
         premium,
         license,
         licenseSince,
+        viewCount,
         hmac:
           premium && secret
             ? createHmac('sha256', secret)

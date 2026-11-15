@@ -209,6 +209,7 @@ export async function initDatabase() {
       premium BIT NOT NULL DEFAULT FALSE,
       azimuth FLOAT DEFAULT NULL,
       license VARCHAR(32) CHARSET ascii NOT NULL DEFAULT 'CC-BY-SA-4.0',
+      viewCount INT UNSIGNED NOT NULL DEFAULT 0,
       FOREIGN KEY (userId) REFERENCES user (id) ON DELETE CASCADE,
       INDEX picPano (pano),
       INDEX picPremium (premium),
@@ -581,6 +582,8 @@ export async function initDatabase() {
 
     // Every event is public.
     'ALTER TABLE event DROP COLUMN IF EXISTS visibility',
+
+    'ALTER TABLE picture ADD COLUMN IF NOT EXISTS viewCount INT UNSIGNED NOT NULL DEFAULT 0',
   ];
 
   const db = await pool.getConnection();
