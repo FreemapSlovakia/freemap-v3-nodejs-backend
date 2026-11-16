@@ -103,7 +103,7 @@ export function attachGetPictureHandler(router: RouterInstance) {
             .literal('1')
             .optional()
             .describe(
-              'Count this request as a view (not by the author); omitted when re-fetching a shown picture',
+              'Count this request as a view; omitted when re-fetching a shown picture',
             ),
         }),
       },
@@ -175,11 +175,11 @@ export function attachGetPictureHandler(router: RouterInstance) {
 
       const { user } = ctx.state;
 
-      // Not by the author, and not of a premium photo the viewer can't see.
+      // Not of a premium photo the viewer can't see.
       if (
         ctx.query.countView === '1' &&
-        row.userId !== user?.id &&
         (!row.premium ||
+          row.userId === user?.id ||
           (!!user?.premiumExpiration && user.premiumExpiration > new Date()))
       ) {
         try {
