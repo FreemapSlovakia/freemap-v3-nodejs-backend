@@ -52,6 +52,7 @@ const COMPOSITE_PK_TABLES = [
   'pictureRating',
   'mapWriteAccess',
   'eventParticipant',
+  'eventGoingNotified',
   'mailWatch',
 ] as const;
 

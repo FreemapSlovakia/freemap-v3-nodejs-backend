@@ -432,6 +432,16 @@ export async function initDatabase() {
       INDEX ecEventIdx (eventId, createdAt)
     ) ENGINE=InnoDB`,
 
+    // Who has had a "going" email sent to the organizer, so toggling Going
+    // mails once. Records the send, not its delivery.
+    sql`CREATE TABLE IF NOT EXISTS eventGoingNotified (
+      eventId CHAR(8) CHARSET ascii NOT NULL,
+      userId INT UNSIGNED NOT NULL,
+      PRIMARY KEY (eventId, userId),
+      CONSTRAINT egnEventFk FOREIGN KEY (eventId) REFERENCES event (id) ON DELETE CASCADE,
+      CONSTRAINT egnUserFk FOREIGN KEY (userId) REFERENCES user (id) ON DELETE CASCADE
+    ) ENGINE=InnoDB`,
+
     // Who follows or has muted the emails about one event or photo; no row
     // leaves it to whether the user takes part. No FK: the target is one of
     // three tables, so their deletes clear these rows.
@@ -614,6 +624,10 @@ export async function initDatabase() {
     'ALTER TABLE picture ADD COLUMN IF NOT EXISTS viewCount INT UNSIGNED NOT NULL DEFAULT 0',
 
     'ALTER TABLE user ADD COLUMN IF NOT EXISTS sendEventEmails BIT NOT NULL DEFAULT true AFTER sendGalleryEmails',
+
+    // Those going before the table existed were announced already; only while
+    // it is empty, so later skipped sends stay unrecorded.
+    "INSERT IGNORE INTO eventGoingNotified (eventId, userId) SELECT eventId, userId FROM eventParticipant WHERE status = 'going' AND NOT EXISTS (SELECT 1 FROM eventGoingNotified)",
 
     ...['pictureComment', 'wikimediaComment', 'eventComment'].map(
       (table) =>

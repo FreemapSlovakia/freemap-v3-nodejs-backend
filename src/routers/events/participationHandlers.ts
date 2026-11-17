@@ -68,8 +68,6 @@ async function setParticipation(
         ),
       );
 
-    // TODO toggling Going off and on mails the organizer each time; nothing
-    // remembers who they were already told about.
     if (status === 'going' && previous?.status !== 'going') {
       await mailEventGoing(conn, logger.child({ reqId: ctx.reqId }), {
         eventId: id,

@@ -131,6 +131,20 @@ export async function mailEventGoing(
     watchers: false,
   });
 
+  if (!recipients.length) {
+    return;
+  }
+
+  // Once per person and event, however often Going is toggled.
+  const { affectedRows } = await conn.query<{ affectedRows: number }>(
+    sql`INSERT IGNORE INTO eventGoingNotified (eventId, userId)
+      VALUES (${event.id}, ${opts.actor.id})`,
+  );
+
+  if (!affectedRows) {
+    return;
+  }
+
   afterCommit(conn, () =>
     mailInBackground(logger, recipients, (r) => {
       const t = mailTexts(r.language);
