@@ -256,8 +256,9 @@ export async function mailEventDeleted(
         targetId: event.id,
         subject: t.deletedSubject(event.title),
         body: t.deletedBody(t.quote(event.title), when),
-        // No link: the event is gone.
+        // No link: the event is gone, and with it anything to stop.
         html: [htmlPara(t.deletedBody(htmlRef(event.title), esc(when)))],
+        final: true,
       });
     }),
   );

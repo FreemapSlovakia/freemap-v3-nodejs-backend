@@ -302,6 +302,11 @@ export async function sendWatchedMail(opts: {
   html?: string[];
   /** The site the links lead to; by default the first `WEB_BASE_URL`. */
   web?: string;
+  /**
+   * No stop link: the last email about a target that is gone. The one-click
+   * header stays, as mail providers expect it; it does nothing harmful then.
+   */
+  final?: boolean;
 }) {
   const { recipient, target, targetId, subject, body, web = webBaseUrl } = opts;
 
@@ -311,23 +316,25 @@ export async function sendWatchedMail(opts: {
 
   const settingsUrl = `${web}/#show=account/notifications`;
 
-  const stopUrl = token ? `${web}/#show=mail-watch/${token}` : settingsUrl;
-
-  const footer = [
-    `${target === 'event' ? texts.stopEvent : texts.stopPhoto}: ${stopUrl}`,
-    `${texts.settings}: ${settingsUrl}`,
-  ].join('\n');
-
-  const text = `${body}\n\n-- \n${footer}`;
-
   const stopLabel = target === 'event' ? texts.stopEvent : texts.stopPhoto;
+
+  const links = [
+    ...(token && !opts.final
+      ? [{ label: stopLabel, url: `${web}/#show=mail-watch/${token}` }]
+      : []),
+    { label: texts.settings, url: settingsUrl },
+  ];
+
+  const text = `${body}\n\n-- \n${links.map((l) => `${l.label}: ${l.url}`).join('\n')}`;
 
   const html =
     opts.html &&
     [
       '<!doctype html><html><body style="font-family:sans-serif;font-size:15px;line-height:1.4">',
       ...opts.html,
-      `<hr style="border:0;border-top:1px solid #ddd"><p style="font-size:13px;color:#666"><a href="${esc(stopUrl)}">${esc(stopLabel)}</a> · <a href="${esc(settingsUrl)}">${esc(texts.settings)}</a></p>`,
+      `<hr style="border:0;border-top:1px solid #ddd"><p style="font-size:13px;color:#666">${links
+        .map((l) => `<a href="${esc(l.url)}">${esc(l.label)}</a>`)
+        .join(' · ')}</p>`,
       '</body></html>',
     ].join('\n');
 

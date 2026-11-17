@@ -9,6 +9,7 @@ import {
   MailTargetSchema,
   parseWatchToken,
   setWatch,
+  targetExists,
   watchState,
 } from '../../mailWatch.js';
 import { AUTH_REQUIRED, registerPath } from '../../openapi.js';
@@ -111,6 +112,7 @@ registerPath('/mail-watch/token', {
         content: { 'application/json': { schema: TokenResponseSchema } },
       },
       404: { description: 'invalid token' },
+      410: { description: 'the event or photo no longer exists' },
     },
   },
 });
@@ -192,14 +194,23 @@ router.post('/token', acceptValidator('application/json'), async (ctx) => {
 
   const { userId, target, targetId } = parsed;
 
-  // An account merged away or deleted since the email went out.
-  const state =
-    body.watching === undefined
-      ? await watchState(pool, userId, target, targetId)
-      : await setWatch(pool, userId, target, targetId, body.watching);
+  // The account first: one merged away or deleted since the email went out
+  // makes the link invalid, whatever became of its target.
+  let state = await watchState(pool, userId, target, targetId);
 
   if (!state) {
     return ctx.throw(404, 'invalid token');
+  }
+
+  if (!(await targetExists(pool, target, targetId))) {
+    return ctx.throw(410, 'no such event or photo');
+  }
+
+  if (body.watching !== undefined) {
+    state = {
+      ...state,
+      ...(await setWatch(pool, userId, target, targetId, body.watching)),
+    };
   }
 
   ctx.body = TokenResponseSchema.parse({
@@ -215,17 +226,14 @@ router.post('/unsubscribe', async (ctx) => {
 
   const parsed = typeof token === 'string' ? parseWatchToken(token) : null;
 
-  if (
-    !parsed ||
-    !(await setWatch(
-      pool,
-      parsed.userId,
-      parsed.target,
-      parsed.targetId,
-      false,
-    ))
-  ) {
+  if (!parsed) {
     return ctx.throw(404, 'invalid token');
+  }
+
+  // A genuine token always succeeds, so the provider doesn't retry: with its
+  // account or target gone, nothing mails about it anyway.
+  if (await targetExists(pool, parsed.target, parsed.targetId)) {
+    await setWatch(pool, parsed.userId, parsed.target, parsed.targetId, false);
   }
 
   ctx.status = 204;

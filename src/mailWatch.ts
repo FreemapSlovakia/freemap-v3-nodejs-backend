@@ -168,13 +168,20 @@ export async function setWatch(
   return { watching, enabled: state.enabled };
 }
 
-async function targetExists(db: Db, target: MailTarget, targetId: string) {
+export async function targetExists(
+  db: Db,
+  target: MailTarget,
+  targetId: string,
+) {
+  // A Commons photo outlives our monthly import of it, as its comments do.
+  if (target === 'wikimedia') {
+    return true;
+  }
+
   const [row] = await db.query<unknown[]>(
     target === 'event'
       ? sql`SELECT 1 FROM event WHERE id = ${targetId}`
-      : target === 'picture'
-        ? sql`SELECT 1 FROM picture WHERE id = ${targetId}`
-        : sql`SELECT 1 FROM wikimediaPicture WHERE pageId = ${targetId}`,
+      : sql`SELECT 1 FROM picture WHERE id = ${targetId}`,
   );
 
   return row !== undefined;
