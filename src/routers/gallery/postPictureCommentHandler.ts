@@ -90,7 +90,7 @@ export function attachPostPictureCommentHandler(router: RouterInstance) {
       const insertId = await runInTransaction(async (conn) => {
         let ownerId: number | null = null;
 
-        let picTitle = '';
+        let picTitle: string | null = null;
 
         if (ref.source === 'wikimedia') {
           const [row] = await conn.query<{ pageId: number }[]>(
@@ -121,7 +121,7 @@ export function attachPostPictureCommentHandler(router: RouterInstance) {
 
           ownerId = row.userId;
 
-          picTitle = row.title ? `"${row.title}" ` : '';
+          picTitle = row.title;
         }
 
         const { insertId } = await conn.query<{ insertId: number }>(
@@ -147,7 +147,7 @@ export function attachPostPictureCommentHandler(router: RouterInstance) {
               target,
               targetId,
               own: r.id === ownerId,
-              commenterName: user.name,
+              commenter: user,
               comment,
               picUrl,
               picTitle,

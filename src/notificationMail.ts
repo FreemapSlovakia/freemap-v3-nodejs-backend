@@ -250,9 +250,37 @@ export function formatEventTime(
 
 export const eventUrl = (id: string) => `${webBaseUrl}/#panel=event/${id}`;
 
+export const userUrl = (id: number, web = webBaseUrl) =>
+  `${web}/#show=user/${id}`;
+
+/** Text for HTML; the texts' own wording holds no markup characters. */
+export const esc = (s: string) =>
+  s
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;');
+
+/** A name or title as the HTML mail shows it: italic, linking where it leads. */
+export const htmlRef = (text: string, href?: string) =>
+  href
+    ? `<a href="${esc(href)}"><i>${esc(text)}</i></a>`
+    : `<i>${esc(text)}</i>`;
+
+/** A paragraph of HTML already escaped where it needs to be. */
+export const htmlPara = (html: string) => `<p>${html}</p>`;
+
+/** User-written text, its line breaks kept. */
+export const htmlQuote = (text: string) =>
+  `<blockquote style="margin:0;padding-left:12px;border-left:3px solid #ccc">${text
+    .split(/\r?\n/)
+    .map(esc)
+    .join('<br>')}</blockquote>`;
+
 /**
  * Sends one email: `body` and a footer letting the recipient stop the emails
- * about this target, with the matching one-click `List-Unsubscribe`.
+ * about this target, with the matching one-click `List-Unsubscribe`. `html`,
+ * the same as HTML blocks (`htmlPara`, `htmlQuote`), makes it multipart.
  */
 export async function sendWatchedMail(opts: {
   recipient: Recipient;
@@ -260,6 +288,7 @@ export async function sendWatchedMail(opts: {
   targetId: string | number;
   subject: string;
   body: string;
+  html?: string[];
   /** The site the links lead to; by default the first `WEB_BASE_URL`. */
   web?: string;
 }) {
@@ -280,6 +309,17 @@ export async function sendWatchedMail(opts: {
 
   const text = `${body}\n\n-- \n${footer}`;
 
+  const stopLabel = target === 'event' ? texts.stopEvent : texts.stopPhoto;
+
+  const html =
+    opts.html &&
+    [
+      '<!doctype html><html><body style="font-family:sans-serif;font-size:15px;line-height:1.4">',
+      ...opts.html,
+      `<hr style="border:0;border-top:1px solid #ddd"><p style="font-size:13px;color:#666"><a href="${esc(stopUrl)}">${esc(stopLabel)}</a> · <a href="${esc(settingsUrl)}">${esc(texts.settings)}</a></p>`,
+      '</body></html>',
+    ].join('\n');
+
   const headers: Record<string, string> =
     token && apiUrl
       ? {
@@ -291,7 +331,7 @@ export async function sendWatchedMail(opts: {
   // Development: the whole mail in the log, nothing sent.
   if (!getEnvBoolean('MAILGUN_ENABLE', false)) {
     mailLogger.info(
-      { to: recipient.email, subject, text, headers },
+      { to: recipient.email, subject, text, html, headers },
       'MAILGUN_ENABLE is off — not sending',
     );
 
@@ -305,6 +345,7 @@ export async function sendWatchedMail(opts: {
     // One stalled send must not hold up the rest of its batch for good.
     30_000,
     headers,
+    html,
   );
 }
 

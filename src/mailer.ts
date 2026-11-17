@@ -29,6 +29,8 @@ export async function sendMail(
   timeoutMs?: number,
   /** Extra headers, e.g. `List-Unsubscribe`. */
   headers: Record<string, string> = {},
+  /** An HTML alternative to `text`. */
+  html?: string,
 ) {
   await got.post(
     `https://api${getEnvBoolean('MAILGUN_EU', false) ? '.eu' : ''}.mailgun.net/v3/${getEnv('MAILGUN_DOMAIN')}/messages`,
@@ -40,6 +42,7 @@ export async function sendMail(
         to,
         subject,
         text,
+        ...(html === undefined ? {} : { html }),
         // Mailgun's way of setting a header.
         ...Object.fromEntries(
           Object.entries(headers).map(([k, v]) => [`h:${k}`, v]),
