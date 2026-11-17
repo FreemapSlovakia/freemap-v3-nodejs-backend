@@ -4,7 +4,14 @@ import { OSM_API_BASE, OSM_USER_AGENT } from './osm.js';
 
 const logger = appLogger.child({ module: 'providerProfiles' });
 
-export type ProviderProfile = { url: string; name: string };
+export type OsmStats = {
+  mapperSince: string;
+  changesetCount: number;
+  traceCount: number;
+  lastEditAt: string | null;
+};
+
+export type ProviderProfile = { url: string; name: string; osm?: OsmStats };
 
 const TIMEOUT_MS = 3000;
 
@@ -23,6 +30,19 @@ const cache = new Map<
 
 const OsmUserSchema = z.object({
   user: z.object({ display_name: z.string() }),
+});
+
+// Parsed apart from the name, so a change here never drops the profile link.
+const OsmUserStatsSchema = z.object({
+  user: z.object({
+    account_created: z.iso.datetime(),
+    changesets: z.object({ count: z.uint32() }),
+    traces: z.object({ count: z.uint32() }),
+  }),
+});
+
+const OsmChangesetsSchema = z.object({
+  changesets: z.array(z.object({ created_at: z.iso.datetime() })),
 });
 
 const GithubUserSchema = z.object({ login: z.string(), html_url: z.url() });
@@ -47,15 +67,40 @@ async function fetchProfile(
   id: string,
 ): Promise<ProviderProfile> {
   if (provider === 'osm') {
-    const name = OsmUserSchema.parse(
-      await fetchJson(`${OSM_API_BASE}/user/${id}.json`, {
-        'user-agent': OSM_USER_AGENT,
-      }),
-    ).user.display_name;
+    const headers = { 'user-agent': OSM_USER_AGENT };
+
+    const [json, lastChangeset] = await Promise.all([
+      fetchJson(`${OSM_API_BASE}/user/${id}.json`, headers),
+      // The latest one is listed first.
+      // TODO: a failure here is cached as long as a hit, hiding the last edit for a day.
+      fetchJson(`${OSM_API_BASE}/changesets.json?user=${id}&limit=1`, headers)
+        .then((json) => OsmChangesetsSchema.parse(json).changesets[0])
+        .catch((err: unknown) => {
+          logger.warn({ err, id }, 'last changeset lookup failed');
+
+          return undefined;
+        }),
+    ]);
+
+    const name = OsmUserSchema.parse(json).user.display_name;
+
+    const stats = OsmUserStatsSchema.safeParse(json);
+
+    if (!stats.success) {
+      logger.warn({ err: stats.error, id }, 'unexpected OSM user stats');
+    }
 
     return {
       url: `https://www.openstreetmap.org/user/${encodeURIComponent(name)}`,
       name,
+      osm: stats.success
+        ? {
+            mapperSince: stats.data.user.account_created,
+            changesetCount: stats.data.user.changesets.count,
+            traceCount: stats.data.user.traces.count,
+            lastEditAt: lastChangeset?.created_at ?? null,
+          }
+        : undefined,
     };
   }
 
