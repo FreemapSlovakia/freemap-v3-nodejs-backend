@@ -539,7 +539,7 @@ async function byBbox(ctx: ParameterizedContext) {
 
   if (fields?.includes('lastCommentedAt')) {
     sqlFields.push(
-      '(SELECT MAX(createdAt) FROM pictureComment WHERE pictureId = picture.id) AS lastCommentedAt',
+      '(SELECT MAX(createdAt) FROM pictureComment WHERE pictureId = picture.id AND deletedAt IS NULL) AS lastCommentedAt',
     );
   }
 
@@ -855,7 +855,7 @@ async function byOrder(ctx: ParameterizedContext) {
     ${hv.length ? sql`HAVING ${join(hv, ' AND ')}` : empty}
     ORDER BY ${
       orderBy === 'lastCommentedAt'
-        ? sql`(SELECT MAX(createdAt) FROM pictureComment WHERE pictureId = picture.id)`
+        ? sql`(SELECT MAX(createdAt) FROM pictureComment WHERE pictureId = picture.id AND deletedAt IS NULL)`
         : raw(orderBy)
     } ${raw(direction)}, id ${raw(direction)}
     LIMIT 1000
@@ -907,7 +907,7 @@ async function byOrder(ctx: ParameterizedContext) {
   } else if (orderBy === 'lastCommentedAt') {
     wmArm = sql`SELECT -CAST(w.pageId AS SIGNED) AS id, MAX(w.createdAt) AS ord
         ${needRating ? raw(`, (SELECT ${ratingExp} FROM wikimediaRating WHERE pageId = w.pageId) AS rating`) : empty}
-        FROM wikimediaComment w ${wmJoin}
+        FROM (SELECT pageId, createdAt FROM wikimediaComment WHERE deletedAt IS NULL) w ${wmJoin}
         GROUP BY w.pageId
         ${needRating ? sql`HAVING ${join(hv, ' AND ')}` : empty}
         ORDER BY ord ${raw(direction)}, w.pageId ${raw(direction)} LIMIT 1000`;
@@ -968,7 +968,7 @@ async function byOrder(ctx: ParameterizedContext) {
             `(SELECT ${ratingExp} FROM pictureRating WHERE pictureId = picture.id)`,
           )
         : orderBy === 'lastCommentedAt'
-          ? sql`(SELECT MAX(createdAt) FROM pictureComment WHERE pictureId = picture.id)`
+          ? sql`(SELECT MAX(createdAt) FROM pictureComment WHERE pictureId = picture.id AND deletedAt IS NULL)`
           : raw(orderBy);
 
     // Same filters as the non-UNION query: `wh` (private guard + date/pano/

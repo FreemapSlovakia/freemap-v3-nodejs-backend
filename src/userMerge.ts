@@ -36,6 +36,7 @@ const SIMPLE_FK_TABLES = [
   'trackingDevice',
   'map',
   'event',
+  'eventComment',
   'purchase',
   'purchaseToken',
   'purchaseIntent',

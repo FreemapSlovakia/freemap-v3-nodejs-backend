@@ -6,6 +6,7 @@ import type { ParameterizedContext } from 'koa';
 import sql, { empty, raw } from 'sql-template-tag';
 import z from 'zod';
 import { authenticator } from '../../authenticator.js';
+import { CommentSchema, listComments } from '../../comments.js';
 import { pool } from '../../database.js';
 import { getEnv } from '../../env.js';
 import { appLogger } from '../../logger.js';
@@ -46,16 +47,6 @@ const PictureDbRowSchema = z.object({
   viewCount: z.number(),
 });
 
-const CommentDbRowSchema = z.object({
-  id: z.uint32(),
-  createdAt: zDateToIso,
-  comment: z.string(),
-  userId: z.uint32(),
-  name: z.string(),
-  hasPicture: z.coerce.boolean(),
-  premium: z.coerce.boolean(),
-});
-
 const UserSchema = z.strictObject({
   id: z.uint32(),
   name: z.string(),
@@ -74,16 +65,7 @@ const ResponseBodySchema = PictureDbRowSchema.omit({
   id: z.uint32(),
   source: z.literal('gallery'),
   user: UserSchema.nullable(),
-  comments: CommentDbRowSchema.omit({
-    userId: true,
-    name: true,
-    hasPicture: true,
-    premium: true,
-  })
-    .extend({
-      user: UserSchema,
-    })
-    .array(),
+  comments: CommentSchema.array(),
   hmac: z.string().optional(),
   size: z.number().optional(),
 });
@@ -196,35 +178,7 @@ export function attachGetPictureHandler(router: RouterInstance) {
         }
       }
 
-      const commentRows = CommentDbRowSchema.array().parse(
-        await pool.query<unknown>(sql`
-          SELECT
-            pictureComment.id,
-            pictureComment.createdAt,
-            comment,
-            user.name,
-            userId,
-            user.picture IS NOT NULL AS hasPicture,
-            (user.premiumExpiration IS NOT NULL AND user.premiumExpiration > NOW()) AS premium
-          FROM pictureComment JOIN user ON (userId = user.id)
-          WHERE pictureId = ${ref.id}
-          ORDER BY pictureComment.createdAt
-        `),
-      );
-
-      const comments = commentRows.map(
-        ({ id, createdAt, comment, userId, name, hasPicture, premium }) => ({
-          id,
-          createdAt,
-          comment,
-          user: {
-            id: userId,
-            name,
-            hasPicture,
-            premium,
-          },
-        }),
-      );
+      const comments = await listComments(pool, 'pictureComment', ref.id);
 
       const {
         pictureId,
@@ -336,20 +290,7 @@ async function respondWikimedia(
     ctx.throw(404, 'no such picture');
   }
 
-  const commentRows = CommentDbRowSchema.array().parse(
-    await pool.query<unknown>(sql`
-      SELECT
-        wikimediaComment.id,
-        wikimediaComment.createdAt,
-        comment,
-        user.name,
-        userId,
-        user.picture IS NOT NULL AS hasPicture,
-        (user.premiumExpiration IS NOT NULL AND user.premiumExpiration > NOW()) AS premium
-      FROM wikimediaComment JOIN user ON (userId = user.id)
-      WHERE pageId = ${pageId}
-      ORDER BY wikimediaComment.createdAt`),
-  );
+  const comments = await listComments(pool, 'wikimediaComment', pageId);
 
   ctx.body = {
     id: pageId,
@@ -359,14 +300,7 @@ async function respondWikimedia(
     lon: row.lon,
     createdAt: row.uploadedAt,
     tags: [],
-    comments: commentRows.map(
-      ({ id, createdAt, comment, userId, name, hasPicture, premium }) => ({
-        id,
-        createdAt,
-        comment,
-        user: { id: userId, name, hasPicture, premium },
-      }),
-    ),
+    comments,
     rating: row.rating,
     myStars: row.myStars ?? null,
   };

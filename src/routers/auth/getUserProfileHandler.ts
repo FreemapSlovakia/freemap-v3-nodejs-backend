@@ -174,8 +174,8 @@ export function attachGetUserProfileHandler(router: RouterInstance) {
             githubUserId,
             stravaUserId,
             (SELECT COUNT(*) FROM picture WHERE userId = ${id}) AS pictureCount,
-            (SELECT COUNT(*) FROM pictureComment WHERE userId = ${id})
-              + (SELECT COUNT(*) FROM wikimediaComment WHERE userId = ${id})
+            (SELECT COUNT(*) FROM pictureComment WHERE userId = ${id} AND deletedAt IS NULL)
+              + (SELECT COUNT(*) FROM wikimediaComment WHERE userId = ${id} AND deletedAt IS NULL)
               AS commentCount,
             (SELECT COUNT(*) FROM event WHERE userId = ${id})
               AS eventCount,

@@ -2,6 +2,7 @@ import type { RouterInstance } from '@koa/router';
 import sql from 'sql-template-tag';
 import z from 'zod';
 import { authenticator } from '../../authenticator.js';
+import { CommentBodySchema } from '../../comments.js';
 import { runInTransaction } from '../../database.js';
 import { getEnv, getEnvBoolean } from '../../env.js';
 import { appLogger } from '../../logger.js';
@@ -13,8 +14,8 @@ import { PictureIdParamSchema, parsePictureId } from './pictureId.js';
 const webBaseUrls = getEnv('WEB_BASE_URL').split(',').filter(Boolean);
 
 const BodySchema = z.strictObject({
+  ...CommentBodySchema.shape,
   webBaseUrl: z.url().optional(),
-  comment: z.string().min(1).max(4096),
 });
 
 const ResponseSchema = z.strictObject({ id: z.uint32() });
@@ -114,7 +115,7 @@ export function attachPostPictureCommentHandler(router: RouterInstance) {
                     SELECT DISTINCT mailableEmail AS email, sendGalleryEmails, language
                       FROM user
                       JOIN wikimediaComment ON userId = user.id
-                      WHERE sendGalleryEmails AND pageId = ${ref.pageId} AND userId <> ${user.id} AND mailableEmail IS NOT NULL
+                      WHERE sendGalleryEmails AND pageId = ${ref.pageId} AND userId <> ${user.id} AND mailableEmail IS NOT NULL AND deletedAt IS NULL
                   `),
                   ]
                 : ([undefined] as const)),
@@ -198,7 +199,7 @@ export function attachPostPictureCommentHandler(router: RouterInstance) {
                     SELECT DISTINCT mailableEmail AS email, sendGalleryEmails, language
                       FROM user
                       JOIN pictureComment ON userId = user.id
-                      WHERE sendGalleryEmails AND pictureId = ${ref.id} AND userId <> ${user.id} AND mailableEmail IS NOT NULL
+                      WHERE sendGalleryEmails AND pictureId = ${ref.id} AND userId <> ${user.id} AND mailableEmail IS NOT NULL AND deletedAt IS NULL
                   `),
                 ]
               : ([undefined, undefined] as const)),

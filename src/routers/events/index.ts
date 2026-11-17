@@ -1,4 +1,5 @@
 import Router from '@koa/router';
+import { attachCommentHandlers } from './commentHandlers.js';
 import { attachEventCoverHandlers } from './coverHandlers.js';
 import { attachDeleteEventHandler } from './deleteEventHandler.js';
 import { attachGetEventHandler } from './getEventHandler.js';
@@ -18,6 +19,7 @@ attachSourceHandler(router);
 attachEventCoverHandlers(router);
 attachParticipationHandlers(router);
 attachParticipantsHandler(router);
+attachCommentHandlers(router);
 attachPostEventHandler(router);
 attachGetEventHandler(router);
 attachPatchEventHandler(router);

@@ -417,6 +417,20 @@ export async function initDatabase() {
       INDEX epUserIdx (userId)
     ) ENGINE=InnoDB`,
 
+    sql`CREATE TABLE IF NOT EXISTS eventComment (
+      id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+      eventId CHAR(8) CHARSET ascii NOT NULL,
+      userId INT UNSIGNED NOT NULL,
+      createdAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      comment VARCHAR(4096) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+      editedAt TIMESTAMP NULL,
+      deletedAt TIMESTAMP NULL,
+      deletedBy ENUM('author', 'owner', 'moderator') CHARSET ascii NULL,
+      CONSTRAINT ecEventFk FOREIGN KEY (eventId) REFERENCES event (id) ON DELETE CASCADE,
+      CONSTRAINT ecUserFk FOREIGN KEY (userId) REFERENCES user (id) ON DELETE CASCADE,
+      INDEX ecEventIdx (eventId, createdAt)
+    ) ENGINE=InnoDB`,
+
     // CREATE OR REPLACE (not IF NOT EXISTS) so the trigger is recreated on every
     // startup, resetting its DEFINER to the app's current connection user. This
     // self-heals a stale DEFINER (e.g. after restoring the DB onto a new host
@@ -584,6 +598,11 @@ export async function initDatabase() {
     'ALTER TABLE event DROP COLUMN IF EXISTS visibility',
 
     'ALTER TABLE picture ADD COLUMN IF NOT EXISTS viewCount INT UNSIGNED NOT NULL DEFAULT 0',
+
+    ...['pictureComment', 'wikimediaComment', 'eventComment'].map(
+      (table) =>
+        `ALTER TABLE ${table} ADD COLUMN IF NOT EXISTS editedAt TIMESTAMP NULL, ADD COLUMN IF NOT EXISTS deletedAt TIMESTAMP NULL, ADD COLUMN IF NOT EXISTS deletedBy ENUM('author', 'owner', 'moderator') CHARSET ascii NULL`,
+    ),
   ];
 
   const db = await pool.getConnection();
