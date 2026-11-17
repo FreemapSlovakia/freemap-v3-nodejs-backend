@@ -3,12 +3,14 @@ import sql from 'sql-template-tag';
 import z from 'zod';
 import { authenticator } from '../../authenticator.js';
 import { CommentBodySchema } from '../../comments.js';
-import { runInTransaction } from '../../database.js';
-import { getEnv, getEnvBoolean } from '../../env.js';
+import { afterCommit, runInTransaction } from '../../database.js';
+import { getEnv } from '../../env.js';
 import { appLogger } from '../../logger.js';
+import { mailRecipients, unmute } from '../../mailWatch.js';
+import { MAIL_LANGS, mailInBackground } from '../../notificationMail.js';
 import { AUTH_REQUIRED, registerPath } from '../../openapi.js';
 import { acceptValidator } from '../../requestValidators.js';
-import { COMMENT_MAIL_LANGS, sendCommentMail } from './commentMail.js';
+import { sendCommentMail } from './commentMail.js';
 import { PictureIdParamSchema, parsePictureId } from './pictureId.js';
 
 const webBaseUrls = getEnv('WEB_BASE_URL').split(',').filter(Boolean);
@@ -19,6 +21,8 @@ const BodySchema = z.strictObject({
 });
 
 const ResponseSchema = z.strictObject({ id: z.uint32() });
+
+const logger = appLogger.child({ module: 'postPictureComment' });
 
 export function attachPostPictureCommentHandler(router: RouterInstance) {
   registerPath('/gallery/pictures/{id}/comments', {
@@ -61,103 +65,46 @@ export function attachPostPictureCommentHandler(router: RouterInstance) {
 
       const { comment, webBaseUrl: webBaseUrlCandidate } = body;
 
-      let webBaseUrl: string;
-
-      if (webBaseUrlCandidate !== undefined) {
-        if (!webBaseUrls.includes(webBaseUrlCandidate)) {
-          ctx.throw(403, 'invalid webBaseUrl');
-        }
-
-        webBaseUrl = webBaseUrlCandidate;
-      } else {
-        webBaseUrl = webBaseUrls[0];
+      if (
+        webBaseUrlCandidate !== undefined &&
+        !webBaseUrls.includes(webBaseUrlCandidate)
+      ) {
+        ctx.throw(403, 'invalid webBaseUrl');
       }
+
+      const webBaseUrl = webBaseUrlCandidate ?? webBaseUrls[0];
 
       const user = ctx.state.user!;
 
-      const mailEnabled = getEnvBoolean('MAILGUN_ENABLE', false);
+      // For a recipient who never chose a language.
+      const acceptLang = ctx.acceptsLanguages([...MAIL_LANGS]) || 'en';
 
-      const acceptLang = ctx.acceptsLanguages([...COMMENT_MAIL_LANGS]) || 'en';
+      const target = ref.source === 'gallery' ? 'picture' : 'wikimedia';
+
+      const targetId = ref.source === 'gallery' ? ref.id : ref.pageId;
 
       const picUrl = `${webBaseUrl}/?image=${ref.source === 'gallery' ? ref.id : `w${ref.pageId}`}`;
 
-      const logger = appLogger.child({
-        module: 'postPictureComment',
-        reqId: ctx.reqId,
-      });
+      const reqLogger = logger.child({ reqId: ctx.reqId });
 
-      // Wikimedia photos have no local uploader, so notifications go only to
-      // prior commenters.
-      if (ref.source === 'wikimedia') {
-        const { insertId, recipients } = await runInTransaction(
-          async (conn) => {
-            const [row] = await conn.query<{ pageId: number }[]>(
-              sql`SELECT pageId FROM wikimediaPicture WHERE pageId = ${ref.pageId} FOR UPDATE`,
-            );
+      const insertId = await runInTransaction(async (conn) => {
+        let ownerId: number | null = null;
 
-            if (!row) {
-              ctx.throw(404, 'no such picture');
-            }
+        let picTitle = '';
 
-            const proms = [
-              conn.query<{ insertId: number }>(sql`
-              INSERT INTO wikimediaComment SET
-                pageId = ${ref.pageId},
-                userId = ${user.id},
-                comment = ${comment},
-                createdAt = ${new Date()}
-            `),
-              ...(mailEnabled
-                ? [
-                    conn.query<
-                      { email: string; language: string | null }[]
-                    >(sql`
-                    SELECT DISTINCT mailableEmail AS email, sendGalleryEmails, language
-                      FROM user
-                      JOIN wikimediaComment ON userId = user.id
-                      WHERE sendGalleryEmails AND pageId = ${ref.pageId} AND userId <> ${user.id} AND mailableEmail IS NOT NULL AND deletedAt IS NULL
-                  `),
-                  ]
-                : ([undefined] as const)),
-            ] as const;
+        if (ref.source === 'wikimedia') {
+          const [row] = await conn.query<{ pageId: number }[]>(
+            sql`SELECT pageId FROM wikimediaPicture WHERE pageId = ${ref.pageId} FOR UPDATE`,
+          );
 
-            const [{ insertId }, recipients = []] = await Promise.all(proms);
-
-            return { insertId, recipients };
-          },
-        );
-
-        await Promise.all(
-          recipients.map((recipient) => {
-            logger.info(
-              { to: recipient.email, lang: recipient.language, own: false },
-              'Sending picture comment mail.',
-            );
-
-            return sendCommentMail({
-              to: recipient.email,
-              own: false,
-              lang: recipient.language || acceptLang,
-              commenterName: user.name,
-              comment,
-              webBaseUrl,
-              picUrl,
-              picTitle: '',
-            });
-          }),
-        );
-
-        ctx.body = ResponseSchema.parse({ id: insertId });
-
-        return;
-      }
-
-      const { insertId, picInfo, recipients } = await runInTransaction(
-        async (conn) => {
+          if (!row) {
+            ctx.throw(404, 'no such picture');
+          }
+        } else {
           const [row] = await conn.query<
-            { userId: number; premium: boolean }[]
+            { userId: number; premium: boolean; title: string | null }[]
           >(
-            sql`SELECT userId, premium FROM picture WHERE id = ${ref.id} FOR UPDATE`,
+            sql`SELECT userId, premium, title FROM picture WHERE id = ${ref.id} FOR UPDATE`,
           );
 
           if (!row) {
@@ -172,97 +119,45 @@ export function attachPostPictureCommentHandler(router: RouterInstance) {
             ctx.throw(402);
           }
 
-          const proms = [
-            conn.query<{ insertId: number }>(sql`
-              INSERT INTO pictureComment SET
-                pictureId = ${ref.id},
-                userId = ${user.id},
-                comment = ${comment},
-                createdAt = ${new Date()}
-            `),
-            ...(mailEnabled
-              ? [
-                  conn.query<
-                    {
-                      title: string | null;
-                      email: string | null;
-                      userId: number | null;
-                      language: string | null;
-                    }[]
-                  >(sql`
-                    SELECT IF(sendGalleryEmails, mailableEmail, NULL) AS email, language, title, userId
-                      FROM user
-                      JOIN picture ON userId = user.id
-                      WHERE picture.id = ${ref.id}
-                  `),
-                  conn.query<{ email: string; language: string | null }[]>(sql`
-                    SELECT DISTINCT mailableEmail AS email, sendGalleryEmails, language
-                      FROM user
-                      JOIN pictureComment ON userId = user.id
-                      WHERE sendGalleryEmails AND pictureId = ${ref.id} AND userId <> ${user.id} AND mailableEmail IS NOT NULL AND deletedAt IS NULL
-                  `),
-                ]
-              : ([undefined, undefined] as const)),
-          ] as const;
+          ownerId = row.userId;
 
-          const [{ insertId }, [picInfo] = [], recipients = []] =
-            await Promise.all(proms);
+          picTitle = row.title ? `"${row.title}" ` : '';
+        }
 
-          return { insertId, picInfo, recipients };
-        },
-      );
-
-      const picTitle =
-        picInfo && 'title' in picInfo && picInfo.title
-          ? `"${picInfo.title}" `
-          : '';
-
-      const promises: Promise<void>[] = [];
-
-      if (
-        picInfo?.email &&
-        (!('userId' in picInfo) || picInfo.userId !== user.id)
-      ) {
-        logger.info(
-          { to: picInfo.email, lang: picInfo.language, own: true },
-          'Sending picture comment mail.',
+        const { insertId } = await conn.query<{ insertId: number }>(
+          ref.source === 'wikimedia'
+            ? sql`INSERT INTO wikimediaComment SET
+                pageId = ${ref.pageId}, userId = ${user.id}, comment = ${comment}, createdAt = ${new Date()}`
+            : sql`INSERT INTO pictureComment SET
+                pictureId = ${ref.id}, userId = ${user.id}, comment = ${comment}, createdAt = ${new Date()}`,
         );
 
-        promises.push(
-          sendCommentMail({
-            to: picInfo.email,
-            own: true,
-            lang: picInfo.language || acceptLang,
-            commenterName: user.name,
-            comment,
-            webBaseUrl,
-            picUrl,
-            picTitle,
-          }),
+        await unmute(conn, user.id, target, targetId);
+
+        const recipients = await mailRecipients(conn, {
+          target,
+          targetId,
+          actorId: user.id,
+        });
+
+        afterCommit(conn, () =>
+          mailInBackground(reqLogger, recipients, (r) =>
+            sendCommentMail({
+              recipient: { ...r, language: r.language ?? acceptLang },
+              target,
+              targetId,
+              own: r.id === ownerId,
+              commenterName: user.name,
+              comment,
+              picUrl,
+              picTitle,
+              web: webBaseUrl,
+            }),
+          ),
         );
-      }
 
-      promises.push(
-        ...recipients.map((recipient) => {
-          logger.info(
-            { to: recipient.email, lang: recipient.language, own: false },
-            'Sending picture comment mail.',
-          );
-
-          return sendCommentMail({
-            to: recipient.email!,
-            own: false,
-            lang: recipient.language || picInfo?.language || acceptLang,
-            commenterName: user.name,
-            comment,
-            webBaseUrl,
-            picUrl,
-            picTitle,
-          });
-        }),
-      );
-
-      await Promise.all(promises);
+        return insertId;
+      });
 
       ctx.body = ResponseSchema.parse({ id: insertId });
     },

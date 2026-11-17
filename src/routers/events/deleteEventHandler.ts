@@ -4,9 +4,11 @@ import z from 'zod';
 import { authenticator } from '../../authenticator.js';
 import { runInTransaction } from '../../database.js';
 import { appLogger } from '../../logger.js';
+import { forgetTarget } from '../../mailWatch.js';
 import { AUTH_REQUIRED, registerPath } from '../../openapi.js';
 import { acceptValidator } from '../../requestValidators.js';
 import { removeCover } from './cover.js';
+import { mailEventDeleted } from './eventMail.js';
 import { canWriteEvent } from './types.js';
 
 const logger = appLogger.child({ module: 'deleteEvent' });
@@ -52,9 +54,16 @@ export function attachDeleteEventHandler(router: RouterInstance) {
           ctx.throw(403);
         }
 
+        await mailEventDeleted(conn, logger.child({ reqId: ctx.reqId }), {
+          eventId: ctx.params.id,
+          actorId: ctx.state.user!.id,
+        });
+
         await conn.query<unknown>(
           sql`DELETE FROM event WHERE id = ${ctx.params.id}`,
         );
+
+        await forgetTarget(conn, 'event', ctx.params.id);
 
         return item.cover;
       });

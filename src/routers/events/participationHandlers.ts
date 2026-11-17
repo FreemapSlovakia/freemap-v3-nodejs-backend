@@ -4,8 +4,11 @@ import sql from 'sql-template-tag';
 import z from 'zod';
 import { authenticator } from '../../authenticator.js';
 import { runInTransaction } from '../../database.js';
+import { appLogger } from '../../logger.js';
+import { unmute } from '../../mailWatch.js';
 import { AUTH_REQUIRED, registerPath } from '../../openapi.js';
 import { acceptValidator } from '../../requestValidators.js';
+import { mailEventGoing } from './eventMail.js';
 import {
   EventRowSchema,
   EventSchema,
@@ -15,6 +18,8 @@ import {
 } from './types.js';
 
 const IdParamsSchema = z.object({ id: z.string().nonempty() });
+
+const logger = appLogger.child({ module: 'eventParticipation' });
 
 const BodySchema = z
   .strictObject({ status: ParticipationSchema })
@@ -39,6 +44,10 @@ async function setParticipation(
       ctx.throw(404, 'no such event');
     }
 
+    const [previous] = await conn.query<{ status: string }[]>(
+      sql`SELECT status FROM eventParticipant WHERE eventId = ${id} AND userId = ${userId}`,
+    );
+
     await conn.query<unknown>(
       status
         ? sql`INSERT INTO eventParticipant (eventId, userId, status)
@@ -47,6 +56,10 @@ async function setParticipation(
         : sql`DELETE FROM eventParticipant WHERE eventId = ${id} AND userId = ${userId}`,
     );
 
+    if (status) {
+      await unmute(conn, userId, 'event', id);
+    }
+
     const [row] = EventRowSchema.array()
       .length(1)
       .parse(
@@ -54,6 +67,16 @@ async function setParticipation(
           sql`${eventSelect(ctx.state.user)} WHERE e.id = ${id}`,
         ),
       );
+
+    // TODO toggling Going off and on mails the organizer each time; nothing
+    // remembers who they were already told about.
+    if (status === 'going' && previous?.status !== 'going') {
+      await mailEventGoing(conn, logger.child({ reqId: ctx.reqId }), {
+        eventId: id,
+        actor: ctx.state.user!,
+        going: row.goingCount,
+      });
+    }
 
     ctx.body = eventRowToResponse(row, ctx.state.user);
   });

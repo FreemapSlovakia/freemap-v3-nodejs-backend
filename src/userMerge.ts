@@ -52,6 +52,7 @@ const COMPOSITE_PK_TABLES = [
   'pictureRating',
   'mapWriteAccess',
   'eventParticipant',
+  'mailWatch',
 ] as const;
 
 export class MergeConflictError extends Error {
@@ -284,6 +285,7 @@ export async function mergeUserAccounts(
     language,
     createdAt,
     sendGalleryEmails,
+    sendEventEmails,
     premiumExpiration,
     credits,
   } = source;
@@ -301,6 +303,7 @@ export async function mergeUserAccounts(
       publicFields = ${mergedPublicFields},
       ${premiumExpiration ? sql`premiumExpiration = COALESCE(GREATEST(premiumExpiration, ${premiumExpiration}), ${premiumExpiration}),` : empty}
       sendGalleryEmails = sendGalleryEmails OR ${sendGalleryEmails},
+      sendEventEmails = sendEventEmails OR ${sendEventEmails},
       settings = ${mergedSettings},
       credits = credits + ${credits},
       ${polarFields}

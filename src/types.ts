@@ -89,6 +89,7 @@ export const CommonUserSchema = {
   credits: z.number().nonnegative(),
   language: z.string().nullable(),
   sendGalleryEmails: z.boolean(),
+  sendEventEmails: z.boolean(),
   // Not to be asked for an address: declined, or removed it.
   emailReminderOff: z.boolean(),
   hasPicture: z.coerce.boolean(),
@@ -157,6 +158,7 @@ const USER_COLUMN_NAMES = [
   'lon',
   'settings',
   'sendGalleryEmails',
+  'sendEventEmails',
   'premiumExpiration',
   'credits',
   'language',

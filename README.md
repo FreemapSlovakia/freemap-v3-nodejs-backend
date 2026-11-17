@@ -210,6 +210,10 @@ pnpm start | pnpm exec pino-pretty
   (paid) photos.
 - `LOCUS_TOKEN_SECRET` — HMAC secret (at least 32 characters) the "Locus Map"
   app tokens are derived from; changing it invalidates every Locus install.
+- `MAIL_TOKEN_SECRET` — HMAC secret signing the "stop emails about this event
+  or photo" links and the one-click `List-Unsubscribe` header in notification
+  emails. Without it the emails link to the account settings instead and carry
+  no such header; changing it breaks the links in emails already sent.
 
 ### Purchases (Polar)
 

@@ -27,6 +27,8 @@ export async function sendMail(
    * which is the pre-existing behaviour and not something to change from here.
    */
   timeoutMs?: number,
+  /** Extra headers, e.g. `List-Unsubscribe`. */
+  headers: Record<string, string> = {},
 ) {
   await got.post(
     `https://api${getEnvBoolean('MAILGUN_EU', false) ? '.eu' : ''}.mailgun.net/v3/${getEnv('MAILGUN_DOMAIN')}/messages`,
@@ -38,6 +40,10 @@ export async function sendMail(
         to,
         subject,
         text,
+        // Mailgun's way of setting a header.
+        ...Object.fromEntries(
+          Object.entries(headers).map(([k, v]) => [`h:${k}`, v]),
+        ),
       },
       ...(timeoutMs === undefined
         ? {}

@@ -11,9 +11,14 @@ import {
   listComments,
 } from '../../comments.js';
 import { pool, runInTransaction } from '../../database.js';
+import { appLogger } from '../../logger.js';
+import { unmute } from '../../mailWatch.js';
 import { AUTH_OPTIONAL, AUTH_REQUIRED, registerPath } from '../../openapi.js';
 import { acceptValidator } from '../../requestValidators.js';
 import { idParam } from '../../routeParams.js';
+import { mailEventComment } from './eventMail.js';
+
+const logger = appLogger.child({ module: 'eventComments' });
 
 const IdParamsSchema = z.object({ id: z.string().nonempty() });
 
@@ -123,10 +128,20 @@ export function attachCommentHandlers(router: RouterInstance) {
           ctx.throw(404, 'no such event');
         }
 
+        const user = ctx.state.user!;
+
         const { insertId } = await conn.query<{ insertId: number }>(
           sql`INSERT INTO eventComment (eventId, userId, comment)
-            VALUES (${id}, ${ctx.state.user!.id}, ${body.comment})`,
+            VALUES (${id}, ${user.id}, ${body.comment})`,
         );
+
+        await unmute(conn, user.id, 'event', id);
+
+        await mailEventComment(conn, logger.child({ reqId: ctx.reqId }), {
+          eventId: id,
+          actor: user,
+          comment: body.comment,
+        });
 
         return getComment(conn, 'eventComment', insertId);
       });

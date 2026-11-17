@@ -3,8 +3,10 @@ import sql, { join, raw, type Sql } from 'sql-template-tag';
 import z from 'zod';
 import { authenticator } from '../../authenticator.js';
 import { runInTransaction } from '../../database.js';
+import { appLogger } from '../../logger.js';
 import { AUTH_REQUIRED, registerPath } from '../../openapi.js';
 import { acceptValidator } from '../../requestValidators.js';
+import { mailEventChange, readEventWhen } from './eventMail.js';
 import { assertOwnMap } from './mapLink.js';
 import { assertCanOwn } from './organizerHandlers.js';
 import {
@@ -16,6 +18,8 @@ import {
   eventSelect,
 } from './types.js';
 import { EventPatchSchema } from './validation.js';
+
+const logger = appLogger.child({ module: 'patchEvent' });
 
 export function attachPatchEventHandler(router: RouterInstance) {
   registerPath('/events/{id}', {
@@ -177,9 +181,21 @@ export function attachPatchEventHandler(router: RouterInstance) {
         }
 
         if (sets.length) {
+          const before = await readEventWhen(conn, sql`id = ${id}`);
+
           await conn.query<unknown>(
             sql`UPDATE event SET ${join(sets, ', ')} WHERE id = ${id}`,
           );
+
+          const after = await readEventWhen(conn, sql`id = ${id}`);
+
+          if (before && after) {
+            await mailEventChange(conn, logger.child({ reqId: ctx.reqId }), {
+              before,
+              after,
+              actorId: ctx.state.user!.id,
+            });
+          }
         }
 
         const [row] = EventRowSchema.array()

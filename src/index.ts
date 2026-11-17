@@ -25,6 +25,7 @@ import { attachPostGarminCourses } from './routers/garminCoursesHandler.js';
 import { attachGeoIp } from './routers/geoip.js';
 import { geotoolsRouter } from './routers/geotools/index.js';
 import { attachGetUsers } from './routers/getUsersHandler.js';
+import { mailWatchRouter } from './routers/mailWatch/index.js';
 import { locusRouter, oruxRouter } from './routers/mapApps/index.js';
 import { mapsRouter } from './routers/maps/index.js';
 import { attachOsmGpxHandlers } from './routers/osmGpxHandler.js';
@@ -224,6 +225,12 @@ router.use(
 router.use('/maps', mapsRouter.routes(), mapsRouter.allowedMethods());
 
 router.use('/events', eventsRouter.routes(), eventsRouter.allowedMethods());
+
+router.use(
+  '/mail-watch',
+  mailWatchRouter.routes(),
+  mailWatchRouter.allowedMethods(),
+);
 
 router.use('/locus', locusRouter.routes(), locusRouter.allowedMethods());
 

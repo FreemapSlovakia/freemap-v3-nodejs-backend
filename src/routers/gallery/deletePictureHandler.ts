@@ -4,6 +4,7 @@ import sql from 'sql-template-tag';
 import z from 'zod';
 import { authenticator } from '../../authenticator.js';
 import { runInTransaction } from '../../database.js';
+import { forgetTarget } from '../../mailWatch.js';
 import { AUTH_REQUIRED, registerPath } from '../../openapi.js';
 import { isOwnerOrRole } from '../../roles.js';
 import { picturesDir } from '../gallery/constants.js';
@@ -50,6 +51,8 @@ export function attachDeletePictureHandler(router: RouterInstance) {
         }
 
         await conn.query<unknown>(sql`DELETE FROM picture WHERE id = ${id}`);
+
+        await forgetTarget(conn, 'picture', id);
 
         return rows[0].pathname;
       });

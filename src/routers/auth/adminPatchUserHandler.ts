@@ -24,6 +24,7 @@ const BodySchema = z
     description: true,
     language: true,
     sendGalleryEmails: true,
+    sendEventEmails: true,
     roles: true,
     credits: true,
   })

@@ -77,6 +77,7 @@ export async function initDatabase() {
       lon DECIMAL(9, 6) NULL,
       settings JSON NOT NULL DEFAULT '{}',
       sendGalleryEmails BIT NOT NULL DEFAULT true,
+      sendEventEmails BIT NOT NULL DEFAULT true,
       premiumExpiration TIMESTAMP NULL,
       credits FLOAT NOT NULL DEFAULT 0,
       language CHAR(2) CHARSET ascii NULL,
@@ -431,6 +432,19 @@ export async function initDatabase() {
       INDEX ecEventIdx (eventId, createdAt)
     ) ENGINE=InnoDB`,
 
+    // Who follows or has muted the emails about one event or photo; no row
+    // leaves it to whether the user takes part. No FK: the target is one of
+    // three tables, so their deletes clear these rows.
+    sql`CREATE TABLE IF NOT EXISTS mailWatch (
+      userId INT UNSIGNED NOT NULL,
+      target ENUM('event', 'picture', 'wikimedia') CHARSET ascii NOT NULL,
+      targetId VARCHAR(16) CHARSET ascii NOT NULL,
+      watching BIT NOT NULL,
+      PRIMARY KEY (userId, target, targetId),
+      CONSTRAINT mwUserFk FOREIGN KEY (userId) REFERENCES user (id) ON DELETE CASCADE,
+      INDEX mwTargetIdx (target, targetId)
+    ) ENGINE=InnoDB`,
+
     // CREATE OR REPLACE (not IF NOT EXISTS) so the trigger is recreated on every
     // startup, resetting its DEFINER to the app's current connection user. This
     // self-heals a stale DEFINER (e.g. after restoring the DB onto a new host
@@ -598,6 +612,8 @@ export async function initDatabase() {
     'ALTER TABLE event DROP COLUMN IF EXISTS visibility',
 
     'ALTER TABLE picture ADD COLUMN IF NOT EXISTS viewCount INT UNSIGNED NOT NULL DEFAULT 0',
+
+    'ALTER TABLE user ADD COLUMN IF NOT EXISTS sendEventEmails BIT NOT NULL DEFAULT true AFTER sendGalleryEmails',
 
     ...['pictureComment', 'wikimediaComment', 'eventComment'].map(
       (table) =>

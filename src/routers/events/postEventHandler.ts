@@ -2,10 +2,12 @@ import type { RouterInstance } from '@koa/router';
 import sql, { empty } from 'sql-template-tag';
 import { authenticator } from '../../authenticator.js';
 import { runInTransaction } from '../../database.js';
+import { appLogger } from '../../logger.js';
 import { AUTH_REQUIRED, registerPath } from '../../openapi.js';
 import { nanoid } from '../../randomId.js';
 import { acceptValidator } from '../../requestValidators.js';
 import { hasRole } from '../../roles.js';
+import { mailEventChange, readEventWhen } from './eventMail.js';
 import { assertOwnMap } from './mapLink.js';
 import { assertCanOwn } from './organizerHandlers.js';
 import {
@@ -15,6 +17,8 @@ import {
   eventSelect,
 } from './types.js';
 import { EventBodySchema } from './validation.js';
+
+const logger = appLogger.child({ module: 'postEvent' });
 
 export function attachPostEventHandler(router: RouterInstance) {
   registerPath('/events', {
@@ -85,6 +89,11 @@ export function attachPostEventHandler(router: RouterInstance) {
           children = ${body.children ?? null}
         `;
 
+        // A re-harvest mails only what really changed; the nightly run posts all.
+        const before = body.sourceKey
+          ? await readEventWhen(conn, sql`sourceKey = ${body.sourceKey}`, true)
+          : undefined;
+
         // A known source key updates its event, keeping the id, cover and participants.
         await conn.query<unknown>(sql`
           INSERT INTO event SET
@@ -105,6 +114,18 @@ export function attachPostEventHandler(router: RouterInstance) {
                 : sql`${eventSelect(ctx.state.user)} WHERE e.id = ${id}`,
             ),
           );
+
+        if (before) {
+          const after = await readEventWhen(conn, sql`id = ${before.id}`);
+
+          if (after) {
+            await mailEventChange(conn, logger.child({ reqId: ctx.reqId }), {
+              before,
+              after,
+              actorId: ctx.state.user!.id,
+            });
+          }
+        }
 
         ctx.body = eventRowToResponse(row, ctx.state.user);
       });

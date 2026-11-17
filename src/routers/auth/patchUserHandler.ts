@@ -34,6 +34,7 @@ const BodySchema = z
     lon: z.number().min(-180).max(180).nullish(),
     settings: z.record(z.string(), z.unknown()).optional(),
     sendGalleryEmails: z.boolean().nullish(),
+    sendEventEmails: z.boolean().optional(),
     emailReminderOff: z.boolean().optional(),
     language: z.string().min(2).max(2).nullish(),
     publicFields: z.array(PublicFieldSchema).optional(),
