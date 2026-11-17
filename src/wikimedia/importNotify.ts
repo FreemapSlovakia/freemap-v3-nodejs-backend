@@ -130,7 +130,7 @@ export async function notify({ subject, body }: Report): Promise<boolean> {
     // otherwise leave the importer in `activating` until systemd's start
     // timeout killed it hours later, and the backstop would then mail "DIED"
     // in place of the real reason.
-    await sendMail(to, subject, body, SEND_DEADLINE_MS);
+    await sendMail(to, subject, body, { timeoutMs: SEND_DEADLINE_MS });
 
     logger.info(`Mailed the import report to ${to}`);
 

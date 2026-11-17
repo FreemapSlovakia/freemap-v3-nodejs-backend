@@ -1,9 +1,6 @@
+import { htmlLink, htmlPara, htmlQuote, htmlRef } from '../../mailHtml.js';
 import type { Recipient } from '../../mailWatch.js';
 import {
-  esc,
-  htmlPara,
-  htmlQuote,
-  htmlRef,
   type MailLang,
   mailLang,
   sendWatchedMail,
@@ -91,7 +88,7 @@ export async function sendCommentMail(opts: {
           {
             name: htmlRef(commenter.name, userUrl(commenter.id, web)),
             title: picTitle ? `${htmlRef(picTitle, picUrl)} ` : '',
-            url: `<a href="${esc(picUrl)}">${esc(picUrl)}</a>`,
+            url: htmlLink(picUrl),
           },
           own,
         ),

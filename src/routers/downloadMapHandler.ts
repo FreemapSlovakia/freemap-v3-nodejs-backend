@@ -17,11 +17,14 @@ import { type DownloadableMap, downloadableMaps } from '../downloadableMaps.js';
 import { getEnv } from '../env.js';
 import { appLogger } from '../logger.js';
 import { pickLanguage, sendMail } from '../mailer.js';
+import { esc, htmlLink, htmlPage, htmlPara, htmlSmall } from '../mailHtml.js';
 import { AUTH_REQUIRED, registerPath } from '../openapi.js';
 import { acceptValidator } from '../requestValidators.js';
 import { fetchLicenses, TileCodeCollector } from '../tileAttribution.js';
 
 const CONCURRENCY = 8;
+
+const MAIL_TIMEOUT_MS = 30_000;
 
 type Combo = {
   subject: string;
@@ -373,7 +376,7 @@ export function attachDownloadMapHandler(router: RouterInstance) {
         ctx.throw(409, 'not enough credit');
       }
 
-      conn.query<unknown>(
+      await conn.query<unknown>(
         sql`UPDATE user SET credits = ${credits} WHERE id = ${user.id}`,
       );
 
@@ -412,13 +415,19 @@ export function attachDownloadMapHandler(router: RouterInstance) {
           'Error during map download, sending email notification.',
         );
 
-        await sendMail(
-          email,
-          translation.error.subject,
-          translation.error.body,
-        );
-
         refund = true;
+
+        // Neither failing nor stalling may hold up the refund below.
+        try {
+          await sendMail(
+            email,
+            translation.error.subject,
+            translation.error.body,
+            { timeoutMs: MAIL_TIMEOUT_MS },
+          );
+        } catch (err) {
+          logger.error({ err }, 'Map download error mail failed.');
+        }
       }
 
       await runInTransaction(async (conn) => {
@@ -730,14 +739,26 @@ async function download(
 
   // For an export the mail is the only moment the user is present, so it is
   // the one place the credits are sure to reach them.
-  await sendMail(
-    email,
-    translation.subject,
-    `${translation.body.replace(
-      '{URL}',
-      `${getEnv('MBTILES_URL_PREFIX')}/${encodeURIComponent(dbName)}.${format}`,
-    )}\n\n${translation.credits}\n${attribution}`,
-  );
+  // The map is built: a failed or stalled mail is logged, not taken for a
+  // failed download that would refund it.
+  try {
+    const url = `${getEnv('MBTILES_URL_PREFIX')}/${encodeURIComponent(dbName)}.${format}`;
+
+    await sendMail(
+      email,
+      translation.subject,
+      `${translation.body.replace('{URL}', () => url)}\n\n${translation.credits}\n${attribution}`,
+      {
+        timeoutMs: MAIL_TIMEOUT_MS,
+        html: htmlPage([
+          htmlPara(esc(translation.body).replace('{URL}', () => htmlLink(url))),
+          htmlSmall(`${esc(translation.credits)}<br>${esc(attribution)}`),
+        ]),
+      },
+    );
+  } catch (err) {
+    logger.error({ err }, 'Map download success mail failed.');
+  }
 }
 
 export function* calculateTiles(

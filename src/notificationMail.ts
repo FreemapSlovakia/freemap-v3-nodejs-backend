@@ -2,6 +2,7 @@ import type { Logger } from 'pino';
 import { getEnv, getEnvBoolean } from './env.js';
 import { appLogger } from './logger.js';
 import { sendMail } from './mailer.js';
+import { htmlLink, htmlPage, htmlSmall } from './mailHtml.js';
 import { type MailTarget, type Recipient, watchToken } from './mailWatch.js';
 
 export const MAIL_LANGS = [
@@ -264,30 +265,6 @@ export const eventUrl = (id: string) => `${webBaseUrl}/#panel=event/${id}`;
 export const userUrl = (id: number, web = webBaseUrl) =>
   `${web}/#show=user/${id}`;
 
-/** Text for HTML; the texts' own wording holds no markup characters. */
-export const esc = (s: string) =>
-  s
-    .replaceAll('&', '&amp;')
-    .replaceAll('<', '&lt;')
-    .replaceAll('>', '&gt;')
-    .replaceAll('"', '&quot;');
-
-/** A name or title as the HTML mail shows it: italic, linking where it leads. */
-export const htmlRef = (text: string, href?: string) =>
-  href
-    ? `<a href="${esc(href)}"><i>${esc(text)}</i></a>`
-    : `<i>${esc(text)}</i>`;
-
-/** A paragraph of HTML already escaped where it needs to be. */
-export const htmlPara = (html: string) => `<p>${html}</p>`;
-
-/** User-written text, its line breaks kept. */
-export const htmlQuote = (text: string) =>
-  `<blockquote style="margin:0;padding-left:12px;border-left:3px solid #ccc">${text
-    .split(/\r?\n/)
-    .map(esc)
-    .join('<br>')}</blockquote>`;
-
 /**
  * Sends one email: `body` and a footer letting the recipient stop the emails
  * about this target, with the matching one-click `List-Unsubscribe`. `html`,
@@ -333,14 +310,10 @@ export async function sendWatchedMail(opts: {
 
   const html =
     opts.html &&
-    [
-      '<!doctype html><html><body style="font-family:sans-serif;font-size:15px;line-height:1.4">',
+    htmlPage([
       ...opts.html,
-      `<hr style="border:0;border-top:1px solid #ddd"><p style="font-size:13px;color:#666">${links
-        .map((l) => `<a href="${esc(l.url)}">${esc(l.label)}</a>`)
-        .join(' · ')}</p>`,
-      '</body></html>',
-    ].join('\n');
+      htmlSmall(links.map((l) => htmlLink(l.url, l.label)).join(' · ')),
+    ]);
 
   const headers: Record<string, string> =
     token && apiUrl
@@ -360,15 +333,12 @@ export async function sendWatchedMail(opts: {
     return;
   }
 
-  await sendMail(
-    recipient.email,
-    subject,
-    text,
+  await sendMail(recipient.email, subject, text, {
     // One stalled send must not hold up the rest of its batch for good.
-    30_000,
+    timeoutMs: 30_000,
     headers,
     html,
-  );
+  });
 }
 
 /**

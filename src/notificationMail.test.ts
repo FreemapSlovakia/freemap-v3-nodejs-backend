@@ -4,9 +4,9 @@ import test from 'node:test';
 // Read when the modules load.
 process.env['WEB_BASE_URL'] ??= 'https://www.freemap.sk';
 
-const { MAIL_LANGS, mailTexts, htmlQuote } = await import(
-  './notificationMail.js'
-);
+const { htmlQuote } = await import('./mailHtml.js');
+
+const { MAIL_LANGS, mailTexts } = await import('./notificationMail.js');
 
 const { MESSAGES } = await import('./routers/gallery/commentMail.js');
 

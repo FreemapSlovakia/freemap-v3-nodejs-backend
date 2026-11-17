@@ -3,14 +3,11 @@ import type { Logger } from 'pino';
 import sql, { type Sql } from 'sql-template-tag';
 import z from 'zod';
 import { afterCommit } from '../../database.js';
+import { esc, htmlPara, htmlQuote, htmlRef } from '../../mailHtml.js';
 import { mailRecipients } from '../../mailWatch.js';
 import {
-  esc,
   eventUrl,
   formatEventTime,
-  htmlPara,
-  htmlQuote,
-  htmlRef,
   mailInBackground,
   mailTexts,
   sendWatchedMail,

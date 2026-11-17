@@ -20,18 +20,21 @@ export async function sendMail(
   to: string,
   subject: string,
   text: string,
-  /**
-   * Give up after this long. Callers that are holding something up until the
-   * mail settles want it — a black-holed connection to Mailgun otherwise never
-   * resolves. Left unset (as the request handlers do) the send waits forever,
-   * which is the pre-existing behaviour and not something to change from here.
-   */
-  timeoutMs?: number,
-  /** Extra headers, e.g. `List-Unsubscribe`. */
-  headers: Record<string, string> = {},
-  /** An HTML alternative to `text`. */
-  html?: string,
+  opts: {
+    /**
+     * Give up after this long. Callers that are holding something up until
+     * the mail settles want it — a black-holed connection to Mailgun otherwise
+     * never resolves. Left unset the send waits forever.
+     */
+    timeoutMs?: number;
+    /** Extra headers, e.g. `List-Unsubscribe`. */
+    headers?: Record<string, string>;
+    /** An HTML alternative to `text`. */
+    html?: string;
+  } = {},
 ) {
+  const { timeoutMs, headers = {}, html } = opts;
+
   await got.post(
     `https://api${getEnvBoolean('MAILGUN_EU', false) ? '.eu' : ''}.mailgun.net/v3/${getEnv('MAILGUN_DOMAIN')}/messages`,
     {
