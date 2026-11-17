@@ -37,6 +37,8 @@ const SIMPLE_FK_TABLES = [
   'map',
   'event',
   'eventComment',
+  // TODO may leave more than MAX_EVENT_FILTERS; saving then waits for deletes.
+  'eventFilter',
   'purchase',
   'purchaseToken',
   'purchaseIntent',

@@ -19,6 +19,7 @@ import { requestLogger } from './requestLogger.js';
 import { authRouter } from './routers/auth/index.js';
 import { trackingRouter } from './routers/deviceTracking/index.js';
 import { attachDownloadMapHandler } from './routers/downloadMapHandler.js';
+import { eventFiltersRouter } from './routers/eventFilters/index.js';
 import { eventsRouter } from './routers/events/index.js';
 import { galleryRouter } from './routers/gallery/index.js';
 import { attachPostGarminCourses } from './routers/garminCoursesHandler.js';
@@ -225,6 +226,12 @@ router.use(
 router.use('/maps', mapsRouter.routes(), mapsRouter.allowedMethods());
 
 router.use('/events', eventsRouter.routes(), eventsRouter.allowedMethods());
+
+router.use(
+  '/event-filters',
+  eventFiltersRouter.routes(),
+  eventFiltersRouter.allowedMethods(),
+);
 
 router.use(
   '/mail-watch',

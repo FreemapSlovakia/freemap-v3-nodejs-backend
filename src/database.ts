@@ -442,6 +442,18 @@ export async function initDatabase() {
       CONSTRAINT egnUserFk FOREIGN KEY (userId) REFERENCES user (id) ON DELETE CASCADE
     ) ENGINE=InnoDB`,
 
+    // A user's named events filters; `notify` emails newly added matches.
+    sql`CREATE TABLE IF NOT EXISTS eventFilter (
+      id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+      userId INT UNSIGNED NOT NULL,
+      name VARCHAR(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+      filter JSON NOT NULL,
+      notify BOOLEAN NOT NULL DEFAULT FALSE,
+      createdAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      CONSTRAINT efUserFk FOREIGN KEY (userId) REFERENCES user (id) ON DELETE CASCADE,
+      INDEX efNotifyIdx (notify)
+    ) ENGINE=InnoDB`,
+
     // Who follows or has muted the emails about one event or photo; no row
     // leaves it to whether the user takes part. No FK: the target is one of
     // three tables, so their deletes clear these rows.
