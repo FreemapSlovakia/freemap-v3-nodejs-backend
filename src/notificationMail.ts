@@ -24,7 +24,10 @@ const apiUrl = getEnv('API_URL', '');
 
 const mailLogger = appLogger.child({ module: 'notificationMail' });
 
+// The body sentences take the title ready to show: `quote`d in plain text,
+// a link in HTML. Subjects are plain text only and quote it themselves.
 type Texts = {
+  quote: (title: string) => string;
   commentSubject: (title: string) => string;
   commentIntro: (name: string, title: string, own: boolean) => string;
   goingSubject: (name: string, title: string) => string;
@@ -47,19 +50,20 @@ type Texts = {
 const TEXTS: Record<MailLang, Texts> = {
   en: {
     commentSubject: (t) => `New comment on the event "${t}"`,
+    quote: (t) => `"${t}"`,
     commentIntro: (n, t, own) =>
-      `New comment from ${n} on ${own ? 'your' : 'the'} event "${t}":`,
+      `New comment from ${n} on ${own ? 'your' : 'the'} event ${t}:`,
     goingSubject: (n, t) => `${n} is going to your event "${t}"`,
     goingBody: (n, t, c) =>
-      `${n} is going to your event "${t}". Going now: ${c}.`,
+      `${n} is going to your event ${t}. Going now: ${c}.`,
     changedSubject: (t) => `The event "${t}" has changed`,
-    changedIntro: (t) => `The event "${t}" has changed:`,
+    changedIntro: (t) => `The event ${t} has changed:`,
     start: 'Start',
     end: 'End',
     moved: 'The start point has moved.',
     deletedSubject: (t) => `The event "${t}" has been deleted`,
     deletedBody: (t, w) =>
-      `The event "${t}" (${w}) has been deleted and is no longer on the map.`,
+      `The event ${t} (${w}) has been deleted and is no longer on the map.`,
     event: 'Event',
     stopEvent: 'Stop emails about this event',
     stopPhoto: 'Stop emails about this photo',
@@ -67,19 +71,19 @@ const TEXTS: Record<MailLang, Texts> = {
   },
   sk: {
     commentSubject: (t) => `Nový komentár k akcii „${t}“`,
+    quote: (t) => `„${t}“`,
     commentIntro: (n, t, own) =>
-      `Nový komentár od používateľa ${n} k ${own ? 'vašej ' : ''}akcii „${t}“:`,
+      `Nový komentár od používateľa ${n} k ${own ? 'vašej ' : ''}akcii ${t}:`,
     goingSubject: (n, t) => `${n} príde na vašu akciu „${t}“`,
-    goingBody: (n, t, c) =>
-      `Na vašu akciu „${t}“ príde ${n}. Spolu prídu: ${c}.`,
+    goingBody: (n, t, c) => `Na vašu akciu ${t} príde ${n}. Spolu prídu: ${c}.`,
     changedSubject: (t) => `Zmena akcie „${t}“`,
-    changedIntro: (t) => `Akcia „${t}“ sa zmenila:`,
+    changedIntro: (t) => `Akcia ${t} sa zmenila:`,
     start: 'Začiatok',
     end: 'Koniec',
     moved: 'Miesto štartu sa presunulo.',
     deletedSubject: (t) => `Akcia „${t}“ bola zmazaná`,
     deletedBody: (t, w) =>
-      `Akcia „${t}“ (${w}) bola zmazaná a na mape už nie je.`,
+      `Akcia ${t} (${w}) bola zmazaná a na mape už nie je.`,
     event: 'Akcia',
     stopEvent: 'Nedostávať e-maily o tejto akcii',
     stopPhoto: 'Nedostávať e-maily o tejto fotke',
@@ -87,18 +91,19 @@ const TEXTS: Record<MailLang, Texts> = {
   },
   cs: {
     commentSubject: (t) => `Nový komentář k akci „${t}“`,
+    quote: (t) => `„${t}“`,
     commentIntro: (n, t, own) =>
-      `Nový komentář od uživatele ${n} k ${own ? 'vaší ' : ''}akci „${t}“:`,
+      `Nový komentář od uživatele ${n} k ${own ? 'vaší ' : ''}akci ${t}:`,
     goingSubject: (n, t) => `${n} přijde na vaši akci „${t}“`,
     goingBody: (n, t, c) =>
-      `Na vaši akci „${t}“ přijde ${n}. Celkem přijde: ${c}.`,
+      `Na vaši akci ${t} přijde ${n}. Celkem přijde: ${c}.`,
     changedSubject: (t) => `Změna akce „${t}“`,
-    changedIntro: (t) => `Akce „${t}“ se změnila:`,
+    changedIntro: (t) => `Akce ${t} se změnila:`,
     start: 'Začátek',
     end: 'Konec',
     moved: 'Místo startu se přesunulo.',
     deletedSubject: (t) => `Akce „${t}“ byla smazána`,
-    deletedBody: (t, w) => `Akce „${t}“ (${w}) byla smazána a na mapě už není.`,
+    deletedBody: (t, w) => `Akce ${t} (${w}) byla smazána a na mapě už není.`,
     event: 'Akce',
     stopEvent: 'Nedostávat e-maily o této akci',
     stopPhoto: 'Nedostávat e-maily o této fotce',
@@ -106,19 +111,20 @@ const TEXTS: Record<MailLang, Texts> = {
   },
   hu: {
     commentSubject: (t) => `Új hozzászólás a(z) „${t}” eseményhez`,
+    quote: (t) => `„${t}”`,
     commentIntro: (n, t, own) =>
-      `${n} új hozzászólást írt ${own ? `az Ön „${t}” eseményéhez` : `a(z) „${t}” eseményhez`}:`,
+      `${n} új hozzászólást írt ${own ? `az Ön ${t} eseményéhez` : `a(z) ${t} eseményhez`}:`,
     goingSubject: (n, t) => `${n} részt vesz az Ön „${t}” eseményén`,
     goingBody: (n, t, c) =>
-      `${n} részt vesz az Ön „${t}” eseményén. Résztvevők száma: ${c}.`,
+      `${n} részt vesz az Ön ${t} eseményén. Résztvevők száma: ${c}.`,
     changedSubject: (t) => `Megváltozott a(z) „${t}” esemény`,
-    changedIntro: (t) => `A(z) „${t}” esemény megváltozott:`,
+    changedIntro: (t) => `A(z) ${t} esemény megváltozott:`,
     start: 'Kezdés',
     end: 'Vége',
     moved: 'A kiindulópont áthelyeződött.',
     deletedSubject: (t) => `Törölték a(z) „${t}” eseményt`,
     deletedBody: (t, w) =>
-      `A(z) „${t}” eseményt (${w}) törölték, és már nem szerepel a térképen.`,
+      `A(z) ${t} eseményt (${w}) törölték, és már nem szerepel a térképen.`,
     event: 'Esemény',
     stopEvent: 'Ne kapjon több e-mailt erről az eseményről',
     stopPhoto: 'Ne kapjon több e-mailt erről a fotóról',
@@ -126,19 +132,20 @@ const TEXTS: Record<MailLang, Texts> = {
   },
   it: {
     commentSubject: (t) => `Nuovo commento sull’evento «${t}»`,
+    quote: (t) => `«${t}»`,
     commentIntro: (n, t, own) =>
-      `Nuovo commento di ${n} ${own ? `sul Suo evento «${t}»` : `sull’evento «${t}»`}:`,
+      `Nuovo commento di ${n} ${own ? `sul Suo evento ${t}` : `sull’evento ${t}`}:`,
     goingSubject: (n, t) => `${n} parteciperà al Suo evento «${t}»`,
     goingBody: (n, t, c) =>
-      `${n} parteciperà al Suo evento «${t}». Partecipanti: ${c}.`,
+      `${n} parteciperà al Suo evento ${t}. Partecipanti: ${c}.`,
     changedSubject: (t) => `L’evento «${t}» è cambiato`,
-    changedIntro: (t) => `L’evento «${t}» è cambiato:`,
+    changedIntro: (t) => `L’evento ${t} è cambiato:`,
     start: 'Inizio',
     end: 'Fine',
     moved: 'Il punto di partenza è stato spostato.',
     deletedSubject: (t) => `L’evento «${t}» è stato eliminato`,
     deletedBody: (t, w) =>
-      `L’evento «${t}» (${w}) è stato eliminato e non è più sulla mappa.`,
+      `L’evento ${t} (${w}) è stato eliminato e non è più sulla mappa.`,
     event: 'Evento',
     stopEvent: 'Non ricevere più email su questo evento',
     stopPhoto: 'Non ricevere più email su questa foto',
@@ -146,19 +153,20 @@ const TEXTS: Record<MailLang, Texts> = {
   },
   de: {
     commentSubject: (t) => `Neuer Kommentar zur Veranstaltung „${t}“`,
+    quote: (t) => `„${t}“`,
     commentIntro: (n, t, own) =>
-      `Neuer Kommentar von ${n} zu ${own ? 'Ihrer' : 'der'} Veranstaltung „${t}“:`,
+      `Neuer Kommentar von ${n} zu ${own ? 'Ihrer' : 'der'} Veranstaltung ${t}:`,
     goingSubject: (n, t) => `${n} nimmt an Ihrer Veranstaltung „${t}“ teil`,
     goingBody: (n, t, c) =>
-      `${n} nimmt an Ihrer Veranstaltung „${t}“ teil. Zusagen insgesamt: ${c}.`,
+      `${n} nimmt an Ihrer Veranstaltung ${t} teil. Zusagen insgesamt: ${c}.`,
     changedSubject: (t) => `Änderung der Veranstaltung „${t}“`,
-    changedIntro: (t) => `Die Veranstaltung „${t}“ wurde geändert:`,
+    changedIntro: (t) => `Die Veranstaltung ${t} wurde geändert:`,
     start: 'Beginn',
     end: 'Ende',
     moved: 'Der Startpunkt wurde verlegt.',
     deletedSubject: (t) => `Die Veranstaltung „${t}“ wurde gelöscht`,
     deletedBody: (t, w) =>
-      `Die Veranstaltung „${t}“ (${w}) wurde gelöscht und ist nicht mehr auf der Karte.`,
+      `Die Veranstaltung ${t} (${w}) wurde gelöscht und ist nicht mehr auf der Karte.`,
     event: 'Veranstaltung',
     stopEvent: 'Keine E-Mails mehr zu dieser Veranstaltung',
     stopPhoto: 'Keine E-Mails mehr zu diesem Foto',
@@ -166,18 +174,19 @@ const TEXTS: Record<MailLang, Texts> = {
   },
   pl: {
     commentSubject: (t) => `Nowy komentarz do wydarzenia „${t}”`,
-    commentIntro: (n, t) => `Nowy komentarz od ${n} do wydarzenia „${t}”:`,
+    quote: (t) => `„${t}”`,
+    commentIntro: (n, t) => `Nowy komentarz od ${n} do wydarzenia ${t}:`,
     goingSubject: (n, t) => `${n} weźmie udział w wydarzeniu „${t}”`,
     goingBody: (n, t, c) =>
-      `${n} weźmie udział w wydarzeniu „${t}”. Łącznie uczestników: ${c}.`,
+      `${n} weźmie udział w wydarzeniu ${t}. Łącznie uczestników: ${c}.`,
     changedSubject: (t) => `Zmiana wydarzenia „${t}”`,
-    changedIntro: (t) => `Wydarzenie „${t}” zostało zmienione:`,
+    changedIntro: (t) => `Wydarzenie ${t} zostało zmienione:`,
     start: 'Początek',
     end: 'Koniec',
     moved: 'Miejsce startu zostało przeniesione.',
     deletedSubject: (t) => `Wydarzenie „${t}” zostało usunięte`,
     deletedBody: (t, w) =>
-      `Wydarzenie „${t}” (${w}) zostało usunięte i nie ma go już na mapie.`,
+      `Wydarzenie ${t} (${w}) zostało usunięte i nie ma go już na mapie.`,
     event: 'Wydarzenie',
     stopEvent: 'Rezygnacja z e-maili o tym wydarzeniu',
     stopPhoto: 'Rezygnacja z e-maili o tym zdjęciu',
@@ -185,19 +194,20 @@ const TEXTS: Record<MailLang, Texts> = {
   },
   sl: {
     commentSubject: (t) => `Nov komentar k dogodku »${t}«`,
+    quote: (t) => `»${t}«`,
     commentIntro: (n, t, own) =>
-      `Nov komentar uporabnika ${n} k ${own ? 'vašemu ' : ''}dogodku »${t}«:`,
+      `Nov komentar uporabnika ${n} k ${own ? 'vašemu ' : ''}dogodku ${t}:`,
     goingSubject: (n, t) => `Na vaš dogodek »${t}« pride ${n}`,
     goingBody: (n, t, c) =>
-      `Na vaš dogodek »${t}« pride ${n}. Skupaj udeležencev: ${c}.`,
+      `Na vaš dogodek ${t} pride ${n}. Skupaj udeležencev: ${c}.`,
     changedSubject: (t) => `Sprememba dogodka »${t}«`,
-    changedIntro: (t) => `Dogodek »${t}« se je spremenil:`,
+    changedIntro: (t) => `Dogodek ${t} se je spremenil:`,
     start: 'Začetek',
     end: 'Konec',
     moved: 'Izhodišče je bilo premaknjeno.',
     deletedSubject: (t) => `Dogodek »${t}« je bil izbrisan`,
     deletedBody: (t, w) =>
-      `Dogodek »${t}« (${w}) je bil izbrisan in ga ni več na zemljevidu.`,
+      `Dogodek ${t} (${w}) je bil izbrisan in ga ni več na zemljevidu.`,
     event: 'Dogodek',
     stopEvent: 'Odjava od e-pošte o tem dogodku',
     stopPhoto: 'Odjava od e-pošte o tej fotografiji',
@@ -205,19 +215,20 @@ const TEXTS: Record<MailLang, Texts> = {
   },
   fr: {
     commentSubject: (t) => `Nouveau commentaire sur l’événement « ${t} »`,
+    quote: (t) => `« ${t} »`,
     commentIntro: (n, t, own) =>
-      `Nouveau commentaire de ${n} sur ${own ? 'votre événement' : 'l’événement'} « ${t} » :`,
+      `Nouveau commentaire de ${n} sur ${own ? 'votre événement' : 'l’événement'} ${t} :`,
     goingSubject: (n, t) => `${n} participe à votre événement « ${t} »`,
     goingBody: (n, t, c) =>
-      `${n} participe à votre événement « ${t} ». Participants : ${c}.`,
+      `${n} participe à votre événement ${t}. Participants : ${c}.`,
     changedSubject: (t) => `L’événement « ${t} » a changé`,
-    changedIntro: (t) => `L’événement « ${t} » a changé :`,
+    changedIntro: (t) => `L’événement ${t} a changé :`,
     start: 'Début',
     end: 'Fin',
     moved: 'Le point de départ a été déplacé.',
     deletedSubject: (t) => `L’événement « ${t} » a été supprimé`,
     deletedBody: (t, w) =>
-      `L’événement « ${t} » (${w}) a été supprimé et n’apparaît plus sur la carte.`,
+      `L’événement ${t} (${w}) a été supprimé et n’apparaît plus sur la carte.`,
     event: 'Événement',
     stopEvent: 'Ne plus recevoir d’e-mails sur cet événement',
     stopPhoto: 'Ne plus recevoir d’e-mails sur cette photo',

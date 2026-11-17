@@ -101,7 +101,7 @@ export async function mailEventComment(
         target: 'event',
         targetId: event.id,
         subject: t.commentSubject(event.title),
-        body: `${t.commentIntro(opts.actor.name, event.title, own)}\n\n${opts.comment}\n\n${t.event}: ${eventUrl(event.id)}`,
+        body: `${t.commentIntro(opts.actor.name, t.quote(event.title), own)}\n\n${opts.comment}\n\n${t.event}: ${eventUrl(event.id)}`,
         html: [
           htmlPara(t.commentIntro(actorRef(opts.actor), eventRef(event), own)),
           htmlQuote(opts.comment),
@@ -140,7 +140,7 @@ export async function mailEventGoing(
         target: 'event',
         targetId: event.id,
         subject: t.goingSubject(opts.actor.name, event.title),
-        body: `${t.goingBody(opts.actor.name, event.title, opts.going)}\n\n${t.event}: ${eventUrl(event.id)}`,
+        body: `${t.goingBody(opts.actor.name, t.quote(event.title), opts.going)}\n\n${t.event}: ${eventUrl(event.id)}`,
         html: [
           htmlPara(
             t.goingBody(actorRef(opts.actor), eventRef(event), opts.going),
@@ -199,7 +199,7 @@ export async function mailEventChange(
         target: 'event',
         targetId: after.id,
         subject: t.changedSubject(after.title),
-        body: `${t.changedIntro(after.title)}\n\n${lines.join('\n')}\n\n${t.event}: ${eventUrl(after.id)}`,
+        body: `${t.changedIntro(t.quote(after.title))}\n\n${lines.join('\n')}\n\n${t.event}: ${eventUrl(after.id)}`,
         html: [
           htmlPara(t.changedIntro(eventRef(after))),
           htmlPara(lines.map(esc).join('<br>')),
@@ -241,7 +241,7 @@ export async function mailEventDeleted(
         target: 'event',
         targetId: event.id,
         subject: t.deletedSubject(event.title),
-        body: t.deletedBody(event.title, when),
+        body: t.deletedBody(t.quote(event.title), when),
         // No link: the event is gone.
         html: [htmlPara(t.deletedBody(htmlRef(event.title), esc(when)))],
       });
