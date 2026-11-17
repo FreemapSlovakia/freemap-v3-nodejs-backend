@@ -168,20 +168,29 @@ export async function setWatch(
   return { watching, enabled: state.enabled };
 }
 
+/**
+ * The table holding a target, keyed by `id`. A Commons photo has none of its
+ * own: our monthly import of it comes and goes, its comments don't.
+ */
+export const TARGET_TABLE = {
+  event: 'event',
+  picture: 'picture',
+  wikimedia: null,
+} as const satisfies Record<MailTarget, string | null>;
+
 export async function targetExists(
   db: Db,
   target: MailTarget,
   targetId: string,
 ) {
-  // A Commons photo outlives our monthly import of it, as its comments do.
-  if (target === 'wikimedia') {
+  const table = TARGET_TABLE[target];
+
+  if (!table) {
     return true;
   }
 
   const [row] = await db.query<unknown[]>(
-    target === 'event'
-      ? sql`SELECT 1 FROM event WHERE id = ${targetId}`
-      : sql`SELECT 1 FROM picture WHERE id = ${targetId}`,
+    sql`SELECT 1 FROM ${raw(table)} WHERE id = ${targetId}`,
   );
 
   return row !== undefined;

@@ -316,7 +316,11 @@ export async function sendWatchedMail(opts: {
 
   const settingsUrl = `${web}/#show=account/notifications`;
 
-  const stopLabel = target === 'event' ? texts.stopEvent : texts.stopPhoto;
+  const stopLabel = {
+    event: texts.stopEvent,
+    picture: texts.stopPhoto,
+    wikimedia: texts.stopPhoto,
+  }[target];
 
   const links = [
     ...(token && !opts.final

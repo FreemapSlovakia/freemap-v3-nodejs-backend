@@ -1,6 +1,6 @@
 import Router from '@koa/router';
 import type { ParameterizedContext } from 'koa';
-import sql from 'sql-template-tag';
+import sql, { raw } from 'sql-template-tag';
 import z from 'zod';
 import { authenticator } from '../../authenticator.js';
 import { pool } from '../../database.js';
@@ -9,6 +9,7 @@ import {
   MailTargetSchema,
   parseWatchToken,
   setWatch,
+  TARGET_TABLE,
   targetExists,
   watchState,
 } from '../../mailWatch.js';
@@ -61,14 +62,15 @@ function params(ctx: ParameterizedContext) {
 }
 
 async function targetTitle(target: MailTarget, targetId: string) {
-  if (target === 'wikimedia') {
+  const table = TARGET_TABLE[target];
+
+  // A Commons photo's title is Commons', not ours.
+  if (!table) {
     return null;
   }
 
   const [row] = await pool.query<{ title: string | null }[]>(
-    target === 'event'
-      ? sql`SELECT title FROM event WHERE id = ${targetId}`
-      : sql`SELECT title FROM picture WHERE id = ${targetId}`,
+    sql`SELECT title FROM ${raw(table)} WHERE id = ${targetId}`,
   );
 
   return row?.title ?? null;
