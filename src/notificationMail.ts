@@ -265,11 +265,7 @@ export const eventUrl = (id: string) => `${webBaseUrl}/#panel=event/${id}`;
 export const userUrl = (id: number, web = webBaseUrl) =>
   `${web}/#show=user/${id}`;
 
-/**
- * Sends one email: `body` and a footer letting the recipient stop the emails
- * about this target, with the matching one-click `List-Unsubscribe`. `html`,
- * the same as HTML blocks (`htmlPara`, `htmlQuote`), makes it multipart.
- */
+/** `sendNotificationMail` with the stop link of a watched event or photo. */
 export async function sendWatchedMail(opts: {
   recipient: Recipient;
   target: MailTarget;
@@ -285,23 +281,48 @@ export async function sendWatchedMail(opts: {
    */
   final?: boolean;
 }) {
-  const { recipient, target, targetId, subject, body, web = webBaseUrl } = opts;
+  const { recipient, target, targetId, web = webBaseUrl } = opts;
 
   const texts = mailTexts(recipient.language);
 
-  const token = watchToken(recipient.id, target, targetId);
+  await sendNotificationMail({
+    ...opts,
+    stopLabel: {
+      event: texts.stopEvent,
+      picture: texts.stopPhoto,
+      wikimedia: texts.stopPhoto,
+    }[target],
+    token: watchToken(recipient.id, target, targetId),
+    web,
+  });
+}
+
+/**
+ * Sends one email: `body` and a footer with the stop link `token` makes and
+ * the account's settings, and the matching one-click `List-Unsubscribe`;
+ * the mail-watch page and endpoint take a watch or a saved filter's token.
+ * `html`, the same as HTML blocks (`htmlPara`, `htmlQuote`), makes it
+ * multipart.
+ */
+export async function sendNotificationMail(opts: {
+  recipient: Recipient;
+  subject: string;
+  body: string;
+  html?: string[];
+  stopLabel: string;
+  token: string | null;
+  web?: string;
+  final?: boolean;
+}) {
+  const { recipient, subject, body, token, web = webBaseUrl } = opts;
+
+  const texts = mailTexts(recipient.language);
 
   const settingsUrl = `${web}/#show=account/notifications`;
 
-  const stopLabel = {
-    event: texts.stopEvent,
-    picture: texts.stopPhoto,
-    wikimedia: texts.stopPhoto,
-  }[target];
-
   const links = [
     ...(token && !opts.final
-      ? [{ label: stopLabel, url: `${web}/#show=mail-watch/${token}` }]
+      ? [{ label: opts.stopLabel, url: `${web}/#show=mail-watch/${token}` }]
       : []),
     { label: texts.settings, url: settingsUrl },
   ];

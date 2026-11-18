@@ -276,3 +276,30 @@ export function parseWatchToken(token: string) {
     targetId: m[3]!,
   };
 }
+
+/** A link's token stopping one saved filter's emails, as {@link watchToken}. */
+export function filterToken(userId: number, filterId: number): string | null {
+  if (!secret()) {
+    return null;
+  }
+
+  const payload = `${userId}.filter.${filterId}`;
+
+  return `${payload}.${sign(payload)}`;
+}
+
+export function parseFilterToken(token: string) {
+  const m = /^(\d+)\.filter\.(\d+)\.([\w-]{22})$/.exec(token);
+
+  if (!m || !secret()) {
+    return null;
+  }
+
+  const expected = Buffer.from(sign(`${m[1]}.filter.${m[2]}`));
+
+  const given = Buffer.from(m[3]!);
+
+  return timingSafeEqual(expected, given)
+    ? { userId: Number(m[1]), filterId: Number(m[2]) }
+    : null;
+}

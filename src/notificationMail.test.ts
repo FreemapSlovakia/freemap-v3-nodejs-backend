@@ -10,6 +10,8 @@ const { MAIL_LANGS, mailTexts } = await import('./notificationMail.js');
 
 const { MESSAGES } = await import('./routers/gallery/commentMail.js');
 
+const { EVENT_FILTER_TEXTS } = await import('./eventFilterMailTexts.js');
+
 // The wording goes into HTML unescaped, around escaped names and titles.
 test('no email wording holds a markup character', () => {
   for (const lang of MAIL_LANGS) {
@@ -25,6 +27,15 @@ test('no email wording holds a markup character', () => {
     for (const own of [true, false]) {
       texts.push(MESSAGES[lang]({ name: 'X', title: 'Y ', url: 'U' }, own));
     }
+
+    const filter = EVENT_FILTER_TEXTS[lang];
+
+    texts.push(
+      filter.subject('X'),
+      filter.intro('X'),
+      filter.more(3),
+      filter.stop,
+    );
 
     for (const text of texts) {
       assert.doesNotMatch(String(text), /[<>&]/, `${lang}: ${text}`);

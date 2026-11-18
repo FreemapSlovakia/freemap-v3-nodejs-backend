@@ -1,12 +1,14 @@
 import Router from '@koa/router';
 import type { ParameterizedContext } from 'koa';
-import sql, { raw } from 'sql-template-tag';
+import sql, { join, raw } from 'sql-template-tag';
 import z from 'zod';
 import { authenticator } from '../../authenticator.js';
-import { pool } from '../../database.js';
+import { pool, runInTransaction } from '../../database.js';
+import { dropStaleMatches, notifySets } from '../../eventFilter.js';
 import {
   type MailTarget,
   MailTargetSchema,
+  parseFilterToken,
   parseWatchToken,
   setWatch,
   TARGET_TABLE,
@@ -48,12 +50,46 @@ const TokenBodySchema = z
 
 const TokenResponseSchema = z
   .strictObject({
-    target: MailTargetSchema,
+    // `eventFilter`: a saved events filter's emails, by its own token.
+    target: z.enum([...MailTargetSchema.options, 'eventFilter']),
     targetId: z.string(),
     title: z.string().nullable(),
     watching: z.boolean(),
   })
   .meta({ id: 'MailWatchTokenResult' });
+
+/**
+ * A saved filter's name and emails, turned on or off first if `notify` is
+ * given; null if it is gone, or no longer the token's user's.
+ */
+async function filterNotify(
+  { userId, filterId }: { userId: number; filterId: number },
+  notify: boolean | undefined,
+) {
+  if (notify !== undefined) {
+    await runInTransaction(async (conn) => {
+      const { affectedRows } = await conn.query<{ affectedRows: number }>(sql`
+        UPDATE eventFilter SET ${join(notifySets(notify))}
+        WHERE id = ${filterId} AND userId = ${userId}
+      `);
+
+      if (affectedRows) {
+        await dropStaleMatches(conn, filterId);
+      }
+    });
+  }
+
+  const [row] = z
+    .array(z.object({ name: z.string(), notify: z.coerce.boolean() }))
+    .parse(
+      await pool.query<unknown>(sql`
+        SELECT name, notify FROM eventFilter
+        WHERE id = ${filterId} AND userId = ${userId}
+      `),
+    );
+
+  return row ?? null;
+}
 
 function params(ctx: ParameterizedContext) {
   const parsed = ParamsSchema.safeParse(ctx.params);
@@ -188,6 +224,25 @@ router.post('/token', acceptValidator('application/json'), async (ctx) => {
     return ctx.throw(400, err as Error);
   }
 
+  const filter = parseFilterToken(body.token);
+
+  if (filter) {
+    const state = await filterNotify(filter, body.watching);
+
+    if (!state) {
+      return ctx.throw(410, 'no such saved filter');
+    }
+
+    ctx.body = TokenResponseSchema.parse({
+      target: 'eventFilter',
+      targetId: String(filter.filterId),
+      title: state.name,
+      watching: state.notify,
+    });
+
+    return;
+  }
+
   const parsed = parseWatchToken(body.token);
 
   if (!parsed) {
@@ -225,6 +280,16 @@ router.post('/token', acceptValidator('application/json'), async (ctx) => {
 
 router.post('/unsubscribe', async (ctx) => {
   const token = ctx.query['token'];
+
+  const filter = typeof token === 'string' ? parseFilterToken(token) : null;
+
+  if (filter) {
+    await filterNotify(filter, false);
+
+    ctx.status = 204;
+
+    return;
+  }
 
   const parsed = typeof token === 'string' ? parseWatchToken(token) : null;
 

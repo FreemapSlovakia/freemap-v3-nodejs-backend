@@ -1,3 +1,5 @@
+import type { PoolConnection } from 'mariadb';
+import sql from 'sql-template-tag';
 import z from 'zod';
 import { DifficultySchema, TransportSchema } from './routers/events/types.js';
 
@@ -46,3 +48,22 @@ export type EventFilter = z.infer<typeof EventFilterSchema>;
 
 /** Saved filters one user may have. */
 export const MAX_EVENT_FILTERS = 20;
+
+/**
+ * Assignments turning a filter's emails on or off; turned on, they cover
+ * events added from now. Must precede any other `notify` assignment.
+ */
+export const notifySets = (notify: boolean) => [
+  ...(notify ? [sql`matchSince = IF(notify, matchSince, NOW())`] : []),
+  sql`notify = ${notify}`,
+];
+
+/** Drops the queued matches a moved `matchSince` no longer covers. */
+export async function dropStaleMatches(db: PoolConnection, filterId: number) {
+  await db.query(sql`
+    DELETE m FROM eventFilterMatch m
+    JOIN eventFilter ef ON ef.id = m.filterId
+    WHERE m.filterId = ${filterId} AND m.sentAt IS NULL
+      AND m.createdAt < ef.matchSince
+  `);
+}

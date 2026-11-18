@@ -10,6 +10,7 @@ import websockify from 'koa-websocket';
 import { createDocument } from 'zod-openapi';
 import { initDatabase } from './database.js';
 import { getEnv, getEnvInteger } from './env.js';
+import { startEventFilterMail } from './eventFilterMail.js';
 import { Sentry } from './instrument.js';
 import { appLogger } from './logger.js';
 import { attachMapCatalogHandler } from './mapCatalog.js';
@@ -38,6 +39,8 @@ import { startSocketDeviceTracking } from './socketDeviceTracking.js';
 import { attachWs } from './ws.js';
 
 await initDatabase();
+
+startEventFilterMail();
 
 const logger = appLogger.child({ module: 'app' });
 

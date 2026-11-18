@@ -4,7 +4,12 @@ import sql, { join } from 'sql-template-tag';
 import z from 'zod';
 import { authenticator } from '../../authenticator.js';
 import { pool, runInTransaction } from '../../database.js';
-import { EventFilterSchema, MAX_EVENT_FILTERS } from '../../eventFilter.js';
+import {
+  dropStaleMatches,
+  EventFilterSchema,
+  MAX_EVENT_FILTERS,
+  notifySets,
+} from '../../eventFilter.js';
 import { AUTH_REQUIRED, registerPath } from '../../openapi.js';
 import { acceptValidator } from '../../requestValidators.js';
 
@@ -197,21 +202,38 @@ router.patch(
 
     const body = parseBody(ctx, PatchBodySchema);
 
+    const filter =
+      body.filter === undefined ? undefined : JSON.stringify(body.filter);
+
+    // Emails cover events added from now on once the conditions change; a
+    // rename keeps them going. Before `filter =`, as MariaDB reads the row's
+    // values as each assignment leaves them.
     const sets = [
-      ...(body.name === undefined ? [] : [sql`name = ${body.name}`]),
-      ...(body.filter === undefined
+      ...(filter === undefined
         ? []
-        : [sql`filter = ${JSON.stringify(body.filter)}`]),
-      ...(body.notify === undefined ? [] : [sql`notify = ${body.notify}`]),
+        : [
+            sql`matchSince = IF(JSON_EQUALS(filter, ${filter}), matchSince, NOW())`,
+            sql`filter = ${filter}`,
+          ]),
+      ...(body.name === undefined ? [] : [sql`name = ${body.name}`]),
+      ...(body.notify === undefined ? [] : notifySets(body.notify)),
     ];
 
     const userId = ctx.state.user!.id;
 
     if (sets.length) {
-      await pool.query(sql`
-        UPDATE eventFilter SET ${join(sets)}
-        WHERE id = ${id} AND userId = ${userId}
-      `);
+      await runInTransaction(async (conn) => {
+        const { affectedRows } = await conn.query<{ affectedRows: number }>(
+          sql`
+            UPDATE eventFilter SET ${join(sets)}
+            WHERE id = ${id} AND userId = ${userId}
+          `,
+        );
+
+        if (affectedRows) {
+          await dropStaleMatches(conn, id);
+        }
+      });
     }
 
     const [row] = await pool.query<unknown[]>(

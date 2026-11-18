@@ -450,8 +450,24 @@ export async function initDatabase() {
       filter JSON NOT NULL,
       notify BOOLEAN NOT NULL DEFAULT FALSE,
       createdAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      -- Only events added since are emailed; set as the conditions change
+      -- or the emails are turned on, not by a rename.
+      matchSince TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
       CONSTRAINT efUserFk FOREIGN KEY (userId) REFERENCES user (id) ON DELETE CASCADE,
       INDEX efNotifyIdx (notify)
+    ) ENGINE=InnoDB`,
+
+    // A saved filter's newly added matches, queued for its email; `sentAt`
+    // once mailed, kept a while so a later pass doesn't mail them again.
+    sql`CREATE TABLE IF NOT EXISTS eventFilterMatch (
+      filterId INT UNSIGNED NOT NULL,
+      eventId CHAR(8) CHARSET ascii NOT NULL,
+      createdAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      sentAt TIMESTAMP NULL,
+      PRIMARY KEY (filterId, eventId),
+      CONSTRAINT efmFilterFk FOREIGN KEY (filterId) REFERENCES eventFilter (id) ON DELETE CASCADE,
+      CONSTRAINT efmEventFk FOREIGN KEY (eventId) REFERENCES event (id) ON DELETE CASCADE,
+      INDEX efmSentIdx (sentAt)
     ) ENGINE=InnoDB`,
 
     // Who follows or has muted the emails about one event or photo; no row
@@ -645,6 +661,11 @@ export async function initDatabase() {
       (table) =>
         `ALTER TABLE ${table} ADD COLUMN IF NOT EXISTS editedAt TIMESTAMP NULL, ADD COLUMN IF NOT EXISTS deletedAt TIMESTAMP NULL, ADD COLUMN IF NOT EXISTS deletedBy ENUM('author', 'owner', 'moderator') CHARSET ascii NULL`,
     ),
+
+    'ALTER TABLE eventFilter ADD COLUMN IF NOT EXISTS matchSince TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP',
+
+    // The saved filters' mail reads the last day's events every minute.
+    'ALTER TABLE event ADD INDEX IF NOT EXISTS eventCreatedIdx (createdAt)',
   ];
 
   const db = await pool.getConnection();
