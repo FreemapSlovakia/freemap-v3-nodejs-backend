@@ -138,7 +138,7 @@ export function attachPatchMapHandler(router: RouterInstance) {
           `);
 
         if (writers) {
-          conn.query<unknown>(
+          await conn.query<unknown>(
             sql`DELETE FROM mapWriteAccess WHERE mapId = ${id}`,
           );
 

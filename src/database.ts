@@ -361,6 +361,8 @@ export async function initDatabase() {
       userId INT UNSIGNED NOT NULL,
       data MEDIUMTEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL DEFAULT '{}',
       -- The event's own, not listed among its creator's maps; see eventMap.ts.
+      -- TODO it still goes with its creator's account (umUserFk), even after
+      -- the event was handed to another owner.
       forEvent BIT NOT NULL DEFAULT false,
       CONSTRAINT umUserFk FOREIGN KEY (userId) REFERENCES user (id) ON DELETE CASCADE,
       INDEX umCreatedAtIdx (createdAt)
@@ -726,6 +728,13 @@ export async function initDatabase() {
 
     await pool.query<unknown>(
       sql`DELETE FROM emailCode WHERE createdAt < NOW() - INTERVAL 1 DAY`,
+    );
+
+    // An event's own map is linked as the event is saved; one left unlinked a
+    // week by a save that failed and was never retried is nobody's to find.
+    await pool.query<unknown>(
+      sql`DELETE FROM map WHERE forEvent AND createdAt < NOW() - INTERVAL 7 DAY
+        AND NOT EXISTS (SELECT 1 FROM event WHERE mapId = map.id)`,
     );
 
     await runInTransaction(async (conn) => {

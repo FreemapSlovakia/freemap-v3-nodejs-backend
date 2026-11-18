@@ -66,17 +66,6 @@ export function attachPostMapHandler(router: RouterInstance) {
           forEvent = ${forEvent}
       `);
 
-      // An event's own map is linked as the event is saved; one left unlinked
-      // for a week by a save that failed and was never retried is dropped.
-      if (forEvent) {
-        await pool.query<unknown>(sql`
-          DELETE FROM map
-            WHERE userId = ${userId} AND forEvent
-              AND createdAt < ${new Date(now.getTime() - 7 * 86_400_000)}
-              AND NOT EXISTS (SELECT 1 FROM event WHERE mapId = map.id)
-        `);
-      }
-
       if (writers?.length) {
         await pool.query<unknown>(
           sql`INSERT INTO mapWriteAccess (mapId, userId) VALUES ${bulk(writers.map((writer) => [id, writer]))}`,
