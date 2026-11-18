@@ -14,31 +14,54 @@ import {
   mailTexts,
   sendNotificationMail,
 } from './notificationMail.js';
-import { savedFilterSql } from './routers/events/filterSql.js';
+import { savedFilterSql, withinEnd } from './routers/events/filterSql.js';
 
 const logger = appLogger.child({ module: 'eventFilterMail' });
 
 /** Events listed in one email; the rest are counted. */
 const MAX_LISTED = 50;
 
+/** Local hour from which events coming within a period are queued. */
+const PERIOD_HOUR = 7;
+
 /**
- * Queues each emailing filter's matches among the events added in the last
- * day, but since its `matchSince`, and not the user's own.
+ * Queues each emailing filter's matches, not the user's own: the events added
+ * in the last day, since its `matchSince`, and with a period, those whose date
+ * came within it since `matchedUntil`. A period moves at local midnight, so
+ * that is looked at once a day, from the morning on, and goes out then.
  */
-// TODO a run could skip when no event was added since the last one; events
-// added during a downtime over a day are never matched.
+// TODO events added during a downtime over a day are never matched as added;
+// an edited event is not matched again by its new date, and one queued over
+// two days before may be mailed again when its new date comes within a period.
 async function queueMatches(conn: PoolConnection) {
   const now = new Date();
 
+  // Not yet looked at today: an earlier `matchedUntil` is from before today's
+  // move of the periods.
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+  const periodTime = now.getHours() >= PERIOD_HOUR;
+
   const filters = z
-    .array(z.object({ id: z.number(), filter: z.unknown() }))
+    .array(
+      z.object({
+        id: z.number(),
+        userId: z.number(),
+        filter: z.unknown(),
+        matchSince: z.date(),
+        matchedUntil: z.date(),
+      }),
+    )
     .parse(
       await conn.query<unknown>(sql`
-        SELECT ef.id, ef.filter
+        SELECT ef.id, ef.userId, ef.filter, ef.matchSince, ef.matchedUntil
         FROM eventFilter ef JOIN user u ON u.id = ef.userId
         WHERE ef.notify AND u.sendEventEmails AND u.mailableEmail IS NOT NULL
       `),
     );
+
+  // Left behind, so a later run tries them again.
+  const failed: number[] = [];
 
   for (const row of filters) {
     // One filter gone bad must not stop the others' emails.
@@ -47,6 +70,20 @@ async function queueMatches(conn: PoolConnection) {
         typeof row.filter === 'string' ? JSON.parse(row.filter) : row.filter,
       );
 
+      const added = sql`e.createdAt > ${new Date(now.getTime() - 86_400_000)}
+        AND e.createdAt >= ${row.matchSince}`;
+
+      // Beyond the period as it was, and (by `savedFilterSql`) within it now.
+      const since = new Date(
+        Math.max(row.matchSince.getTime(), row.matchedUntil.getTime()),
+      );
+
+      const period = periodTime && since < today ? filter.within : undefined;
+
+      const came = period
+        ? sql`((${added}) OR e.startAt > ${withinEnd(period, since)})`
+        : added;
+
       // Read, then inserted: an INSERT … SELECT would lock the events read.
       // `u` is the event's owner, which `importedSql` reads.
       const ids = z.array(z.object({ id: z.string() })).parse(
@@ -54,10 +91,8 @@ async function queueMatches(conn: PoolConnection) {
             SELECT e.id
             FROM event e
             JOIN user u ON u.id = e.userId
-            JOIN eventFilter ef ON ef.id = ${row.id}
-            WHERE e.createdAt > ${new Date(now.getTime() - 86_400_000)}
-              AND e.createdAt >= ef.matchSince
-              AND e.userId <> ef.userId
+            WHERE ${came}
+              AND e.userId <> ${row.userId}
               AND ${join(savedFilterSql(filter, now), ' AND ')}
           `),
       );
@@ -70,7 +105,19 @@ async function queueMatches(conn: PoolConnection) {
       }
     } catch (err) {
       logger.warn({ err, filterId: row.id }, 'saved filter not matched');
+
+      failed.push(row.id);
     }
+  }
+
+  // Every filter, emailing or not: one whose emails come back later starts
+  // from then, not with what came within its period meanwhile.
+  if (periodTime) {
+    await conn.query<unknown>(sql`
+      UPDATE eventFilter SET matchedUntil = ${now}
+      WHERE matchedUntil < ${today}
+        ${failed.length ? sql`AND id NOT IN (${join(failed)})` : sql``}
+    `);
   }
 }
 
@@ -218,6 +265,8 @@ async function run() {
 
       await sendDue(conn);
 
+      // Kept past the day an added event is looked for, and the run that
+      // queued one coming within a period.
       await conn.query<unknown>(
         sql`DELETE FROM eventFilterMatch WHERE sentAt < NOW() - INTERVAL 2 DAY`,
       );

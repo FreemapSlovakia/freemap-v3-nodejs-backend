@@ -14,58 +14,59 @@ export type EventFilterTexts = {
 // no markup characters (see notificationMail.test.ts).
 export const EVENT_FILTER_TEXTS: Record<MailLang, EventFilterTexts> = {
   en: {
-    subject: (n) => `New events: "${n}"`,
-    intro: (n) => `New events matching your saved filter ${n}:`,
+    subject: (n) => `Events for "${n}"`,
+    intro: (n) => `Events that now match your saved filter ${n}:`,
     more: (k) => `…and ${k} more`,
     stop: 'Stop emails for this filter',
   },
   sk: {
-    subject: (n) => `Nové akcie: „${n}“`,
-    intro: (n) => `Nové akcie zodpovedajúce vášmu uloženému filtru ${n}:`,
+    subject: (n) => `Akcie pre „${n}“`,
+    intro: (n) => `Akcie, ktoré teraz zodpovedajú vášmu uloženému filtru ${n}:`,
     more: (k) => `…a ďalších ${k}`,
     stop: 'Zastaviť e-maily pre tento filter',
   },
   cs: {
-    subject: (n) => `Nové akce: „${n}“`,
-    intro: (n) => `Nové akce odpovídající vašemu uloženému filtru ${n}:`,
+    subject: (n) => `Akce pro „${n}“`,
+    intro: (n) => `Akce, které nyní odpovídají vašemu uloženému filtru ${n}:`,
     more: (k) => `…a dalších ${k}`,
     stop: 'Zastavit e-maily pro tento filtr',
   },
   hu: {
-    subject: (n) => `Új események: „${n}”`,
+    subject: (n) => `Események: „${n}”`,
     intro: (n) =>
-      `Új események, amelyek megfelelnek a(z) ${n} mentett szűrőnek:`,
+      `Események, amelyek most megfelelnek a(z) ${n} mentett szűrőnek:`,
     more: (k) => `…és még ${k}`,
     stop: 'E-mailek leállítása ehhez a szűrőhöz',
   },
   it: {
-    subject: (n) => `Nuovi eventi: «${n}»`,
-    intro: (n) => `Nuovi eventi che corrispondono al Suo filtro salvato ${n}:`,
+    subject: (n) => `Eventi per «${n}»`,
+    intro: (n) => `Eventi che ora corrispondono al Suo filtro salvato ${n}:`,
     more: (k) => `…e altri ${k}`,
     stop: 'Interrompi le e-mail per questo filtro',
   },
   de: {
-    subject: (n) => `Neue Veranstaltungen: „${n}“`,
-    intro: (n) => `Neue Veranstaltungen zu Ihrem gespeicherten Filter ${n}:`,
+    subject: (n) => `Veranstaltungen zu „${n}“`,
+    intro: (n) =>
+      `Veranstaltungen, die jetzt zu Ihrem gespeicherten Filter ${n} passen:`,
     more: (k) => `…und ${k} weitere`,
     stop: 'E-Mails für diesen Filter abbestellen',
   },
   pl: {
-    subject: (n) => `Nowe wydarzenia: „${n}”`,
-    intro: (n) => `Nowe wydarzenia pasujące do zapisanego filtra ${n}:`,
+    subject: (n) => `Wydarzenia: „${n}”`,
+    intro: (n) => `Wydarzenia, które teraz pasują do zapisanego filtra ${n}:`,
     more: (k) => `…i ${k} więcej`,
     stop: 'Wyłącz e-maile dla tego filtra',
   },
   sl: {
-    subject: (n) => `Novi dogodki: »${n}«`,
-    intro: (n) => `Novi dogodki, ki ustrezajo vašemu shranjenemu filtru ${n}:`,
+    subject: (n) => `Dogodki: »${n}«`,
+    intro: (n) => `Dogodki, ki zdaj ustrezajo vašemu shranjenemu filtru ${n}:`,
     more: (k) => `…in še ${k}`,
     stop: 'Ustavi e-pošto za ta filter',
   },
   fr: {
-    subject: (n) => `Nouveaux événements : « ${n} »`,
+    subject: (n) => `Événements : « ${n} »`,
     intro: (n) =>
-      `Nouveaux événements correspondant à votre filtre enregistré ${n} :`,
+      `Événements qui correspondent désormais à votre filtre enregistré ${n} :`,
     more: (k) => `…et ${k} de plus`,
     stop: 'Arrêter les e-mails pour ce filtre',
   },

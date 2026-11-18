@@ -442,7 +442,7 @@ export async function initDatabase() {
       CONSTRAINT egnUserFk FOREIGN KEY (userId) REFERENCES user (id) ON DELETE CASCADE
     ) ENGINE=InnoDB`,
 
-    // A user's named events filters; `notify` emails newly added matches.
+    // A user's named events filters; `notify` emails events coming to match.
     sql`CREATE TABLE IF NOT EXISTS eventFilter (
       id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
       userId INT UNSIGNED NOT NULL,
@@ -450,15 +450,18 @@ export async function initDatabase() {
       filter JSON NOT NULL,
       notify BOOLEAN NOT NULL DEFAULT FALSE,
       createdAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      -- Only events added since are emailed; set as the conditions change
-      -- or the emails are turned on, not by a rename.
+      -- Only events coming to match since are emailed; set as the conditions
+      -- change or the emails are turned on, not by a rename.
       matchSince TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      -- When the mail job last moved every filter's period (its local day
+      -- counts); before matchSince, matchSince stands for it.
+      matchedUntil TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
       CONSTRAINT efUserFk FOREIGN KEY (userId) REFERENCES user (id) ON DELETE CASCADE,
       INDEX efNotifyIdx (notify)
     ) ENGINE=InnoDB`,
 
-    // A saved filter's newly added matches, queued for its email; `sentAt`
-    // once mailed, kept a while so a later pass doesn't mail them again.
+    // A saved filter's matches, queued for its email; `sentAt` once mailed,
+    // kept a while so a later pass doesn't mail them again.
     sql`CREATE TABLE IF NOT EXISTS eventFilterMatch (
       filterId INT UNSIGNED NOT NULL,
       eventId CHAR(8) CHARSET ascii NOT NULL,
@@ -663,6 +666,10 @@ export async function initDatabase() {
     ),
 
     'ALTER TABLE eventFilter ADD COLUMN IF NOT EXISTS matchSince TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP',
+
+    // Set to now for existing filters: what entered their period before was
+    // never promised by email.
+    'ALTER TABLE eventFilter ADD COLUMN IF NOT EXISTS matchedUntil TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP',
 
     // The saved filters' mail reads the last day's events every minute.
     'ALTER TABLE event ADD INDEX IF NOT EXISTS eventCreatedIdx (createdAt)',
