@@ -17,10 +17,12 @@ import dvv from './event-sources/dvv.mjs';
 import { daysBetween, isDate, USER_AGENT } from './event-sources/fetch.mjs';
 import kct from './event-sources/kct.mjs';
 import kst from './event-sources/kst.mjs';
+import kstRegions from './event-sources/kstRegions.mjs';
 import suedtirol from './event-sources/suedtirol.mjs';
 import ttt from './event-sources/ttt.mjs';
 
-const SOURCES = [kct, kst, ttt, datatourisme, dvv, suedtirol];
+// The KST yearbook before its regions', which defer to it.
+const SOURCES = [kct, kst, kstRegions, ttt, datatourisme, dvv, suedtirol];
 
 const API_URL = process.env.API_URL ?? 'https://backend.freemap.sk';
 
@@ -160,8 +162,11 @@ const titleWords = (title) =>
 // A week a request: the API lists 1000 at most, harvested events included.
 const WINDOW_MS = 7 * 86_400_000;
 
-/** The public events entered by hand around the harvested days. */
-async function handEnteredEvents(results) {
+/**
+ * The public events entered by hand around the harvested days, and those of
+ * the sources `defersTo` names, which win over this one's copies too.
+ */
+async function handEnteredEvents(results, defersTo = []) {
   const starts = results
     .filter((r) => r.body)
     .map((r) => Date.parse(r.body.startAt));
@@ -193,7 +198,10 @@ async function handEnteredEvents(results) {
     // Windows overlap by the events spanning their bounds. `manual:` ones were
     // imported by hand, from no source a harvest syncs.
     for (const e of page) {
-      if (!e.sourceKey || e.sourceKey.startsWith('manual:')) {
+      if (
+        !e.sourceKey ||
+        ['manual', ...defersTo].some((s) => e.sourceKey.startsWith(`${s}:`))
+      ) {
         events.set(e.id, e);
       }
     }
@@ -211,11 +219,13 @@ const startDay = (e) =>
         .toPlainDate()
         .toString();
 
-async function markDuplicates(results) {
-  const existing = (await handEnteredEvents(results)).map((e) => ({
-    ...e,
-    day: startDay(e),
-  }));
+async function markDuplicates(results, source) {
+  const existing = (await handEnteredEvents(results, source.defersTo)).map(
+    (e) => ({
+      ...e,
+      day: startDay(e),
+    }),
+  );
 
   for (const r of results) {
     if (!r.body) {
@@ -342,7 +352,7 @@ for (const source of sources) {
   try {
     results = await source.harvest({ from, to, limit, today, cacheDir });
 
-    await markDuplicates(results);
+    await markDuplicates(results, source);
   } catch (err) {
     console.error(`${source.key}: ${err}`);
 

@@ -42,7 +42,7 @@ const MODE = /^([PCLHVJM](?:\s*,\s*[PCLHVJM])*)\s*[–-]\s*(.*)$/;
 
 // A sentence giving a contact, which a private person's would be: an email, a
 // phone number, words introducing one, or a postal address.
-const CONTACT_RE =
+export const CONTACT_RE =
   /[\w.+-]+(@|\(at\))[\w-]+(\.[\w-]+)+|\b\d{3}\s?\d{3}\s?\d{3}\b|\+?421\d{9}|kontakt|telefon|\btel\.|e\s?[-–]?\s?mail|mobil|vedúc|\b\d{3}\s?\d{2}\s+\p{Lu}/iu;
 
 // Sentences saying where and when participants meet.

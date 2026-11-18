@@ -39,11 +39,11 @@ jobs:
       # The harvester needs only the Anthropic SDK and zod: no native builds.
       - run: pnpm install --frozen-lockfile --ignore-scripts
 
-      # The KST yearbook is read with poppler-utils.
+      # KST's yearbook and regional calendars are read with poppler-utils.
       - name: Check pdftotext
         run: |
-          command -v pdftotext || {
-            echo '::error::pdftotext missing on the runner: apt install poppler-utils'
+          command -v pdftotext && command -v pdfinfo || {
+            echo '::error::pdftotext or pdfinfo missing on the runner: apt install poppler-utils'
             exit 1
           }
 
