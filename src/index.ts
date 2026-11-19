@@ -31,6 +31,7 @@ import { mailWatchRouter } from './routers/mailWatch/index.js';
 import { locusRouter, oruxRouter } from './routers/mapApps/index.js';
 import { mapsRouter } from './routers/maps/index.js';
 import { attachOsmGpxHandlers } from './routers/osmGpxHandler.js';
+import { placesRouter } from './routers/places/index.js';
 import { attachStravaHandlers } from './routers/stravaHandler.js';
 import { tracklogsRouter } from './routers/tracklogs/index.js';
 import { attachWmsProxyHandler } from './routers/wmsProxyHandler.js';
@@ -235,6 +236,8 @@ router.use(
   eventFiltersRouter.routes(),
   eventFiltersRouter.allowedMethods(),
 );
+
+router.use('/places', placesRouter.routes(), placesRouter.allowedMethods());
 
 router.use(
   '/mail-watch',

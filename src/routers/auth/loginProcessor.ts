@@ -18,6 +18,7 @@ import {
 } from '../../emailAddress.js';
 import { pickLanguage } from '../../mailer.js';
 import { NEW_USER_NAMES } from '../../newUserNames.js';
+import { addHomePlace } from '../../places.js';
 import { fetchAndProcessProfilePicture } from '../../profilePicture.js';
 import {
   LoginResponseSchema,
@@ -57,21 +58,37 @@ export async function findByVerifiedEmail(
   return row ? UserRowSchema.parse(row) : undefined;
 }
 
+/** A new account; a home location given for it becomes its first place. */
 async function insertUser(
   conn: PoolConnection,
-  fields: Record<string, unknown>,
+  {
+    home,
+    ...fields
+  }: Record<string, unknown> & {
+    home: { lat: number | null; lon: number | null };
+    language: string | null;
+  },
 ): Promise<number> {
-  return (
-    await conn.query<{ insertId: number }>(
-      sql`INSERT INTO user SET ${join(
-        Object.entries({
-          sendGalleryEmails: true,
-          credits: 100,
-          ...fields,
-        }).map(([column, value]) => sql`${raw(column)} = ${value}`),
-      )}`,
-    )
-  ).insertId;
+  const { insertId } = await conn.query<{ insertId: number }>(
+    sql`INSERT INTO user SET ${join(
+      Object.entries({
+        sendGalleryEmails: true,
+        credits: 100,
+        ...fields,
+      }).map(([column, value]) => sql`${raw(column)} = ${value}`),
+    )}`,
+  );
+
+  if (home.lat != null && home.lon != null) {
+    await addHomePlace(
+      conn,
+      insertId,
+      { lat: home.lat, lon: home.lon },
+      fields.language,
+    );
+  }
+
+  return insertId;
 }
 
 export async function startSession(
@@ -111,13 +128,12 @@ export async function loginWithEmail(
 
     const now = new Date();
 
-    // What it lacks, as a provider login fills it in.
+    // What it lacks, as a provider login fills it in. Not a home: places are
+    // the user's, and one removed must not come back with a login.
     if (user) {
       await conn.query<unknown>(
         sql`UPDATE user SET
-          language = COALESCE(language, ${language}),
-          lat = COALESCE(lat, ${settings.lat ?? null}),
-          lon = COALESCE(lon, ${settings.lon ?? null})
+          language = COALESCE(language, ${language})
         WHERE id = ${user.id}`,
       );
     }
@@ -129,8 +145,7 @@ export async function loginWithEmail(
         ...fields,
         language,
         createdAt: now,
-        lat: settings.lat ?? null,
-        lon: settings.lon ?? null,
+        home: { lat: settings.lat ?? null, lon: settings.lon ?? null },
         settings: JSON.stringify(settings),
       }));
 
@@ -350,8 +365,6 @@ export async function login(
         } else if (matchedByEmail) {
           await conn.query<unknown>(sql`UPDATE user SET
           language = COALESCE(language, ${remoteLanguage}),
-          lat = COALESCE(lat, ${remoteLat ?? null}),
-          lon = COALESCE(lon, ${remoteLon ?? null}),
           picture = COALESCE(picture, ${newPicture}),
           ${join(
             Object.entries({
@@ -401,8 +414,6 @@ export async function login(
           await conn.query<unknown>(sql`UPDATE user SET
           ${await emailAfterSql(current)},
           language = COALESCE(language, ${remoteLanguage}),
-          lat = COALESCE(lat, ${lat}),
-          lon = COALESCE(lon, ${lon}),
           picture = COALESCE(picture, ${newPicture}),
           ${join(
             Object.entries({
@@ -424,8 +435,7 @@ export async function login(
             }),
             language: remoteLanguage,
             createdAt: now,
-            lat: lat ?? null,
-            lon: lon ?? null,
+            home: { lat, lon },
             settings: JSON.stringify(settings),
             picture: newPicture,
             [authProviderToColumn[authProvider]]: remoteUserId,

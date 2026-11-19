@@ -4,6 +4,7 @@ import { deleteRoleTokens } from './appTokens.js';
 import { emailFieldsSql, nextEmail } from './emailAddress.js';
 import { appLogger } from './logger.js';
 import { isPlaceholderName } from './newUserNames.js';
+import { mirrorLegacyHome } from './places.js';
 import {
   liveSubscriptionSql,
   PROVIDER_ID_COLUMNS,
@@ -284,7 +285,6 @@ export async function mergeUserAccounts(
 
   const {
     id: sourceId,
-    coordinates,
     language,
     createdAt,
     sendGalleryEmails,
@@ -298,8 +298,6 @@ export async function mergeUserAccounts(
       ${emailFieldsSql(mergedEmail)},
       name = ${mergedName},
       description = ${mergedDescription},
-      lat = COALESCE(lat, ${coordinates?.lat}),
-      lon = COALESCE(lon, ${coordinates?.lon}),
       language = COALESCE(language, ${language}),
       createdAt = LEAST(createdAt, ${createdAt}),
       roles = ${mergedRoles},
@@ -323,6 +321,21 @@ export async function mergeUserAccounts(
       ])}
     WHERE id = ${target.id}
   `);
+
+  // Re-inserted, not repointed: new ids put them after the target's own, whose
+  // first stays the legacy home.
+  // TODO may leave more than MAX_PLACES; adding then waits for deletes.
+  await conn.query<unknown>(sql`
+    INSERT INTO userPlace (userId, name, lat, lon, createdAt)
+    SELECT ${target.id}, name, lat, lon, createdAt FROM userPlace
+    WHERE userId = ${source.id} ORDER BY id
+  `);
+
+  await conn.query<unknown>(
+    sql`DELETE FROM userPlace WHERE userId = ${source.id}`,
+  );
+
+  await mirrorLegacyHome(conn, target.id);
 
   // Repointed before the DELETE would cascade them away; one hop resolves all.
   await conn.query<unknown>(

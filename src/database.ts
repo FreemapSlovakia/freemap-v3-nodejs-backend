@@ -6,6 +6,7 @@ import z from 'zod';
 import { normalizeEmail } from './emailAddress.js';
 import { getEnv, getEnvInteger } from './env.js';
 import { appLogger } from './logger.js';
+import { MIGRATE_HOMES_SQL } from './places.js';
 
 export const pool = createPool({
   host: getEnv('MARIADB_HOST'),
@@ -464,6 +465,18 @@ export async function initDatabase() {
       INDEX efNotifyIdx (notify)
     ) ENGINE=InnoDB`,
 
+    // A user's named places; the first is mirrored to `user.lat`/`lon`, the
+    // legacy home (see places.ts).
+    sql`CREATE TABLE IF NOT EXISTS userPlace (
+      id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+      userId INT UNSIGNED NOT NULL,
+      name VARCHAR(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+      lat DECIMAL(8, 6) NOT NULL,
+      lon DECIMAL(9, 6) NOT NULL,
+      createdAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      CONSTRAINT upUserFk FOREIGN KEY (userId) REFERENCES user (id) ON DELETE CASCADE
+    ) ENGINE=InnoDB`,
+
     // A saved filter's matches, queued for its email; `sentAt` once mailed,
     // kept a while so a later pass doesn't mail them again.
     sql`CREATE TABLE IF NOT EXISTS eventFilterMatch (
@@ -679,6 +692,9 @@ export async function initDatabase() {
     'ALTER TABLE event ADD INDEX IF NOT EXISTS eventCreatedIdx (createdAt)',
 
     'ALTER TABLE map ADD COLUMN IF NOT EXISTS forEvent BIT NOT NULL DEFAULT false AFTER data',
+
+    // Home locations into places; see places.ts.
+    MIGRATE_HOMES_SQL,
   ];
 
   const db = await pool.getConnection();

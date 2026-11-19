@@ -9,6 +9,7 @@ import {
   nextEmail,
 } from '../../emailAddress.js';
 import { AUTH_REQUIRED, registerPath } from '../../openapi.js';
+import { applyLegacyHome } from '../../places.js';
 import {
   MAX_PICTURE_INPUT_BYTES,
   processProfilePicture,
@@ -29,7 +30,7 @@ const BodySchema = z
     name: z.string().optional(),
     email: z.email().nullish(),
     description: z.string().nullish(),
-    // The home location; `null` removes it.
+    // Legacy home location: the first of `/places`; `null` removes that place.
     lat: z.number().min(-90).max(90).nullish(),
     lon: z.number().min(-180).max(180).nullish(),
     settings: z.record(z.string(), z.unknown()).optional(),
@@ -45,9 +46,12 @@ const BodySchema = z
   .refine((data) => Object.values(data).some((v) => v !== undefined), {
     message: 'At least one field must be provided',
   })
-  .refine((data) => (data.lat == null) === (data.lon == null), {
-    message: 'lat and lon go together',
-  });
+  .refine(
+    (data) =>
+      (data.lat === undefined) === (data.lon === undefined) &&
+      (data.lat === null) === (data.lon === null),
+    { message: 'lat and lon go together' },
+  );
 
 export function attachPatchUserHandler(router: RouterInstance) {
   registerPath('/auth/settings', {
@@ -95,6 +99,9 @@ export function attachPatchUserHandler(router: RouterInstance) {
         k !== 'settings' &&
         k !== 'publicFields' &&
         k !== 'email' &&
+        // The legacy home is the first place; the columns only mirror it.
+        k !== 'lat' &&
+        k !== 'lon' &&
         body[k] !== undefined,
     );
 
@@ -102,6 +109,7 @@ export function attachPatchUserHandler(router: RouterInstance) {
 
     if (
       keys.length === 0 &&
+      body.lat === undefined &&
       processedPicture === undefined &&
       settings === undefined &&
       publicFields === undefined &&
@@ -122,8 +130,10 @@ export function attachPatchUserHandler(router: RouterInstance) {
 
     const userId = ctx.state.user!.id;
 
-    // Only these depend on the stored row; anything else is a plain write.
+    // Only these depend on the stored row (the legacy home moves the first
+    // place); anything else is a plain write.
     if (
+      body.lat === undefined &&
       settings === undefined &&
       publicFields === undefined &&
       body.email === undefined
@@ -215,9 +225,22 @@ export function attachPatchUserHandler(router: RouterInstance) {
         sets.push(sql`publicFields = ${JSON.stringify(allowed)}`);
       }
 
-      await conn.query<unknown>(
-        sql`UPDATE user SET ${join(sets)} WHERE id = ${userId}`,
-      );
+      if (sets.length > 0) {
+        await conn.query<unknown>(
+          sql`UPDATE user SET ${join(sets)} WHERE id = ${userId}`,
+        );
+      }
+
+      if (body.lat !== undefined) {
+        await applyLegacyHome(
+          conn,
+          userId,
+          body.lat == null || body.lon == null
+            ? null
+            : { lat: body.lat, lon: body.lon },
+          body.language ?? row.language,
+        );
+      }
     });
 
     ctx.status = 204;
