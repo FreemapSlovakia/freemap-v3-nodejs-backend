@@ -42,8 +42,8 @@ jobs:
       # KST's yearbook and regional calendars are read with poppler-utils.
       - name: Check pdftotext
         run: |
-          command -v pdftotext && command -v pdfinfo || {
-            echo '::error::pdftotext or pdfinfo missing on the runner: apt install poppler-utils'
+          command -v pdftotext && command -v pdfinfo && command -v pdftoppm || {
+            echo '::error::poppler-utils (pdftotext, pdfinfo, pdftoppm) missing on the runner: apt install poppler-utils'
             exit 1
           }
 

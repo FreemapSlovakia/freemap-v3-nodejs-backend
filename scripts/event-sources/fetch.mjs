@@ -22,12 +22,12 @@ const robotsRules = new Map();
 
 const crawlDelays = new Map();
 
-async function politeResponse(url, headers = {}) {
+async function politeResponse(url, headers = {}, form) {
   for (let attempt = 0; ; attempt++) {
     let res;
 
     try {
-      res = await politeRequest(url, headers);
+      res = await politeRequest(url, headers, form);
     } catch (err) {
       // A network failure: the connection refused, reset or timed out.
       if (attempt >= RETRY_MS.length) {
@@ -59,7 +59,7 @@ async function politeResponse(url, headers = {}) {
   }
 }
 
-async function politeRequest(url, headers) {
+async function politeRequest(url, headers, form) {
   const { host } = new URL(url);
 
   // A robots.txt Crawl-delay, when longer, wins; our own Photon needs less.
@@ -78,12 +78,16 @@ async function politeRequest(url, headers) {
 
   return fetch(url, {
     headers: { 'User-Agent': USER_AGENT, ...headers },
+    ...(form && { method: 'POST', body: new URLSearchParams(form) }),
   });
 }
 
-/** `headers` for an API key, kept out of the URL and so out of the logs. */
-export async function politeFetch(url, headers = {}) {
-  return (await politeResponse(url, headers)).text();
+/**
+ * `headers` for an API key, kept out of the URL and so out of the logs;
+ * `form` posts those fields, for a page that lists by a form.
+ */
+export async function politeFetch(url, headers = {}, form = undefined) {
+  return (await politeResponse(url, headers, form)).text();
 }
 
 /**

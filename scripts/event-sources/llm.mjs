@@ -122,11 +122,18 @@ let calendarCache;
 let calendarCachePath;
 
 /**
- * The events of a club calendar's text (pdftotext output), each as
- * {@link CalendarEventSchema}, or null without a key. Cached by the text, so
- * a calendar is read again only when it changes.
+ * The events of a club calendar — a PDF's or a page's `text`, or `images` of
+ * scanned pages — each as {@link CalendarEventSchema}, or null without a key.
+ * Cached by that input, so a calendar is read again only when it changes;
+ * `year` null for a page naming its own years.
  */
-export async function calendarEvents({ text, year, publisher, cacheDir }) {
+export async function calendarEvents({
+  text,
+  images = [],
+  year,
+  publisher,
+  cacheDir,
+}) {
   if (!client) {
     return null;
   }
@@ -141,11 +148,18 @@ export async function calendarEvents({ text, year, publisher, cacheDir }) {
     }
   }
 
-  const input = `Kalendár: ${publisher}, rok ${year}\n\n${text}`;
+  // A page holding several years, or naming its own, is given none.
+  const input = `Kalendár: ${publisher}${year ? `, rok ${year}` : ''}\n\n${text ?? ''}`;
 
-  const key = createHash('sha256')
-    .update(`${CALENDAR_MODEL}\n${CALENDAR_VERSION}\n${input}`)
-    .digest('hex');
+  const hash = createHash('sha256').update(
+    `${CALENDAR_MODEL}\n${CALENDAR_VERSION}\n${input}`,
+  );
+
+  for (const image of images) {
+    hash.update(image);
+  }
+
+  const key = hash.digest('hex');
 
   if (key in calendarCache) {
     return calendarCache[key];
@@ -159,19 +173,34 @@ export async function calendarEvents({ text, year, publisher, cacheDir }) {
       betas: ['server-side-fallback-2026-07-01'],
       fallbacks: 'default',
       output_config: {
-        effort: 'medium',
+        effort: 'low',
         format: betaZodOutputFormat(CalendarSchema),
       },
       system: [
-        'You read the text of a Slovak or Czech hiking club calendar, extracted from a PDF, and list every public event in it, each once.',
-        'Dates are in the calendar\'s year unless written otherwise; a multi-day event gives its first day as date and its last as endDate. The time is when participants start or meet ("Štart: … o 8.30 hod" is 08:30); for a start window ("6.00 h – 12.00 h") its beginning; null if unsaid.',
+        "You read a Slovak or Czech hiking club calendar (a PDF's text, a web page's text, or images of its pages) and list every public event in it, each once.",
+        'Dates are in the calendar\'s year unless written otherwise; with no year given, in the year the page names for its list; a multi-day event gives its first day as date and its last as endDate. The time is when participants start or meet ("Štart: … o 8.30 hod" is 08:30); for a start window ("6.00 h – 12.00 h") its beginning; null if unsaid.',
         'Give the title in the case it would be written normally, not in capitals, without the edition, which goes to edition ("47. ročník" is 47).',
         'kinds: hiking for walks and marches (P, pešo, vysokohorská), bike for cycling (C, cyklo), ski, water, other for the rest; an event may have several.',
         "details: the route, start, finish, fee and practical notes in a sentence or few, in the calendar's language; leave out every person's name, phone number and email.",
         'For the start, give the meeting place and its municipality as a map names them, in the nominative, without prepositions ("Štart: Dolný Lopašov, turistický klub" is place "turistický klub", municipality "Dolný Lopašov"); for a walk to a summit with no meeting place, that summit as summit; the organizing club\'s home municipality as organizerTown where its name or the text says it. Use only what the text says; otherwise null.',
-        'Skip pages of general information, calendar grids, adverts and lists of summits or badges that are not events.',
+        "Skip pages of general information, calendar grids, adverts, a website's menus and lists of summits or badges that are not events.",
       ].join('\n'),
-      messages: [{ role: 'user', content: input }],
+      messages: [
+        {
+          role: 'user',
+          content: [
+            ...images.map((data) => ({
+              type: 'image',
+              source: {
+                type: 'base64',
+                media_type: 'image/jpeg',
+                data: data.toString('base64'),
+              },
+            })),
+            { type: 'text', text: input },
+          ],
+        },
+      ],
     })
     .finalMessage();
 
@@ -179,7 +208,9 @@ export async function calendarEvents({ text, year, publisher, cacheDir }) {
     message.stop_reason === 'refusal' ||
     message.stop_reason === 'max_tokens'
   ) {
-    throw new Error(`calendar of ${publisher} ${year}: ${message.stop_reason}`);
+    throw new Error(
+      `calendar of ${publisher}${year ? ` ${year}` : ''}: ${message.stop_reason}`,
+    );
   }
 
   const json = message.content.find((b) => b.type === 'text')?.text;

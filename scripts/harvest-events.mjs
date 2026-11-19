@@ -317,7 +317,15 @@ async function sync(source, results, complete) {
     `/events/sources/${encodeURIComponent(source.key)}`,
   );
 
-  const gone = ours.filter((e) => !kept.has(e.sourceKey));
+  // A part of the source that failed (`keeps`, a sourceKey prefix) keeps all
+  // its events.
+  const keeps = results.flatMap((r) => (r.keeps ? [r.keeps] : []));
+
+  const gone = ours.filter(
+    (e) =>
+      !kept.has(e.sourceKey) &&
+      !keeps.some((prefix) => e.sourceKey.startsWith(prefix)),
+  );
 
   // A source answering with far fewer events is broken, not emptied.
   if (gone.length > Math.max(20, ours.length / 4)) {
