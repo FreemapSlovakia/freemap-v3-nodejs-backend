@@ -1,3 +1,4 @@
+import * as Sentry from '@sentry/node';
 import type { Context, Middleware } from 'koa';
 import sql, { raw } from 'sql-template-tag';
 import z from 'zod';
@@ -127,6 +128,13 @@ export function authenticator(
     }
 
     ctx.state.user = user;
+
+    // Only the id: Sentry then counts users, not IPs, with no personal data.
+    // Not on a WebSocket upgrade: Sentry gives it no request scope, so the
+    // user would stick to the process-wide one and tag unrelated errors.
+    if (!ctx.websocket) {
+      Sentry.setUser({ id: String(user.id) });
+    }
 
     await next();
   };
