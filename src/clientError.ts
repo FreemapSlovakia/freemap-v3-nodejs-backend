@@ -26,11 +26,14 @@ export function isClientError(
   );
 }
 
-// A write to a connection the client has closed: Koa's body pipeline reports
-// a premature close, a write to the dead socket fails with EPIPE (the
-// GET /events reports in Sentry). Not ECONNRESET: none seen yet — add it if
-// it shows up.
-const HANG_UP_CODES = new Set(['ERR_STREAM_PREMATURE_CLOSE', 'EPIPE']);
+// A connection the client has closed: Koa's body pipeline reports a premature
+// close, a write to the dead socket fails with EPIPE, a client that reset it
+// leaves ECONNRESET.
+const HANG_UP_CODES = new Set([
+  'ERR_STREAM_PREMATURE_CLOSE',
+  'EPIPE',
+  'ECONNRESET',
+]);
 
 /**
  * Whether a thrown value is what a client hanging up leaves behind. Only

@@ -241,7 +241,7 @@ test('isHangUp: a dead client socket, not other failures', () => {
 
   assert.equal(isHangUp(thrown('EPIPE')), true);
   assert.equal(isHangUp(thrown('ERR_STREAM_PREMATURE_CLOSE')), true);
-  assert.equal(isHangUp(thrown('ECONNRESET')), false);
+  assert.equal(isHangUp(thrown('ECONNRESET')), true);
   assert.equal(isHangUp(thrown('ENOENT')), false);
   assert.equal(isHangUp(new Error('no code')), false);
   assert.equal(isHangUp(null), false);
