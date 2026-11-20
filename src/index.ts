@@ -34,6 +34,7 @@ import { attachOsmGpxHandlers } from './routers/osmGpxHandler.js';
 import { placesRouter } from './routers/places/index.js';
 import { attachStravaHandlers } from './routers/stravaHandler.js';
 import { tracklogsRouter } from './routers/tracklogs/index.js';
+import { weatherRouter } from './routers/weather/index.js';
 import { attachWmsProxyHandler } from './routers/wmsProxyHandler.js';
 import { attachWmsTileHandler } from './routers/wmsTileHandler.js';
 import { startSocketDeviceTracking } from './socketDeviceTracking.js';
@@ -239,6 +240,8 @@ router.use(
 
 router.use('/places', placesRouter.routes(), placesRouter.allowedMethods());
 
+router.use('/weather', weatherRouter.routes(), weatherRouter.allowedMethods());
+
 router.use(
   '/mail-watch',
   mailWatchRouter.routes(),
@@ -291,6 +294,7 @@ router.get('/documentation', (ctx) => {
       },
       { name: 'offline-maps', description: 'Offline map tile packages' },
       { name: 'strava', description: 'Strava activity import' },
+      { name: 'weather', description: 'Weather forecast' },
     ],
     paths,
   });
