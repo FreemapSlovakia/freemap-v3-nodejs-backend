@@ -108,6 +108,9 @@ export const ForecastSchema = z
       .meta({
         description: 'by UTC day; null in a polar day or night',
       }),
+    timeZone: z.string().nullable().meta({
+      description: "the place's IANA time zone, to show its times in",
+    }),
     attribution: z.strictObject({ name: z.string(), url: z.string() }),
   })
   .meta({ id: 'Forecast' });
@@ -297,6 +300,7 @@ export function forecastOfOpenMeteo(
   om: OpenMeteoResponse,
   elevation: number | null,
   now: number,
+  timeZone: string | null,
 ): Forecast {
   const h = om.hourly;
 
@@ -393,6 +397,7 @@ export function forecastOfOpenMeteo(
         ? { sunrise: null, sunset: null }
         : { sunrise: isoOfUnix(rise), sunset: isoOfUnix(set) };
     }),
+    timeZone,
     // The data's CC BY 4.0 asks for the credit and the licence.
     attribution: {
       name: 'Open-Meteo (CC BY 4.0)',

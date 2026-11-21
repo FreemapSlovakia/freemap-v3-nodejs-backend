@@ -7,6 +7,7 @@ import {
   type OpenMeteoResponse,
   weatherOfWmoCode,
 } from './forecast.js';
+import { timeZoneOf } from './timeZone.js';
 
 const T0 = Date.parse('2026-11-20T09:00:00Z');
 
@@ -92,6 +93,7 @@ test("a step's sums come from the next hour, its instants from its own", () => {
     }),
     1500,
     T0,
+    null,
   );
 
   assert.deepEqual(
@@ -122,6 +124,7 @@ test("a bare sky is the step's own, as its cloud layers are", () => {
     }),
     null,
     T0,
+    null,
   ).steps;
 
   assert.equal(step?.weather.sky, 'cloudy');
@@ -138,6 +141,7 @@ test('rain and showers add up, snow apart', () => {
     }),
     null,
     T0,
+    null,
   ).steps;
 
   assert.deepEqual(
@@ -164,6 +168,7 @@ test('a polar night or day has no sunrise', () => {
     },
     null,
     T0,
+    null,
   );
 
   assert.deepEqual(forecast.sun, [
@@ -186,6 +191,7 @@ test('a trace of snow in rain is no sleet', () => {
     }),
     null,
     T0,
+    null,
   ).steps;
 
   assert.equal(step?.weather.precipitation?.type, 'rain');
@@ -196,6 +202,7 @@ test('past hours and hours beyond the models are left out', () => {
     response({ temperature_2m: [1, 2, null] }),
     null,
     T0 + 3_600_000,
+    null,
   );
 
   assert.deepEqual(
@@ -214,4 +221,27 @@ test('Europe is covered, the rest of the world is not', () => {
   assert.equal(inCoverage(40.71, -74.0), false);
 
   assert.equal(inCoverage(55.75, 37.62), false);
+});
+
+test("a place near a border gets its own country's offset", () => {
+  // Winter and summer, to tell DST rules apart.
+  const offsets = (zone: string | null) => {
+    assert.ok(zone);
+
+    return [T0, Date.parse('2026-07-01T09:00:00Z')].map((t) =>
+      new Intl.DateTimeFormat('en', {
+        timeZone: zone,
+        timeZoneName: 'shortOffset',
+      }).format(t),
+    );
+  };
+
+  // Nová Sedlica, next to Ukraine.
+  assert.deepEqual(
+    offsets(timeZoneOf(49.055, 22.515)),
+    offsets('Europe/Bratislava'),
+  );
+
+  // Medyka, next to Ukraine.
+  assert.deepEqual(offsets(timeZoneOf(49.8, 22.93)), offsets('Europe/Warsaw'));
 });

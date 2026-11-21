@@ -14,6 +14,7 @@ import {
   OPEN_METEO_HOURLY,
   OpenMeteoResponseSchema,
 } from './forecast.js';
+import { timeZoneOf } from './timeZone.js';
 
 // Our own Open-Meteo instance on fm5, which answers fm6 only.
 const OPEN_METEO_URL = getEnv(
@@ -219,6 +220,7 @@ async function refresh(
         OpenMeteoResponseSchema.parse(await res.json()),
         elevation,
         Date.now(),
+        timeZoneOf(lat, lon),
       ),
     );
   } catch (err) {
