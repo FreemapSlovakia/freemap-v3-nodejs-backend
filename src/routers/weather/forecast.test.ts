@@ -113,21 +113,33 @@ test("a step's sums come from the next hour, its instants from its own", () => {
   assert.equal(forecast.elevation, 1500);
 });
 
-test("a bare sky is the step's own, as its cloud layers are", () => {
-  // Overcast at 09:00 clearing by 10:00: the 09:00 step is overcast, though
-  // the code at 10:00 says clear.
+test('the cloud layers are those the code saw', () => {
+  // Overcast at 09:00 clearing by 10:00: the 09:00 step has the code at 10:00.
   const [step] = forecastOfOpenMeteo(
     response({
       temperature_2m: [1, 1, 1],
-      cloud_cover: [98, 0, 0],
-      weather_code: [3, 0, 0],
+      cloud_cover: [98, 40, 0],
+      cloud_cover_low: [98, 30, 0],
+      cloud_cover_mid: [90, 20, 0],
+      cloud_cover_high: [80, 10, 0],
+      weather_code: [3, 1, 0],
     }),
     null,
     T0,
     null,
   ).steps;
 
-  assert.equal(step?.weather.sky, 'cloudy');
+  assert.equal(step?.weather.sky, 'fair');
+
+  assert.deepEqual(
+    [
+      step?.cloudCover,
+      step?.cloudCoverLow,
+      step?.cloudCoverMid,
+      step?.cloudCoverHigh,
+    ],
+    [40, 30, 20, 10],
+  );
 });
 
 test('rain and showers add up, snow apart', () => {
