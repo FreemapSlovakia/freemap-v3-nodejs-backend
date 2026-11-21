@@ -41,21 +41,21 @@ export const ForecastStepSchema = z
       .number()
       .nullable()
       .meta({ description: 'degrees the wind blows from' }),
-    cloudCover: z
-      .number()
-      .meta({ description: "% at the period's end, as `weather` has it" }),
+    cloudCover: z.number().meta({
+      description: "% at `time`; a dry step's `weather` sky is by it",
+    }),
     cloudCoverLow: z
       .number()
       .nullable()
-      .meta({ description: "% below 3 km at the period's end" }),
+      .meta({ description: '% below 3 km at `time`' }),
     cloudCoverMid: z
       .number()
       .nullable()
-      .meta({ description: "% at 3–8 km at the period's end" }),
+      .meta({ description: '% at 3–8 km at `time`' }),
     cloudCoverHigh: z
       .number()
       .nullable()
-      .meta({ description: "% above 8 km at the period's end" }),
+      .meta({ description: '% above 8 km at `time`' }),
     precipitation: z.number().meta({ description: 'mm over the period' }),
     precipitationProbability: z
       .number()
@@ -294,6 +294,42 @@ function phaseOf(
       : 'rain';
 }
 
+/** WMO 0 clear to 3 overcast, by cloud cover in %. */
+function skyCode(cloudCover: number): number {
+  return cloudCover < 20 ? 0 : cloudCover < 50 ? 1 : cloudCover < 80 ? 2 : 3;
+}
+
+function isFogCode(code: number | null | undefined): boolean {
+  return code === 45 || code === 48;
+}
+
+/** A WMO code of the sky alone: clear to overcast, or fog. */
+function isSkyCode(code: number | null | undefined): boolean {
+  return code != null && (code <= 3 || isFogCode(code));
+}
+
+/**
+ * The step's picture: the sky at its start with the precipitation or thunder
+ * of its hour. The code at `next` has that hour's precipitation; the sky is
+ * fog by the code at the start, which is by the visibility then, else by the
+ * cloud cover there, with Open-Meteo's own thresholds.
+ */
+function stepCode(
+  startCode: number | null | undefined,
+  nextCode: number | null | undefined,
+  cloudCover: number | null | undefined,
+): number | null | undefined {
+  if (!isSkyCode(nextCode)) {
+    return nextCode;
+  }
+
+  if (isFogCode(startCode)) {
+    return startCode;
+  }
+
+  return cloudCover == null ? nextCode : skyCode(cloudCover);
+}
+
 function isoOfUnix(t: number | null | undefined): string | null {
   return t == null ? null : new Date(t * 1000).toISOString();
 }
@@ -325,11 +361,9 @@ export function forecastOfOpenMeteo(
 
     const windSpeed = h.wind_speed_10m[i];
 
-    // Open-Meteo's code weighs the hour's precipitation and the sky at its
-    // end, so the cloud layers are read there too, to agree with it.
-    const code = h.weather_code[next];
+    const cloudCover = h.cloud_cover[i];
 
-    const cloudCover = h.cloud_cover[next];
+    const code = stepCode(h.weather_code[i], h.weather_code[next], cloudCover);
 
     // Past the reach of every model.
     if (temperature == null || windSpeed == null || code == null) {
@@ -356,9 +390,9 @@ export function forecastOfOpenMeteo(
       windGust: h.wind_gusts_10m[next] ?? null,
       windDirection: h.wind_direction_10m[i] ?? null,
       cloudCover: cloudCover ?? 0,
-      cloudCoverLow: h.cloud_cover_low[next] ?? null,
-      cloudCoverMid: h.cloud_cover_mid[next] ?? null,
-      cloudCoverHigh: h.cloud_cover_high[next] ?? null,
+      cloudCoverLow: h.cloud_cover_low[i] ?? null,
+      cloudCoverMid: h.cloud_cover_mid[i] ?? null,
+      cloudCoverHigh: h.cloud_cover_high[i] ?? null,
       precipitation: h.precipitation[next] ?? 0,
       precipitationProbability: h.precipitation_probability[next] ?? null,
       rain,

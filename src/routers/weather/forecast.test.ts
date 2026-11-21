@@ -113,33 +113,62 @@ test("a step's sums come from the next hour, its instants from its own", () => {
   assert.equal(forecast.elevation, 1500);
 });
 
-test('the cloud layers are those the code saw', () => {
-  // Overcast at 09:00 clearing by 10:00: the 09:00 step has the code at 10:00.
-  const [step] = forecastOfOpenMeteo(
+test("the sky is at a step's start, the precipitation over its hour", () => {
+  // Overcast at 09:00 clearing by 10:00, then rain until 11:00.
+  const [dry, wet] = forecastOfOpenMeteo(
     response({
       temperature_2m: [1, 1, 1],
-      cloud_cover: [98, 40, 0],
-      cloud_cover_low: [98, 30, 0],
+      cloud_cover: [98, 40, 90],
+      cloud_cover_low: [98, 30, 90],
       cloud_cover_mid: [90, 20, 0],
       cloud_cover_high: [80, 10, 0],
-      weather_code: [3, 1, 0],
+      weather_code: [3, 1, 61],
     }),
     null,
     T0,
     null,
   ).steps;
 
-  assert.equal(step?.weather.sky, 'fair');
+  assert.equal(dry?.weather.sky, 'cloudy');
 
   assert.deepEqual(
     [
-      step?.cloudCover,
-      step?.cloudCoverLow,
-      step?.cloudCoverMid,
-      step?.cloudCoverHigh,
+      dry?.cloudCover,
+      dry?.cloudCoverLow,
+      dry?.cloudCoverMid,
+      dry?.cloudCoverHigh,
     ],
-    [40, 30, 20, 10],
+    [98, 98, 90, 80],
   );
+
+  assert.equal(wet?.weather.precipitation?.type, 'rain');
+
+  assert.equal(wet?.cloudCoverLow, 30);
+});
+
+test('a dry hour after rain has the sky of its clouds; fog is by code', () => {
+  // Rain until 09:00 under a closing sky, clear at 10:00; fog at 10:00.
+  const [afterRain] = forecastOfOpenMeteo(
+    response({
+      temperature_2m: [1, 1, 1],
+      cloud_cover: [95, 0, 0],
+      weather_code: [61, 0, 0],
+    }),
+    null,
+    T0,
+    null,
+  ).steps;
+
+  assert.equal(afterRain?.weather.sky, 'cloudy');
+
+  const [, fog] = forecastOfOpenMeteo(
+    response({ temperature_2m: [1, 1, 1], weather_code: [0, 45, 0] }),
+    null,
+    T0,
+    null,
+  ).steps;
+
+  assert.equal(fog?.weather.sky, 'fog');
 });
 
 test('rain and showers add up, snow apart', () => {
