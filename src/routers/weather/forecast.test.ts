@@ -122,6 +122,7 @@ test("the sky is at a step's start, the precipitation over its hour", () => {
       cloud_cover_low: [98, 30, 90],
       cloud_cover_mid: [90, 20, 0],
       cloud_cover_high: [80, 10, 0],
+      precipitation: [0, 0, 0.4],
       weather_code: [3, 1, 61],
     }),
     null,
@@ -178,6 +179,7 @@ test('rain and showers add up, snow apart', () => {
       rain: [0, 0.3, 0],
       showers: [0, 0.2, 0],
       snowfall: [0, 0.7, 0],
+      precipitation: [0, 1, 0],
       weather_code: [0, 61, 0],
     }),
     null,
@@ -228,6 +230,7 @@ test('a trace of snow in rain is no sleet', () => {
       temperature_2m: [0, 0, 0],
       rain: [0, 3, 0],
       snowfall: [0, 0.01, 0],
+      precipitation: [0, 3, 0],
       weather_code: [0, 63, 0],
     }),
     null,
@@ -236,6 +239,55 @@ test('a trace of snow in rain is no sleet', () => {
   ).steps;
 
   assert.equal(step?.weather.precipitation?.type, 'rain');
+});
+
+test('the picture follows the amount beside it', () => {
+  // A dry code over 2 mm of snow; a rain code over nothing; thunder over nothing.
+  const [snowing, dry] = forecastOfOpenMeteo(
+    response({
+      temperature_2m: [-2, -2, -2],
+      snowfall: [0, 1.4, 0],
+      precipitation: [0, 2, 0],
+      weather_code: [3, 3, 61],
+    }),
+    null,
+    T0,
+    null,
+  ).steps;
+
+  assert.deepEqual(snowing?.weather.precipitation, {
+    type: 'snow',
+    intensity: 'light',
+    showers: false,
+  });
+
+  assert.equal(dry?.weather.precipitation, null);
+
+  // A dry code over 8 mm of rain, and a rain code with no amount known.
+  const [pouring, unknown] = forecastOfOpenMeteo(
+    response({
+      temperature_2m: [9, 9, 9],
+      rain: [0, 8, 0],
+      precipitation: [0, 8, null],
+      weather_code: [3, 3, 61],
+    }),
+    null,
+    T0,
+    null,
+  ).steps;
+
+  assert.equal(pouring?.weather.precipitation?.intensity, 'heavy');
+
+  assert.equal(unknown?.weather.precipitation?.type, 'rain');
+
+  const [thunder] = forecastOfOpenMeteo(
+    response({ temperature_2m: [9, 9, 9], weather_code: [0, 95, 0] }),
+    null,
+    T0,
+    null,
+  ).steps;
+
+  assert.equal(thunder?.weather.thunder, true);
 });
 
 test('past hours and hours beyond the models are left out', () => {

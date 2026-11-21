@@ -313,21 +313,42 @@ function isSkyCode(code: number | null | undefined): boolean {
  * of its hour. The code at `next` has that hour's precipitation; the sky is
  * fog by the code at the start, which is by the visibility then, else by the
  * cloud cover there, with Open-Meteo's own thresholds.
+ *
+ * The code and the hour's `amount` (mm, in tenths) can come from different
+ * models, so whether it rains or snows follows the amount shown beside it,
+ * where known; thunder stays.
  */
 function stepCode(
   startCode: number | null | undefined,
   nextCode: number | null | undefined,
   cloudCover: number | null | undefined,
+  amount: number | null,
 ): number | null | undefined {
-  if (!isSkyCode(nextCode)) {
+  if (nextCode == null) {
     return nextCode;
+  }
+
+  const falls = amount === null ? !isSkyCode(nextCode) : amount > 0;
+
+  if (falls || nextCode >= 95) {
+    // The amounts' phase makes a rain code snow or sleet.
+    return isSkyCode(nextCode) ? rainCode(amount ?? 0) : nextCode;
   }
 
   if (isFogCode(startCode)) {
     return startCode;
   }
 
-  return cloudCover == null ? nextCode : skyCode(cloudCover);
+  return cloudCover != null
+    ? skyCode(cloudCover)
+    : isSkyCode(nextCode)
+      ? nextCode
+      : 3;
+}
+
+/** WMO slight, moderate or heavy rain by its rate in mm/h. */
+function rainCode(amount: number): number {
+  return amount < 2.5 ? 61 : amount < 7.6 ? 63 : 65;
 }
 
 function isoOfUnix(t: number | null | undefined): string | null {
@@ -363,7 +384,12 @@ export function forecastOfOpenMeteo(
 
     const cloudCover = h.cloud_cover[i];
 
-    const code = stepCode(h.weather_code[i], h.weather_code[next], cloudCover);
+    const code = stepCode(
+      h.weather_code[i],
+      h.weather_code[next],
+      cloudCover,
+      h.precipitation[next] ?? null,
+    );
 
     // Past the reach of every model.
     if (temperature == null || windSpeed == null || code == null) {
