@@ -34,9 +34,10 @@ const TTL_MS = 30 * 60_000;
 
 /**
  * How long a failing Open-Meteo is left alone. Short: a failure is mostly a
- * stall while it reloads files its sync rewrote, which soon passes.
+ * stall while it reloads the files a new model run rewrote, which takes
+ * seconds; the web app asks again once after it (`Retry-After`).
  */
-const RETRY_MS = 15_000;
+const RETRY_MS = 5000;
 
 const ELEVATION_TIMEOUT_MS = 3000;
 
@@ -93,10 +94,19 @@ class UpstreamError extends Error {
   constructor(
     readonly status: number,
     message: string,
+    /** Seconds after which asking again may succeed; unset when it wouldn't. */
+    readonly retryAfter?: number,
   ) {
     super(message);
   }
 }
+
+/** What is left of the pause, in whole seconds. */
+function pauseLeft() {
+  return Math.max(1, Math.ceil((upstreamDownUntil - Date.now()) / 1000));
+}
+
+const QUEUE_RETRY_AFTER = Math.ceil(MAX_WAIT_MS / 1000);
 
 function store(key: string, entry: Entry) {
   cache.delete(key);
@@ -142,28 +152,37 @@ async function refresh(
   // A recent stale answer beats none whenever Open-Meteo or our own budget
   // fails us; it is kept a little longer, so a failing Open-Meteo isn't asked
   // again at once.
-  const failed = (status: number, err: unknown) => {
+  const failed = (status: number, err: unknown, retryAfter?: number) => {
     if (stale && Date.now() - stale.fetchedAt < STALE_MAX_MS) {
       log.warn({ err }, 'Open-Meteo forecast failed; serving the stale one');
 
       return store(key, { ...stale, expires: Date.now() + RETRY_MS });
     }
 
-    throw new UpstreamError(status, `Open-Meteo forecast failed: ${err}`);
+    throw new UpstreamError(
+      status,
+      `Open-Meteo forecast failed: ${err}`,
+      retryAfter,
+    );
   };
 
   const upstreamDown = (err: unknown) => {
-    upstreamDownUntil = Date.now() + RETRY_MS;
+    // Once per pause: a failure while paused neither logs nor extends it.
+    if (Date.now() >= upstreamDownUntil) {
+      log.warn({ err }, 'Open-Meteo failed; pausing it');
 
-    return failed(502, err);
+      upstreamDownUntil = Date.now() + RETRY_MS;
+    }
+
+    return failed(502, err, pauseLeft());
   };
 
   if (Date.now() < upstreamDownUntil) {
-    return failed(502, 'Open-Meteo failed a moment ago');
+    return failed(502, 'Open-Meteo failed a moment ago', pauseLeft());
   }
 
   if (queueFull()) {
-    return failed(503, 'too many forecast requests');
+    return failed(503, 'too many forecast requests', QUEUE_RETRY_AFTER);
   }
 
   // Before the turn upstream, so a slow lookup doesn't spend it. A missing
@@ -174,7 +193,12 @@ async function refresh(
       : await terrainElevation(lat, lon, log);
 
   if (!(await upstreamTurn())) {
-    return failed(503, 'too many forecast requests');
+    return failed(503, 'too many forecast requests', QUEUE_RETRY_AFTER);
+  }
+
+  // Again: a pause may have begun while this one waited for its turn.
+  if (Date.now() < upstreamDownUntil) {
+    return failed(502, 'Open-Meteo failed a moment ago', pauseLeft());
   }
 
   const url = new URL(OPEN_METEO_URL);
@@ -325,6 +349,13 @@ router.get('/forecast', acceptValidator('application/json'), async (ctx) => {
       ctx.status = err.status;
 
       ctx.set('Cache-Control', 'no-store');
+
+      // The web app asks again once, after it; exposed, as it reads it cross-origin.
+      if (err.retryAfter !== undefined) {
+        ctx.set('Retry-After', String(err.retryAfter));
+
+        ctx.set('Access-Control-Expose-Headers', 'Retry-After');
+      }
 
       ctx.body = err.message;
 
