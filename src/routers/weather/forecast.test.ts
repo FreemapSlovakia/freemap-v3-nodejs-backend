@@ -1,135 +1,201 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { forecastOfMet, weatherOfMetSymbol } from './forecast.js';
+import { inCoverage } from './coverage.js';
+import {
+  forecastOfOpenMeteo,
+  OPEN_METEO_HOURLY,
+  type OpenMeteoResponse,
+  weatherOfWmoCode,
+} from './forecast.js';
 
-test('plain skies keep their day or night', () => {
-  assert.deepEqual(weatherOfMetSymbol('partlycloudy_night'), {
+const T0 = Date.parse('2026-11-20T09:00:00Z');
+
+/** Three hours from T0, every variable 0 unless given. */
+function response(
+  values: Partial<
+    Record<(typeof OPEN_METEO_HOURLY)[number], (number | null)[]>
+  >,
+): OpenMeteoResponse {
+  const time = [0, 1, 2].map((h) => (T0 + h * 3_600_000) / 1000);
+
+  return {
+    elevation: 1000,
+    hourly: {
+      time,
+      ...Object.fromEntries(
+        OPEN_METEO_HOURLY.map((name) => [name, values[name] ?? [0, 0, 0]]),
+      ),
+    } as OpenMeteoResponse['hourly'],
+  };
+}
+
+test('clear and cloudy codes keep their day or night', () => {
+  assert.deepEqual(weatherOfWmoCode(2, false), {
     sky: 'partlyCloudy',
     precipitation: null,
     thunder: false,
     day: false,
   });
 
-  assert.equal(weatherOfMetSymbol('cloudy').day, true);
+  assert.equal(weatherOfWmoCode(45, true).sky, 'fog');
 });
 
 test('precipitation codes split into type, intensity, showers and thunder', () => {
-  assert.deepEqual(weatherOfMetSymbol('heavyrainshowersandthunder_day'), {
-    sky: 'partlyCloudy',
-    precipitation: { type: 'rain', intensity: 'heavy', showers: true },
-    thunder: true,
-    day: true,
+  assert.deepEqual(weatherOfWmoCode(82, true).precipitation, {
+    type: 'rain',
+    intensity: 'heavy',
+    showers: true,
   });
 
-  assert.deepEqual(weatherOfMetSymbol('snow').precipitation, {
+  assert.deepEqual(weatherOfWmoCode(73, true).precipitation, {
     type: 'snow',
     intensity: 'moderate',
     showers: false,
   });
+
+  assert.equal(weatherOfWmoCode(99, true).thunder, true);
 });
 
-test('a step reaches the next instant, whatever the spacing', () => {
-  const instant = {
-    details: { air_temperature: 1, wind_speed: 2, cloud_area_fraction: 50 },
-  };
-
-  const period = (mm: number) => ({
-    summary: { symbol_code: 'rain' },
-    details: { precipitation_amount: mm },
-  });
-
-  const forecast = forecastOfMet(
-    {
-      properties: {
-        meta: { updated_at: '2026-11-20T09:00:00Z' },
-        timeseries: [
-          // 3 hours on: half the 6-hour period.
-          {
-            time: '2026-11-20T09:00:00Z',
-            data: { instant, next_1_hours: period(1), next_6_hours: period(6) },
-          },
-          // No hourly period an hour before the next: a sixth of it.
-          {
-            time: '2026-11-20T12:00:00Z',
-            data: { instant, next_6_hours: period(6) },
-          },
-          {
-            time: '2026-11-20T13:00:00Z',
-            data: { instant, next_6_hours: period(6) },
-          },
-        ],
-      },
-    },
-    null,
+test('the amounts say what falls, whatever the code', () => {
+  assert.equal(
+    weatherOfWmoCode(61, true, 'sleet').precipitation?.type,
+    'sleet',
   );
 
+  assert.equal(
+    weatherOfWmoCode(71, true, 'sleet').precipitation?.type,
+    'sleet',
+  );
+
+  // Thundersnow.
   assert.deepEqual(
-    forecast.steps.map((s) => [s.hours, s.precipitation]),
     [
-      [3, 3],
-      [1, 1],
-      [6, 6],
+      weatherOfWmoCode(95, true, 'snow').precipitation?.type,
+      weatherOfWmoCode(95, true, 'snow').thunder,
     ],
+    ['snow', true],
   );
+
+  // Freezing rain stays sleet.
+  assert.equal(weatherOfWmoCode(66, true, 'rain').precipitation?.type, 'sleet');
 });
 
-test("MET's double-s misspelling is read as light", () => {
-  assert.deepEqual(
-    weatherOfMetSymbol('lightssleetshowersandthunder_night').precipitation,
-    { type: 'sleet', intensity: 'light', showers: true },
-  );
-});
-
-test('hourly steps, the last of them 6-hourly, and the trailing instant dropped', () => {
-  const instant = {
-    details: { air_temperature: 1, wind_speed: 2, cloud_area_fraction: 50 },
-  };
-
-  const period = (code: string, mm: number) => ({
-    summary: { symbol_code: code },
-    details: { precipitation_amount: mm },
-  });
-
-  const forecast = forecastOfMet(
-    {
-      properties: {
-        meta: { updated_at: '2026-11-20T09:00:00Z' },
-        timeseries: [
-          {
-            time: '2026-11-20T09:00:00Z',
-            data: {
-              instant,
-              next_1_hours: period('rain', 0.3),
-              next_6_hours: period('rain', 2),
-            },
-          },
-          {
-            time: '2026-11-20T10:00:00Z',
-            data: {
-              instant,
-              next_1_hours: period('cloudy', 0),
-              next_6_hours: period('lightrain', 1.5),
-            },
-          },
-          {
-            time: '2026-11-20T16:00:00Z',
-            data: { instant, next_6_hours: period('fog', 0) },
-          },
-          { time: '2026-11-20T22:00:00Z', data: { instant } },
-        ],
-      },
-    },
+test("a step's sums come from the next hour, its instants from its own", () => {
+  const forecast = forecastOfOpenMeteo(
+    response({
+      temperature_2m: [1, 2, 3],
+      precipitation: [9, 0.4, 0.2],
+      weather_code: [0, 61, 71],
+      snow_depth: [0.12, 0.13, 0.14],
+      sunshine_duration: [0, 1800, 3600],
+      is_day: [1, 1, 1],
+    }),
     1500,
+    T0,
   );
 
   assert.deepEqual(
-    forecast.steps.map((s) => [s.hours, s.precipitation, s.weather.sky]),
+    forecast.steps.map((s) => [
+      s.temperature,
+      s.precipitation,
+      s.weather.precipitation?.type,
+      s.snowDepth,
+      s.sunshine,
+    ]),
     [
-      [1, 0.3, 'cloudy'],
-      [6, 1.5, 'cloudy'],
-      [6, 0, 'fog'],
+      [1, 0.4, 'rain', 12, 30],
+      [2, 0.2, 'snow', 13, 60],
     ],
   );
 
   assert.equal(forecast.elevation, 1500);
+});
+
+test('rain and showers add up, snow apart', () => {
+  const [step] = forecastOfOpenMeteo(
+    response({
+      temperature_2m: [0, 0, 0],
+      rain: [0, 0.3, 0],
+      showers: [0, 0.2, 0],
+      snowfall: [0, 0.7, 0],
+      weather_code: [0, 61, 0],
+    }),
+    null,
+    T0,
+  ).steps;
+
+  assert.deepEqual(
+    [step?.rain, step?.snowfall, step?.weather.precipitation?.type],
+    [0.5, 0.7, 'sleet'],
+  );
+});
+
+test('a polar night or day has no sunrise', () => {
+  const om = response({});
+
+  const day = T0 / 1000;
+
+  const forecast = forecastOfOpenMeteo(
+    {
+      ...om,
+      daily: {
+        time: [day, day + 86_400, day + 172_800],
+        // Night: both at its start; day: from its start to the next; then a
+        // plain day.
+        sunrise: [day, day + 86_400, day + 172_800 + 21_600],
+        sunset: [day, day + 172_800, day + 172_800 + 54_000],
+      },
+    },
+    null,
+    T0,
+  );
+
+  assert.deepEqual(forecast.sun, [
+    { sunrise: null, sunset: null },
+    { sunrise: null, sunset: null },
+    {
+      sunrise: '2026-11-22T15:00:00.000Z',
+      sunset: '2026-11-23T00:00:00.000Z',
+    },
+  ]);
+});
+
+test('a trace of snow in rain is no sleet', () => {
+  const [step] = forecastOfOpenMeteo(
+    response({
+      temperature_2m: [0, 0, 0],
+      rain: [0, 3, 0],
+      snowfall: [0, 0.01, 0],
+      weather_code: [0, 63, 0],
+    }),
+    null,
+    T0,
+  ).steps;
+
+  assert.equal(step?.weather.precipitation?.type, 'rain');
+});
+
+test('past hours and hours beyond the models are left out', () => {
+  const forecast = forecastOfOpenMeteo(
+    response({ temperature_2m: [1, 2, null] }),
+    null,
+    T0 + 3_600_000,
+  );
+
+  assert.deepEqual(
+    forecast.steps.map((s) => s.time),
+    ['2026-11-20T10:00:00.000Z'],
+  );
+
+  assert.equal(forecast.elevation, 1000);
+});
+
+test('Europe is covered, the rest of the world is not', () => {
+  assert.equal(inCoverage(48.94, 20.18), true);
+
+  assert.equal(inCoverage(64.15, -21.94), true);
+
+  assert.equal(inCoverage(40.71, -74.0), false);
+
+  assert.equal(inCoverage(55.75, 37.62), false);
 });

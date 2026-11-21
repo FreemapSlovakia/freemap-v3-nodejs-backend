@@ -2,67 +2,65 @@ import { setTimeout as sleep } from 'node:timers/promises';
 import Router from '@koa/router';
 import type { Logger } from 'pino';
 import z from 'zod';
+import { getEnv } from '../../env.js';
 import { registerPath } from '../../openapi.js';
 import { acceptValidator } from '../../requestValidators.js';
 import { resolveElevations } from '../geotools/elevation.js';
+import { inCoverage } from './coverage.js';
 import {
   ForecastSchema,
-  forecastOfMet,
-  MetResponseSchema,
+  forecastOfOpenMeteo,
+  OPEN_METEO_DAILY,
+  OPEN_METEO_HOURLY,
+  OpenMeteoResponseSchema,
 } from './forecast.js';
 
-// MET's terms: identify the app and a contact, keep below 20 requests/s, and
-// don't ask again before `Expires`; If-Modified-Since makes the repeat cheap.
-const MET_URL = 'https://api.met.no/weatherapi/locationforecast/2.0/complete';
+// Our own Open-Meteo instance on fm5, which answers fm6 only.
+const OPEN_METEO_URL = getEnv(
+  'OPEN_METEO_URL',
+  'https://weather.freemap.sk/v1/forecast',
+);
 
-const USER_AGENT = 'Freemap https://www.freemap.sk/ freemap@freemap.sk';
+const FORECAST_DAYS = 16;
 
-/** 10 requests/s, queued rather than refused, up to a wait of… */
-const UPSTREAM_INTERVAL_MS = 100;
+/** 50 requests/s, queued rather than refused, up to a wait of… */
+const UPSTREAM_INTERVAL_MS = 20;
 
 const MAX_WAIT_MS = 5000;
 
-const MIN_TTL_MS = 10 * 60_000;
+// The models are run every 1 to 6 hours.
+const TTL_MS = 30 * 60_000;
 
-const MAX_TTL_MS = 6 * 3_600_000;
-
-/** How long a failing MET is left alone. */
+/** How long a failing Open-Meteo is left alone. */
 const RETRY_MS = 60_000;
-
-/** How long a point MET refused isn't asked for again. */
-const REFUSED_MS = 10 * 60_000;
 
 const ELEVATION_TIMEOUT_MS = 3000;
 
-/** Older than this, a forecast is no answer even while MET fails. */
+/** Older than this, a forecast is no answer even while Open-Meteo fails. */
 const STALE_MAX_MS = 12 * 3_600_000;
 
-// A forecast's JSON is ~20 kB.
-const MAX_ENTRIES = 2000;
+// A forecast's JSON is ~200 kB; a miss costs our own Open-Meteo milliseconds.
+const MAX_ENTRIES = 500;
 
 type Entry = {
   /** The response, serialized once. */
   body: string;
   elevation: number | null;
-  /** When MET last gave or confirmed it. */
+  /** When Open-Meteo last gave it. */
   fetchedAt: number;
   expires: number;
-  lastModified: string | null;
 };
 
-// Keyed by the 3-decimal (~100 m) position MET is asked for; least recently
-// used first.
+// Keyed by the 3-decimal (~100 m) position Open-Meteo is asked for; least
+// recently used first.
 const cache = new Map<string, Entry>();
 
 const inFlight = new Map<string, Promise<Entry>>();
 
 let nextSlot = 0;
 
-/** Until when MET is not asked, after it failed; per point would retry per point. */
-let metDownUntil = 0;
-
-/** Points MET refused, until when they aren't asked for again. */
-const refused = new Map<string, number>();
+/** Until when Open-Meteo is not asked, after it failed; per point would retry per point. */
+let upstreamDownUntil = 0;
 
 function queueFull() {
   return nextSlot - Date.now() > MAX_WAIT_MS;
@@ -123,7 +121,7 @@ async function terrainElevation(
 
     return resolved == null ? null : Math.round(resolved);
   } catch (err) {
-    // Only adjusts the temperature; MET answers without it.
+    // Only adjusts the temperature; Open-Meteo answers without it.
     log.warn({ err }, 'no elevation for the forecast');
 
     return null;
@@ -137,30 +135,27 @@ async function refresh(
   stale: Entry | undefined,
   log: Pick<Logger, 'warn'>,
 ): Promise<Entry> {
-  // A recent stale answer beats none whenever MET or our own budget fails us;
-  // it is kept a little longer, so a failing MET isn't asked again at once.
+  // A recent stale answer beats none whenever Open-Meteo or our own budget
+  // fails us; it is kept a little longer, so a failing Open-Meteo isn't asked
+  // again at once.
   const failed = (status: number, err: unknown) => {
     if (stale && Date.now() - stale.fetchedAt < STALE_MAX_MS) {
-      log.warn({ err }, 'MET forecast failed; serving the stale one');
+      log.warn({ err }, 'Open-Meteo forecast failed; serving the stale one');
 
       return store(key, { ...stale, expires: Date.now() + RETRY_MS });
     }
 
-    throw new UpstreamError(status, `MET forecast failed: ${err}`);
+    throw new UpstreamError(status, `Open-Meteo forecast failed: ${err}`);
   };
 
-  const metDown = (err: unknown) => {
-    metDownUntil = Date.now() + RETRY_MS;
+  const upstreamDown = (err: unknown) => {
+    upstreamDownUntil = Date.now() + RETRY_MS;
 
     return failed(502, err);
   };
 
-  if (Date.now() < metDownUntil) {
-    return failed(502, 'MET failed a moment ago');
-  }
-
-  if ((refused.get(key) ?? 0) > Date.now()) {
-    return failed(502, 'MET refused this point a moment ago');
+  if (Date.now() < upstreamDownUntil) {
+    return failed(502, 'Open-Meteo failed a moment ago');
   }
 
   if (queueFull()) {
@@ -178,68 +173,57 @@ async function refresh(
     return failed(503, 'too many forecast requests');
   }
 
-  const url = new URL(MET_URL);
+  const url = new URL(OPEN_METEO_URL);
 
-  url.searchParams.set('lat', String(lat));
+  url.searchParams.set('latitude', String(lat));
 
-  url.searchParams.set('lon', String(lon));
+  url.searchParams.set('longitude', String(lon));
 
   if (elevation !== null) {
-    url.searchParams.set('altitude', String(elevation));
+    url.searchParams.set('elevation', String(elevation));
   }
 
-  const headers: Record<string, string> = { 'user-agent': USER_AGENT };
+  url.searchParams.set('hourly', OPEN_METEO_HOURLY.join(','));
 
-  // Not once a height was found since: the stored body was asked for without it.
-  if (stale?.lastModified && stale.elevation === elevation) {
-    headers['if-modified-since'] = stale.lastModified;
-  }
+  url.searchParams.set('daily', OPEN_METEO_DAILY.join(','));
+
+  url.searchParams.set('forecast_days', String(FORECAST_DAYS));
+
+  url.searchParams.set('timeformat', 'unixtime');
+
+  url.searchParams.set('wind_speed_unit', 'ms');
+
+  // Sunrise and sunset by the place's own days, as clients group days; the
+  // times themselves stay unix.
+  url.searchParams.set('timezone', 'auto');
 
   let res: Response;
 
   try {
-    res = await fetch(url, { headers, signal: AbortSignal.timeout(15_000) });
+    res = await fetch(url, { signal: AbortSignal.timeout(15_000) });
   } catch (err) {
-    return metDown(err);
+    return upstreamDown(err);
   }
 
-  const expiresAt = Date.parse(res.headers.get('expires') ?? '');
-
-  const expires = Math.min(
-    Date.now() + MAX_TTL_MS,
-    Math.max(Date.now() + MIN_TTL_MS, Number.isNaN(expiresAt) ? 0 : expiresAt),
-  );
-
-  if (res.status === 304 && stale) {
-    return store(key, { ...stale, expires, fetchedAt: Date.now() });
-  }
-
-  // 203 is MET's "deprecated product" warning, still with a body.
-  if (res.status !== 200 && res.status !== 203) {
+  if (res.status !== 200) {
     // Unread, the body would hold its connection.
     await res.body?.cancel();
 
-    // 403 is MET refusing us, not the point.
-    if (res.status >= 500 || res.status === 429 || res.status === 403) {
-      return metDown(res.status);
-    }
-
-    refused.delete(key);
-
-    refused.set(key, Date.now() + REFUSED_MS);
-
-    if (refused.size > MAX_ENTRIES) {
-      refused.delete(refused.keys().next().value!);
-    }
-
-    return failed(502, res.status);
+    // A refused request fails alone; an instance failing, for every point.
+    return res.status >= 400 && res.status < 500 && res.status !== 429
+      ? failed(502, res.status)
+      : upstreamDown(res.status);
   }
 
   let body: string;
 
   try {
     body = JSON.stringify(
-      forecastOfMet(MetResponseSchema.parse(await res.json()), elevation),
+      forecastOfOpenMeteo(
+        OpenMeteoResponseSchema.parse(await res.json()),
+        elevation,
+        Date.now(),
+      ),
     );
   } catch (err) {
     return failed(502, err);
@@ -249,8 +233,7 @@ async function refresh(
     body,
     elevation,
     fetchedAt: Date.now(),
-    expires,
-    lastModified: res.headers.get('last-modified'),
+    expires: Date.now() + TTL_MS,
   });
 }
 
@@ -295,14 +278,15 @@ const QuerySchema = z.object({
 
 registerPath('/weather/forecast', {
   get: {
-    summary: 'Weather forecast for a point',
+    summary: 'Weather forecast for a point in Europe',
     description:
-      'Hourly for about 2.5 days, then 6-hourly up to about 9 days. The point is rounded to 3 decimals and the temperature adjusted to its terrain elevation. Cached until the provider has a newer forecast.',
+      'Hourly for 16 days. The point is rounded to 3 decimals and the temperature adjusted to its terrain elevation. Cached for 30 minutes.',
     tags: ['weather'],
     requestParams: { query: QuerySchema },
     responses: {
       200: { content: { 'application/json': { schema: ForecastSchema } } },
       400: {},
+      404: { description: 'the point is outside Europe' },
       502: { description: 'the provider failed' },
       503: { description: 'too many forecasts asked for at once' },
     },
@@ -316,6 +300,18 @@ router.get('/forecast', acceptValidator('application/json'), async (ctx) => {
 
   if (!query.success) {
     return ctx.throw(400, query.error);
+  }
+
+  if (!inCoverage(query.data.lat, query.data.lon)) {
+    ctx.status = 404;
+
+    // Short: the region may grow.
+    ctx.set('Cache-Control', 'public, max-age=3600');
+
+    // The web app tells this 404 from others by "outside Europe".
+    ctx.body = 'no forecast outside Europe';
+
+    return;
   }
 
   let entry: Entry;
