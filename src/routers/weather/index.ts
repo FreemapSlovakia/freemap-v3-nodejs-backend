@@ -193,10 +193,6 @@ async function refresh(
 
   url.searchParams.set('wind_speed_unit', 'ms');
 
-  // Sunrise and sunset by the place's own days, as clients group days; the
-  // times themselves stay unix.
-  url.searchParams.set('timezone', 'auto');
-
   let res: Response;
 
   try {

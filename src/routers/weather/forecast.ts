@@ -106,7 +106,7 @@ export const ForecastSchema = z
       })
       .array()
       .meta({
-        description: "by the place's local day; null in a polar day or night",
+        description: 'by UTC day; null in a polar day or night',
       }),
     attribution: z.strictObject({ name: z.string(), url: z.string() }),
   })
@@ -280,6 +280,11 @@ function phaseOf(
       : 'rain';
 }
 
+/** WMO 0 clear to 3 overcast, by cloud cover in %. */
+function skyCode(cloudCover: number): number {
+  return cloudCover < 20 ? 0 : cloudCover < 50 ? 1 : cloudCover < 80 ? 2 : 3;
+}
+
 function isoOfUnix(t: number | null | undefined): string | null {
   return t == null ? null : new Date(t * 1000).toISOString();
 }
@@ -310,7 +315,17 @@ export function forecastOfOpenMeteo(
 
     const windSpeed = h.wind_speed_10m[i];
 
-    const code = h.weather_code[next];
+    // The code at `next` weighs the hour's precipitation but the sky only at
+    // its end; a bare sky is taken from the cloud cover at the step's start,
+    // as its cloud layers are, by Open-Meteo's own thresholds.
+    const nextCode = h.weather_code[next];
+
+    const cloudCover = h.cloud_cover[i];
+
+    const code =
+      nextCode != null && nextCode <= 3 && cloudCover != null
+        ? skyCode(cloudCover)
+        : nextCode;
 
     // Past the reach of every model.
     if (temperature == null || windSpeed == null || code == null) {
@@ -336,7 +351,7 @@ export function forecastOfOpenMeteo(
       windSpeed,
       windGust: h.wind_gusts_10m[next] ?? null,
       windDirection: h.wind_direction_10m[i] ?? null,
-      cloudCover: h.cloud_cover[i] ?? 0,
+      cloudCover: cloudCover ?? 0,
       cloudCoverLow: h.cloud_cover_low[i] ?? null,
       cloudCoverMid: h.cloud_cover_mid[i] ?? null,
       cloudCoverHigh: h.cloud_cover_high[i] ?? null,
