@@ -32,8 +32,11 @@ const MAX_WAIT_MS = 5000;
 // The models are run every 1 to 6 hours.
 const TTL_MS = 30 * 60_000;
 
-/** How long a failing Open-Meteo is left alone. */
-const RETRY_MS = 60_000;
+/**
+ * How long a failing Open-Meteo is left alone. Short: a failure is mostly a
+ * stall while it reloads files its sync rewrote, which soon passes.
+ */
+const RETRY_MS = 15_000;
 
 const ELEVATION_TIMEOUT_MS = 3000;
 
