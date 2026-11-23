@@ -1,3 +1,4 @@
+import { rename, rm } from 'node:fs/promises';
 import type { RouterInstance } from '@koa/router';
 import sql, { bulk, empty, join } from 'sql-template-tag';
 import z from 'zod';
@@ -5,8 +6,10 @@ import { authenticator } from '../../authenticator.js';
 import { runInTransaction } from '../../database.js';
 import { AUTH_REQUIRED, registerPath } from '../../openapi.js';
 import { isOwnerOrRole } from '../../roles.js';
+import { picturesDir } from './constants.js';
 import { LicenseSchema } from './licenses.js';
 import { galleryPictureId, PictureIdParamSchema } from './pictureId.js';
+import { RotationSchema, rotateJpeg } from './rotation.js';
 
 const BodySchema = z.strictObject({
   position: z.strictObject({
@@ -20,6 +23,7 @@ const BodySchema = z.strictObject({
   tags: z.array(z.string()).nullish(),
   premium: z.boolean().optional(),
   license: LicenseSchema.optional(),
+  rotation: RotationSchema.optional(),
 });
 
 export function attachPutPictureHandler(router: RouterInstance) {
@@ -72,11 +76,19 @@ export function attachPutPictureHandler(router: RouterInstance) {
         azimuth,
         premium,
         license,
+        rotation,
       } = body;
 
       await runInTransaction(async (conn) => {
-        const rows = await conn.query<{ userId: number; license: string }[]>(
-          sql`SELECT userId, license FROM picture WHERE id = ${id} FOR UPDATE`,
+        const rows = await conn.query<
+          {
+            userId: number;
+            license: string;
+            pathname: string;
+            pano: boolean;
+          }[]
+        >(
+          sql`SELECT userId, license, pathname, pano FROM picture WHERE id = ${id} FOR UPDATE`,
         );
 
         if (rows.length === 0) {
@@ -131,6 +143,21 @@ export function attachPutPictureHandler(router: RouterInstance) {
         }
 
         await Promise.all(queries);
+
+        // Last, and under the row lock, which serializes concurrent rotations;
+        // the new mtime changes the image's ETag.
+        // TODO: a PUT retried after a lost 204 turns the photo again.
+        if (rotation && !rows[0].pano) {
+          const path = `${picturesDir}/${rows[0].pathname}`;
+
+          try {
+            await rotateJpeg(path, `${path}.tmp`, rotation);
+
+            await rename(`${path}.tmp`, path);
+          } finally {
+            await rm(`${path}.tmp`, { force: true });
+          }
+        }
       });
 
       ctx.status = 204;

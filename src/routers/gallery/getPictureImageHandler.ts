@@ -92,6 +92,9 @@ export function attachGetPictureImageHandler(router: RouterInstance) {
 
       ctx.response.lastModified = stats.mtime;
 
+      // Revalidated by the ETag, as a rotation rewrites the file in place.
+      ctx.set('Cache-Control', 'no-cache');
+
       ctx.append('Vary', 'Width');
 
       ctx.type = 'image/jpeg';

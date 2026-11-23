@@ -1,5 +1,5 @@
 import { execFile } from 'node:child_process';
-import { mkdir } from 'node:fs/promises';
+import { mkdir, rename, rm } from 'node:fs/promises';
 import { dirname } from 'node:path';
 import { promisify } from 'node:util';
 import type { RouterInstance } from '@koa/router';
@@ -15,6 +15,7 @@ import { AUTH_REQUIRED, registerPath } from '../../openapi.js';
 import { acceptValidator } from '../../requestValidators.js';
 import { picturesDir } from '../../routers/gallery/constants.js';
 import { DEFAULT_PHOTO_LICENSE, LicenseSchema } from './licenses.js';
+import { RotationSchema, rotateJpeg } from './rotation.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -43,6 +44,7 @@ const MetaSchema = z.strictObject({
   premium: z.boolean().optional(),
   azimuth: z.number().min(0).lt(360).nullish(),
   license: LicenseSchema.default(DEFAULT_PHOTO_LICENSE),
+  rotation: RotationSchema.default(0),
 });
 
 const MultipartBodySchema = z.object({ meta: z.unknown() });
@@ -193,33 +195,11 @@ export function attachPostPictureHandler(router: RouterInstance) {
 
           await mkdir(dirname(outPath), { recursive: true });
 
-          // HEIF can't be processed by exiftran, so re-encode it to JPEG with
-          // ImageMagick (applying the EXIF orientation); JPEG is rotated
-          // losslessly by exiftran.
           let exif;
 
           try {
-            [exif] = await Promise.all([
-              ExifReader.load(image.filepath),
-
-              (await isHeifFile(image.filepath))
-                ? execFileAsync('convert', [
-                    image.filepath,
-                    '-auto-orient',
-                    '-quality',
-                    '85',
-                    outPath,
-                  ])
-                : execFileAsync('exiftran', [
-                    '-a',
-                    image.filepath,
-                    '-o',
-                    outPath,
-                  ]),
-            ]);
+            exif = await ExifReader.load(image.filepath);
           } catch {
-            // A malformed or unsupported upload (e.g. not a valid JPEG/HEIF)
-            // makes exiftran/convert fail; that's a client error, not a 500.
             return ctx.throw(400, 'invalid or unsupported image file');
           }
 
@@ -235,6 +215,46 @@ export function attachPostPictureHandler(router: RouterInstance) {
             exif.UsePanoramaViewer?.value === 'True' &&
             (projectionType === undefined ||
               projectionType === 'equirectangular');
+
+          // A pano is never turned sideways.
+          const rotation = pano ? 0 : meta.rotation;
+
+          // HEIF can't be processed by exiftran, so re-encode it to JPEG with
+          // ImageMagick (applying the EXIF orientation); JPEG is rotated
+          // losslessly by exiftran.
+          try {
+            if (await isHeifFile(image.filepath)) {
+              await execFileAsync('convert', [
+                image.filepath,
+                '-auto-orient',
+                ...(rotation ? ['-rotate', String(rotation)] : []),
+                '-quality',
+                '85',
+                outPath,
+              ]);
+            } else {
+              await execFileAsync('exiftran', [
+                '-a',
+                image.filepath,
+                '-o',
+                outPath,
+              ]);
+
+              if (rotation) {
+                await rotateJpeg(outPath, `${outPath}.tmp`, rotation);
+
+                await rename(`${outPath}.tmp`, outPath);
+              }
+            }
+          } catch {
+            await Promise.all(
+              [outPath, `${outPath}.tmp`].map((p) => rm(p, { force: true })),
+            );
+
+            // A malformed or unsupported upload (e.g. not a valid JPEG/HEIF)
+            // makes exiftran/convert fail; that's a client error, not a 500.
+            return ctx.throw(400, 'invalid or unsupported image file');
+          }
 
           const createdAt = new Date();
 
