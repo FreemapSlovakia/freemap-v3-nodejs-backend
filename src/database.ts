@@ -222,11 +222,14 @@ export async function initDatabase() {
 
     // `labeledAt` once tagLabeler has asked; a tag with no labels then shows
     // its name in every language. `labelAttempts`: its failed asks.
+    // `parentId`: the broader tag, set by hand; a filter on it finds this one.
     sql`CREATE TABLE IF NOT EXISTS tag (
       id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
       name VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL UNIQUE,
       labeledAt TIMESTAMP NULL,
-      labelAttempts TINYINT UNSIGNED NOT NULL DEFAULT 0
+      labelAttempts TINYINT UNSIGNED NOT NULL DEFAULT 0,
+      parentId INT UNSIGNED NULL,
+      CONSTRAINT tagParentFk FOREIGN KEY (parentId) REFERENCES tag (id) ON DELETE SET NULL
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
 
     // Only where the label differs from the tag's name.
@@ -237,6 +240,14 @@ export async function initDatabase() {
       PRIMARY KEY (tagId, language),
       INDEX tlLabelIdx (label),
       CONSTRAINT tlTagFk FOREIGN KEY (tagId) REFERENCES tag (id) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
+
+    // Other words for a tag, found like its name but never shown as a tag.
+    sql`CREATE TABLE IF NOT EXISTS tagSynonym (
+      synonym VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL PRIMARY KEY,
+      tagId INT UNSIGNED NOT NULL,
+      INDEX tsTagIdx (tagId),
+      CONSTRAINT tsTagFk FOREIGN KEY (tagId) REFERENCES tag (id) ON DELETE CASCADE
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
 
     sql`CREATE TABLE IF NOT EXISTS pictureTag (
@@ -722,6 +733,11 @@ export async function initDatabase() {
       'ALTER TABLE pictureTag ADD COLUMN IF NOT EXISTS tagId INT UNSIGNED NULL AFTER pictureId',
       'UPDATE pictureTag pt JOIN tag t ON t.name = pt.name SET pt.tagId = t.id',
       'ALTER TABLE pictureTag DROP PRIMARY KEY, DROP INDEX ptNameIdx, DROP COLUMN name, MODIFY COLUMN tagId INT UNSIGNED NOT NULL, ADD PRIMARY KEY (pictureId, tagId), ADD INDEX ptTagIdx (tagId), ADD CONSTRAINT ptTagFk FOREIGN KEY (tagId) REFERENCES tag (id) ON DELETE CASCADE',
+    ],
+
+    [
+      'ALTER TABLE tag ADD COLUMN IF NOT EXISTS parentId INT UNSIGNED NULL',
+      'ALTER TABLE tag ADD CONSTRAINT tagParentFk FOREIGN KEY IF NOT EXISTS (parentId) REFERENCES tag (id) ON DELETE SET NULL',
     ],
   ];
 

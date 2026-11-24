@@ -50,6 +50,8 @@ export const PRIVATE_PICTURE_IDS = raw(
   `SELECT pt.pictureId FROM pictureTag pt JOIN tag t ON t.id = pt.tagId WHERE t.name IN ('${PRIVATE_TAG}', '')`,
 );
 
+const MAX_TAG_DEPTH = 10;
+
 function cleanNames(names: string[] | null | undefined) {
   return [...new Set((names ?? []).map(oneLine))].filter(Boolean);
 }
@@ -70,22 +72,30 @@ export function tagFilterJoin(
     return empty;
   }
 
-  // Each value numbered, with the ids of its tags, by the indexes on tag.name
-  // and tagLabel.label: a name finds a tag by its name or a label in any
-  // language, so the English or Latin name of a Slovak tag finds it too.
+  // Each value numbered, with the ids of its tags: a name finds a tag by its
+  // name, a synonym or a label in any language, so the English or Latin name
+  // of a Slovak tag finds it too.
   const valueTags = join(
     [
       ...names.map(
         (n, i) =>
           // IN, not =: see PRIVATE_PICTURE_IDS.
-          sql`SELECT ${i} AS v, id FROM tag WHERE name IN (${n}, '') UNION ALL SELECT ${i}, tagId FROM tagLabel WHERE label = ${n}`,
+          sql`SELECT ${i} AS v, id FROM tag WHERE name IN (${n}, '')
+            UNION ALL SELECT ${i}, tagId FROM tagSynonym WHERE synonym IN (${n}, '')
+            UNION ALL SELECT ${i}, tagId FROM tagLabel WHERE label = ${n}`,
       ),
       ...ids.map((id, i) => sql`SELECT ${names.length + i} AS v, ${id} AS id`),
     ],
     ' UNION ALL ',
   );
 
-  const matching = sql`FROM pictureTag pt JOIN (${valueTags}) vt ON pt.tagId = vt.id`;
+  // With their narrower tags; the depth limit stops a cycle set by hand.
+  const matching = sql`FROM pictureTag pt JOIN (
+      WITH RECURSIVE vt AS (
+        SELECT v, id, 0 AS depth FROM (${valueTags}) roots
+        UNION ALL SELECT vt.v, t.id, vt.depth + 1 FROM vt JOIN tag t ON t.parentId = vt.id WHERE vt.depth < ${MAX_TAG_DEPTH}
+      ) SELECT DISTINCT v, id FROM vt
+    ) vt ON pt.tagId = vt.id`;
 
   // 'all': each value matched by some tag of the picture.
   return mode === 'any'
@@ -96,8 +106,9 @@ export function tagFilterJoin(
 
 /**
  * Sets a picture's tags to those `ids` that exist and `names`, creating the
- * names that are no tag's. Not by labels: a word of one language can be
- * another's label ("pole"); tagLabeler, seeing the photo, merges instead.
+ * names that are no tag's name or synonym. Not by labels: a word of one
+ * language can be another's label ("pole"); tagLabeler, seeing the photo,
+ * merges instead.
  */
 export async function setPictureTags(
   conn: PoolConnection,
@@ -128,7 +139,7 @@ export async function setPictureTags(
         await conn.query<unknown>(
           // Not locked: a locking read of a name not there yet takes a gap
           // lock, and two saves creating one tag deadlock.
-          sql`SELECT typedNames.typed, t.id AS tagged
+          sql`SELECT typedNames.typed, COALESCE(t.id, ts.tagId) AS tagged
             FROM (${join(
               names.map(
                 (n) =>
@@ -136,7 +147,8 @@ export async function setPictureTags(
               ),
               ' UNION ALL ',
             )}) typedNames
-            LEFT JOIN tag t ON t.name = typedNames.typed`,
+            LEFT JOIN tag t ON t.name = typedNames.typed
+            LEFT JOIN tagSynonym ts ON ts.synonym = typedNames.typed`,
         ),
       );
 
@@ -185,7 +197,8 @@ export async function setPictureTags(
   let tags = await lock();
 
   // A name whose tag was merged away since the lookup is created anew (and
-  // merged again by tagLabeler).
+  // merged again by tagLabeler). TODO a synonym so created shadows the one
+  // the merge moved.
   const vanished = [...namedIds].filter(
     ([id]) => !tags.some((t) => t.id === id),
   );
