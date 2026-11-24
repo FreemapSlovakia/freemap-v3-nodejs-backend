@@ -16,6 +16,7 @@ import { acceptValidator } from '../../requestValidators.js';
 import { picturesDir } from '../../routers/gallery/constants.js';
 import { DEFAULT_PHOTO_LICENSE, LicenseSchema } from './licenses.js';
 import { RotationSchema, rotateJpeg } from './rotation.js';
+import { setPictureTags } from './tags.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -40,7 +41,12 @@ const MetaSchema = z.strictObject({
   title: z.string().nullish(),
   description: z.string().nullish(),
   takenAt: z.iso.datetime().nullish(),
-  tags: z.array(z.string()).nullish(),
+  tags: z
+    .array(z.string().max(255))
+    .max(50)
+    .nullish()
+    .meta({ description: 'names of tags, created where new' }),
+  tagIds: z.array(z.uint32()).max(50).nullish(),
   premium: z.boolean().optional(),
   azimuth: z.number().min(0).lt(360).nullish(),
   license: LicenseSchema.default(DEFAULT_PHOTO_LICENSE),
@@ -181,6 +187,7 @@ export function attachPostPictureHandler(router: RouterInstance) {
             position: { lat, lon },
             azimuth,
             tags = [],
+            tagIds = [],
             premium,
             license,
           } = meta;
@@ -278,11 +285,7 @@ export function attachPostPictureHandler(router: RouterInstance) {
               sql`INSERT INTO pictureLicenseHistory (pictureId, license, changedAt) VALUES (${insertId}, ${license}, ${createdAt})`,
             );
 
-            if (tags?.length) {
-              await conn.query<unknown>(
-                sql`INSERT INTO pictureTag (name, pictureId) VALUES ${bulk(tags.map((tag) => [tag, insertId]))} ON DUPLICATE KEY UPDATE name = name`,
-              );
-            }
+            await setPictureTags(conn, insertId, tags, tagIds);
 
             return insertId;
           });

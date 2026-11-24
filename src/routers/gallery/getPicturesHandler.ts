@@ -22,6 +22,11 @@ import {
   ratingSubquery,
   wikimediaRatingSubquery,
 } from './ratingConstants.js';
+import {
+  PRIVATE_PICTURE_IDS,
+  TAG_NAMES_SUBQUERY,
+  tagFilterJoin,
+} from './tags.js';
 import { LICENSE_Q_MAP, licenseQIds } from './wikimediaLicense.js';
 
 const secret = getEnv('PREMIUM_PHOTO_SECRET', '');
@@ -51,7 +56,11 @@ const CommonQuerySchema = z.object({
   createdAtTo: z.iso.datetime().optional(),
   tag: z.preprocess(
     (v) => (Array.isArray(v) ? v : v ? [v] : undefined),
-    z.array(z.string().nonempty()).optional(),
+    z.array(z.string().trim().nonempty()).max(50).optional(),
+  ),
+  tagId: z.preprocess(
+    (v) => (Array.isArray(v) ? v : v ? [v] : undefined),
+    z.array(z.coerce.number().pipe(z.uint32())).max(50).optional(),
   ),
   tagMode: z.enum(['any', 'all']).default('any'),
   pano: booleanParam,
@@ -268,12 +277,14 @@ function toWireDate(
 // and drop them.
 function wikimediaExcludedByFilter(f: {
   tag?: string[];
+  tagId?: number[];
   userId?: number[];
   pano?: boolean;
   premium?: boolean;
 }): boolean {
   return (
     f.tag !== undefined ||
+    f.tagId !== undefined ||
     (f.userId?.length ?? 0) > 0 ||
     f.pano === true ||
     f.premium === true
@@ -361,6 +372,7 @@ async function byRadius(ctx: ParameterizedContext) {
   const {
     userId,
     tag,
+    tagId,
     tagMode,
     ratingFrom,
     ratingTo,
@@ -402,13 +414,7 @@ async function byRadius(ctx: ParameterizedContext) {
     ST_Distance_Sphere(location, POINT(${lon}, ${lat})) / 1000 AS distance
     ${ratingFrom !== undefined || ratingTo !== undefined ? sql`, ${raw(ratingSubquery)}` : empty}
     FROM picture
-    ${
-      tagArray.length > 0
-        ? tagMode === 'all'
-          ? sql`JOIN (SELECT pictureId FROM pictureTag WHERE name IN (${join(tagArray)}) GROUP BY pictureId HAVING COUNT(DISTINCT name) = ${tagArray.length}) AS pt ON pt.pictureId = picture.id`
-          : sql`JOIN (SELECT DISTINCT pictureId FROM pictureTag WHERE name IN (${join(tagArray)})) AS pt ON pt.pictureId = picture.id`
-        : empty
-    }
+    ${tagFilterJoin(tagArray, tagId ?? [], tagMode)}
     WHERE MBRContains(ST_GeomFromText(${`LINESTRING(${minLon} ${minLat}, ${maxLon} ${maxLat})`}, 4326), location)
     ${takenAtFrom ? sql`AND takenAt >= ${new Date(takenAtFrom)}` : empty}
     ${takenAtTo ? sql`AND takenAt <= ${new Date(takenAtTo)}` : empty}
@@ -421,7 +427,7 @@ async function byRadius(ctx: ParameterizedContext) {
     ${
       hasRole(ctx.state.user, 'galleryModerator')
         ? empty
-        : sql`AND (picture.id NOT IN (SELECT pictureId FROM pictureTag WHERE name = 'private') OR userId = ${myUserId})`
+        : sql`AND (picture.id NOT IN (${PRIVATE_PICTURE_IDS}) OR userId = ${myUserId})`
     }
     ${tagArray.length === 0 && tag !== undefined ? raw('AND picture.id NOT IN (SELECT pictureId FROM pictureTag)') : empty}
     HAVING distance <= ${distance}
@@ -481,6 +487,7 @@ async function byBbox(ctx: ParameterizedContext) {
     bbox: [minLon, minLat, maxLon, maxLat],
     userId,
     tag,
+    tagId,
     tagMode,
     ratingFrom,
     ratingTo,
@@ -526,9 +533,7 @@ async function byBbox(ctx: ParameterizedContext) {
   }
 
   if (fields?.includes('tags')) {
-    sqlFields.push(
-      "(SELECT GROUP_CONCAT(name SEPARATOR '\n') FROM pictureTag WHERE pictureId = picture.id) AS tags",
-    );
+    sqlFields.push(`${TAG_NAMES_SUBQUERY} AS tags`);
   }
 
   if (fields?.includes('user')) {
@@ -545,13 +550,7 @@ async function byBbox(ctx: ParameterizedContext) {
 
   const query = sql`SELECT ${raw(sqlFields.join(','))}
     FROM picture
-    ${
-      tagArray.length > 0
-        ? tagMode === 'all'
-          ? sql`JOIN (SELECT pictureId FROM pictureTag WHERE name IN (${join(tagArray)}) GROUP BY pictureId HAVING COUNT(DISTINCT name) = ${tagArray.length}) AS pt ON pt.pictureId = picture.id`
-          : sql`JOIN (SELECT DISTINCT pictureId FROM pictureTag WHERE name IN (${join(tagArray)})) AS pt ON pt.pictureId = picture.id`
-        : empty
-    }
+    ${tagFilterJoin(tagArray, tagId ?? [], tagMode)}
     WHERE MBRContains(ST_GeomFromText(${`LINESTRING(${minLon} ${minLat}, ${maxLon} ${maxLat})`}, 4326), location)
     ${takenAtFrom ? sql`AND takenAt >= ${new Date(takenAtFrom)}` : empty}
     ${takenAtTo ? sql`AND takenAt <= ${new Date(takenAtTo)}` : empty}
@@ -564,7 +563,7 @@ async function byBbox(ctx: ParameterizedContext) {
     ${
       hasRole(ctx.state.user, 'galleryModerator')
         ? empty
-        : sql`AND (picture.id NOT IN (SELECT pictureId FROM pictureTag WHERE name = 'private') OR userId = ${myUserId})`
+        : sql`AND (picture.id NOT IN (${PRIVATE_PICTURE_IDS}) OR userId = ${myUserId})`
     }
     ${tagArray.length === 0 && tag !== undefined ? raw('AND picture.id NOT IN (SELECT pictureId FROM pictureTag)') : empty}
     ${ratingFrom == null ? empty : sql`HAVING rating >= ${ratingFrom}`}
@@ -761,6 +760,7 @@ async function byOrder(ctx: ParameterizedContext) {
   const {
     userId,
     tag,
+    tagId,
     tagMode,
     ratingFrom,
     ratingTo,
@@ -791,7 +791,7 @@ async function byOrder(ctx: ParameterizedContext) {
   const wh = hasRole(ctx.state.user, 'galleryModerator')
     ? []
     : [
-        sql`(picture.id NOT IN (SELECT pictureId FROM pictureTag WHERE name = 'private') OR userId = ${myUserId})`,
+        sql`(picture.id NOT IN (${PRIVATE_PICTURE_IDS}) OR userId = ${myUserId})`,
       ];
 
   if (ratingFrom !== undefined) {
@@ -844,13 +844,7 @@ async function byOrder(ctx: ParameterizedContext) {
       : empty
   }
     FROM picture
-    ${
-      tagArray.length > 0
-        ? tagMode === 'all'
-          ? sql`JOIN (SELECT pictureId FROM pictureTag WHERE name IN (${join(tagArray)}) GROUP BY pictureId HAVING COUNT(DISTINCT name) = ${tagArray.length}) AS pt ON pt.pictureId = picture.id`
-          : sql`JOIN (SELECT DISTINCT pictureId FROM pictureTag WHERE name IN (${join(tagArray)})) AS pt ON pt.pictureId = picture.id`
-        : empty
-    }
+    ${tagFilterJoin(tagArray, tagId ?? [], tagMode)}
     ${wh.length ? sql`WHERE ${join(wh, ' AND ')}` : empty}
     ${hv.length ? sql`HAVING ${join(hv, ' AND ')}` : empty}
     ORDER BY ${

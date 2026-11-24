@@ -1,6 +1,6 @@
 import { rename, rm } from 'node:fs/promises';
 import type { RouterInstance } from '@koa/router';
-import sql, { bulk, empty, join } from 'sql-template-tag';
+import sql, { empty } from 'sql-template-tag';
 import z from 'zod';
 import { authenticator } from '../../authenticator.js';
 import { runInTransaction } from '../../database.js';
@@ -10,6 +10,7 @@ import { picturesDir } from './constants.js';
 import { LicenseSchema } from './licenses.js';
 import { galleryPictureId, PictureIdParamSchema } from './pictureId.js';
 import { RotationSchema, rotateJpeg } from './rotation.js';
+import { setPictureTags } from './tags.js';
 
 const BodySchema = z.strictObject({
   position: z.strictObject({
@@ -20,7 +21,12 @@ const BodySchema = z.strictObject({
   title: z.string().nullish(),
   description: z.string().nullish(),
   takenAt: z.iso.datetime().nullish(),
-  tags: z.array(z.string()).nullish(),
+  tags: z
+    .array(z.string().max(255))
+    .max(50)
+    .nullish()
+    .meta({ description: 'names of tags, created where new' }),
+  tagIds: z.array(z.uint32()).max(50).nullish(),
   premium: z.boolean().optional(),
   license: LicenseSchema.optional(),
   rotation: RotationSchema.optional(),
@@ -73,6 +79,7 @@ export function attachPutPictureHandler(router: RouterInstance) {
         takenAt,
         position: { lat, lon },
         tags = [],
+        tagIds = [],
         azimuth,
         premium,
         license,
@@ -116,12 +123,6 @@ export function attachPutPictureHandler(router: RouterInstance) {
             ${license === undefined ? empty : sql`, license = ${license}`}
             WHERE id = ${id}
         `),
-
-          // delete missing tags
-          conn.query<unknown>(
-            sql`DELETE FROM pictureTag WHERE pictureId = ${id}
-            ${tags?.length ? sql` AND name NOT IN (${join(tags)})` : empty}`,
-          ),
         ];
 
         if (licenseChanged) {
@@ -132,17 +133,11 @@ export function attachPutPictureHandler(router: RouterInstance) {
           );
         }
 
-        if (tags?.length) {
-          queries.push(
-            conn.query<unknown>(
-              sql`INSERT INTO pictureTag (name, pictureId)
-                  VALUES ${bulk(tags.map((tag: string) => [tag, id]))}
-                  ON DUPLICATE KEY UPDATE name = name`,
-            ),
-          );
-        }
-
         await Promise.all(queries);
+
+        // Not in the Promise.all: its queries run in turn, and a sibling's
+        // rejection would release the connection while they still run.
+        await setPictureTags(conn, id, tags, tagIds);
 
         // Last, and under the row lock, which serializes concurrent rotations;
         // the new mtime changes the image's ETag.

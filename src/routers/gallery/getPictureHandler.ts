@@ -16,6 +16,12 @@ import { zDateToIso, zNullableDateToIso } from '../../types.js';
 import { picturesDir } from './constants.js';
 import { PictureIdParamSchema, parsePictureId } from './pictureId.js';
 import { ratingExp, ratingSubquery } from './ratingConstants.js';
+import {
+  LangQuerySchema,
+  TAG_NAMES_SUBQUERY,
+  TagListSchema,
+  tagListSubquery,
+} from './tags.js';
 
 const secret = getEnv('PREMIUM_PHOTO_SECRET', '');
 
@@ -42,6 +48,12 @@ const PictureDbRowSchema = z.object({
     .nullable()
     .transform((t) => (t ? t.split('\n') : []))
     .pipe(z.array(z.string())),
+  // The driver parses the JSON where the server marks it so; NULL for a
+  // picture with no tags.
+  tagList: z.preprocess(
+    (t) => (typeof t === 'string' ? JSON.parse(t) : (t ?? [])),
+    TagListSchema,
+  ),
   rating: z.number(),
   myStars: z.number().nullish(),
   viewCount: z.number(),
@@ -87,6 +99,7 @@ export function attachGetPictureHandler(router: RouterInstance) {
             .describe(
               'Count this request as a view; omitted when re-fetching a shown picture',
             ),
+          lang: LangQuerySchema,
         }),
       },
       responses: {
@@ -139,7 +152,9 @@ export function attachGetPictureHandler(router: RouterInstance) {
               user.name,
               user.picture IS NOT NULL AS hasPicture,
               (user.premiumExpiration IS NOT NULL AND user.premiumExpiration > NOW()) AS userPremium,
-              (SELECT GROUP_CONCAT(name SEPARATOR '\n') FROM pictureTag WHERE pictureId = picture.id) AS tags, ${raw(ratingSubquery)}
+              ${raw(TAG_NAMES_SUBQUERY)} AS tags,
+              ${tagListSubquery(LangQuerySchema.catch(undefined).parse(ctx.query.lang) ?? '')} AS tagList,
+              ${raw(ratingSubquery)}
               ${
                 ctx.state.user
                   ? sql`, (SELECT stars FROM pictureRating WHERE pictureId = picture.id AND userId = ${ctx.state.user!.id}) AS myStars`
@@ -194,6 +209,7 @@ export function attachGetPictureHandler(router: RouterInstance) {
         hasPicture,
         userPremium,
         tags,
+        tagList,
         rating,
         myStars,
         pano,
@@ -230,6 +246,7 @@ export function attachGetPictureHandler(router: RouterInstance) {
                 premium: userPremium,
               },
         tags,
+        tagList,
         comments,
         rating,
         myStars,
@@ -300,6 +317,7 @@ async function respondWikimedia(
     lon: row.lon,
     createdAt: row.uploadedAt,
     tags: [],
+    tagList: [],
     comments,
     rating: row.rating,
     myStars: row.myStars ?? null,

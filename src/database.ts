@@ -220,12 +220,32 @@ export async function initDatabase() {
       SPATIAL INDEX picture_location_spx (location)
     ) ENGINE=InnoDB`,
 
+    // `labeledAt` once tagLabeler has asked; a tag with no labels then shows
+    // its name in every language. `labelAttempts`: its failed asks.
+    sql`CREATE TABLE IF NOT EXISTS tag (
+      id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+      name VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL UNIQUE,
+      labeledAt TIMESTAMP NULL,
+      labelAttempts TINYINT UNSIGNED NOT NULL DEFAULT 0
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
+
+    // Only where the label differs from the tag's name.
+    sql`CREATE TABLE IF NOT EXISTS tagLabel (
+      tagId INT UNSIGNED NOT NULL,
+      language CHAR(2) CHARSET ascii NOT NULL,
+      label VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+      PRIMARY KEY (tagId, language),
+      INDEX tlLabelIdx (label),
+      CONSTRAINT tlTagFk FOREIGN KEY (tagId) REFERENCES tag (id) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
+
     sql`CREATE TABLE IF NOT EXISTS pictureTag (
       pictureId INT UNSIGNED NOT NULL,
-      name VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
-      PRIMARY KEY (pictureId, name),
+      tagId INT UNSIGNED NOT NULL,
+      PRIMARY KEY (pictureId, tagId),
       FOREIGN KEY (pictureId) REFERENCES picture (id) ON DELETE CASCADE,
-      INDEX ptNameIdx (name)
+      INDEX ptTagIdx (tagId),
+      CONSTRAINT ptTagFk FOREIGN KEY (tagId) REFERENCES tag (id) ON DELETE CASCADE
     ) ENGINE=InnoDB`,
 
     sql`CREATE TABLE IF NOT EXISTS pictureComment (
@@ -599,10 +619,8 @@ export async function initDatabase() {
 
     // Columns that inherited utf8mb3 from those defaults, one statement per
     // table. Checked first: no value in a narrowed column holds a non-ASCII
-    // byte, and pictureTag's (pictureId, name) key has no pairs that collide
-    // under utf8mb4_unicode_ci.
+    // byte.
     'ALTER TABLE map MODIFY COLUMN name VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL',
-    'ALTER TABLE pictureTag MODIFY COLUMN name VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL',
     'ALTER TABLE trackingAccessToken MODIFY COLUMN listingLabel VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL, MODIFY COLUMN note VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL',
     'ALTER TABLE trackingDevice MODIFY COLUMN name VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL',
     'ALTER TABLE trackingPoint MODIFY COLUMN message VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL',
@@ -695,6 +713,16 @@ export async function initDatabase() {
 
     // Home locations into places; see places.ts.
     MIGRATE_HOMES_SQL,
+
+    // Tag names into `tag`. The first step fails once `pictureTag.name` is
+    // gone, which ends the chain. Marked labeled: their labels are imported
+    // separately, not asked of tagLabeler.
+    [
+      'INSERT INTO tag (name, labeledAt) SELECT name, NOW() FROM pictureTag GROUP BY name ON DUPLICATE KEY UPDATE id = id',
+      'ALTER TABLE pictureTag ADD COLUMN IF NOT EXISTS tagId INT UNSIGNED NULL AFTER pictureId',
+      'UPDATE pictureTag pt JOIN tag t ON t.name = pt.name SET pt.tagId = t.id',
+      'ALTER TABLE pictureTag DROP PRIMARY KEY, DROP INDEX ptNameIdx, DROP COLUMN name, MODIFY COLUMN tagId INT UNSIGNED NOT NULL, ADD PRIMARY KEY (pictureId, tagId), ADD INDEX ptTagIdx (tagId), ADD CONSTRAINT ptTagFk FOREIGN KEY (tagId) REFERENCES tag (id) ON DELETE CASCADE',
+    ],
   ];
 
   const db = await pool.getConnection();

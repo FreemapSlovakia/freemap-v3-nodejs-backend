@@ -38,11 +38,14 @@ import { weatherRouter } from './routers/weather/index.js';
 import { attachWmsProxyHandler } from './routers/wmsProxyHandler.js';
 import { attachWmsTileHandler } from './routers/wmsTileHandler.js';
 import { startSocketDeviceTracking } from './socketDeviceTracking.js';
+import { labelNewTags } from './tagLabeler.js';
 import { attachWs } from './ws.js';
 
 await initDatabase();
 
 startEventFilterMail();
+
+labelNewTags();
 
 const logger = appLogger.child({ module: 'app' });
 
