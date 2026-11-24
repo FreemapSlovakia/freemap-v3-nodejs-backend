@@ -222,15 +222,22 @@ export async function initDatabase() {
 
     // `labeledAt` once tagLabeler has asked; a tag with no labels then shows
     // its name in every language. `labelAttempts`: its failed asks.
-    // `parentId`: the broader tag, set by hand; a filter on it finds this one.
     sql`CREATE TABLE IF NOT EXISTS tag (
       id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
       name VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL UNIQUE,
       labeledAt TIMESTAMP NULL,
-      labelAttempts TINYINT UNSIGNED NOT NULL DEFAULT 0,
-      parentId INT UNSIGNED NULL,
-      CONSTRAINT tagParentFk FOREIGN KEY (parentId) REFERENCES tag (id) ON DELETE SET NULL
+      labelAttempts TINYINT UNSIGNED NOT NULL DEFAULT 0
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
+
+    // A tag's broader tags, set by hand; a filter on one finds this tag.
+    sql`CREATE TABLE IF NOT EXISTS tagParent (
+      tagId INT UNSIGNED NOT NULL,
+      parentId INT UNSIGNED NOT NULL,
+      PRIMARY KEY (tagId, parentId),
+      INDEX tpParentIdx (parentId),
+      CONSTRAINT tpTagFk FOREIGN KEY (tagId) REFERENCES tag (id) ON DELETE CASCADE,
+      CONSTRAINT tpParentFk FOREIGN KEY (parentId) REFERENCES tag (id) ON DELETE CASCADE
+    ) ENGINE=InnoDB`,
 
     // Only where the label differs from the tag's name.
     sql`CREATE TABLE IF NOT EXISTS tagLabel (
@@ -735,9 +742,10 @@ export async function initDatabase() {
       'ALTER TABLE pictureTag DROP PRIMARY KEY, DROP INDEX ptNameIdx, DROP COLUMN name, MODIFY COLUMN tagId INT UNSIGNED NOT NULL, ADD PRIMARY KEY (pictureId, tagId), ADD INDEX ptTagIdx (tagId), ADD CONSTRAINT ptTagFk FOREIGN KEY (tagId) REFERENCES tag (id) ON DELETE CASCADE',
     ],
 
+    // `tag.parentId` into `tagParent`; ends once the column is gone.
     [
-      'ALTER TABLE tag ADD COLUMN IF NOT EXISTS parentId INT UNSIGNED NULL',
-      'ALTER TABLE tag ADD CONSTRAINT tagParentFk FOREIGN KEY IF NOT EXISTS (parentId) REFERENCES tag (id) ON DELETE SET NULL',
+      'INSERT IGNORE INTO tagParent (tagId, parentId) SELECT id, parentId FROM tag WHERE parentId IS NOT NULL',
+      'ALTER TABLE tag DROP FOREIGN KEY IF EXISTS tagParentFk, DROP COLUMN IF EXISTS parentId',
     ],
   ];
 

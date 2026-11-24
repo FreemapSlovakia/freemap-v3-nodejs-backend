@@ -332,10 +332,15 @@ async function labelTag({ id, name, pathname }: z.infer<typeof TagRowSchema>) {
         sql`UPDATE tagSynonym SET tagId = ${other.id} WHERE tagId = ${id}`,
       );
 
-      // TODO the merged tag's own parent is dropped, and moving its children
-      // could close a cycle; a new tag rarely has either.
+      // Its broader and narrower tags pass on; IGNORE keeps links the target
+      // has already, which the delete then drops. TODO moving them could
+      // close a cycle; a new tag rarely has any.
       await conn.query<unknown>(
-        sql`UPDATE tag SET parentId = ${other.id} WHERE parentId = ${id} AND id <> ${other.id}`,
+        sql`UPDATE IGNORE tagParent SET tagId = ${other.id} WHERE tagId = ${id} AND parentId <> ${other.id}`,
+      );
+
+      await conn.query<unknown>(
+        sql`UPDATE IGNORE tagParent SET parentId = ${other.id} WHERE parentId = ${id} AND tagId <> ${other.id}`,
       );
 
       await conn.query<unknown>(sql`DELETE FROM tag WHERE id = ${id}`);

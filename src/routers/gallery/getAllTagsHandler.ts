@@ -12,15 +12,14 @@ const QuerySchema = z.object({ lang: LangQuerySchema });
 const TagSchema = z.strictObject({
   ...TagListSchema.element.shape,
   count: z.uint32().meta({ description: 'number of pictures with that tag' }),
-  parentId: z
-    .uint32()
-    .nullable()
-    .meta({ description: 'the broader tag; filtering by it finds this one' }),
 });
 
 const ResponseSchema = z.array(
   z.strictObject({
     ...TagSchema.shape,
+    parentIds: z.array(z.uint32()).meta({
+      description: 'the broader tags; filtering by one finds this one',
+    }),
     synonyms: z
       .array(z.string())
       .meta({ description: 'other words that find the tag' }),
@@ -28,7 +27,11 @@ const ResponseSchema = z.array(
 );
 
 const RowSchema = z.array(
-  z.strictObject({ ...TagSchema.shape, synonyms: z.string().nullable() }),
+  z.strictObject({
+    ...TagSchema.shape,
+    parentIds: z.string().nullable(),
+    synonyms: z.string().nullable(),
+  }),
 );
 
 export function attachGetAllTagsHandler(router: RouterInstance) {
@@ -53,14 +56,15 @@ export function attachGetAllTagsHandler(router: RouterInstance) {
       // broader tag without photos of its own is listed too, to filter by.
       const rows = RowSchema.parse(
         await pool.query<unknown>(
-          sql`SELECT t.id, t.name, tl.label, la.label AS latin, COALESCE(c.count, 0) AS count, t.parentId, s.synonyms
+          sql`SELECT t.id, t.name, tl.label, la.label AS latin, COALESCE(c.count, 0) AS count, p.parentIds, s.synonyms
             FROM tag t
             LEFT JOIN (SELECT tagId, COUNT(*) AS count FROM pictureTag GROUP BY tagId) c ON c.tagId = t.id
             LEFT JOIN tagLabel tl ON tl.tagId = t.id AND tl.language = ${lang ?? ''}
             LEFT JOIN tagLabel la ON la.tagId = t.id AND la.language = ${LATIN}
+            LEFT JOIN (SELECT tagId, GROUP_CONCAT(parentId ORDER BY parentId) AS parentIds FROM tagParent GROUP BY tagId) p ON p.tagId = t.id
             LEFT JOIN (SELECT tagId, GROUP_CONCAT(synonym ORDER BY synonym SEPARATOR '\n') AS synonyms
               FROM tagSynonym GROUP BY tagId) s ON s.tagId = t.id
-            WHERE c.count IS NOT NULL OR t.id IN (SELECT parentId FROM tag)
+            WHERE c.count IS NOT NULL OR t.id IN (SELECT parentId FROM tagParent)
             ORDER BY t.name`,
         ),
       );
@@ -68,6 +72,7 @@ export function attachGetAllTagsHandler(router: RouterInstance) {
       ctx.body = ResponseSchema.parse(
         rows.map((row) => ({
           ...row,
+          parentIds: row.parentIds ? row.parentIds.split(',').map(Number) : [],
           synonyms: row.synonyms ? row.synonyms.split('\n') : [],
         })),
       );

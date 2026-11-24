@@ -50,8 +50,6 @@ export const PRIVATE_PICTURE_IDS = raw(
   `SELECT pt.pictureId FROM pictureTag pt JOIN tag t ON t.id = pt.tagId WHERE t.name IN ('${PRIVATE_TAG}', '')`,
 );
 
-const MAX_TAG_DEPTH = 10;
-
 function cleanNames(names: string[] | null | undefined) {
   return [...new Set((names ?? []).map(oneLine))].filter(Boolean);
 }
@@ -89,12 +87,13 @@ export function tagFilterJoin(
     ' UNION ALL ',
   );
 
-  // With their narrower tags; the depth limit stops a cycle set by hand.
+  // With their narrower tags. UNION, not UNION ALL: a tag reached again (by
+  // another path, or a cycle set by hand) adds no row, which ends the walk.
   const matching = sql`FROM pictureTag pt JOIN (
       WITH RECURSIVE vt AS (
-        SELECT v, id, 0 AS depth FROM (${valueTags}) roots
-        UNION ALL SELECT vt.v, t.id, vt.depth + 1 FROM vt JOIN tag t ON t.parentId = vt.id WHERE vt.depth < ${MAX_TAG_DEPTH}
-      ) SELECT DISTINCT v, id FROM vt
+        SELECT v, id FROM (${valueTags}) roots
+        UNION SELECT vt.v, tp.tagId FROM vt JOIN tagParent tp ON tp.parentId = vt.id
+      ) SELECT v, id FROM vt
     ) vt ON pt.tagId = vt.id`;
 
   // 'all': each value matched by some tag of the picture.
