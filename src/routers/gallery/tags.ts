@@ -43,8 +43,11 @@ export function tagListSubquery(lang: string): Sql {
 }
 
 /** Pictures hidden from all but their author and moderators. */
+// IN, not =: MariaDB 11.8 fails a query scanning a spatial index whose
+// subquery reads a single row by a unique key ("Update locks cannot be
+// acquired during a READ UNCOMMITTED transaction"); a range read is fine.
 export const PRIVATE_PICTURE_IDS = raw(
-  `SELECT pt.pictureId FROM pictureTag pt JOIN tag t ON t.id = pt.tagId WHERE t.name = '${PRIVATE_TAG}'`,
+  `SELECT pt.pictureId FROM pictureTag pt JOIN tag t ON t.id = pt.tagId WHERE t.name IN ('${PRIVATE_TAG}', '')`,
 );
 
 function cleanNames(names: string[] | null | undefined) {
@@ -74,7 +77,8 @@ export function tagFilterJoin(
     [
       ...names.map(
         (n, i) =>
-          sql`SELECT ${i} AS v, id FROM tag WHERE name = ${n} UNION ALL SELECT ${i}, tagId FROM tagLabel WHERE label = ${n}`,
+          // IN, not =: see PRIVATE_PICTURE_IDS.
+          sql`SELECT ${i} AS v, id FROM tag WHERE name IN (${n}, '') UNION ALL SELECT ${i}, tagId FROM tagLabel WHERE label = ${n}`,
       ),
       ...ids.map((id, i) => sql`SELECT ${names.length + i} AS v, ${id} AS id`),
     ],
