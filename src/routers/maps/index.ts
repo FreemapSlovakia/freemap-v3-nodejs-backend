@@ -1,4 +1,5 @@
 import Router from '@koa/router';
+import { attachDeleteMapAccessHandler } from './deleteMapAccessHandler.js';
 import { attachDeleteMapHandler } from './deleteMapHandler.js';
 import { attachGetAllMapsHandler } from './getAllMapsHandler.js';
 import { attachGetMapHandler } from './getMapHandler.js';
@@ -9,6 +10,7 @@ import { attachPutMapTagsHandler } from './putMapTagsHandler.js';
 const router = new Router();
 
 attachDeleteMapHandler(router);
+attachDeleteMapAccessHandler(router);
 attachGetAllMapsHandler(router);
 attachGetMapHandler(router);
 attachPostMapHandler(router);
