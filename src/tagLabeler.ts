@@ -8,6 +8,7 @@
 import { join as joinPath } from 'node:path';
 import Anthropic from '@anthropic-ai/sdk';
 import { zodOutputFormat } from '@anthropic-ai/sdk/helpers/zod';
+import type { PoolConnection } from 'mariadb';
 import sharp from 'sharp';
 import sql, { bulk, join } from 'sql-template-tag';
 import z from 'zod';
@@ -230,6 +231,97 @@ async function photo(pathname: string | null) {
   }
 }
 
+const NamesSchema = z.array(z.object({ name: z.string() }));
+
+/**
+ * Puts a tag under the broader tags Claude chose: only names from the list,
+ * never one of its own narrower tags (a cycle), and of two chosen on one path
+ * only the lower ("cesta", not "doprava" beside it). Only the answer is
+ * weighed, not broader tags the tag may have already: a new tag rarely does.
+ */
+async function placeTag(
+  conn: PoolConnection,
+  id: number,
+  name: string,
+  answered: string[],
+  broaderTags: string[],
+) {
+  const below = new Set(
+    NamesSchema.parse(
+      await conn.query<unknown>(
+        sql`WITH RECURSIVE d AS (SELECT tagId AS id FROM tagParent WHERE parentId = ${id}
+            UNION SELECT tp.tagId FROM d JOIN tagParent tp ON tp.parentId = d.id)
+          SELECT t.name FROM d JOIN tag t ON t.id = d.id`,
+      ),
+    ).map((row) => row.name),
+  );
+
+  // Accents count: "pás" and "pas" are two words.
+  const chosen = [...new Set(answered)]
+    .filter(
+      (b) =>
+        broaderTags.includes(b) &&
+        !below.has(b) &&
+        b.localeCompare(name, 'sk', { sensitivity: 'accent' }) !== 0,
+    )
+    .slice(0, MAX_BROADER);
+
+  if (!chosen.length) {
+    return;
+  }
+
+  // Each chosen tag's ancestors; UNION stops at cycles.
+  const ancestry =
+    chosen.length > 1
+      ? z.array(z.object({ start: z.string(), ancestor: z.string() })).parse(
+          await conn.query<unknown>(
+            sql`WITH RECURSIVE anc AS (
+                SELECT t.id AS start, tp.parentId AS id FROM tag t JOIN tagParent tp ON tp.tagId = t.id WHERE t.name IN (${join(chosen)})
+                UNION SELECT anc.start, tp.parentId FROM anc JOIN tagParent tp ON tp.tagId = anc.id)
+              SELECT s.name AS start, a.name AS ancestor FROM anc JOIN tag s ON s.id = anc.start JOIN tag a ON a.id = anc.id`,
+          ),
+        )
+      : [];
+
+  // In turn, against those not dropped yet: of two on a cycle, one stays.
+  const dropped = new Set<string>();
+
+  for (const b of chosen) {
+    if (
+      chosen.some(
+        (c) =>
+          c !== b &&
+          !dropped.has(c) &&
+          ancestry.some((row) => row.start === c && row.ancestor === b),
+      )
+    ) {
+      dropped.add(b);
+    }
+  }
+
+  const { affectedRows } = await conn.query<{ affectedRows: number }>(
+    // The narrower tags again, as the statement locks them: one put under
+    // the tag meanwhile would close a cycle.
+    sql`INSERT IGNORE INTO tagParent (tagId, parentId)
+      SELECT ${id}, t.id FROM tag t WHERE t.name IN (${join(chosen.filter((b) => !dropped.has(b)))}) AND t.id <> ${id}
+        AND t.id NOT IN (
+          WITH RECURSIVE d AS (SELECT tagId AS id FROM tagParent WHERE parentId = ${id}
+            UNION SELECT tp.tagId FROM d JOIN tagParent tp ON tp.parentId = d.id)
+          SELECT id FROM d)`,
+  );
+
+  // TODO record placements like merges: a wrong one shows only in this log.
+  if (affectedRows) {
+    const parents = NamesSchema.parse(
+      await conn.query<unknown>(
+        sql`SELECT t.name FROM tagParent tp JOIN tag t ON t.id = tp.parentId WHERE tp.tagId = ${id} ORDER BY t.name`,
+      ),
+    ).map((row) => row.name);
+
+    logger.info(`Put tag "${name}" under "${parents.join('", "')}".`);
+  }
+}
+
 async function labelTag({ id, name, pathname }: z.infer<typeof TagRowSchema>) {
   const image = await photo(pathname);
 
@@ -406,30 +498,9 @@ async function labelTag({ id, name, pathname }: z.infer<typeof TagRowSchema>) {
       );
     }
 
-    // Only names from the list, and none of the tag's narrower tags, which
-    // would close a cycle. `private` stays out of the tree.
-    const broader = answer.broader
-      .filter(
-        (b) =>
-          broaderTags.includes(b) &&
-          b.localeCompare(fixed, 'sk', { sensitivity: 'base' }) !== 0,
-      )
-      .slice(0, MAX_BROADER);
-
-    if (broader.length && !rejected && !isSystemTag(fixed)) {
-      const { affectedRows } = await conn.query<{ affectedRows: number }>(
-        sql`INSERT IGNORE INTO tagParent (tagId, parentId)
-          SELECT ${id}, t.id FROM tag t WHERE t.name IN (${join(broader)}) AND t.id <> ${id}
-            AND t.id NOT IN (
-              WITH RECURSIVE d AS (SELECT tagId AS id FROM tagParent WHERE parentId = ${id}
-                UNION SELECT tp.tagId FROM d JOIN tagParent tp ON tp.parentId = d.id)
-              SELECT id FROM d)`,
-      );
-
-      // TODO record placements like merges: a wrong one shows only in this log.
-      if (affectedRows) {
-        logger.info(`Put tag "${fixed}" under "${broader.join('", "')}".`);
-      }
+    // `private` stays out of the tree.
+    if (answer.broader.length && !rejected && !isSystemTag(fixed)) {
+      await placeTag(conn, id, fixed, answer.broader, broaderTags);
     }
 
     await conn.query<unknown>(
