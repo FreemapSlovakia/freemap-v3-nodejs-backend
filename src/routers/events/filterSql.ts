@@ -133,12 +133,12 @@ export function withinEnd(
 
 /**
  * A saved filter as conditions on `e` and its owner `u`, as of `now`: what
- * has not ended, within its period if it has one.
+ * has not ended by `since`, within its period if it has one.
  */
-export function savedFilterSql(f: EventFilter, now: Date): Sql[] {
+export function savedFilterSql(f: EventFilter, now: Date, since = now): Sql[] {
   return [
     // As JS dates, not NOW(): the columns hold UTC, the session may not.
-    sql`${eventEndSql} >= ${now}`,
+    sql`${eventEndSql} >= ${since}`,
     ...(f.within ? [sql`e.startAt <= ${withinEnd(f.within, now)}`] : []),
     ...(f.near ? nearSql(f.near.lat, f.near.lon, f.near.radius) : []),
     ...attributesSql(f),

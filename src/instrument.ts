@@ -29,9 +29,32 @@ if (dsn) {
         return null;
       }
 
-      return event;
+      return scrubAuthToken(event);
     },
+    beforeSendTransaction: scrubAuthToken,
   });
+}
+
+// A calendar feed's token is long-lived; keep it out of reports.
+function scrubAuthToken<T extends Sentry.Event>(event: T): T {
+  const { request } = event;
+
+  if (request) {
+    const scrub = (s: string) =>
+      s.replace(/((?:^|[?&])authToken=)[^&]*/, '$1…');
+
+    if (typeof request.query_string === 'string') {
+      request.query_string = scrub(request.query_string);
+    } else if (request.query_string) {
+      request.query_string = undefined;
+    }
+
+    if (request.url) {
+      request.url = scrub(request.url);
+    }
+  }
+
+  return event;
 }
 
 export { Sentry };

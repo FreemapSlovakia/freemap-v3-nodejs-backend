@@ -1,4 +1,5 @@
 import Router from '@koa/router';
+import { attachCalendarHandlers } from './calendar.js';
 import { attachCommentHandlers } from './commentHandlers.js';
 import { attachEventCoverHandlers } from './coverHandlers.js';
 import { attachDeleteEventHandler } from './deleteEventHandler.js';
@@ -14,6 +15,8 @@ import { attachSourceHandler } from './sourceHandler.js';
 const router = new Router();
 
 attachGetEventsHandler(router);
+// Before `/:id`.
+attachCalendarHandlers(router);
 attachOrganizerHandlers(router);
 attachSourceHandler(router);
 attachEventCoverHandlers(router);

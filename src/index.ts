@@ -116,7 +116,8 @@ app.use(
         return {
           id: req.id,
           method: req.method,
-          url: req.url,
+          // A calendar feed's token is long-lived; keep it out of the logs.
+          url: req.url?.replace(/([?&]authToken=)[^&]*/, '$1…'),
           userAgent: req.headers['user-agent'],
         };
       },

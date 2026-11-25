@@ -17,6 +17,8 @@ export const AppTokenScopeSchema = z
     'maps:write',
     'events:read',
     'events:write',
+    // Only the calendar feed: its token sits in the URL a calendar app keeps.
+    'events:calendar',
     'tracking:read',
     'tracking:write',
     'tiles:outdoor',
