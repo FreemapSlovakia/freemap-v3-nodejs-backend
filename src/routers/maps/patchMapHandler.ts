@@ -1,5 +1,5 @@
 import type { RouterInstance } from '@koa/router';
-import sql, { bulk, empty } from 'sql-template-tag';
+import sql, { bulk, empty, join } from 'sql-template-tag';
 import z from 'zod';
 import { authenticator } from '../../authenticator.js';
 import { runInTransaction } from '../../database.js';
@@ -147,6 +147,12 @@ export function attachPatchMapHandler(router: RouterInstance) {
               sql`INSERT INTO mapWriteAccess (mapId, userId) VALUES ${bulk(writers.map((writer: number) => [id, writer]))}`,
             );
           }
+
+          // The map leaves a removed writer's list, and so do their tags.
+          await conn.query<unknown>(
+            sql`DELETE FROM mapTag WHERE mapId = ${id} AND userId <> ${item.userId}
+              ${writers.length ? sql`AND userId NOT IN (${join(writers)})` : empty}`,
+          );
         }
 
         ctx.body = MapMetaSchema.parse({

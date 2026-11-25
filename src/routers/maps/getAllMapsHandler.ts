@@ -16,6 +16,11 @@ const DbRowSchema = z.object({
     .nullable()
     .transform((w) => (w ? w.split(',').map(Number) : []))
     .pipe(z.number().array()),
+  ownerName: z.string(),
+  tags: z
+    .string()
+    .nullable()
+    .transform((t) => (t ? t.split('\n') : [])),
   createdAt: zDateToIso,
   modifiedAt: zDateToIso,
 });
@@ -24,7 +29,8 @@ export function attachGetAllMapsHandler(router: RouterInstance) {
   registerPath('/maps', {
     get: {
       tags: ['maps'],
-      summary: 'List all maps owned by the authenticated user',
+      summary:
+        'List the maps the authenticated user owns or may write, with their own tags',
       security: AUTH_REQUIRED,
       responses: {
         200: {
@@ -44,10 +50,17 @@ export function attachGetAllMapsHandler(router: RouterInstance) {
 
       const items = DbRowSchema.array().parse(
         await pool.query<unknown>(sql`
-          SELECT id, name, createdAt, modifiedAt, map.userId, GROUP_CONCAT(mapWriteAccess.userId) AS writers
-            FROM map LEFT JOIN mapWriteAccess ON (mapWriteAccess.mapId = id)
-            WHERE map.userId = ${user.id} AND NOT map.forEvent
-            GROUP BY id, name, createdAt, modifiedAt, map.userId
+          SELECT map.id, map.name, map.createdAt, map.modifiedAt, map.userId, user.name AS ownerName,
+              (SELECT GROUP_CONCAT(mwa.userId) FROM mapWriteAccess mwa WHERE mwa.mapId = map.id) AS writers,
+              (SELECT GROUP_CONCAT(mt.tag ORDER BY mt.tag SEPARATOR '\n') FROM mapTag mt WHERE mt.mapId = map.id AND mt.userId = ${user.id}) AS tags
+            -- A UNION, as an OR across the two would scan every map.
+            FROM (
+              SELECT id FROM map WHERE userId = ${user.id}
+              UNION SELECT mapId FROM mapWriteAccess WHERE userId = ${user.id}
+            ) mine
+            JOIN map ON map.id = mine.id
+            JOIN user ON user.id = map.userId
+            WHERE NOT map.forEvent
         `),
       );
 
@@ -60,7 +73,10 @@ export function attachGetAllMapsHandler(router: RouterInstance) {
           userId: item.userId,
           public: true,
           writers: item.userId === user.id ? item.writers : undefined,
-          canWrite: item.userId === user.id || item.writers.includes(user.id),
+          // Only maps the user owns or writes are listed.
+          canWrite: true,
+          tags: item.tags,
+          ownerName: item.ownerName,
         });
       });
     },

@@ -54,6 +54,7 @@ const SIMPLE_FK_TABLES = [
 const COMPOSITE_PK_TABLES = [
   'pictureRating',
   'mapWriteAccess',
+  'mapTag',
   'eventParticipant',
   'eventGoingNotified',
   'mailWatch',

@@ -259,6 +259,10 @@ export const MapMetaSchema = z
     forEvent: z.boolean().optional(),
     /** The event whose own map it is, written by whoever may write the event. */
     eventId: z.string().nullable().optional(),
+    /** The caller's own tags, in the list only. */
+    tags: z.array(z.string()).optional(),
+    /** In the list only. */
+    ownerName: z.string().optional(),
   })
   .meta({ id: 'MapMeta' });
 

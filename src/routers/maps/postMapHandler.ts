@@ -7,6 +7,7 @@ import { AUTH_REQUIRED, registerPath } from '../../openapi.js';
 import { nanoid } from '../../randomId.js';
 import { acceptValidator } from '../../requestValidators.js';
 import { MapMetaSchema } from '../../types.js';
+import { MapTagsSchema, setMapTags } from './tags.js';
 
 const BodySchema = z.strictObject({
   name: z.string().min(1).max(255),
@@ -18,6 +19,7 @@ const BodySchema = z.strictObject({
   writers: z.array(z.uint32()).optional(),
   // For an event to link as its own; see eventMap.ts.
   forEvent: z.boolean().optional(),
+  tags: MapTagsSchema.optional().meta({ description: "The caller's own" }),
 });
 
 export function attachPostMapHandler(router: RouterInstance) {
@@ -47,7 +49,7 @@ export function attachPostMapHandler(router: RouterInstance) {
         return ctx.throw(400, err as Error);
       }
 
-      const { name, data, writers, forEvent = false } = body;
+      const { name, data, writers, forEvent = false, tags } = body;
 
       const id = nanoid();
 
@@ -70,6 +72,10 @@ export function attachPostMapHandler(router: RouterInstance) {
         await pool.query<unknown>(
           sql`INSERT INTO mapWriteAccess (mapId, userId) VALUES ${bulk(writers.map((writer) => [id, writer]))}`,
         );
+      }
+
+      if (tags?.length && !forEvent) {
+        await setMapTags(pool, id, userId, tags);
       }
 
       ctx.body = MapMetaSchema.parse({

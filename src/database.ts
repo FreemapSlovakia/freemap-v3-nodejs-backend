@@ -415,6 +415,17 @@ export async function initDatabase() {
       CONSTRAINT mwaMapFk FOREIGN KEY (mapId) REFERENCES map (id) ON DELETE CASCADE
     ) ENGINE=InnoDB`,
 
+    // Each user's own labels for the maps in their list, seen by nobody else.
+    sql`CREATE TABLE IF NOT EXISTS mapTag (
+      mapId CHAR(8) CHARSET ascii NOT NULL,
+      userId INT UNSIGNED NOT NULL,
+      tag VARCHAR(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+      PRIMARY KEY (mapId, userId, tag),
+      INDEX mtUserIdx (userId),
+      CONSTRAINT mtUserFk FOREIGN KEY (userId) REFERENCES user (id) ON DELETE CASCADE,
+      CONSTRAINT mtMapFk FOREIGN KEY (mapId) REFERENCES map (id) ON DELETE CASCADE
+    ) ENGINE=InnoDB`,
+
     // A shared trip. It may link one of its owner's maps, and keeps a snapshot
     // of that map's trip stats for filtering; deleting the map only unlinks it.
     // Lat/lon columns rather than POINT, so a plain index serves the bbox filter.
