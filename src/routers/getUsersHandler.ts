@@ -6,7 +6,12 @@ import { registerPath } from '../openapi.js';
 import { acceptValidator } from '../requestValidators.js';
 
 const ResponseSchema = z.array(
-  z.strictObject({ id: z.uint32(), name: z.string() }),
+  z.strictObject({
+    id: z.uint32(),
+    name: z.string(),
+    hasPicture: z.coerce.boolean(),
+    premium: z.coerce.boolean(),
+  }),
 );
 
 export function attachGetUsers(router: RouterInstance) {
@@ -22,7 +27,11 @@ export function attachGetUsers(router: RouterInstance) {
 
   router.get('/users', acceptValidator('application/json'), async (ctx) => {
     ctx.body = ResponseSchema.parse(
-      await pool.query<unknown>(sql`SELECT id, name FROM user ORDER BY name`),
+      await pool.query<unknown>(sql`
+        SELECT id, name, picture IS NOT NULL AS hasPicture,
+            (premiumExpiration IS NOT NULL AND premiumExpiration > NOW()) AS premium
+          FROM user ORDER BY name
+      `),
     );
   });
 }

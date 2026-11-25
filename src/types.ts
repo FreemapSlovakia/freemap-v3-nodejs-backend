@@ -242,6 +242,13 @@ export const LoginResponseSchema = z
   })
   .meta({ id: 'LoginResponse' });
 
+export const MapUserSchema = z.strictObject({
+  id: z.uint32(),
+  name: z.string(),
+  hasPicture: z.coerce.boolean(),
+  premium: z.coerce.boolean(),
+});
+
 export const MapMetaSchema = z
   .strictObject({
     id: z.string().nonempty(),
@@ -262,7 +269,9 @@ export const MapMetaSchema = z
     /** The caller's own tags, in the list only. */
     tags: z.array(z.string()).optional(),
     /** In the list only. */
-    ownerName: z.string().optional(),
+    owner: MapUserSchema.optional(),
+    /** `writers` as users; in the list, to the owner only. */
+    editors: z.array(MapUserSchema).optional(),
   })
   .meta({ id: 'MapMeta' });
 
